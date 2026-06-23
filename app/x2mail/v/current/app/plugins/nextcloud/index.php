@@ -74,10 +74,10 @@ class NextcloudPlugin extends \X2Mail\Engine\Plugins\AbstractPlugin
 		// it is enabled in config, the user is currently logged in with OIDC,
 		// the current X2Mail account is the OIDC account and no account defined explicitly
 		if ($oAccount instanceof \X2Mail\Engine\Model\MainAccount
-		 && \OCP\Server::get(\OCA\X2Mail\Util\EngineHelper::class)->isOIDCLogin()
+		 && \OCP\Server::get(\OCA\SouveraMail\Util\EngineHelper::class)->isOIDCLogin()
 		 && \str_starts_with($oSettings->passphrase, 'oidc_login|')
 		) {
-			$sToken = \OCP\Server::get(\OCA\X2Mail\Util\EngineHelper::class)->getOidcAccessToken();
+			$sToken = \OCP\Server::get(\OCA\SouveraMail\Util\EngineHelper::class)->getOidcAccessToken();
 			if (!$sToken) {
 				return;
 			}

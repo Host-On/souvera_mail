@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Command;
+namespace OCA\SouveraMail\Command;
 
-use OCA\X2Mail\Service\DomainConfigService;
-use OCA\X2Mail\Service\LogService;
-use OCA\X2Mail\Util\EngineHelper;
+use OCA\SouveraMail\Service\DomainConfigService;
+use OCA\SouveraMail\Service\LogService;
+use OCA\SouveraMail\Util\EngineHelper;
 use Symfony\Component\Console\Command\Command;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
@@ -15,7 +15,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class Status extends Command
 {
-    private const APP_ID = 'x2mail';
+    private const APP_ID = 'souvera_mail';
 
     public function __construct(
         private IAppConfig $appConfig,
@@ -30,7 +30,7 @@ class Status extends Command
     protected function configure()
     {
         $this
-            ->setName('x2mail:status')
+            ->setName('souvera_mail:status')
             ->setDescription('Show Souvera Mail configuration status')
         ;
     }
@@ -153,8 +153,8 @@ class Status extends Command
         $output->writeln('<comment>Debug Log:</comment>');
         $debugEnabled = $this->logService->isEnabled();
         $output->writeln('  Status: ' . ($debugEnabled ? '<info>enabled</info>' : 'disabled'));
-        $output->writeln('  File: ' . $this->domainService->getDataPath() . '/x2mail.log');
-        $output->writeln('  Toggle: occ config:app:set x2mail debug_log --value=1|0');
+        $output->writeln('  File: ' . $this->domainService->getDataPath() . '/souvera_mail.log');
+        $output->writeln('  Toggle: occ config:app:set souvera_mail debug_log --value=1|0');
 
         $output->writeln('');
         $output->writeln('  Data path: ' . $this->domainService->getDataPath());

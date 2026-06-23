@@ -109,15 +109,15 @@
 <div class="section x2m-section x2m-section-info">
     <h2><?php p($l->t('Info')); ?></h2>
     <div class="x2m-info">
-        <img class="x2m-info-logo" src="<?php p(image_path('x2mail', 'logo-64x64.png')); ?>" alt="Souvera Mail">
+        <img class="x2m-info-logo" src="<?php p(image_path('souvera_mail', 'logo-64x64.png')); ?>" alt="Souvera Mail">
         <div class="x2m-info-meta">
             <div class="x2m-info-version"><?php p($_['x2mail_version']); ?></div>
             <div class="x2m-info-copy">2026 &copy; NK-IT Dev. <?php p($l->t('All rights reserved.')); ?></div>
             <a class="x2m-info-link"
-               href="https://github.com/NK-IT-CLOUD/x2mail"
+               href="https://github.com/PhiGi87/souvera_mail"
                target="_blank"
                rel="noopener noreferrer">
-                github.com/NK-IT-CLOUD/x2mail
+                github.com/PhiGi87/souvera_mail
             </a>
         </div>
     </div>

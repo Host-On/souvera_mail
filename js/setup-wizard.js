@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	if (!wizard) return;
 
 	const el = id => document.getElementById(id);
-	const baseUrl = OC.generateUrl('/apps/x2mail/setup');
+	const baseUrl = OC.generateUrl('/apps/souvera_mail/setup');
 
 	let wizardData = { domains: {}, oidc: {} };
 
@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		})
 		.catch(err => {
 			console.error('Setup wizard: failed to load config', err);
-			setStatus(t('x2mail', 'Failed to load configuration: {error}').replace('{error}', err.message), 'err');
+			setStatus(t('souvera_mail', 'Failed to load configuration: {error}').replace('{error}', err.message), 'err');
 		});
 	}
 
@@ -152,13 +152,13 @@ document.addEventListener('DOMContentLoaded', () => {
 		if (!vals.imap_host) {
 			results.style.display = 'block';
 			results.className = 'preflight-results error';
-			results.textContent = t('x2mail', 'IMAP host is required');
+			results.textContent = t('souvera_mail', 'IMAP host is required');
 			return;
 		}
 
 		results.style.display = 'block';
 		results.className = 'preflight-results running';
-		results.textContent = t('x2mail', 'Running checks...');
+		results.textContent = t('souvera_mail', 'Running checks...');
 
 		fetch(baseUrl + '/preflight', {
 			method: 'POST',
@@ -305,13 +305,13 @@ document.addEventListener('DOMContentLoaded', () => {
 		if (!vals.imap_host) {
 			results.style.display = 'block';
 			results.className = 'preflight-results error';
-			results.textContent = t('x2mail', 'IMAP host is required');
+			results.textContent = t('souvera_mail', 'IMAP host is required');
 			return;
 		}
 
 		results.style.display = 'block';
 		results.className = 'preflight-results running';
-		results.textContent = t('x2mail', 'Testing SSO mail login...');
+		results.textContent = t('souvera_mail', 'Testing SSO mail login...');
 
 		const body = new URLSearchParams({
 			imap_host: vals.imap_host,
@@ -413,10 +413,10 @@ document.addEventListener('DOMContentLoaded', () => {
 		e.preventDefault();
 		const vals = getFormValues();
 
-		if (!vals.domain) { setStatus(t('x2mail', 'Domain is required'), 'err'); return; }
-		if (!vals.imap_host) { setStatus(t('x2mail', 'IMAP host is required'), 'err'); return; }
+		if (!vals.domain) { setStatus(t('souvera_mail', 'Domain is required'), 'err'); return; }
+		if (!vals.imap_host) { setStatus(t('souvera_mail', 'IMAP host is required'), 'err'); return; }
 
-		setStatus(t('x2mail', 'Saving...'), '');
+		setStatus(t('souvera_mail', 'Saving...'), '');
 
 		fetch(baseUrl + '/save', {
 			method: 'POST',
@@ -431,12 +431,12 @@ document.addEventListener('DOMContentLoaded', () => {
 			.then(data => {
 				if (data.status === 'success') {
 					const message = data.cleanup_warnings?.length
-						? (data.message || t('x2mail', 'Saved')) + ' ' + t('x2mail', 'Some previous domains could not be removed automatically.')
-						: (data.message || t('x2mail', 'Saved'));
+						? (data.message || t('souvera_mail', 'Saved')) + ' ' + t('souvera_mail', 'Some previous domains could not be removed automatically.')
+						: (data.message || t('souvera_mail', 'Saved'));
 					setStatus(message, 'ok');
 					loadConfig();
 				} else {
-					setStatus(data.message || t('x2mail', 'Save failed'), 'err');
+					setStatus(data.message || t('souvera_mail', 'Save failed'), 'err');
 				}
 		})
 		.catch(err => {
@@ -449,11 +449,11 @@ document.addEventListener('DOMContentLoaded', () => {
 	el('wiz-delete-btn').addEventListener('click', e => {
 		e.preventDefault();
 		const domain = el('wiz-domain').value.trim();
-		if (!domain || !confirm(t('x2mail', 'Delete domain "{domain}"?').replace('{domain}', domain))) {
+		if (!domain || !confirm(t('souvera_mail', 'Delete domain "{domain}"?').replace('{domain}', domain))) {
 			return;
 		}
 
-		setStatus(t('x2mail', 'Deleting...'), '');
+		setStatus(t('souvera_mail', 'Deleting...'), '');
 
 		fetch(baseUrl + '/delete', {
 			method: 'POST',
@@ -467,10 +467,10 @@ document.addEventListener('DOMContentLoaded', () => {
 		.then(r => r.json())
 		.then(data => {
 			if (data.status === 'success') {
-				setStatus(data.message || t('x2mail', 'Deleted'), 'ok');
+				setStatus(data.message || t('souvera_mail', 'Deleted'), 'ok');
 				loadConfig();
 			} else {
-				setStatus(data.message || t('x2mail', 'Delete failed'), 'err');
+				setStatus(data.message || t('souvera_mail', 'Delete failed'), 'err');
 			}
 		})
 		.catch(err => {
@@ -513,7 +513,7 @@ function collectAdvancedSettingsBody() {
 		status.className = 'x2m-status';
 		status.textContent = '…';
 		try {
-			const resp = await fetch(OC.generateUrl('/apps/x2mail/setup') + '/admin-settings', {
+			const resp = await fetch(OC.generateUrl('/apps/souvera_mail/setup') + '/admin-settings', {
 				method: 'POST',
 				credentials: 'same-origin',
 				headers: {
@@ -525,7 +525,7 @@ function collectAdvancedSettingsBody() {
 			const data = await resp.json();
 			if (resp.ok) {
 				status.className = 'x2m-status ok';
-				status.textContent = '✓ ' + (window.t ? t('x2mail', 'Saved') : 'Saved');
+				status.textContent = '✓ ' + (window.t ? t('souvera_mail', 'Saved') : 'Saved');
 			} else {
 				status.className = 'x2m-status err';
 				status.textContent = '✗ ' + (data.error || 'Save failed');
@@ -547,7 +547,7 @@ function collectAdvancedSettingsBody() {
 		status.className = 'x2m-status';
 		status.textContent = '…';
 		try {
-			const resp = await fetch(OC.generateUrl('/apps/x2mail/setup') + '/admin-settings', {
+			const resp = await fetch(OC.generateUrl('/apps/souvera_mail/setup') + '/admin-settings', {
 				method: 'POST',
 				credentials: 'same-origin',
 				headers: {
@@ -559,7 +559,7 @@ function collectAdvancedSettingsBody() {
 			const data = await resp.json();
 			if (resp.ok) {
 				status.className = 'x2m-status ok';
-				status.textContent = '✓ ' + (window.t ? t('x2mail', 'Saved') : 'Saved');
+				status.textContent = '✓ ' + (window.t ? t('souvera_mail', 'Saved') : 'Saved');
 			} else {
 				status.className = 'x2m-status err';
 				status.textContent = '✗ ' + (data.error || 'Save failed');

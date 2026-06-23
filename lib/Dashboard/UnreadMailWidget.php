@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Dashboard;
+namespace OCA\SouveraMail\Dashboard;
 
-use OCA\X2Mail\Util\EngineHelper;
+use OCA\SouveraMail\Util\EngineHelper;
 use OCP\Dashboard\IAPIWidgetV2;
 use OCP\Dashboard\IIconWidget;
 use OCP\Dashboard\IReloadableWidget;
@@ -48,7 +48,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function getUrl(): ?string
     {
-        return $this->urlGenerator->getAbsoluteURL($this->urlGenerator->linkToRoute('x2mail.page.index'));
+        return $this->urlGenerator->getAbsoluteURL($this->urlGenerator->linkToRoute('souvera_mail.page.index'));
     }
 
     public function load(): void
@@ -58,7 +58,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
     /**
      * Refresh OIDC token before engine bootstrap.
      *
-     * TokenRefreshMiddleware only runs for x2mail controller requests.
+     * TokenRefreshMiddleware only runs for Souvera Mail controller requests.
      * Dashboard OCS API bypasses our middleware entirely (runs in dashboard app context).
      * We must refresh the token explicitly here.
      */
@@ -85,8 +85,8 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
             }
             if (!$oAccount) {
                 $this->logger->info(
-                    'X2Mail widget: no engine session — showing fallback',
-                    ['app' => 'x2mail']
+                    'Souvera Mail widget: no engine session — showing fallback',
+                    ['app' => 'souvera_mail']
                 );
                 return new WidgetItems([], $this->l10n->t('Open Souvera Mail to connect'));
             }
@@ -109,14 +109,14 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
             $MessageCollection = $oMailClient->MessageList($oParams);
 
             $items = [];
-            $baseURL = $this->urlGenerator->linkToRoute('x2mail.page.index') . '#';
+            $baseURL = $this->urlGenerator->linkToRoute('souvera_mail.page.index') . '#';
 
             foreach ($MessageCollection as $Message) {
                 $items[] = new WidgetItem(
                     $Message->From()->ToString(),
                     $Message->Subject(),
                     $baseURL . '/mailbox/INBOX/m' . $Message->Uid(),
-                    $this->urlGenerator->imagePath('x2mail', 'logo-64x64.png'),
+                    $this->urlGenerator->imagePath('souvera_mail', 'logo-64x64.png'),
                     $Message->ETag('')
                 );
             }
@@ -128,8 +128,8 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
             return new WidgetItems($items);
         } catch (\Throwable $e) {
             $this->logger->warning(
-                'X2Mail widget error: ' . $e->getMessage(),
-                ['app' => 'x2mail', 'exception' => $e]
+                'Souvera Mail widget error: ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
             );
             return new WidgetItems([], $this->l10n->t('Open Souvera Mail to connect'));
         }
@@ -142,6 +142,6 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function getIconUrl(): string
     {
-        return $this->urlGenerator->imagePath('x2mail', 'logo-64x64.png');
+        return $this->urlGenerator->imagePath('souvera_mail', 'logo-64x64.png');
     }
 }

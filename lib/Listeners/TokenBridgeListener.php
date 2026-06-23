@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Listeners;
+namespace OCA\SouveraMail\Listeners;
 
-use OCA\X2Mail\Service\LogService;
+use OCA\SouveraMail\Service\LogService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\ISession;
 use OCP\IUserSession;
 
 /**
- * Bridge user_oidc TokenObtainedEvent to X2Mail session keys.
+ * Bridge user_oidc TokenObtainedEvent to Souvera Mail session keys.
  *
  * IMPORTANT: Do NOT import any OCA\UserOIDC classes here.
  */
@@ -45,7 +45,7 @@ class TokenBridgeListener implements IEventListener
         $user = $this->userSession->getUser();
         $uid = $user ? $user->getUID() : null;
         if ($uid) {
-            $this->session->set('x2mail-uid', $uid);
+            $this->session->set('souvera_mail-uid', $uid);
         }
 
         $tokenLen = \strlen($accessToken);

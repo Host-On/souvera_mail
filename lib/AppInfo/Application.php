@@ -1,19 +1,19 @@
 <?php
 
-namespace OCA\X2Mail\AppInfo;
+namespace OCA\SouveraMail\AppInfo;
 
-use OCA\X2Mail\Dashboard\UnreadMailWidget;
-use OCA\X2Mail\Listeners\ImpersonateListener;
-use OCA\X2Mail\Listeners\LoginBridgeListener;
-use OCA\X2Mail\Listeners\LogoutListener;
-use OCA\X2Mail\Listeners\TokenBridgeListener;
-use OCA\X2Mail\Middleware\TokenRefreshMiddleware;
-use OCA\X2Mail\Search\Provider;
+use OCA\SouveraMail\Dashboard\UnreadMailWidget;
+use OCA\SouveraMail\Listeners\ImpersonateListener;
+use OCA\SouveraMail\Listeners\LoginBridgeListener;
+use OCA\SouveraMail\Listeners\LogoutListener;
+use OCA\SouveraMail\Listeners\TokenBridgeListener;
+use OCA\SouveraMail\Middleware\TokenRefreshMiddleware;
+use OCA\SouveraMail\Search\Provider;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
-use OCA\X2Mail\Util\NavigationTitle;
+use OCA\SouveraMail\Util\NavigationTitle;
 use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\INavigationManager;
@@ -23,7 +23,7 @@ use OCP\User\Events\UserLoggedInEvent;
 
 class Application extends App implements IBootstrap
 {
-    public const APP_ID = 'x2mail';
+    public const APP_ID = 'souvera_mail';
 
     /** @param array<string, mixed> $urlParams */
     public function __construct(array $urlParams = [])
@@ -79,7 +79,7 @@ class Application extends App implements IBootstrap
 
         $config = $serverContainer->get(IConfig::class);
         $dataDir = \rtrim(\trim($config->getSystemValue('datadirectory', '')), '\\/');
-        if (!\is_dir($dataDir . '/appdata_x2mail')) {
+        if (!\is_dir($dataDir . '/appdata_souvera_mail')) {
             return;
         }
 
@@ -91,7 +91,7 @@ class Application extends App implements IBootstrap
             return [
                 'id' => self::APP_ID,
                 'name' => NavigationTitle::resolve($appConfig),
-                'href' => $urlGenerator->linkToRoute('x2mail.page.index'),
+                'href' => $urlGenerator->linkToRoute('souvera_mail.page.index'),
                 'icon' => $urlGenerator->imagePath(self::APP_ID, 'logo-white-64x64.png'),
                 'order' => 4,
             ];

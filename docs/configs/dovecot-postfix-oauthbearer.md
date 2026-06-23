@@ -70,7 +70,7 @@ service auth {
 ## 3) Souvera Mail Setup Example
 
 ```bash
-occ x2mail:setup \
+occ souvera_mail:setup \
   --imap-host mail.example.com \
   --imap-port 143 --imap-ssl starttls \
   --smtp-host mail.example.com \

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Command;
+namespace OCA\SouveraMail\Command;
 
-use OCA\X2Mail\Service\ConnectivityCheckService;
-use OCA\X2Mail\Service\DomainConfigService;
-use OCA\X2Mail\Util\EngineHelper;
-use OCA\X2Mail\Util\SetupResolvers;
+use OCA\SouveraMail\Service\ConnectivityCheckService;
+use OCA\SouveraMail\Service\DomainConfigService;
+use OCA\SouveraMail\Util\EngineHelper;
+use OCA\SouveraMail\Util\SetupResolvers;
 use Symfony\Component\Console\Command\Command;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
@@ -19,7 +19,7 @@ class Setup extends Command
 {
     use SetupResolvers;
 
-    private const APP_ID = 'x2mail';
+    private const APP_ID = 'souvera_mail';
     private const OIDC_PROVIDER_KEY = 'oidc-provider';
 
     public function __construct(
@@ -35,7 +35,7 @@ class Setup extends Command
     protected function configure(): void
     {
         $this
-            ->setName('x2mail:setup')
+            ->setName('souvera_mail:setup')
             ->setDescription('Configure Souvera Mail server connection and authentication')
             ->addOption('imap-host', null, InputOption::VALUE_REQUIRED, 'IMAP server hostname')
             ->addOption('imap-port', null, InputOption::VALUE_REQUIRED, 'IMAP server port', '143')

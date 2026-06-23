@@ -1,4 +1,4 @@
-/* X2Mail Webmail (c) 2026 NK-IT Dev | Licensed under AGPL v3 */
+/* Souvera Mail Webmail (c) 2026 NK-IT Dev | Licensed under AGPL v3 */
 (function () {
 	'use strict';
 

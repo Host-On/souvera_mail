@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Search;
+namespace OCA\SouveraMail\Search;
 
-use OCA\X2Mail\AppInfo\Application;
-use OCA\X2Mail\Util\EngineHelper;
+use OCA\SouveraMail\AppInfo\Application;
+use OCA\SouveraMail\Util\EngineHelper;
 use OCP\ISession;
 use OCP\IURLGenerator;
 use OCP\IUser;
@@ -50,7 +50,7 @@ class Provider implements IProvider
 
     /**
      * Refresh OIDC token before engine bootstrap.
-     * NC Unified Search may run outside x2mail's middleware context.
+     * NC Unified Search may run outside Souvera Mail's middleware context.
      */
     private function refreshOidcToken(): void
     {
@@ -94,7 +94,7 @@ class Provider implements IProvider
 
             $MessageCollection = $oMailClient->MessageList($oParams);
 
-            $baseURL = $this->urlGenerator->linkToRoute('x2mail.page.index');
+            $baseURL = $this->urlGenerator->linkToRoute('souvera_mail.page.index');
             $baseURL .= '#';
             $search = \rawurlencode($oParams->sSearch);
 
@@ -109,7 +109,7 @@ class Provider implements IProvider
                 );
             }
         } else {
-            $this->logger->debug('X2Mail not logged in to use unified search');
+            $this->logger->debug('Souvera Mail not logged in to use unified search');
         }
 
         if ($iLimit > \count($result)) {

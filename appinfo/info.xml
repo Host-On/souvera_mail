@@ -1,21 +1,21 @@
 <?xml version="1.0"?>
 <info xmlns:xsi= "http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
-	<id>x2mail</id>
+	<id>souvera_mail</id>
 	<name>Souvera Mail</name>
 	<summary>Webmail with native Nextcloud SSO — zero extra passwords, full NC integration</summary>
 	<version>0.8.0</version>
 	<licence>AGPL-3.0-or-later</licence>
-	<author homepage="https://github.com/NK-IT-CLOUD/x2mail">NK-IT Dev</author>
-	<website>https://github.com/NK-IT-CLOUD/x2mail</website>
-	<repository type="git">https://github.com/NK-IT-CLOUD/x2mail</repository>
-	<bugs>https://github.com/NK-IT-CLOUD/x2mail/issues</bugs>
+	<author homepage="https://github.com/PhiGi87/souvera_mail">NK-IT Dev</author>
+	<website>https://github.com/PhiGi87/souvera_mail</website>
+	<repository type="git">https://github.com/PhiGi87/souvera_mail</repository>
+	<bugs>https://github.com/PhiGi87/souvera_mail/issues</bugs>
 	<documentation>
-		<admin>https://github.com/NK-IT-CLOUD/x2mail#setup</admin>
-		<developer>https://github.com/NK-IT-CLOUD/x2mail</developer>
+		<admin>https://github.com/PhiGi87/souvera_mail#setup</admin>
+		<developer>https://github.com/PhiGi87/souvera_mail</developer>
 	</documentation>
-	<screenshot>https://raw.githubusercontent.com/NK-IT-CLOUD/x2mail/main/img/screenshot-inbox.png</screenshot>
-	<screenshot>https://raw.githubusercontent.com/NK-IT-CLOUD/x2mail/main/img/screenshot-wizard.png</screenshot>
-	<screenshot>https://raw.githubusercontent.com/NK-IT-CLOUD/x2mail/main/img/screenshot-calendar.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/PhiGi87/souvera_mail/main/img/screenshot-inbox.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/PhiGi87/souvera_mail/main/img/screenshot-wizard.png</screenshot>
+	<screenshot>https://raw.githubusercontent.com/PhiGi87/souvera_mail/main/img/screenshot-calendar.png</screenshot>
 	<description><![CDATA[**Souvera Mail** — Webmail for Nextcloud with native SSO integration.
 
 Log into Nextcloud via Keycloak or any OIDC provider, open Email — done. No extra passwords, no extra login forms. Your OIDC token authenticates directly against IMAP via OAuth2 (OAUTHBEARER/XOAUTH2).
@@ -38,11 +38,11 @@ Everything runs through Nextcloud's native APIs — no external services, no sep
 - **Sieve filtering** — server-side mail rules
 - **Multiple identities** — manage sender aliases
 - **OpenPGP / S/MIME** — end-to-end encryption
-- **CLI tools** — `occ x2mail:setup`, `occ x2mail:status`
+- **CLI tools** — `occ souvera_mail:setup`, `occ souvera_mail:status`
 
 ### Setup
 ```
-occ x2mail:setup --imap-host mail.example.com --domain example.com --sieve
+occ souvera_mail:setup --imap-host mail.example.com --domain example.com --sieve
 ```
 
 ### Requirements
@@ -51,7 +51,7 @@ occ x2mail:setup --imap-host mail.example.com --domain example.com --sieve
 - OIDC provider (Keycloak, Authentik, etc.) + `user_oidc`
 
 	]]></description>
-	<namespace>X2Mail</namespace>
+	<namespace>SouveraMail</namespace>
 	<category>integration</category>
 	<category>office</category>
 	<dependencies>
@@ -62,21 +62,21 @@ occ x2mail:setup --imap-host mail.example.com --domain example.com --sieve
 		<nextcloud min-version="33" max-version="35" />
 	</dependencies>
 	<settings>
-		<admin>OCA\X2Mail\Settings\AdminSettings</admin>
-		<admin-section>OCA\X2Mail\Settings\AdminSection</admin-section>
-		<personal>OCA\X2Mail\Settings\PersonalSettings</personal>
-		<personal-section>OCA\X2Mail\Settings\PersonalSection</personal-section>
+		<admin>OCA\SouveraMail\Settings\AdminSettings</admin>
+		<admin-section>OCA\SouveraMail\Settings\AdminSection</admin-section>
+		<personal>OCA\SouveraMail\Settings\PersonalSettings</personal>
+		<personal-section>OCA\SouveraMail\Settings\PersonalSection</personal-section>
 	</settings>
 	<repair-steps>
 		<install>
-			<step>OCA\X2Mail\Migration\InstallStep</step>
+			<step>OCA\SouveraMail\Migration\InstallStep</step>
 		</install>
 		<post-update>
-			<step>OCA\X2Mail\Migration\InstallStep</step>
+			<step>OCA\SouveraMail\Migration\InstallStep</step>
 		</post-update>
 	</repair-steps>
 	<commands>
-		<command>OCA\X2Mail\Command\Setup</command>
-		<command>OCA\X2Mail\Command\Status</command>
+		<command>OCA\SouveraMail\Command\Setup</command>
+		<command>OCA\SouveraMail\Command\Status</command>
 	</commands>
 </info>

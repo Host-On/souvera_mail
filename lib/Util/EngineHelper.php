@@ -1,6 +1,6 @@
 <?php
 
-namespace OCA\X2Mail\Util;
+namespace OCA\SouveraMail\Util;
 
 use OCP\App\IAppManager;
 use OCP\Config\IUserConfig;
@@ -68,13 +68,13 @@ class EngineHelper
 
         if (!\defined('APP_DATA_FOLDER_PATH')) {
             $dataDir = \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/');
-            \define('APP_DATA_FOLDER_PATH', $dataDir . '/appdata_x2mail/');
+            \define('APP_DATA_FOLDER_PATH', $dataDir . '/appdata_souvera_mail/');
         }
 
         $app_dir = \dirname(\dirname(__DIR__)) . '/app';
         $index = $app_dir . '/index.php';
         if (!\is_readable($index)) {
-            $this->logger->warning('X2Mail: app/index.php not readable, skipping engine bootstrap');
+            $this->logger->warning('Souvera Mail: app/index.php not readable, skipping engine bootstrap');
             return;
         }
         require_once $index;
@@ -102,10 +102,10 @@ class EngineHelper
                     );
                 } catch (\X2Mail\Engine\Exceptions\ClientException $e) {
                     // OIDC login failure — no credentials to clear
-                    $this->logger->debug('X2Mail SSO login failed: ' . $e->getMessage());
+                    $this->logger->debug('Souvera Mail SSO login failed: ' . $e->getMessage());
                 } catch (\Throwable $e) {
                     // Non-login errors — don't touch credentials
-                    $this->logger->warning('X2Mail engine login error: ' . $e->getMessage());
+                    $this->logger->warning('Souvera Mail engine login error: ' . $e->getMessage());
                 }
             }
 
@@ -115,7 +115,7 @@ class EngineHelper
                 exit;
             }
         } catch (\Throwable $e) {
-            $this->logger->warning('X2Mail engine bootstrap error: ' . $e->getMessage());
+            $this->logger->warning('Souvera Mail engine bootstrap error: ' . $e->getMessage());
         }
     }
 
@@ -141,7 +141,7 @@ class EngineHelper
      */
     public function getSsoUid(): ?string
     {
-        $uid = $this->session->get('x2mail-uid');
+        $uid = $this->session->get('souvera_mail-uid');
         return \is_string($uid) && $uid !== '' ? $uid : null;
     }
 
@@ -180,7 +180,7 @@ class EngineHelper
             return null;
         }
 
-        $custom = $this->userConfig->getValueString($uid, 'x2mail', 'email', '');
+        $custom = $this->userConfig->getValueString($uid, 'souvera_mail', 'email', '');
         if ($custom !== '') {
             return $custom;
         }
@@ -203,7 +203,7 @@ class EngineHelper
 
     public function isOIDCLogin(): bool
     {
-        if ($this->appConfig->getValueString('x2mail', 'autologin-oidc', '0') !== '0') {
+        if ($this->appConfig->getValueString('souvera_mail', 'autologin-oidc', '0') !== '0') {
             if ($this->appManager->isEnabledForUser('user_oidc')) {
                 if ($this->session->get('is_oidc')) {
                     if ($this->session->get('oidc_access_token')) {
@@ -232,10 +232,10 @@ class EngineHelper
     public function getOidcAccessToken(?string $audienceOverride = null, ?string $scopesOverride = null): ?string
     {
         $audience = $audienceOverride
-            ?? $this->appConfig->getValueString('x2mail', 'oidc-exchange-audience', '');
+            ?? $this->appConfig->getValueString('souvera_mail', 'oidc-exchange-audience', '');
         if ($audience !== '') {
             $rawScopes = $scopesOverride
-                ?? $this->appConfig->getValueString('x2mail', 'oidc-exchange-scopes', '');
+                ?? $this->appConfig->getValueString('souvera_mail', 'oidc-exchange-scopes', '');
             $scopes = \preg_split('/\s+/', \trim($rawScopes), -1, PREG_SPLIT_NO_EMPTY) ?: [];
             $exchanged = $this->dispatchTokenEvent(
                 'OCA\\UserOIDC\\Event\\ExchangedTokenRequestedEvent',
@@ -318,7 +318,7 @@ class EngineHelper
     private function getLoginCredentials(): array
     {
         $sUID = $this->userSession->getUser()->getUID();
-        if ($this->session->get('x2mail-uid') === $sUID && $this->isOIDCLogin()) {
+        if ($this->session->get('souvera_mail-uid') === $sUID && $this->isOIDCLogin()) {
             $sEmail = $this->userConfig->getValueString($sUID, 'settings', 'email');
             return [$sUID, $sEmail, "oidc_login|{$sUID}"];
         }

@@ -84,7 +84,7 @@ occ user_oidc:provider YourProvider \
   -d https://idp.example.com/realms/example/.well-known/openid-configuration
 ```
 
-`occ x2mail:setup` sets `store_login_token=1` for `user_oidc` when needed.
+`occ souvera_mail:setup` sets `store_login_token=1` for `user_oidc` when needed.
 
 ### 2. Mail Server OAuth Support
 
@@ -123,7 +123,7 @@ Install and enable Souvera Mail from the official app catalog:
 In the Nextcloud web UI: **Apps** → search **Souvera Mail** → **Download and enable**.  
 Nextcloud applies updates automatically when a new signed release is published to the App Store.
 
-After installation, configure mail connectivity in **Settings → Souvera Mail** or with `occ x2mail:setup`.
+After installation, configure mail connectivity in **Settings → Souvera Mail** or with `occ souvera_mail:setup`.
 
 ### Manual install (tarball)
 
@@ -135,7 +135,7 @@ cd /path/to/nextcloud/custom_apps
 tar xzf x2mail-*.tar.gz
 chown -R www-data:www-data x2mail
 occ app:enable x2mail
-occ x2mail:setup ...
+occ souvera_mail:setup ...
 ```
 
 The App Store and manual tarball install the **same app package**; only the delivery path differs.
@@ -158,7 +158,7 @@ The legacy SnappyMail-style engine admin panel was removed in 0.7.0.
 **Dovecot + Postfix** (typical STARTTLS listeners):
 
 ```bash
-occ x2mail:setup \
+occ souvera_mail:setup \
   --imap-host mail.example.com \
   --imap-port 143 --imap-ssl starttls \
   --smtp-host mail.example.com \
@@ -172,7 +172,7 @@ occ x2mail:setup \
 **Stalwart** (typical implicit-TLS listeners — verified with Souvera Mail):
 
 ```bash
-occ x2mail:setup \
+occ souvera_mail:setup \
   --imap-host mail.example.com \
   --imap-port 993 --imap-ssl ssl \
   --smtp-host mail.example.com \
@@ -249,7 +249,7 @@ Generated domain config uses OAuth SASL only (`OAUTHBEARER`, `XOAUTH2`) and enab
 ### Check Status
 
 ```bash
-occ x2mail:status
+occ souvera_mail:status
 ```
 
 Shows domain profile, protocol security modes, OIDC provider, and token-store status.
@@ -277,13 +277,13 @@ Shows domain profile, protocol security modes, OIDC provider, and token-store st
 - ManageSieve filtering support
 - Nextcloud Contacts / Files / Calendar integration
 - Multiple identities, OpenPGP / S-MIME
-- `occ x2mail:setup`, `occ x2mail:status`
+- `occ souvera_mail:setup`, `occ souvera_mail:status`
 
 ## Troubleshooting
 
 ### Login form appears instead of mailbox
 
-- Run `occ x2mail:status` (autologin/OIDC/domain)
+- Run `occ souvera_mail:status` (autologin/OIDC/domain)
 - Verify `occ config:app:get user_oidc store_login_token` is `1`
 - Ensure login happened via SSO, not local Nextcloud password
 - Domain in config must match mailbox domain (`user@example.com` -> `example.com`)
@@ -305,7 +305,7 @@ Shows domain profile, protocol security modes, OIDC provider, and token-store st
 
 - Align `--sieve-port` and `--sieve-ssl` with server listener mode
 - STARTTLS on `4190` vs implicit TLS on `4190` must match exactly
-- Re-save wizard or re-run `occ x2mail:setup` with corrected sieve options
+- Re-save wizard or re-run `occ souvera_mail:setup` with corrected sieve options
 
 ### TLS verify failed in wizard
 

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Controller;
+namespace OCA\SouveraMail\Controller;
 
-use OCA\X2Mail\Service\ConnectivityCheckService;
-use OCA\X2Mail\Service\DomainConfigService;
-use OCA\X2Mail\Util\EngineHelper;
-use OCA\X2Mail\Util\NavigationTitle;
-use OCA\X2Mail\Util\SetupResolvers;
+use OCA\SouveraMail\Service\ConnectivityCheckService;
+use OCA\SouveraMail\Service\DomainConfigService;
+use OCA\SouveraMail\Util\EngineHelper;
+use OCA\SouveraMail\Util\NavigationTitle;
+use OCA\SouveraMail\Util\SetupResolvers;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
@@ -25,7 +25,7 @@ class SetupController extends Controller
 {
     use SetupResolvers;
 
-    private const APP_ID = 'x2mail';
+    private const APP_ID = 'souvera_mail';
     private const OIDC_PROVIDER_KEY = 'oidc-provider';
 
     public function __construct(
@@ -384,7 +384,7 @@ class SetupController extends Controller
                 } catch (\Throwable $cleanupError) {
                     $cleanupWarnings[] = $existing;
                     $this->logger->warning(
-                        'X2Mail saveSetup cleanup failed for domain "' . $existing . '": ' . $cleanupError->getMessage()
+                        'Souvera Mail saveSetup cleanup failed for domain "' . $existing . '": ' . $cleanupError->getMessage()
                     );
                 }
             }
@@ -415,8 +415,8 @@ class SetupController extends Controller
                 \X2Mail\Engine\Api::Actions()->Logout(true);
 
                 // Clean up any stored per-user plain credentials
-                $this->userConfig->deleteKey('x2mail', 'passphrase');
-                $this->userConfig->deleteKey('x2mail', 'email');
+                $this->userConfig->deleteKey('souvera_mail', 'passphrase');
+                $this->userConfig->deleteKey('souvera_mail', 'email');
             } catch (\Throwable $e) {
                 // Non-fatal
             }
@@ -431,7 +431,7 @@ class SetupController extends Controller
                 'provider' => $resolvedProvider,
             ]);
         } catch (\Throwable $e) {
-            $this->logger->error('X2Mail saveSetup failed: ' . $e->getMessage());
+            $this->logger->error('Souvera Mail saveSetup failed: ' . $e->getMessage());
             return new JSONResponse(['status' => 'error', 'message' => 'Save failed'], 500);
         }
     }
@@ -661,7 +661,7 @@ class SetupController extends Controller
             $this->domainService->deleteDomainConfig($domain);
             return new JSONResponse(['status' => 'success', 'message' => "Domain '{$domain}' deleted"]);
         } catch (\Throwable $e) {
-            $this->logger->error('X2Mail deleteDomain failed: ' . $e->getMessage());
+            $this->logger->error('Souvera Mail deleteDomain failed: ' . $e->getMessage());
             return new JSONResponse(['status' => 'error', 'message' => 'Delete failed'], 500);
         }
     }

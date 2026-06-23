@@ -1,4 +1,4 @@
-/* X2Mail Webmail (c) X2Mail | Licensed under AGPL v3 */
+/* Souvera Mail Webmail (c) Souvera Mail | Licensed under AGPL v3 */
 (function () {
 	'use strict';
 
@@ -1091,7 +1091,7 @@
 		IMPORTANT : 10;
 		FLAGGED : 11;
 		ALL : 13;
-		// TODO: X2Mail
+		// TODO: Souvera Mail
 		TEMPLATES : 19;
 		// Kolab
 		CONFIGURATION : 20;
@@ -15404,7 +15404,7 @@ body > * {
 		}
 
 		testSystemNotification() {
-			NotificationUserStore.display('X2Mail', 'Test notification');
+			NotificationUserStore.display('Souvera Mail', 'Test notification');
 		}
 
 		selectLanguage() {

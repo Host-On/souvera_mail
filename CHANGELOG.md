@@ -12,7 +12,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - Support for the unmaintained `oidc_login` app — `user_oidc` is the only supported SSO provider now (`oidc_login` does not support Nextcloud 34+). Existing `oidc_login` setups must migrate to `user_oidc`.
 
 ### Added
-- Optional extra scopes for OIDC token exchange — configurable in the setup wizard next to the token audience, via `occ x2mail:setup --oidc-scopes "scope1 scope2"`, or directly: `occ config:app:set x2mail oidc-exchange-scopes --value "scope1 scope2"`. The wizard's Test Login uses the typed scopes.
+- Optional extra scopes for OIDC token exchange — configurable in the setup wizard next to the token audience, via `occ souvera_mail:setup --oidc-scopes "scope1 scope2"`, or directly: `occ config:app:set x2mail oidc-exchange-scopes --value "scope1 scope2"`. The wizard's Test Login uses the typed scopes.
 - Test Login diagnostics show which token was actually used: exchanged token (with audience, scopes and remaining lifetime), a warning when the token exchange fell back to the login token, or the plain login token
 
 ### Security
@@ -79,11 +79,11 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ## [0.6.4] — 2026-05-27
 
 ### Added
-- Optional OAuth token exchange: `occ x2mail:setup --imap-audience <client>` (and a matching setup-wizard field) lets the mail server use a different OIDC client than the Nextcloud login client, for IdPs that support token exchange
+- Optional OAuth token exchange: `occ souvera_mail:setup --imap-audience <client>` (and a matching setup-wizard field) lets the mail server use a different OIDC client than the Nextcloud login client, for IdPs that support token exchange
 
 ### Changed
 - SSO token refresh now uses the official Nextcloud `user_oidc` token API for better forward compatibility
-- `occ x2mail:setup` default `--smtp-port` is now 587 (standard submission port) instead of 25
+- `occ souvera_mail:setup` default `--smtp-port` is now 587 (standard submission port) instead of 25
 
 ### Fixed
 - SSO mailbox reconnect after token expiry is now reliable in persistent-login sessions
@@ -92,7 +92,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ### Changed
 - JS/CSS minification in build pipeline (terser + clean-css)
-- Setup wizard and `occ x2mail:setup` now enforce one active domain profile and consolidate stale extra configs
+- Setup wizard and `occ souvera_mail:setup` now enforce one active domain profile and consolidate stale extra configs
 - OAuth domain configs now advertise only `OAUTHBEARER` and `XOAUTH2` SASL mechanisms by default
 
 ### Fixed
@@ -102,7 +102,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - SMTP OAuth capability is now validated when authenticated sending is enabled in SSO mode
 - Setup wizard now writes the new active domain before cleaning up stale profiles and reports cleanup warnings instead of risking config loss
 - Release defaults for `autologout`, `contacts_autosave`, `show_login_alert`, and identity handling are restored through targeted migration/default application
-- `occ x2mail:status` now reports the actual IMAP/SMTP security mode and the stored OIDC provider selection
+- `occ souvera_mail:status` now reports the actual IMAP/SMTP security mode and the stored OIDC provider selection
 - `occ x2mail:settings` and password-login persistence now store secrets with sensitive/internal flags
 - Repair step no longer wipes legacy passphrases on every update and no longer resets broad engine config on every post-update
 
@@ -159,7 +159,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - SSO-first defaults: OAuth as default auth type
 - Single-domain setup: wizard manages one mail server configuration
 - Domain field auto-suggested from admin email address
-- `occ x2mail:status` shows compact SSO diagnostics
+- `occ souvera_mail:status` shows compact SSO diagnostics
 - Translations updated for all 97 locales
 
 ### Removed
@@ -361,7 +361,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ### Added
 - **Nextcloud-native Contacts integration**: read, create, edit, and delete contacts directly in Nextcloud Contacts — no CardDAV sync, no separate database
 - Autocomplete suggestions in To/Cc/Bcc fields now pull from Nextcloud Contacts
-- `occ x2mail:setup` now enables contacts automatically
+- `occ souvera_mail:setup` now enables contacts automatically
 
 ### Changed
 - Contacts provider replaced: PdoAddressBook/SQLite → NextcloudAddressBook via NC IManager API
@@ -478,7 +478,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - SnappyMail v2.38.2 core engine
 - OAUTHBEARER/XOAUTH2 IMAP authentication
 - Automatic OIDC token refresh
-- `occ x2mail:setup` command
-- `occ x2mail:status` command
+- `occ souvera_mail:setup` command
+- `occ souvera_mail:status` command
 - Nextcloud 28-35 support
 - PHP 8.1+ required

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Migration;
+namespace OCA\SouveraMail\Migration;
 
-use OCA\X2Mail\AppInfo\Application;
-use OCA\X2Mail\Util\EngineHelper;
+use OCA\SouveraMail\AppInfo\Application;
+use OCA\SouveraMail\Util\EngineHelper;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
 use OCP\Config\IUserConfig;
@@ -36,6 +36,12 @@ class InstallStep implements IRepairStep
 
     public function run(IOutput $output): void
     {
+        // Migrate from legacy app id 'x2mail' to new 'souvera_mail' (v0.9.0):
+        //   1) Copy all appconfig keys from 'x2mail'/* into 'souvera_mail'/* (idempotent)
+        //   2) Rename appdata_x2mail/ → appdata_souvera_mail/ if the legacy dir exists
+        // After this, the rest of the upgrade runs in the new namespace as usual.
+        $this->migrateLegacyAppId($output);
+
         // Migrate legacy snappymail-* appconfig keys to new names (v0.6.0)
         $keyMap = [
             'snappymail-autologin-oidc' => 'autologin-oidc',
@@ -43,14 +49,14 @@ class InstallStep implements IRepairStep
             'snappymail-autologin-with-email' => 'autologin-with-email',
         ];
         foreach ($keyMap as $oldKey => $newKey) {
-            $oldVal = $this->appConfig->getValueString('x2mail', $oldKey, '');
+            $oldVal = $this->appConfig->getValueString('souvera_mail', $oldKey, '');
             if ($oldVal !== '') {
-                $newVal = $this->appConfig->getValueString('x2mail', $newKey, '');
+                $newVal = $this->appConfig->getValueString('souvera_mail', $newKey, '');
                 if ($newVal === '') {
-                    $this->appConfig->setValueString('x2mail', $newKey, $oldVal);
+                    $this->appConfig->setValueString('souvera_mail', $newKey, $oldVal);
                     $output->info("Migrated appconfig key: {$oldKey} → {$newKey}");
                 }
-                $this->appConfig->deleteKey('x2mail', $oldKey);
+                $this->appConfig->deleteKey('souvera_mail', $oldKey);
             }
         }
 
@@ -88,7 +94,7 @@ class InstallStep implements IRepairStep
 
         if (!$oConfig->Get('webmail', 'app_path')) {
             $output->info('Set config [webmail]app_path');
-            $appWebPath = $this->appManager->getAppWebPath('x2mail');
+            $appWebPath = $this->appManager->getAppWebPath('souvera_mail');
             $appPath = \preg_replace('#(?<!:)/+#', '/', \rtrim($appWebPath, '/') . '/app/');
             $oConfig->Set('webmail', 'app_path', $appPath);
         }
@@ -152,14 +158,14 @@ class InstallStep implements IRepairStep
             $customConfigFile = $this->appConfig->getValueString(Application::APP_ID, 'custom_config_file');
             if ($customConfigFile) {
                 $output->info("Load custom config: {$customConfigFile}");
-                // Security: restrict to appdata_x2mail/ directory
+                // Security: restrict to appdata_souvera_mail/ directory
                 $resolved = \realpath($customConfigFile);
                 $dataDir = \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/');
-                $allowedDir = \realpath($dataDir . '/appdata_x2mail');
+                $allowedDir = \realpath($dataDir . '/appdata_souvera_mail');
                 if ($resolved && $allowedDir && \str_starts_with($resolved, $allowedDir . '/')) {
                     require $resolved;
                 } else {
-                    throw new \Exception("custom config must be inside appdata_x2mail/");
+                    throw new \Exception("custom config must be inside appdata_souvera_mail/");
                 }
             }
         } catch (\Throwable $e) {
@@ -171,7 +177,7 @@ class InstallStep implements IRepairStep
         try {
             $migrationKey = 'migration-passphrase-cleared-v061';
             if ($this->appConfig->getValueString(Application::APP_ID, $migrationKey, '0') !== '1') {
-                $this->userConfig->deleteKey('x2mail', 'passphrase');
+                $this->userConfig->deleteKey('souvera_mail', 'passphrase');
                 $this->appConfig->setValueString(Application::APP_ID, $migrationKey, '1');
                 $output->info('Cleared legacy password storage (re-encrypted on next login)');
             }
@@ -208,7 +214,7 @@ class InstallStep implements IRepairStep
             $config,
             'webmail',
             'theme',
-            'x2mail',
+            'souvera_mail',
             ['', 'Default', 'NextcloudV25+'],
             $output,
             'Migrated legacy theme to x2mail',
@@ -296,5 +302,58 @@ class InstallStep implements IRepairStep
             $item->isDir() ? \rmdir($item->getPathname()) : \unlink($item->getPathname());
         }
         \rmdir($dir);
+    }
+
+    /**
+     * One-time migration when upgrading from the legacy app id "x2mail" to "souvera_mail".
+     *
+     * Copies every appconfig key stored under the old app namespace into the new one,
+     * and renames the engine data directory `appdata_x2mail/` → `appdata_souvera_mail/`
+     * so existing mailboxes, attachments and engine state survive the rename intact.
+     *
+     * Idempotent: safe to run multiple times. Values already present in the new
+     * namespace are not overwritten; the legacy entries are deleted only after a
+     * successful copy, so a partial run can be resumed.
+     */
+    private function migrateLegacyAppId(IOutput $output): void
+    {
+        $legacy = 'x2mail';
+        $current = Application::APP_ID; // 'souvera_mail'
+
+        // 1) Copy appconfig keys from x2mail/* into souvera_mail/*
+        try {
+            $legacyKeys = $this->appConfig->getKeys($legacy);
+        } catch (\Throwable $e) {
+            $legacyKeys = [];
+        }
+        if ($legacyKeys !== []) {
+            $output->info("Migrating " . \count($legacyKeys) . " legacy appconfig key(s) from '{$legacy}' to '{$current}'");
+            foreach ($legacyKeys as $key) {
+                $value = $this->appConfig->getValueString($legacy, $key, '');
+                $existing = $this->appConfig->getValueString($current, $key, '');
+                if ($existing === '' && $value !== '') {
+                    $this->appConfig->setValueString($current, $key, $value);
+                }
+                $this->appConfig->deleteKey($legacy, $key);
+            }
+        }
+
+        // 2) Rename appdata_x2mail → appdata_souvera_mail if the legacy directory exists
+        $dataDir = \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/');
+        if ($dataDir !== '') {
+            $oldDir = $dataDir . '/appdata_' . $legacy;
+            $newDir = $dataDir . '/appdata_' . $current;
+            if (\is_dir($oldDir) && !\is_dir($newDir)) {
+                if (@\rename($oldDir, $newDir)) {
+                    $output->info("Migrated engine data directory: {$oldDir} → {$newDir}");
+                } else {
+                    $this->logger->error(
+                        "Souvera Mail: failed to rename {$oldDir} to {$newDir}; "
+                        . 'please move the directory manually so engine data survives the upgrade'
+                    );
+                    $output->warning("Could not rename {$oldDir} → {$newDir} (see Nextcloud log).");
+                }
+            }
+        }
     }
 }

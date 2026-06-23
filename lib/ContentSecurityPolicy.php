@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail;
+namespace OCA\SouveraMail;
 
 class ContentSecurityPolicy extends \OCP\AppFramework\Http\ContentSecurityPolicy
 {

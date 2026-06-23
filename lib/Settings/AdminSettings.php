@@ -1,9 +1,9 @@
 <?php
 
-namespace OCA\X2Mail\Settings;
+namespace OCA\SouveraMail\Settings;
 
-use OCA\X2Mail\Util\EngineHelper;
-use OCA\X2Mail\Util\NavigationTitle;
+use OCA\SouveraMail\Util\EngineHelper;
+use OCA\SouveraMail\Util\NavigationTitle;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IAppConfig;
@@ -20,16 +20,16 @@ class AdminSettings implements ISettings
 
     public function getForm()
     {
-        $this->appConfig->setValueString('x2mail', 'autologin-oidc', '1');
-        $this->appConfig->setValueString('x2mail', 'autologin', '1');
+        $this->appConfig->setValueString('souvera_mail', 'autologin-oidc', '1');
+        $this->appConfig->setValueString('souvera_mail', 'autologin', '1');
 
         $this->engineHelper->loadApp();
 
         $parameters = [];
-        $parameters['x2mail-debug-log'] = $this->appConfig->getValueString('x2mail', 'debug_log', '0') === '1';
+        $parameters['x2mail-debug-log'] = $this->appConfig->getValueString('souvera_mail', 'debug_log', '0') === '1';
         $oConfig = \X2Mail\Engine\Api::Config();
 
-        // X2Mail is OIDC-first, no legacy import
+        // Souvera Mail is OIDC-first, no legacy import
 
         $parameters['x2mail-debug'] = $oConfig->Get('debug', 'enable', false);
 
@@ -42,19 +42,19 @@ class AdminSettings implements ISettings
 
         $app_path = $oConfig->Get('webmail', 'app_path');
         if (!$app_path) {
-            $webPath = $this->appManager->getAppWebPath('x2mail');
+            $webPath = $this->appManager->getAppWebPath('souvera_mail');
             $app_path = \preg_replace(
                 '#(?<!:)/+#',
                 '/',
                 \rtrim($webPath, '/') . '/app/'
             );
             $oConfig->Set('webmail', 'app_path', $app_path);
-            $oConfig->Set('webmail', 'theme', 'x2mail');
+            $oConfig->Set('webmail', 'theme', 'souvera_mail');
             $oConfig->Save();
         }
         $parameters['x2mail-app-path'] = $oConfig->Get('webmail', 'app_path', false);
         $parameters['x2mail-nc-lang'] = !$oConfig->Get('webmail', 'allow_languages_on_settings', true);
-        $parameters['x2mail-version'] = $this->appManager->getAppVersion('x2mail');
+        $parameters['x2mail-version'] = $this->appManager->getAppVersion('souvera_mail');
 
         $parameters['menu_title'] = NavigationTitle::storedOverride($this->appConfig);
         $parameters['menu_title_default'] = NavigationTitle::DEFAULT;
@@ -64,14 +64,14 @@ class AdminSettings implements ISettings
         $parameters['gnupg'] = (bool) $oConfig->Get('security', 'gnupg', true);
         $parameters['x2mail_version'] = $parameters['x2mail-version'];
 
-        \OCP\Util::addScript('x2mail', 'setup-wizard');
-        \OCP\Util::addStyle('x2mail', 'setup-wizard');
-        return new TemplateResponse('x2mail', 'admin-local', $parameters);
+        \OCP\Util::addScript('souvera_mail', 'setup-wizard');
+        \OCP\Util::addStyle('souvera_mail', 'setup-wizard');
+        return new TemplateResponse('souvera_mail', 'admin-local', $parameters);
     }
 
     public function getSection()
     {
-        return 'x2mail';
+        return 'souvera_mail';
     }
 
     public function getPriority()

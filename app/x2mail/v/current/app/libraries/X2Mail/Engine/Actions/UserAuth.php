@@ -171,7 +171,7 @@ trait UserAuth
 	 */
 	protected function accountFromNcSession() : ?MainAccount
 	{
-		$helper = \OCP\Server::get(\OCA\X2Mail\Util\EngineHelper::class);
+		$helper = \OCP\Server::get(\OCA\SouveraMail\Util\EngineHelper::class);
 		if (!$helper->isOIDCLogin()) {
 			return null;
 		}

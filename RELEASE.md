@@ -18,5 +18,5 @@ Nextcloud handles upgrades automatically when a new version is published to the 
 
 ```bash
 occ upgrade
-occ x2mail:status
+occ souvera_mail:status
 ```

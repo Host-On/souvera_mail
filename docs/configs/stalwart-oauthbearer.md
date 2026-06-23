@@ -35,7 +35,7 @@ Pick one TLS strategy and keep Souvera Mail values aligned:
 ## 3) Souvera Mail Setup Example
 
 ```bash
-occ x2mail:setup \
+occ souvera_mail:setup \
   --imap-host mail.example.com \
   --imap-port 993 --imap-ssl ssl \
   --smtp-host mail.example.com \

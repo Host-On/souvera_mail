@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\X2Mail\Listeners;
+namespace OCA\SouveraMail\Listeners;
 
-use OCA\X2Mail\Service\LogService;
+use OCA\SouveraMail\Service\LogService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\ISession;
@@ -29,7 +29,7 @@ class LoginBridgeListener implements IEventListener
         }
 
         $uid = $event->getUser()->getUID();
-        $this->session->set('x2mail-uid', $uid);
+        $this->session->set('souvera_mail-uid', $uid);
 
         if ($this->session->get('is_oidc')) {
             $this->logService->info("Login bridge: uid={$uid}, is_oidc=true");

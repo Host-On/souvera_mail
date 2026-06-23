@@ -667,7 +667,7 @@ shortcuts.on();
 
 })(this);
 
-/* X2Mail Webmail (c) 2026 NK-IT Dev | MIT */
+/* Souvera Mail Webmail (c) 2026 NK-IT Dev | MIT */
 (doc => {
 	const
 		defined = v => undefined !== v,
@@ -4801,7 +4801,7 @@ c.g.l.set(e,b,p);r.forEach(c.removeNode);var y=v=>{c.m.Ub(e,v,B);B=v};k=e.ownerD
       return this;
     }
     /**
-     * X2Mail
+     * Souvera Mail
      */
     changeIndentationLevel(direction) {
       let parent = this.getSelectionClosest("UL,OL,BLOCKQUOTE");
@@ -5259,7 +5259,7 @@ const
 
 /**
  * https://github.com/mixmark-io/turndown
- * v7.2.0 modified by X2Mail to be ES2020
+ * v7.2.0 modified by Souvera Mail to be ES2020
  */
 
 const TurndownService = (() => {
