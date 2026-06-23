@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <info xmlns:xsi= "http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
-	<id>souvera_mail</id>
+	<id>smail</id>
 	<name>Souvera Mail</name>
 	<summary>Webmail with native Nextcloud SSO — zero extra passwords, full NC integration</summary>
 	<version>0.8.0</version>
@@ -38,11 +38,11 @@ Everything runs through Nextcloud's native APIs — no external services, no sep
 - **Sieve filtering** — server-side mail rules
 - **Multiple identities** — manage sender aliases
 - **OpenPGP / S/MIME** — end-to-end encryption
-- **CLI tools** — `occ souvera_mail:setup`, `occ souvera_mail:status`
+- **CLI tools** — `occ smail:setup`, `occ smail:status`
 
 ### Setup
 ```
-occ souvera_mail:setup --imap-host mail.example.com --domain example.com --sieve
+occ smail:setup --imap-host mail.example.com --domain example.com --sieve
 ```
 
 ### Requirements
@@ -51,7 +51,7 @@ occ souvera_mail:setup --imap-host mail.example.com --domain example.com --sieve
 - OIDC provider (Keycloak, Authentik, etc.) + `user_oidc`
 
 	]]></description>
-	<namespace>SouveraMail</namespace>
+	<namespace>Smail</namespace>
 	<category>integration</category>
 	<category>office</category>
 	<dependencies>
@@ -62,21 +62,21 @@ occ souvera_mail:setup --imap-host mail.example.com --domain example.com --sieve
 		<nextcloud min-version="33" max-version="35" />
 	</dependencies>
 	<settings>
-		<admin>OCA\SouveraMail\Settings\AdminSettings</admin>
-		<admin-section>OCA\SouveraMail\Settings\AdminSection</admin-section>
-		<personal>OCA\SouveraMail\Settings\PersonalSettings</personal>
-		<personal-section>OCA\SouveraMail\Settings\PersonalSection</personal-section>
+		<admin>OCA\Smail\Settings\AdminSettings</admin>
+		<admin-section>OCA\Smail\Settings\AdminSection</admin-section>
+		<personal>OCA\Smail\Settings\PersonalSettings</personal>
+		<personal-section>OCA\Smail\Settings\PersonalSection</personal-section>
 	</settings>
 	<repair-steps>
 		<install>
-			<step>OCA\SouveraMail\Migration\InstallStep</step>
+			<step>OCA\Smail\Migration\InstallStep</step>
 		</install>
 		<post-update>
-			<step>OCA\SouveraMail\Migration\InstallStep</step>
+			<step>OCA\Smail\Migration\InstallStep</step>
 		</post-update>
 	</repair-steps>
 	<commands>
-		<command>OCA\SouveraMail\Command\Setup</command>
-		<command>OCA\SouveraMail\Command\Status</command>
+		<command>OCA\Smail\Command\Setup</command>
+		<command>OCA\Smail\Command\Status</command>
 	</commands>
 </info>

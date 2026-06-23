@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\Listeners;
+namespace OCA\Smail\Listeners;
 
-use OCA\SouveraMail\Service\LogService;
+use OCA\Smail\Service\LogService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\ISession;
@@ -45,7 +45,7 @@ class TokenBridgeListener implements IEventListener
         $user = $this->userSession->getUser();
         $uid = $user ? $user->getUID() : null;
         if ($uid) {
-            $this->session->set('souvera_mail-uid', $uid);
+            $this->session->set('smail-uid', $uid);
         }
 
         $tokenLen = \strlen($accessToken);

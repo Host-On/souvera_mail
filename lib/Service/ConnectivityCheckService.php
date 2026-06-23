@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\Service;
+namespace OCA\Smail\Service;
 
-use OCA\SouveraMail\Util\EngineHelper;
+use OCA\Smail\Util\EngineHelper;
 
 class ConnectivityCheckService
 {
@@ -531,8 +531,8 @@ class ConnectivityCheckService
                 $this->engineHelper->loadApp();
             }
 
-            if (\class_exists('\\X2Mail\\Engine\\Api')) {
-                $oConfig = \X2Mail\Engine\Api::Config();
+            if (\class_exists('\\Smail\\Engine\\Api')) {
+                $oConfig = \Smail\Engine\Api::Config();
                 $defaults['verify_peer'] = (bool) $oConfig->Get('ssl', 'verify_certificate', true);
                 $defaults['verify_peer_name'] = (bool) $oConfig->Get('ssl', 'verify_certificate', true);
                 $defaults['allow_self_signed'] = (bool) $oConfig->Get('ssl', 'allow_self_signed', false);

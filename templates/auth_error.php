@@ -1,7 +1,7 @@
 <?php
 /** @var \OCP\IL10N $l */
 /** @var array $_ */
-\OCP\Util::addStyle('souvera_mail', 'embed');
+\OCP\Util::addStyle('smail', 'embed');
 ?>
 <div id="app-content"
      style="display:flex;align-items:center;justify-content:center;

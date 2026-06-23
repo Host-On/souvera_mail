@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\Command;
+namespace OCA\Smail\Command;
 
-use OCA\SouveraMail\Service\DomainConfigService;
-use OCA\SouveraMail\Service\LogService;
-use OCA\SouveraMail\Util\EngineHelper;
+use OCA\Smail\Service\DomainConfigService;
+use OCA\Smail\Service\LogService;
+use OCA\Smail\Util\EngineHelper;
 use Symfony\Component\Console\Command\Command;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
@@ -15,7 +15,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class Status extends Command
 {
-    private const APP_ID = 'souvera_mail';
+    private const APP_ID = 'smail';
 
     public function __construct(
         private IAppConfig $appConfig,
@@ -30,7 +30,7 @@ class Status extends Command
     protected function configure()
     {
         $this
-            ->setName('souvera_mail:status')
+            ->setName('smail:status')
             ->setDescription('Show Souvera Mail configuration status')
         ;
     }
@@ -74,7 +74,7 @@ class Status extends Command
                 $output->writeln('');
                 $output->writeln(
                     '  <comment>Warning: release branch uses one active domain.'
-                    . ' Re-run occ x2mail:setup or save in the setup wizard to consolidate.</comment>'
+                    . ' Re-run occ smail:setup or save in the setup wizard to consolidate.</comment>'
                 );
             }
         }
@@ -138,7 +138,7 @@ class Status extends Command
             try {
                 $this->engineHelper->loadApp();
                 $output->writeln('  Version: ' . APP_VERSION);
-                $appPath = \X2Mail\Engine\Api::Config()->Get('webmail', 'app_path', '(not set)');
+                $appPath = \Smail\Engine\Api::Config()->Get('webmail', 'app_path', '(not set)');
                 $output->writeln('  app_path: ' . $appPath);
             } catch (\Throwable $e) {
                 $output->writeln('  <error>Failed to load engine: ' . $e->getMessage() . '</error>');
@@ -153,8 +153,8 @@ class Status extends Command
         $output->writeln('<comment>Debug Log:</comment>');
         $debugEnabled = $this->logService->isEnabled();
         $output->writeln('  Status: ' . ($debugEnabled ? '<info>enabled</info>' : 'disabled'));
-        $output->writeln('  File: ' . $this->domainService->getDataPath() . '/souvera_mail.log');
-        $output->writeln('  Toggle: occ config:app:set souvera_mail debug_log --value=1|0');
+        $output->writeln('  File: ' . $this->domainService->getDataPath() . '/smail.log');
+        $output->writeln('  Toggle: occ config:app:set smail debug_log --value=1|0');
 
         $output->writeln('');
         $output->writeln('  Data path: ' . $this->domainService->getDataPath());

@@ -21,7 +21,7 @@ This stylesheet is used when Souvera Mail runs in embed mode.
 .modal-container li {
 	line-height: normal;
 }
-#content.app-souvera_mail {
+#content.app-smail {
 	max-height: 100%;
 	overflow: hidden;
 }

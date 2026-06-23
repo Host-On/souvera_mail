@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\Util;
+namespace OCA\Smail\Util;
 
 /**
  * Shared SSL-mode and OIDC-provider resolution used by the setup command,

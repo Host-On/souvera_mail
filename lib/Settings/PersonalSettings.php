@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\Settings;
+namespace OCA\Smail\Settings;
 
-use OCA\SouveraMail\Util\EngineHelper;
+use OCA\Smail\Util\EngineHelper;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IURLGenerator;
 use OCP\Settings\ISettings;
@@ -20,17 +20,17 @@ class PersonalSettings implements ISettings
     public function getForm()
     {
         $this->engineHelper->loadApp();
-        $brandName = \X2Mail\Engine\Api::Config()->Get('webmail', 'title', 'Souvera Mail');
+        $brandName = \Smail\Engine\Api::Config()->Get('webmail', 'title', 'Souvera Mail');
 
-        return new TemplateResponse('souvera_mail', 'personal_settings', [
+        return new TemplateResponse('smail', 'personal_settings', [
             'brandName' => $brandName,
-            'settingsUrl' => $this->urlGenerator->linkToRoute('souvera_mail.page.index') . '#/settings/accounts',
+            'settingsUrl' => $this->urlGenerator->linkToRoute('smail.page.index') . '#/settings/accounts',
         ], '');
     }
 
     public function getSection()
     {
-        return 'souvera_mail';
+        return 'smail';
     }
 
     public function getPriority()

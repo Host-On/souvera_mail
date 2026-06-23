@@ -1,5 +1,5 @@
 OC.L10N.register(
-    "x2mail",
+    "smail",
     {
     "Email" : "විද්‍යුත් තැපෑල",
     "Error" : "දෝෂය",

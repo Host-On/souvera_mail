@@ -1,10 +1,10 @@
 <?php
 
-namespace OCA\SouveraMail\Controller;
+namespace OCA\Smail\Controller;
 
-use OCA\SouveraMail\Service\DomainConfigService;
-use OCA\SouveraMail\Util\EngineHelper;
-use OCA\SouveraMail\ContentSecurityPolicy;
+use OCA\Smail\Service\DomainConfigService;
+use OCA\Smail\Util\EngineHelper;
+use OCA\Smail\ContentSecurityPolicy;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
@@ -37,7 +37,7 @@ class PageController extends Controller
         // No domain configured → show setup hint instead of useless login form
         if (empty($this->domainService->listDomains())) {
             $isAdmin = $this->userId && $this->groupManager->isAdmin($this->userId);
-            return new TemplateResponse('souvera_mail', 'not_configured', [
+            return new TemplateResponse('smail', 'not_configured', [
                 'isAdmin' => $isAdmin,
             ]);
         }
@@ -50,9 +50,9 @@ class PageController extends Controller
             return;
         }
 
-        $this->navigationManager->setActiveEntry('souvera_mail');
+        $this->navigationManager->setActiveEntry('smail');
 
-        \OCP\Util::addStyle('souvera_mail', 'embed');
+        \OCP\Util::addStyle('smail', 'embed');
 
         $this->engineHelper->startApp();
 
@@ -60,16 +60,16 @@ class PageController extends Controller
         // (expired/invalid OIDC token), show a clear error instead of the
         // engine's useless login form (LoginProcess rejects passwords anyway).
         if (!$this->engineHelper->hasAuthenticatedAccount()) {
-            return new TemplateResponse('souvera_mail', 'auth_error', [
+            return new TemplateResponse('smail', 'auth_error', [
                 'isOidcLogin' => $this->engineHelper->isOIDCLogin(),
-                'reloadUrl' => $this->urlGenerator->linkToRoute('souvera_mail.page.index'),
+                'reloadUrl' => $this->urlGenerator->linkToRoute('smail.page.index'),
             ]);
         }
 
-        $oConfig = \X2Mail\Engine\Api::Config();
-        $oActions = \X2Mail\Engine\Api::Actions();
-        $oHttp = \X2Mail\Mail\Base\Http::SingletonInstance();
-        $oServiceActions = new \X2Mail\Engine\ServiceActions($oHttp, $oActions);
+        $oConfig = \Smail\Engine\Api::Config();
+        $oActions = \Smail\Engine\Api::Actions();
+        $oHttp = \Smail\Mail\Base\Http::SingletonInstance();
+        $oServiceActions = new \Smail\Engine\ServiceActions($oHttp, $oActions);
         $sLanguage = $oActions->GetLanguage(false);
 
         $csp = new ContentSecurityPolicy();
@@ -82,7 +82,7 @@ class PageController extends Controller
                 ENT_QUOTES | ENT_IGNORE,
                 'UTF-8'
             ),
-            'BaseTemplates' => \X2Mail\Engine\Utils::ClearHtmlOutput(
+            'BaseTemplates' => \Smail\Engine\Utils::ClearHtmlOutput(
                 $oServiceActions->compileTemplates()
             ),
             'BaseAppBootScript' => \file_get_contents(
@@ -101,10 +101,10 @@ class PageController extends Controller
         \OCP\Util::addHeader('link', [
             'type' => 'text/css',
             'rel' => 'stylesheet',
-            'href' => \X2Mail\Engine\Utils::WebStaticPath('css/app.css'),
+            'href' => \Smail\Engine\Utils::WebStaticPath('css/app.css'),
         ], '');
 
-        $response = new TemplateResponse('souvera_mail', 'index_embed', $params);
+        $response = new TemplateResponse('smail', 'index_embed', $params);
 
         $response->setContentSecurityPolicy($csp);
 

@@ -10,7 +10,7 @@ Souvera Mail follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PA
 
 ## Installation
 
-Download the latest release from [GitHub Releases](https://github.com/NK-IT-CLOUD/x2mail/releases) or install via the [Nextcloud App Store](https://apps.nextcloud.com/apps/x2mail).
+Download the latest release from [GitHub Releases](https://github.com/PhiGi87/souvera_mail/releases) or install via the [Nextcloud App Store](https://apps.nextcloud.com/apps/smail).
 
 ## Upgrade
 
@@ -18,5 +18,5 @@ Nextcloud handles upgrades automatically when a new version is published to the 
 
 ```bash
 occ upgrade
-occ souvera_mail:status
+occ smail:status
 ```

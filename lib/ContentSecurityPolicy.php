@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail;
+namespace OCA\Smail;
 
 class ContentSecurityPolicy extends \OCP\AppFramework\Http\ContentSecurityPolicy
 {
     public function __construct()
     {
-        $CSP = \X2Mail\Engine\Api::getCSP();
+        $CSP = \Smail\Engine\Api::getCSP();
 
         $this->allowedScriptDomains = \array_unique(\array_merge($this->allowedScriptDomains, $CSP->get('script-src')));
         $this->allowedScriptDomains = \array_diff($this->allowedScriptDomains, ["'unsafe-inline'", "'unsafe-eval'"]);
@@ -63,7 +63,7 @@ class ContentSecurityPolicy extends \OCP\AppFramework\Http\ContentSecurityPolicy
             // Fallback (manager gone or nonce empty): NC's header knows nothing
             // about our self-generated nonce, so it MUST be allowed via this
             // policy or the inline boot script gets blocked on CSPv3 browsers.
-            $this->engineNonce = \X2Mail\Engine\UUID::generate();
+            $this->engineNonce = \Smail\Engine\UUID::generate();
             $this->addAllowedScriptDomain("'nonce-{$this->engineNonce}'");
         }
 

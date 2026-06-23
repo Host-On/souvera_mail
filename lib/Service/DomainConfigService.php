@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\Service;
+namespace OCA\Smail\Service;
 
-use OCA\SouveraMail\Util\EngineHelper;
+use OCA\Smail\Util\EngineHelper;
 use OCP\IConfig;
 
 /**
  * Service to programmatically read/write engine domain config files.
  *
  * Domain configs are stored as JSON in:
- *   {datadir}/appdata_souvera_mail/_data_/_default_/domains/{domain}.json
+ *   {datadir}/appdata_smail/_data_/_default_/domains/{domain}.json
  */
 class DomainConfigService
 {
@@ -62,11 +62,11 @@ class DomainConfigService
     }
 
     /**
-     * Get the appdata_souvera_mail path.
+     * Get the appdata_smail path.
      */
     public function getDataPath(): string
     {
-        return \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/') . '/appdata_souvera_mail';
+        return \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/') . '/appdata_smail';
     }
 
     /**
@@ -179,8 +179,8 @@ class DomainConfigService
                 $this->engineHelper->loadApp();
             }
 
-            if (\class_exists('\\X2Mail\\Mail\\Net\\SSLContext')) {
-                $context = new \X2Mail\Mail\Net\SSLContext();
+            if (\class_exists('\\Smail\\Mail\\Net\\SSLContext')) {
+                $context = new \Smail\Mail\Net\SSLContext();
                 return [
                     'verify_peer' => $context->verify_peer,
                     'verify_peer_name' => $context->verify_peer_name,

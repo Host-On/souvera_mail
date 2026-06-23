@@ -1,5 +1,5 @@
 OC.L10N.register(
-    "x2mail",
+    "smail",
     {
     "Email" : "Tölvupóstur",
     "Error" : "Villa",

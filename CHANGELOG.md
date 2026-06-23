@@ -12,7 +12,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - Support for the unmaintained `oidc_login` app — `user_oidc` is the only supported SSO provider now (`oidc_login` does not support Nextcloud 34+). Existing `oidc_login` setups must migrate to `user_oidc`.
 
 ### Added
-- Optional extra scopes for OIDC token exchange — configurable in the setup wizard next to the token audience, via `occ souvera_mail:setup --oidc-scopes "scope1 scope2"`, or directly: `occ config:app:set x2mail oidc-exchange-scopes --value "scope1 scope2"`. The wizard's Test Login uses the typed scopes.
+- Optional extra scopes for OIDC token exchange — configurable in the setup wizard next to the token audience, via `occ smail:setup --oidc-scopes "scope1 scope2"`, or directly: `occ config:app:set smail oidc-exchange-scopes --value "scope1 scope2"`. The wizard's Test Login uses the typed scopes.
 - Test Login diagnostics show which token was actually used: exchanged token (with audience, scopes and remaining lifetime), a warning when the token exchange fell back to the login token, or the plain login token
 
 ### Security
@@ -51,7 +51,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ## [0.7.0] — 2026-05-28
 
 ### Removed
-- Password/plain login — Souvera Mail is SSO/OIDC-only (`--auth plain`, `occ x2mail:settings`, and the manual password login form are no longer available)
+- Password/plain login — Souvera Mail is SSO/OIDC-only (`--auth plain`, `occ smail:settings`, and the manual password login form are no longer available)
 - Legacy engine admin panel (`/?admin`) — all administration moves to Nextcloud Settings → Souvera Mail
 - SnappyMail legacy domain blocklist seed (`app/domains/disabled`) — fresh installs no longer copy a public-provider deny list into engine data
 
@@ -79,11 +79,11 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ## [0.6.4] — 2026-05-27
 
 ### Added
-- Optional OAuth token exchange: `occ souvera_mail:setup --imap-audience <client>` (and a matching setup-wizard field) lets the mail server use a different OIDC client than the Nextcloud login client, for IdPs that support token exchange
+- Optional OAuth token exchange: `occ smail:setup --imap-audience <client>` (and a matching setup-wizard field) lets the mail server use a different OIDC client than the Nextcloud login client, for IdPs that support token exchange
 
 ### Changed
 - SSO token refresh now uses the official Nextcloud `user_oidc` token API for better forward compatibility
-- `occ souvera_mail:setup` default `--smtp-port` is now 587 (standard submission port) instead of 25
+- `occ smail:setup` default `--smtp-port` is now 587 (standard submission port) instead of 25
 
 ### Fixed
 - SSO mailbox reconnect after token expiry is now reliable in persistent-login sessions
@@ -92,7 +92,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ### Changed
 - JS/CSS minification in build pipeline (terser + clean-css)
-- Setup wizard and `occ souvera_mail:setup` now enforce one active domain profile and consolidate stale extra configs
+- Setup wizard and `occ smail:setup` now enforce one active domain profile and consolidate stale extra configs
 - OAuth domain configs now advertise only `OAUTHBEARER` and `XOAUTH2` SASL mechanisms by default
 
 ### Fixed
@@ -102,8 +102,8 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - SMTP OAuth capability is now validated when authenticated sending is enabled in SSO mode
 - Setup wizard now writes the new active domain before cleaning up stale profiles and reports cleanup warnings instead of risking config loss
 - Release defaults for `autologout`, `contacts_autosave`, `show_login_alert`, and identity handling are restored through targeted migration/default application
-- `occ souvera_mail:status` now reports the actual IMAP/SMTP security mode and the stored OIDC provider selection
-- `occ x2mail:settings` and password-login persistence now store secrets with sensitive/internal flags
+- `occ smail:status` now reports the actual IMAP/SMTP security mode and the stored OIDC provider selection
+- `occ smail:settings` and password-login persistence now store secrets with sensitive/internal flags
 - Repair step no longer wipes legacy passphrases on every update and no longer resets broad engine config on every post-update
 
 ## [0.6.2] — 2026-03-30
@@ -159,7 +159,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - SSO-first defaults: OAuth as default auth type
 - Single-domain setup: wizard manages one mail server configuration
 - Domain field auto-suggested from admin email address
-- `occ souvera_mail:status` shows compact SSO diagnostics
+- `occ smail:status` shows compact SSO diagnostics
 - Translations updated for all 97 locales
 
 ### Removed
@@ -204,12 +204,12 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ### Changed
 - SSO defaults: disable contacts autosave
-- Hide theme selector on fresh install (x2mail theme is default)
+- Hide theme selector on fresh install (smail theme is default)
 
 ## [0.5.5] — 2026-03-26
 
 ### Fixed
-- Default theme set to x2mail on fresh install (was falling back to "Default")
+- Default theme set to smail on fresh install (was falling back to "Default")
 
 ## [0.5.4] — 2026-03-26
 
@@ -257,7 +257,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ## [0.5.0] — 2026-03-25
 
 ### Added
-- New `x2mail` theme for Nextcloud 33+ design system
+- New `smail` theme for Nextcloud 33+ design system
   - 3-tier color mapping: pastel backgrounds, element colors for icons, text colors for readability
   - Alerts follow NC33 NoteCard pattern (pastel bg + colored left border)
   - Buttons follow NC33 NcButton pattern (focus-visible box-shadow, transitions)
@@ -273,7 +273,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - btn-danger/btn-warning hover states were overridden by generic hover rule
 
 ### Changed
-- Default theme switched from `NextcloudV25+` to `x2mail` (InstallStep, AdminSettings, RainLoop)
+- Default theme switched from `NextcloudV25+` to `smail` (InstallStep, AdminSettings, RainLoop)
 - Remove 20 unused bundled SnappyMail themes (A, BlackWood, Blurred, etc.)
 - Hide auto-logout setting in SSO/embedded mode (NC manages the session)
 
@@ -281,7 +281,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ### Fixed
 - SSO: auto-disable "Add account" and "Manage identities" when OIDC is configured (Setup Wizard, CLI, and upgrade)
-- SSO: SM plugin read autologin config from wrong app namespace (`snappymail` → `x2mail`), breaking fresh installs
+- SSO: SM plugin read autologin config from wrong app namespace (`snappymail` → `smail`), breaking fresh installs
 
 ## [0.4.8] — 2026-03-23
 
@@ -361,7 +361,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ### Added
 - **Nextcloud-native Contacts integration**: read, create, edit, and delete contacts directly in Nextcloud Contacts — no CardDAV sync, no separate database
 - Autocomplete suggestions in To/Cc/Bcc fields now pull from Nextcloud Contacts
-- `occ souvera_mail:setup` now enables contacts automatically
+- `occ smail:setup` now enables contacts automatically
 
 ### Changed
 - Contacts provider replaced: PdoAddressBook/SQLite → NextcloudAddressBook via NC IManager API
@@ -469,7 +469,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - SSO mode: hide toggleLeftPanel button in settings view
 - InstallStep removes SM default domains (gmail.com, hotmail.com, etc.) on install
 - Licence updated to AGPL-3.0-or-later (SPDX format)
-- GitHub URLs corrected to NK-IT-CLOUD/x2mail
+- GitHub URLs corrected to PhiGi87/souvera_mail
 
 ## [0.1.0] — 2026-03-18
 
@@ -478,7 +478,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - SnappyMail v2.38.2 core engine
 - OAUTHBEARER/XOAUTH2 IMAP authentication
 - Automatic OIDC token refresh
-- `occ souvera_mail:setup` command
-- `occ souvera_mail:status` command
+- `occ smail:setup` command
+- `occ smail:status` command
 - Nextcloud 28-35 support
 - PHP 8.1+ required

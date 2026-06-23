@@ -84,7 +84,7 @@ occ user_oidc:provider YourProvider \
   -d https://idp.example.com/realms/example/.well-known/openid-configuration
 ```
 
-`occ souvera_mail:setup` sets `store_login_token=1` for `user_oidc` when needed.
+`occ smail:setup` sets `store_login_token=1` for `user_oidc` when needed.
 
 ### 2. Mail Server OAuth Support
 
@@ -96,7 +96,7 @@ Stack-specific setup guides (masked examples, in repository `docs/configs/`):
 - [Dovecot + Postfix](docs/configs/dovecot-postfix-oauthbearer.md)
 - [Stalwart](docs/configs/stalwart-oauthbearer.md)
 
-These guides are published to the [GitHub mirror](https://github.com/NK-IT-CLOUD/x2mail) on
+These guides are published to the [GitHub mirror](https://github.com/PhiGi87/souvera_mail) on
 release (not shipped inside the Nextcloud app package from the App Store).
 
 ### 3. OIDC Audience and Claims
@@ -118,24 +118,24 @@ Details: [docs/configs/keycloak.md](docs/configs/keycloak.md)
 
 Install and enable Souvera Mail from the official app catalog:
 
-- [Souvera Mail on apps.nextcloud.com](https://apps.nextcloud.com/apps/x2mail)
+- [Souvera Mail on apps.nextcloud.com](https://apps.nextcloud.com/apps/smail)
 
 In the Nextcloud web UI: **Apps** → search **Souvera Mail** → **Download and enable**.  
 Nextcloud applies updates automatically when a new signed release is published to the App Store.
 
-After installation, configure mail connectivity in **Settings → Souvera Mail** or with `occ souvera_mail:setup`.
+After installation, configure mail connectivity in **Settings → Souvera Mail** or with `occ smail:setup`.
 
 ### Manual install (tarball)
 
 For manual deployment, download a release tarball from
-[GitHub Releases](https://github.com/NK-IT-CLOUD/x2mail/releases):
+[GitHub Releases](https://github.com/PhiGi87/souvera_mail/releases):
 
 ```bash
 cd /path/to/nextcloud/custom_apps
-tar xzf x2mail-*.tar.gz
-chown -R www-data:www-data x2mail
-occ app:enable x2mail
-occ souvera_mail:setup ...
+tar xzf smail-*.tar.gz
+chown -R www-data:www-data smail
+occ app:enable smail
+occ smail:setup ...
 ```
 
 The App Store and manual tarball install the **same app package**; only the delivery path differs.
@@ -158,7 +158,7 @@ The legacy SnappyMail-style engine admin panel was removed in 0.7.0.
 **Dovecot + Postfix** (typical STARTTLS listeners):
 
 ```bash
-occ souvera_mail:setup \
+occ smail:setup \
   --imap-host mail.example.com \
   --imap-port 143 --imap-ssl starttls \
   --smtp-host mail.example.com \
@@ -172,7 +172,7 @@ occ souvera_mail:setup \
 **Stalwart** (typical implicit-TLS listeners — verified with Souvera Mail):
 
 ```bash
-occ souvera_mail:setup \
+occ smail:setup \
   --imap-host mail.example.com \
   --imap-port 993 --imap-ssl ssl \
   --smtp-host mail.example.com \
@@ -249,7 +249,7 @@ Generated domain config uses OAuth SASL only (`OAUTHBEARER`, `XOAUTH2`) and enab
 ### Check Status
 
 ```bash
-occ souvera_mail:status
+occ smail:status
 ```
 
 Shows domain profile, protocol security modes, OIDC provider, and token-store status.
@@ -277,13 +277,13 @@ Shows domain profile, protocol security modes, OIDC provider, and token-store st
 - ManageSieve filtering support
 - Nextcloud Contacts / Files / Calendar integration
 - Multiple identities, OpenPGP / S-MIME
-- `occ souvera_mail:setup`, `occ souvera_mail:status`
+- `occ smail:setup`, `occ smail:status`
 
 ## Troubleshooting
 
 ### Login form appears instead of mailbox
 
-- Run `occ souvera_mail:status` (autologin/OIDC/domain)
+- Run `occ smail:status` (autologin/OIDC/domain)
 - Verify `occ config:app:get user_oidc store_login_token` is `1`
 - Ensure login happened via SSO, not local Nextcloud password
 - Domain in config must match mailbox domain (`user@example.com` -> `example.com`)
@@ -305,7 +305,7 @@ Shows domain profile, protocol security modes, OIDC provider, and token-store st
 
 - Align `--sieve-port` and `--sieve-ssl` with server listener mode
 - STARTTLS on `4190` vs implicit TLS on `4190` must match exactly
-- Re-save wizard or re-run `occ souvera_mail:setup` with corrected sieve options
+- Re-save wizard or re-run `occ smail:setup` with corrected sieve options
 
 ### TLS verify failed in wizard
 
@@ -332,8 +332,8 @@ For stack-specific failures, see:
 ## Development
 
 ```bash
-git clone https://github.com/NK-IT-CLOUD/x2mail.git
-cd x2mail
+git clone https://github.com/PhiGi87/souvera_mail.git
+cd smail
 make build
 ```
 

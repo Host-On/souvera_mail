@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\Util;
+namespace OCA\Smail\Util;
 
 use OCP\IAppConfig;
 
@@ -14,14 +14,14 @@ final class NavigationTitle
 
     public static function resolve(IAppConfig $appConfig): string
     {
-        $custom = \trim($appConfig->getValueString('souvera_mail', self::APP_CONFIG_KEY, ''));
+        $custom = \trim($appConfig->getValueString('smail', self::APP_CONFIG_KEY, ''));
 
         return $custom !== '' ? $custom : self::DEFAULT;
     }
 
     public static function storedOverride(IAppConfig $appConfig): string
     {
-        return \trim($appConfig->getValueString('souvera_mail', self::APP_CONFIG_KEY, ''));
+        return \trim($appConfig->getValueString('smail', self::APP_CONFIG_KEY, ''));
     }
 
     public static function validate(string $title): ?string

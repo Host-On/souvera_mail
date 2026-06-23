@@ -1,19 +1,19 @@
 <?php
 
-namespace OCA\SouveraMail\AppInfo;
+namespace OCA\Smail\AppInfo;
 
-use OCA\SouveraMail\Dashboard\UnreadMailWidget;
-use OCA\SouveraMail\Listeners\ImpersonateListener;
-use OCA\SouveraMail\Listeners\LoginBridgeListener;
-use OCA\SouveraMail\Listeners\LogoutListener;
-use OCA\SouveraMail\Listeners\TokenBridgeListener;
-use OCA\SouveraMail\Middleware\TokenRefreshMiddleware;
-use OCA\SouveraMail\Search\Provider;
+use OCA\Smail\Dashboard\UnreadMailWidget;
+use OCA\Smail\Listeners\ImpersonateListener;
+use OCA\Smail\Listeners\LoginBridgeListener;
+use OCA\Smail\Listeners\LogoutListener;
+use OCA\Smail\Listeners\TokenBridgeListener;
+use OCA\Smail\Middleware\TokenRefreshMiddleware;
+use OCA\Smail\Search\Provider;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
-use OCA\SouveraMail\Util\NavigationTitle;
+use OCA\Smail\Util\NavigationTitle;
 use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\INavigationManager;
@@ -23,7 +23,7 @@ use OCP\User\Events\UserLoggedInEvent;
 
 class Application extends App implements IBootstrap
 {
-    public const APP_ID = 'souvera_mail';
+    public const APP_ID = 'smail';
 
     /** @param array<string, mixed> $urlParams */
     public function __construct(array $urlParams = [])
@@ -79,7 +79,7 @@ class Application extends App implements IBootstrap
 
         $config = $serverContainer->get(IConfig::class);
         $dataDir = \rtrim(\trim($config->getSystemValue('datadirectory', '')), '\\/');
-        if (!\is_dir($dataDir . '/appdata_souvera_mail')) {
+        if (!\is_dir($dataDir . '/appdata_smail')) {
             return;
         }
 
@@ -91,7 +91,7 @@ class Application extends App implements IBootstrap
             return [
                 'id' => self::APP_ID,
                 'name' => NavigationTitle::resolve($appConfig),
-                'href' => $urlGenerator->linkToRoute('souvera_mail.page.index'),
+                'href' => $urlGenerator->linkToRoute('smail.page.index'),
                 'icon' => $urlGenerator->imagePath(self::APP_ID, 'logo-white-64x64.png'),
                 'order' => 4,
             ];

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\Command;
+namespace OCA\Smail\Command;
 
-use OCA\SouveraMail\Service\ConnectivityCheckService;
-use OCA\SouveraMail\Service\DomainConfigService;
-use OCA\SouveraMail\Util\EngineHelper;
-use OCA\SouveraMail\Util\SetupResolvers;
+use OCA\Smail\Service\ConnectivityCheckService;
+use OCA\Smail\Service\DomainConfigService;
+use OCA\Smail\Util\EngineHelper;
+use OCA\Smail\Util\SetupResolvers;
 use Symfony\Component\Console\Command\Command;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
@@ -19,7 +19,7 @@ class Setup extends Command
 {
     use SetupResolvers;
 
-    private const APP_ID = 'souvera_mail';
+    private const APP_ID = 'smail';
     private const OIDC_PROVIDER_KEY = 'oidc-provider';
 
     public function __construct(
@@ -35,7 +35,7 @@ class Setup extends Command
     protected function configure(): void
     {
         $this
-            ->setName('souvera_mail:setup')
+            ->setName('smail:setup')
             ->setDescription('Configure Souvera Mail server connection and authentication')
             ->addOption('imap-host', null, InputOption::VALUE_REQUIRED, 'IMAP server hostname')
             ->addOption('imap-port', null, InputOption::VALUE_REQUIRED, 'IMAP server port', '143')
@@ -68,7 +68,7 @@ class Setup extends Command
                 null,
                 InputOption::VALUE_REQUIRED,
                 'Optional: target OIDC client/audience for the mail server. '
-                . 'When set, x2mail exchanges the login token for one scoped to this audience '
+                . 'When set, smail exchanges the login token for one scoped to this audience '
                 . '(requires IdP token-exchange support).'
             )
             ->addOption(
@@ -338,7 +338,7 @@ class Setup extends Command
         if (\is_dir($appDir)) {
             try {
                 $this->engineHelper->loadApp();
-                $oConfig = \X2Mail\Engine\Api::Config();
+                $oConfig = \Smail\Engine\Api::Config();
                 $webPath = $this->appManager->getAppWebPath(self::APP_ID);
                 $appPath = \preg_replace(
                     '#(?<!:)/+#',

@@ -1,6 +1,6 @@
 <?php
 
-namespace OCA\SouveraMail\Util;
+namespace OCA\Smail\Util;
 
 use OCP\App\IAppManager;
 use OCP\Config\IUserConfig;
@@ -28,24 +28,24 @@ class EngineHelper
 
     public function loadApp(): void
     {
-        if (\class_exists('X2Mail\\Engine\\Api')) {
+        if (\class_exists('Smail\\Engine\\Api')) {
             return;
         }
 
-        // X2Mail namespace autoloader (case-sensitive PSR-4 style)
+        // Smail namespace autoloader (case-sensitive PSR-4 style)
         \spl_autoload_register(function ($sClassName) {
-            if (\str_starts_with($sClassName, 'X2Mail\\')) {
-                $file = X2MAIL_LIBRARIES_PATH . \strtr($sClassName, '\\', DIRECTORY_SEPARATOR) . '.php';
+            if (\str_starts_with($sClassName, 'Smail\\')) {
+                $file = SMAIL_LIBRARIES_PATH . \strtr($sClassName, '\\', DIRECTORY_SEPARATOR) . '.php';
                 if (\is_file($file)) {
                     include_once $file;
                 }
             }
         });
 
-        // Lowercase-filename autoloader for X2Mail\Engine
+        // Lowercase-filename autoloader for Smail\Engine
         \spl_autoload_register(function ($sClassName) {
-            if (\str_starts_with($sClassName, 'X2Mail\\Engine\\')) {
-                $file = X2MAIL_LIBRARIES_PATH . 'X2Mail/Engine/'
+            if (\str_starts_with($sClassName, 'Smail\\Engine\\')) {
+                $file = SMAIL_LIBRARIES_PATH . 'Smail/Engine/'
                     . \strtolower(\strtr(\substr($sClassName, 14), '\\', DIRECTORY_SEPARATOR))
                     . '.php';
                 if (\is_file($file)) {
@@ -55,7 +55,7 @@ class EngineHelper
                 $parts = \explode('\\', \substr($sClassName, 14));
                 $fileName = \array_pop($parts);
                 $dirPath = \implode(DIRECTORY_SEPARATOR, \array_map('strtolower', $parts));
-                $file = X2MAIL_LIBRARIES_PATH . 'X2Mail/Engine/'
+                $file = SMAIL_LIBRARIES_PATH . 'Smail/Engine/'
                     . ($dirPath ? $dirPath . DIRECTORY_SEPARATOR : '')
                     . $fileName . '.php';
                 if (\is_file($file)) {
@@ -64,11 +64,11 @@ class EngineHelper
             }
         });
 
-        $_ENV['X2MAIL_INCLUDE_AS_API'] = true;
+        $_ENV['SMAIL_INCLUDE_AS_API'] = true;
 
         if (!\defined('APP_DATA_FOLDER_PATH')) {
             $dataDir = \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/');
-            \define('APP_DATA_FOLDER_PATH', $dataDir . '/appdata_souvera_mail/');
+            \define('APP_DATA_FOLDER_PATH', $dataDir . '/appdata_smail/');
         }
 
         $app_dir = \dirname(\dirname(__DIR__)) . '/app';
@@ -84,23 +84,23 @@ class EngineHelper
     {
         $this->loadApp();
 
-        $oConfig = \X2Mail\Engine\Api::Config();
+        $oConfig = \Smail\Engine\Api::Config();
 
         if (false !== \stripos(\php_sapi_name(), 'cli')) {
             return;
         }
 
         try {
-            $oActions = \X2Mail\Engine\Api::Actions();
+            $oActions = \Smail\Engine\Api::Actions();
             $doLogin = !$oActions->getMainAccountFromToken(false);
             $aCredentials = $this->getLoginCredentials();
             if ($doLogin && $aCredentials[1] && $aCredentials[2]) {
                 try {
                     $oActions->LoginProcess(
                         $aCredentials[1],
-                        new \X2Mail\Engine\SensitiveString($aCredentials[2])
+                        new \Smail\Engine\SensitiveString($aCredentials[2])
                     );
-                } catch (\X2Mail\Engine\Exceptions\ClientException $e) {
+                } catch (\Smail\Engine\Exceptions\ClientException $e) {
                     // OIDC login failure — no credentials to clear
                     $this->logger->debug('Souvera Mail SSO login failed: ' . $e->getMessage());
                 } catch (\Throwable $e) {
@@ -111,7 +111,7 @@ class EngineHelper
 
             if ($handle) {
                 \header_remove('Content-Security-Policy');
-                \X2Mail\Engine\Service::Handle();
+                \Smail\Engine\Service::Handle();
                 exit;
             }
         } catch (\Throwable $e) {
@@ -126,11 +126,11 @@ class EngineHelper
      */
     public function hasAuthenticatedAccount(): bool
     {
-        if (!\class_exists('X2Mail\\Engine\\Api')) {
+        if (!\class_exists('Smail\\Engine\\Api')) {
             return false;
         }
         try {
-            return \X2Mail\Engine\Api::Actions()->getMainAccountFromToken(false) !== null;
+            return \Smail\Engine\Api::Actions()->getMainAccountFromToken(false) !== null;
         } catch (\Throwable $e) {
             return false;
         }
@@ -141,7 +141,7 @@ class EngineHelper
      */
     public function getSsoUid(): ?string
     {
-        $uid = $this->session->get('souvera_mail-uid');
+        $uid = $this->session->get('smail-uid');
         return \is_string($uid) && $uid !== '' ? $uid : null;
     }
 
@@ -167,7 +167,7 @@ class EngineHelper
      * Returns the email for the current SSO user, identical to the value
      * FilterAppData seeds into AppData in the nextcloud engine plugin so the
      * NC-session reconstruction matches the live login path. Resolution order:
-     *   1. custom x2mail email: IUserConfig x2mail/email (overrides everything)
+     *   1. custom smail email: IUserConfig smail/email (overrides everything)
      *   2. profile email: IUserConfig settings/email
      *   3. IUser::getEMailAddress() (NC account email)
      *   4. uid itself (last resort — guarantees a non-empty return)
@@ -180,7 +180,7 @@ class EngineHelper
             return null;
         }
 
-        $custom = $this->userConfig->getValueString($uid, 'souvera_mail', 'email', '');
+        $custom = $this->userConfig->getValueString($uid, 'smail', 'email', '');
         if ($custom !== '') {
             return $custom;
         }
@@ -203,18 +203,18 @@ class EngineHelper
 
     public function isOIDCLogin(): bool
     {
-        if ($this->appConfig->getValueString('souvera_mail', 'autologin-oidc', '0') !== '0') {
+        if ($this->appConfig->getValueString('smail', 'autologin-oidc', '0') !== '0') {
             if ($this->appManager->isEnabledForUser('user_oidc')) {
                 if ($this->session->get('is_oidc')) {
                     if ($this->session->get('oidc_access_token')) {
                         return true;
                     }
-                    \X2Mail\Engine\Log::debug('Nextcloud', 'OIDC access_token missing');
+                    \Smail\Engine\Log::debug('Nextcloud', 'OIDC access_token missing');
                 } else {
-                    \X2Mail\Engine\Log::debug('Nextcloud', 'No OIDC login');
+                    \Smail\Engine\Log::debug('Nextcloud', 'No OIDC login');
                 }
             } else {
-                \X2Mail\Engine\Log::debug('Nextcloud', 'OIDC login disabled');
+                \Smail\Engine\Log::debug('Nextcloud', 'OIDC login disabled');
             }
         }
         return false;
@@ -232,10 +232,10 @@ class EngineHelper
     public function getOidcAccessToken(?string $audienceOverride = null, ?string $scopesOverride = null): ?string
     {
         $audience = $audienceOverride
-            ?? $this->appConfig->getValueString('souvera_mail', 'oidc-exchange-audience', '');
+            ?? $this->appConfig->getValueString('smail', 'oidc-exchange-audience', '');
         if ($audience !== '') {
             $rawScopes = $scopesOverride
-                ?? $this->appConfig->getValueString('souvera_mail', 'oidc-exchange-scopes', '');
+                ?? $this->appConfig->getValueString('smail', 'oidc-exchange-scopes', '');
             $scopes = \preg_split('/\s+/', \trim($rawScopes), -1, PREG_SPLIT_NO_EMPTY) ?: [];
             $exchanged = $this->dispatchTokenEvent(
                 'OCA\\UserOIDC\\Event\\ExchangedTokenRequestedEvent',
@@ -318,7 +318,7 @@ class EngineHelper
     private function getLoginCredentials(): array
     {
         $sUID = $this->userSession->getUser()->getUID();
-        if ($this->session->get('souvera_mail-uid') === $sUID && $this->isOIDCLogin()) {
+        if ($this->session->get('smail-uid') === $sUID && $this->isOIDCLogin()) {
             $sEmail = $this->userConfig->getValueString($sUID, 'settings', 'email');
             return [$sUID, $sEmail, "oidc_login|{$sUID}"];
         }

@@ -65,38 +65,38 @@
     </p>
 
     <p>
-        <input id="x2mail-nc-lang" name="x2mail-nc-lang" type="checkbox" class="checkbox"
-            <?php if ($_['x2mail-nc-lang']) {
+        <input id="smail-nc-lang" name="smail-nc-lang" type="checkbox" class="checkbox"
+            <?php if ($_['smail-nc-lang']) {
                 echo 'checked="checked"';
             } ?>>
-        <label for="x2mail-nc-lang">
+        <label for="smail-nc-lang">
             <?php p($l->t('Force Nextcloud language')); ?>
         </label>
     </p>
     <p>
-        <input id="x2mail-debug" name="x2mail-debug" type="checkbox" class="checkbox"
-            <?php if ($_['x2mail-debug']) {
+        <input id="smail-debug" name="smail-debug" type="checkbox" class="checkbox"
+            <?php if ($_['smail-debug']) {
                 echo 'checked="checked"';
             } ?>>
-        <label for="x2mail-debug">
+        <label for="smail-debug">
             <?php p($l->t('Enable engine debug logging')); ?>
         </label>
     </p>
     <p>
-        <input id="x2mail-debug-log" name="x2mail-debug-log" type="checkbox" class="checkbox"
-            <?php if ($_['x2mail-debug-log']) {
+        <input id="smail-debug-log" name="smail-debug-log" type="checkbox" class="checkbox"
+            <?php if ($_['smail-debug-log']) {
                 echo 'checked="checked"';
             } ?>>
-        <label for="x2mail-debug-log">
+        <label for="smail-debug-log">
             <?php p($l->t('Enable Souvera Mail debug logging (OIDC token events, refresh)')); ?>
         </label>
     </p>
 
     <div class="x2m-grid">
-        <label for="x2mail-app-path"><?php p($l->t('app_path')); ?></label>
+        <label for="smail-app-path"><?php p($l->t('app_path')); ?></label>
         <div class="x2m-field">
-            <input id="x2mail-app-path" name="x2mail-app-path" type="text"
-                   value="<?php p($_['x2mail-app-path']); ?>" autocomplete="off">
+            <input id="smail-app-path" name="smail-app-path" type="text"
+                   value="<?php p($_['smail-app-path']); ?>" autocomplete="off">
         </div>
     </div>
 
@@ -109,9 +109,9 @@
 <div class="section x2m-section x2m-section-info">
     <h2><?php p($l->t('Info')); ?></h2>
     <div class="x2m-info">
-        <img class="x2m-info-logo" src="<?php p(image_path('souvera_mail', 'logo-64x64.png')); ?>" alt="Souvera Mail">
+        <img class="x2m-info-logo" src="<?php p(image_path('smail', 'logo-64x64.png')); ?>" alt="Souvera Mail">
         <div class="x2m-info-meta">
-            <div class="x2m-info-version"><?php p($_['x2mail_version']); ?></div>
+            <div class="x2m-info-version"><?php p($_['smail_version']); ?></div>
             <div class="x2m-info-copy">2026 &copy; NK-IT Dev. <?php p($l->t('All rights reserved.')); ?></div>
             <a class="x2m-info-link"
                href="https://github.com/PhiGi87/souvera_mail"

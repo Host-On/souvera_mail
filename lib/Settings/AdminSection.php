@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\Settings;
+namespace OCA\Smail\Settings;
 
 use OCP\IURLGenerator;
 use OCP\Settings\IIconSection;
@@ -16,7 +16,7 @@ class AdminSection implements IIconSection
 
     public function getID(): string
     {
-        return 'souvera_mail';
+        return 'smail';
     }
 
     public function getName(): string
@@ -31,6 +31,6 @@ class AdminSection implements IIconSection
 
     public function getIcon(): string
     {
-        return $this->urlGenerator->imagePath('souvera_mail', 'logo-64x64.png');
+        return $this->urlGenerator->imagePath('smail', 'logo-64x64.png');
     }
 }

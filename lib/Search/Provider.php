@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\Search;
+namespace OCA\Smail\Search;
 
-use OCA\SouveraMail\AppInfo\Application;
-use OCA\SouveraMail\Util\EngineHelper;
+use OCA\Smail\AppInfo\Application;
+use OCA\Smail\Util\EngineHelper;
 use OCP\ISession;
 use OCP\IURLGenerator;
 use OCP\IUser;
@@ -71,14 +71,14 @@ class Provider implements IProvider
         }
         $this->refreshOidcToken();
         $this->engineHelper->startApp();
-        $oActions = \X2Mail\Engine\Api::Actions();
+        $oActions = \Smail\Engine\Api::Actions();
         $oAccount = $oActions->getAccountFromToken(false);
         $iCursor = (int) $query->getCursor();
         $iLimit = $query->getLimit();
         if ($oAccount) {
             $oConfig = $oActions->Config();
 
-            $oParams = new \X2Mail\Mail\Client\MessageListParams();
+            $oParams = new \Smail\Mail\Client\MessageListParams();
             $oParams->sFolderName = 'INBOX';
             $oParams->sSearch = $query->getTerm();
             $oParams->oCacher = ($oConfig->Get('cache', 'enable', true) && $oConfig->Get('cache', 'server_uids', false))
@@ -94,7 +94,7 @@ class Provider implements IProvider
 
             $MessageCollection = $oMailClient->MessageList($oParams);
 
-            $baseURL = $this->urlGenerator->linkToRoute('souvera_mail.page.index');
+            $baseURL = $this->urlGenerator->linkToRoute('smail.page.index');
             $baseURL .= '#';
             $search = \rawurlencode($oParams->sSearch);
 

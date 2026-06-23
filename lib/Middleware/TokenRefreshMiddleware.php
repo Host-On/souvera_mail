@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\Middleware;
+namespace OCA\Smail\Middleware;
 
-use OCA\SouveraMail\Service\LogService;
+use OCA\Smail\Service\LogService;
 use OCP\AppFramework\Middleware;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventDispatcher;

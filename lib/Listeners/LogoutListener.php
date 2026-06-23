@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\Listeners;
+namespace OCA\Smail\Listeners;
 
-use OCA\SouveraMail\Service\LogService;
+use OCA\Smail\Service\LogService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\ISession;
@@ -25,7 +25,7 @@ class LogoutListener implements IEventListener
             return;
         }
 
-        $this->session->remove('souvera_mail-uid');
+        $this->session->remove('smail-uid');
         $this->logService->debug('Session cleared on logout');
     }
 }
