@@ -6,13 +6,21 @@ namespace OCA\Smail\Command;
 
 use OCA\Smail\Service\DomainConfigService;
 use OCA\Smail\Service\LogService;
+use OCA\Smail\Service\OidcProviderService;
 use OCA\Smail\Util\EngineHelper;
-use Symfony\Component\Console\Command\Command;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
+use OCP\IURLGenerator;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * Read-only diagnostic dump. Designed for deploy pipelines: `--json` returns a
+ * complete state snapshot that downstream automation can grep, jq, or assert
+ * against. Exits 0 when the install is healthy, 1 when a blocker is found.
+ */
 class Status extends Command
 {
     private const APP_ID = 'smail';
@@ -23,142 +31,200 @@ class Status extends Command
         private IAppManager $appManager,
         private LogService $logService,
         private EngineHelper $engineHelper,
+        private OidcProviderService $oidcProvider,
+        private IURLGenerator $urlGenerator,
     ) {
         parent::__construct();
     }
 
-    protected function configure()
+    protected function configure(): void
     {
         $this
             ->setName('smail:status')
-            ->setDescription('Show Souvera Mail configuration status')
+            ->setDescription('Inspect Souvera Mail configuration and OIDC provider health')
+            ->addOption('json', null, InputOption::VALUE_NONE, 'Emit a single machine-readable JSON object')
         ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $jsonMode = (bool) $input->getOption('json');
+        $issues = [];
+        $report = [
+            'command' => 'smail:status',
+            'app' => [
+                'version' => $this->appManager->getAppVersion(self::APP_ID),
+                'enabled' => $this->appManager->isInstalled(self::APP_ID),
+            ],
+            'oidc_provider' => $this->oidcProviderReport($issues),
+            'domain' => $this->domainReport($issues),
+            'engine' => $this->engineReport(),
+            'debug_log' => [
+                'enabled' => $this->logService->isEnabled(),
+                'file' => $this->domainService->getDataPath() . '/smail.log',
+                'toggle_cmd' => 'occ config:app:set smail debug_log --value=1|0',
+            ],
+            'issues' => $issues,
+            'status' => $issues === [] ? 'ok' : 'issues',
+        ];
+
+        if ($jsonMode) {
+            $output->writeln((string) \json_encode($report, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
+        } else {
+            $this->renderHuman($output, $report);
+        }
+        return $issues === [] ? Command::SUCCESS : Command::FAILURE;
+    }
+
+    /**
+     * @param list<string> $issues
+     * @return array<string, mixed>
+     */
+    private function oidcProviderReport(array &$issues): array
+    {
+        $installed = $this->appManager->isInstalled(OidcProviderService::OIDC_APP_ID);
+        $enabled = $this->appManager->isEnabledForUser(OidcProviderService::OIDC_APP_ID);
+        $available = $this->oidcProvider->isProviderAvailable();
+        $clientName = $this->oidcProvider->getClientIdentifier();
+        $clientRegistered = $this->appConfig->getValueString(self::APP_ID, OidcProviderService::SMAIL_CLIENT_KEY, '') !== '';
+        $jwksUrl = $this->urlGenerator->getAbsoluteURL('/index.php/apps/oidc/jwks');
+        $discoveryUrl = $this->urlGenerator->getAbsoluteURL('/index.php/apps/oidc/openid-configuration');
+
+        if (!$installed) {
+            $issues[] = 'H2CK/oidc app not installed (`occ app:install oidc`)';
+        } elseif (!$enabled) {
+            $issues[] = 'H2CK/oidc app installed but not enabled (`occ app:enable oidc`)';
+        } elseif (!$available) {
+            $issues[] = 'H2CK/oidc event class not loadable — possible version mismatch (need 1.17+)';
+        } elseif (!$clientRegistered) {
+            $issues[] = 'No OIDC client registered for smail (`occ smail:oidc:register-client`)';
+        }
+
+        $defaultTokenType = $this->appConfig->getValueString('oidc', 'default_token_type', 'opaque');
+        if ($defaultTokenType !== 'jwt') {
+            $issues[] = "H2CK/oidc default_token_type is '{$defaultTokenType}' (expected 'jwt' — run `occ config:app:set oidc default_token_type --value jwt`)";
+        }
+
+        return [
+            'h2ck_oidc_installed' => $installed,
+            'h2ck_oidc_enabled' => $enabled,
+            'event_class_loadable' => $available,
+            'client_name' => $clientName,
+            'client_registered' => $clientRegistered,
+            'default_token_type' => $defaultTokenType,
+            'discovery_url' => $discoveryUrl,
+            'jwks_url' => $jwksUrl,
+        ];
+    }
+
+    /**
+     * @param list<string> $issues
+     * @return array<string, mixed>
+     */
+    private function domainReport(array &$issues): array
+    {
+        $domains = $this->domainService->listDomains();
+        if ($domains === []) {
+            $issues[] = 'No mail domain configured (`occ smail:setup --imap-host … --domain …`)';
+            return ['configured' => []];
+        }
+        $entries = [];
+        foreach ($domains as $domain) {
+            $cfg = $this->domainService->readDomainConfig($domain);
+            if (!$cfg) {
+                $entries[$domain] = ['error' => 'unreadable'];
+                continue;
+            }
+            $imapType = $cfg['IMAP']['type'] ?? 0;
+            $smtpType = $cfg['SMTP']['type'] ?? 0;
+            $entries[$domain] = [
+                'imap' => [
+                    'host' => $cfg['IMAP']['host'] ?? '',
+                    'port' => $cfg['IMAP']['port'] ?? 0,
+                    'ssl' => \is_int($imapType) ? DomainConfigService::sslToString($imapType) : 'custom',
+                ],
+                'smtp' => [
+                    'host' => $cfg['SMTP']['host'] ?? '',
+                    'port' => $cfg['SMTP']['port'] ?? 0,
+                    'ssl' => \is_int($smtpType) ? DomainConfigService::sslToString($smtpType) : 'custom',
+                ],
+                'sieve_enabled' => (bool) ($cfg['Sieve']['enabled'] ?? false),
+            ];
+        }
+        return [
+            'configured' => $entries,
+            'single_active' => \count($entries) === 1,
+            'oidc_audience' => $this->appConfig->getValueString(self::APP_ID, 'oidc-exchange-audience', ''),
+            'oidc_scopes' => $this->appConfig->getValueString(self::APP_ID, 'oidc-exchange-scopes', ''),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function engineReport(): array
+    {
+        $appDir = \dirname(\dirname(__DIR__)) . '/app';
+        if (!\is_dir($appDir)) {
+            return ['present' => false];
+        }
+        try {
+            $this->engineHelper->loadApp();
+            $cfg = \Smail\Engine\Api::Config();
+            return [
+                'present' => true,
+                'version' => \defined('APP_VERSION') ? APP_VERSION : null,
+                'app_path' => $cfg->Get('webmail', 'app_path', '(not set)'),
+                'webmail_title' => $cfg->Get('webmail', 'title', ''),
+                'theme' => $cfg->Get('webmail', 'theme', ''),
+            ];
+        } catch (\Throwable $e) {
+            return ['present' => true, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $report
+     */
+    private function renderHuman(OutputInterface $output, array $report): void
+    {
         $output->writeln('<info>Souvera Mail Status</info>');
         $output->writeln('');
-
-        // Domains
-        $domains = $this->domainService->listDomains();
-        $output->writeln('<comment>Configured Domains:</comment>');
-        if (empty($domains)) {
-            $output->writeln('  (none)');
+        $output->writeln('<comment>App:</comment>');
+        $output->writeln('  version: ' . ($report['app']['version'] ?: '?'));
+        $output->writeln('');
+        $output->writeln('<comment>OIDC Provider (H2CK/oidc):</comment>');
+        foreach ($report['oidc_provider'] as $k => $v) {
+            $output->writeln('  ' . $k . ': ' . (\is_bool($v) ? ($v ? 'yes' : 'no') : (string) $v));
+        }
+        $output->writeln('');
+        $output->writeln('<comment>Domain Profile:</comment>');
+        if (($report['domain']['configured'] ?? []) === []) {
+            $output->writeln('  (none — run occ smail:setup)');
         } else {
-            foreach ($domains as $domain) {
-                $config = $this->domainService->readDomainConfig($domain);
-                if ($config) {
-                    $imapHost = $config['IMAP']['host'] ?? '?';
-                    $imapPort = $config['IMAP']['port'] ?? '?';
-                    $imapType = $config['IMAP']['type'] ?? 0;
-                    $imapSsl = \is_int($imapType) ? DomainConfigService::sslToString($imapType) : 'custom';
-                    $smtpHost = $config['SMTP']['host'] ?? '?';
-                    $smtpPort = $config['SMTP']['port'] ?? '?';
-                    $smtpType = $config['SMTP']['type'] ?? 0;
-                    $smtpSsl = \is_int($smtpType) ? DomainConfigService::sslToString($smtpType) : 'custom';
-                    $sasl = $config['IMAP']['sasl'] ?? [];
-                    $hasOAuth = \in_array('OAUTHBEARER', $sasl) || \in_array('XOAUTH2', $sasl);
-                    $authMode = $hasOAuth ? 'OAUTHBEARER/XOAUTH2' : 'unknown';
-                    $sieve = ($config['Sieve']['enabled'] ?? false) ? 'yes' : 'no';
-                    $output->writeln("  {$domain}");
-                    $output->writeln("    IMAP: {$imapHost}:{$imapPort} ({$imapSsl})");
-                    $output->writeln("    SMTP: {$smtpHost}:{$smtpPort} ({$smtpSsl})");
-                    $output->writeln("    Auth: {$authMode}");
-                    $output->writeln("    Sieve: {$sieve}");
-                } else {
-                    $output->writeln("  {$domain} (config unreadable)");
+            foreach ($report['domain']['configured'] as $name => $cfg) {
+                $output->writeln('  ' . $name);
+                if (isset($cfg['imap'])) {
+                    $output->writeln("    IMAP  {$cfg['imap']['host']}:{$cfg['imap']['port']} ({$cfg['imap']['ssl']})");
+                    $output->writeln("    SMTP  {$cfg['smtp']['host']}:{$cfg['smtp']['port']} ({$cfg['smtp']['ssl']})");
+                    $output->writeln('    Sieve ' . ($cfg['sieve_enabled'] ? 'enabled' : 'disabled'));
                 }
             }
-            if (\count($domains) > 1) {
-                $output->writeln('');
-                $output->writeln(
-                    '  <comment>Warning: release branch uses one active domain.'
-                    . ' Re-run occ smail:setup or save in the setup wizard to consolidate.</comment>'
-                );
-            }
+            $output->writeln('  audience: ' . ($report['domain']['oidc_audience'] ?? ''));
         }
-
         $output->writeln('');
-
-        // SSO/OIDC status
-        $output->writeln('<comment>SSO Configuration:</comment>');
-        $oidcEnabled = $this->appConfig->getValueString(self::APP_ID, 'autologin-oidc', '0') === '1';
-        $autologin = $this->appConfig->getValueString(self::APP_ID, 'autologin', '0') === '1';
-
-        $userOidc = $this->appManager->isEnabledForUser('user_oidc');
-        $provider = $userOidc ? 'user_oidc' : 'none';
-
-        $output->writeln('  OIDC auto-login: ' . ($oidcEnabled ? '<info>enabled</info>' : 'disabled'));
-        $output->writeln('  Autologin:       ' . ($autologin ? '<info>enabled</info>' : 'disabled'));
-        $providerLabel = $provider === 'none'
-            ? '<error>user_oidc not installed</error>'
-            : "<info>{$provider}</info>";
-        $output->writeln('  Provider:        ' . $providerLabel);
-
-        if ($userOidc) {
-            $storeToken = $this->appConfig->getValueString(
-                'user_oidc',
-                'store_login_token',
-                '0'
-            );
-            $tokenLabel = $storeToken === '1'
-                ? '<info>enabled</info>'
-                : '<error>disabled (set store_login_token=1)</error>';
-            $output->writeln('  Token store:     ' . $tokenLabel);
-
-            try {
-                $hasProvider = $this->appConfig->getValueString(
-                    'user_oidc',
-                    'provider-1-mappingUid',
-                    '',
-                    lazy: true
-                ) !== '';
-                $providerStatus = $hasProvider
-                    ? '<info>configured</info>'
-                    : '<comment>not detected (occ user_oidc:provider)</comment>';
-                $output->writeln('  OIDC provider:   ' . $providerStatus);
-            } catch (\Throwable $e) {
-                // Cannot check — skip
-            }
+        $output->writeln('<comment>Engine:</comment>');
+        foreach ($report['engine'] as $k => $v) {
+            $output->writeln('  ' . $k . ': ' . (\is_bool($v) ? ($v ? 'yes' : 'no') : (string) $v));
         }
-
         $output->writeln('');
-        $output->writeln(
-            '  <comment>Token diagnostics only available in browser wizard'
-            . ' (Admin → Souvera Mail → Run Checks)</comment>'
-        );
-
-        $output->writeln('');
-
-        // Engine version and app_path
-        $output->writeln('<comment>Souvera Mail Engine:</comment>');
-        $appDir = \dirname(\dirname(__DIR__)) . '/app';
-        if (\is_dir($appDir)) {
-            try {
-                $this->engineHelper->loadApp();
-                $output->writeln('  Version: ' . APP_VERSION);
-                $appPath = \Smail\Engine\Api::Config()->Get('webmail', 'app_path', '(not set)');
-                $output->writeln('  app_path: ' . $appPath);
-            } catch (\Throwable $e) {
-                $output->writeln('  <error>Failed to load engine: ' . $e->getMessage() . '</error>');
+        if ($report['issues'] !== []) {
+            $output->writeln('<comment>Issues:</comment>');
+            foreach ($report['issues'] as $issue) {
+                $output->writeln('  <error>✗ ' . $issue . '</error>');
             }
         } else {
-            $output->writeln('  <comment>Engine not present at app/</comment>');
+            $output->writeln('<info>✓ all checks passed</info>');
         }
-
-        $output->writeln('');
-
-        // Debug log status
-        $output->writeln('<comment>Debug Log:</comment>');
-        $debugEnabled = $this->logService->isEnabled();
-        $output->writeln('  Status: ' . ($debugEnabled ? '<info>enabled</info>' : 'disabled'));
-        $output->writeln('  File: ' . $this->domainService->getDataPath() . '/smail.log');
-        $output->writeln('  Toggle: occ config:app:set smail debug_log --value=1|0');
-
-        $output->writeln('');
-        $output->writeln('  Data path: ' . $this->domainService->getDataPath());
-
-        return 0;
     }
 }

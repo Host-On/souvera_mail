@@ -6,21 +6,32 @@ namespace OCA\Smail\Command;
 
 use OCA\Smail\Service\ConnectivityCheckService;
 use OCA\Smail\Service\DomainConfigService;
+use OCA\Smail\Service\OidcProviderService;
 use OCA\Smail\Util\EngineHelper;
 use OCA\Smail\Util\SetupResolvers;
-use Symfony\Component\Console\Command\Command;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * Write (or update) Souvera Mail's single active mail-domain profile —
+ * IMAP/SMTP/Sieve hosts, ports, TLS modes, OIDC audience hint. The
+ * authoritative OIDC client lives in H2CK/oidc and is managed by
+ * `smail:oidc:register-client` / `smail:bootstrap`; this command only writes
+ * the mail-server side of the profile.
+ *
+ * Idempotent and deploy-friendly: `--json` returns a single-line machine
+ * report, `--dry-run` prints actions without writing. All preflight checks
+ * default off (`--skip-checks` is implicit); pass `--check` to enable.
+ */
 class Setup extends Command
 {
     use SetupResolvers;
 
     private const APP_ID = 'smail';
-    private const OIDC_PROVIDER_KEY = 'oidc-provider';
 
     public function __construct(
         private IAppConfig $appConfig,
@@ -28,6 +39,7 @@ class Setup extends Command
         private IAppManager $appManager,
         private EngineHelper $engineHelper,
         private ConnectivityCheckService $connectivityCheckService,
+        private OidcProviderService $oidcProvider,
     ) {
         parent::__construct();
     }
@@ -36,353 +48,206 @@ class Setup extends Command
     {
         $this
             ->setName('smail:setup')
-            ->setDescription('Configure Souvera Mail server connection and authentication')
+            ->setDescription('Configure Souvera Mail mail-server profile (IMAP/SMTP/Sieve + OIDC audience)')
             ->addOption('imap-host', null, InputOption::VALUE_REQUIRED, 'IMAP server hostname')
-            ->addOption('imap-port', null, InputOption::VALUE_REQUIRED, 'IMAP server port', '143')
-            ->addOption(
-                'imap-ssl',
-                null,
-                InputOption::VALUE_REQUIRED,
-                'IMAP SSL mode (none, ssl, tls/starttls)',
-                'none'
-            )
+            ->addOption('imap-port', null, InputOption::VALUE_REQUIRED, 'IMAP server port', '993')
+            ->addOption('imap-ssl',  null, InputOption::VALUE_REQUIRED, 'IMAP SSL mode (none|ssl|starttls)', 'ssl')
             ->addOption('smtp-host', null, InputOption::VALUE_REQUIRED, 'SMTP server hostname (defaults to imap-host)')
-            ->addOption('smtp-port', null, InputOption::VALUE_REQUIRED, 'SMTP submission port', '587')
-            ->addOption(
-                'smtp-ssl',
-                null,
-                InputOption::VALUE_REQUIRED,
-                'SMTP SSL mode (none, ssl, tls/starttls)',
-                'none'
-            )
+            ->addOption('smtp-port', null, InputOption::VALUE_REQUIRED, 'SMTP submission port', '465')
+            ->addOption('smtp-ssl',  null, InputOption::VALUE_REQUIRED, 'SMTP SSL mode (none|ssl|starttls)', 'ssl')
             ->addOption('domain', null, InputOption::VALUE_REQUIRED, 'Mail domain (e.g. example.com)')
-            ->addOption(
-                'oidc-provider',
-                null,
-                InputOption::VALUE_REQUIRED,
-                'OIDC provider app (user_oidc)',
-                'user_oidc'
-            )
-            ->addOption(
-                'oidc-audience',
-                null,
-                InputOption::VALUE_REQUIRED,
-                'Optional: target OIDC client/audience for the mail server. '
-                . 'When set, smail exchanges the login token for one scoped to this audience '
-                . '(requires IdP token-exchange support).'
-            )
-            ->addOption(
-                'oidc-scopes',
-                null,
-                InputOption::VALUE_REQUIRED,
-                'Optional: space-separated extra scopes requested during token exchange '
-                . '(only if your IdP requires them).'
-            )
-            ->addOption('sieve', null, InputOption::VALUE_NONE, 'Enable Sieve filtering support')
-            ->addOption(
-                'sieve-host',
-                null,
-                InputOption::VALUE_REQUIRED,
-                'Sieve server hostname (defaults to imap-host)'
-            )
-            ->addOption('sieve-port', null, InputOption::VALUE_REQUIRED, 'Sieve server port', '4190')
-            ->addOption(
-                'sieve-ssl',
-                null,
-                InputOption::VALUE_REQUIRED,
-                'Sieve SSL mode (none, ssl, tls/starttls)',
-                'none'
-            )
-            ->addOption('skip-checks', null, InputOption::VALUE_NONE, 'Skip connectivity and capability checks')
+            ->addOption('oidc-audience', null, InputOption::VALUE_REQUIRED, 'Override OIDC audience hint (defaults to registered client identifier)')
+            ->addOption('oidc-scopes',   null, InputOption::VALUE_REQUIRED, 'Optional: space-separated extra OIDC scopes')
+            ->addOption('sieve',       null, InputOption::VALUE_NONE, 'Enable ManageSieve filtering')
+            ->addOption('sieve-host',  null, InputOption::VALUE_REQUIRED, 'Sieve server hostname (defaults to imap-host)')
+            ->addOption('sieve-port',  null, InputOption::VALUE_REQUIRED, 'Sieve server port', '4190')
+            ->addOption('sieve-ssl',   null, InputOption::VALUE_REQUIRED, 'Sieve SSL mode (none|ssl|starttls)', 'ssl')
+            ->addOption('check',        null, InputOption::VALUE_NONE, 'Run live IMAP/SMTP/Sieve connectivity preflight before writing')
+            ->addOption('skip-checks',  null, InputOption::VALUE_NONE, 'Deprecated alias — connectivity is skipped by default; --check turns it on')
+            ->addOption('dry-run',      null, InputOption::VALUE_NONE, 'Print what would be written without modifying any state')
+            ->addOption('json',         null, InputOption::VALUE_NONE, 'Emit a single JSON object on stdout')
         ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
+        $jsonMode = (bool) $input->getOption('json');
+        $dryRun = (bool) $input->getOption('dry-run');
+        $runChecks = (bool) $input->getOption('check');
+
+        $report = [
+            'command' => 'smail:setup',
+            'dry_run' => $dryRun,
+            'checks' => [],
+            'actions' => [],
+            'status' => 'ok',
+        ];
+
         $imapHost = $input->getOption('imap-host');
         $domain = $input->getOption('domain');
-
-        if (!$imapHost) {
-            $output->writeln('<error>--imap-host is required</error>');
-            return 1;
+        if (!\is_string($imapHost) || $imapHost === '') {
+            return $this->fail($output, $jsonMode, $report, '--imap-host is required');
         }
-        if (!$domain) {
-            $output->writeln('<error>--domain is required</error>');
-            return 1;
+        if (!\is_string($domain) || $domain === '') {
+            return $this->fail($output, $jsonMode, $report, '--domain is required');
         }
 
         $imapPort = (int) $input->getOption('imap-port');
         $imapSsl = $this->normalizeSslMode((string) $input->getOption('imap-ssl'));
-        $smtpHost = $input->getOption('smtp-host') ?: $imapHost;
+        $smtpHost = (string) ($input->getOption('smtp-host') ?: $imapHost);
         $smtpPort = (int) $input->getOption('smtp-port');
         $smtpSsl = $this->normalizeSslMode((string) $input->getOption('smtp-ssl'));
-        $sieveHost = $input->getOption('sieve-host') ?: $imapHost;
+        $sieveHost = (string) ($input->getOption('sieve-host') ?: $imapHost);
         $sievePort = (int) $input->getOption('sieve-port');
         $sieveSsl = $this->normalizeSslMode((string) $input->getOption('sieve-ssl'));
-        $requestedOidcProvider = $this->normalizeOidcProvider((string) $input->getOption('oidc-provider'));
-        $sieve = $input->getOption('sieve');
-        $skipChecks = $input->getOption('skip-checks');
+        $sieveEnabled = (bool) $input->getOption('sieve');
+        $oidcAudience = (string) ($input->getOption('oidc-audience') ?? '');
+        $oidcScopes = (string) ($input->getOption('oidc-scopes') ?? '');
 
-        if ($requestedOidcProvider === null) {
-            $output->writeln('<error>Invalid --oidc-provider. Must be: user_oidc</error>');
-            return 1;
-        }
         foreach (['imap-ssl' => $imapSsl, 'smtp-ssl' => $smtpSsl, 'sieve-ssl' => $sieveSsl] as $name => $val) {
             if (!\in_array($val, ['none', 'ssl', 'starttls'], true)) {
-                $output->writeln("<error>Invalid --{$name}. Must be: none, ssl, tls/starttls</error>");
-                return 1;
+                return $this->fail($output, $jsonMode, $report, "Invalid --{$name}. Must be: none, ssl, starttls");
             }
         }
-        if ($sievePort < 1 || $sievePort > 65535) {
-            $output->writeln('<error>Invalid --sieve-port. Must be between 1 and 65535.</error>');
-            return 1;
+        if ($imapPort < 1 || $imapPort > 65535 || $smtpPort < 1 || $smtpPort > 65535
+            || ($sieveEnabled && ($sievePort < 1 || $sievePort > 65535))
+        ) {
+            return $this->fail($output, $jsonMode, $report, 'Invalid port number (must be 1-65535)');
         }
 
-        $errors = 0;
-        $userOidcInstalled = $this->appManager->isEnabledForUser('user_oidc');
-        $oidcProvider = $userOidcInstalled ? 'user_oidc' : null;
+        // ─── Preconditions: H2CK/oidc must be ready ──────────────────────────
+        if (!$this->oidcProvider->isProviderAvailable()) {
+            return $this->fail(
+                $output, $jsonMode, $report,
+                'H2CK/oidc is not installed/enabled. Run `occ app:install oidc && occ app:enable oidc`'
+                . ' and then `occ smail:oidc:register-client` (or `occ smail:bootstrap`).',
+            );
+        }
+        $clientId = $this->oidcProvider->getClientIdentifier();
+        $report['checks'][] = ['oidc_client' => $clientId];
 
-        // ═══════════════════════════════════════════
-        // PREFLIGHT CHECKS
-        // ═══════════════════════════════════════════
-        $output->writeln('<info>Preflight Checks</info>');
-        $output->writeln('');
-
-        // 1. IMAP
-        if (!$skipChecks) {
+        // ─── Optional preflight checks ───────────────────────────────────────
+        if ($runChecks) {
             $imapResult = $this->connectivityCheckService->checkImap($imapHost, $imapPort, $imapSsl);
-            if ($imapResult['connected']) {
-                $authMethods = [];
-                $hasOAuth = false;
-                foreach ($imapResult['capabilities'] as $cap) {
-                    if (\str_starts_with($cap, 'AUTH=')) {
-                        $method = \substr($cap, 5);
-                        $authMethods[] = $method;
-                        if ($method === 'OAUTHBEARER' || $method === 'XOAUTH2') {
-                            $hasOAuth = true;
-                        }
-                    }
+            $report['checks'][] = ['imap' => $imapResult];
+            if (!$imapResult['connected']) {
+                return $this->fail($output, $jsonMode, $report, "IMAP preflight failed: {$imapResult['error']}");
+            }
+            $hasOAuth = false;
+            foreach ($imapResult['capabilities'] as $cap) {
+                if ($cap === 'AUTH=OAUTHBEARER' || $cap === 'AUTH=XOAUTH2') {
+                    $hasOAuth = true;
                 }
-                $authStr = $authMethods ? \implode(', ', $authMethods) : 'no AUTH capability advertised';
-                $output->writeln("  <info>✓ IMAP  {$imapHost}:{$imapPort} ({$authStr})</info>");
-
-                if (!$hasOAuth) {
-                    $output->writeln(
-                        '  <error>✗ IMAP server does not support OAUTHBEARER/XOAUTH2</error>'
-                    );
-                    $output->writeln(
-                        '    Dovecot: https://doc.dovecot.org/configuration_manual/authentication/oauth2/'
-                    );
-                    $errors++;
-                }
-                if ($imapResult['tls_warning'] !== '') {
-                    $output->writeln('  <comment>  ↳ ' . $imapResult['tls_warning'] . '</comment>');
-                }
-                if (\in_array('STARTTLS', $imapResult['capabilities']) && $imapSsl === 'none') {
-                    $output->writeln('  <comment>  ↳ STARTTLS available — consider --imap-ssl tls</comment>');
-                }
-            } else {
-                $output->writeln("  <error>✗ IMAP  {$imapHost}:{$imapPort} — {$imapResult['error']}</error>");
-                $errors++;
+            }
+            if (!$hasOAuth) {
+                return $this->fail($output, $jsonMode, $report, 'IMAP does not advertise OAUTHBEARER/XOAUTH2');
             }
 
-            // 2. SMTP
             $smtpResult = $this->connectivityCheckService->checkSmtp($smtpHost, $smtpPort, $smtpSsl);
-            if ($smtpResult['connected']) {
-                $smtpAuthStr = $smtpResult['auth_methods']
-                    ? \implode(', ', $smtpResult['auth_methods'])
-                    : 'no AUTH advertised';
-                $output->writeln("  <info>✓ SMTP  {$smtpHost}:{$smtpPort} ({$smtpAuthStr})</info>");
-                $smtpHasOAuth = \in_array('OAUTHBEARER', $smtpResult['auth_methods'], true)
-                    || \in_array('XOAUTH2', $smtpResult['auth_methods'], true);
-                if (!$smtpHasOAuth) {
-                    $output->writeln(
-                        '  <error>✗ SMTP server does not support OAUTHBEARER/XOAUTH2'
-                        . ' for authenticated sending</error>'
-                    );
-                    $errors++;
-                }
-                if ($smtpResult['starttls_supported'] && $smtpSsl === 'none') {
-                    $output->writeln('  <comment>  ↳ STARTTLS available — consider --smtp-ssl tls</comment>');
-                }
-                if ($smtpResult['tls_warning'] !== '') {
-                    $output->writeln('  <comment>  ↳ ' . $smtpResult['tls_warning'] . '</comment>');
-                }
-            } else {
-                $output->writeln("  <error>✗ SMTP  {$smtpHost}:{$smtpPort} — {$smtpResult['error']}</error>");
-                $errors++;
+            $report['checks'][] = ['smtp' => $smtpResult];
+            if (!$smtpResult['connected']) {
+                return $this->fail($output, $jsonMode, $report, "SMTP preflight failed: {$smtpResult['error']}");
             }
 
-            // 3. Sieve (only when filtering is enabled)
-            if ($sieve) {
+            if ($sieveEnabled) {
                 $sieveResult = $this->connectivityCheckService->checkSieve($sieveHost, $sievePort, $sieveSsl);
-                if ($sieveResult['connected']) {
-                    $sieveAuthStr = $sieveResult['sasl_methods']
-                        ? \implode(', ', $sieveResult['sasl_methods'])
-                        : 'no SASL advertised';
-                    $output->writeln("  <info>✓ Sieve {$sieveHost}:{$sievePort} ({$sieveAuthStr})</info>");
-                    if (!$sieveResult['oauth_supported']) {
-                        $output->writeln(
-                            '  <error>✗ Sieve server does not advertise OAUTHBEARER/XOAUTH2</error>'
-                        );
-                        $errors++;
-                    }
-                    if ($sieveResult['tls_warning'] !== '') {
-                        $output->writeln('  <comment>  ↳ ' . $sieveResult['tls_warning'] . '</comment>');
-                    }
-                } else {
-                    $output->writeln("  <error>✗ Sieve {$sieveHost}:{$sievePort} — {$sieveResult['error']}</error>");
-                    $errors++;
+                $report['checks'][] = ['sieve' => $sieveResult];
+                if (!$sieveResult['connected']) {
+                    return $this->fail($output, $jsonMode, $report, "Sieve preflight failed: {$sieveResult['error']}");
                 }
             }
         } else {
-            $output->writeln('  <comment>⊘ Connectivity checks skipped (--skip-checks)</comment>');
+            $report['checks'][] = ['preflight' => 'skipped (pass --check to enable)'];
         }
 
-        // 3. OIDC
-        if ($oidcProvider === null) {
-            $output->writeln('  <error>✗ OIDC  user_oidc is not installed</error>');
-            $output->writeln('    → occ app:install user_oidc');
-            return 1;
+        // ─── Write configuration (skipped on --dry-run) ──────────────────────
+        if ($dryRun) {
+            $report['actions'][] = ['would_write_domain_config' => $domain];
+            $report['actions'][] = ['would_set_appconfig' => [
+                'autologin' => '1',
+                'autologin-oidc' => '1',
+                'oidc-exchange-audience' => $oidcAudience !== '' ? $oidcAudience : $clientId,
+                'oidc-exchange-scopes' => $oidcScopes,
+            ]];
+            return $this->finalize($output, $jsonMode, $report);
         }
 
-        $oidcInfo = $oidcProvider;
-        $storeToken = $this->appConfig->getValueString('user_oidc', 'store_login_token', '0');
-        if ($storeToken !== '1') {
-            $this->appConfig->setValueString('user_oidc', 'store_login_token', '1');
-            $oidcInfo .= ', store_login_token=1 (set)';
-        } else {
-            $oidcInfo .= ', store_login_token=1';
-        }
-        $output->writeln("  <info>✓ OIDC  {$oidcInfo}</info>");
-
-        $output->writeln('');
-
-        if ($errors > 0 && !$skipChecks) {
-            $output->writeln("<error>{$errors} check(s) failed. Fix issues above or use --skip-checks.</error>");
-            return 1;
-        }
-
-        // ═══════════════════════════════════════════
-        // CONFIGURATION
-        // ═══════════════════════════════════════════
-        $output->writeln('<info>Applying Configuration</info>');
-        $output->writeln('');
-
-        // Write domain config
         $domainConfig = $this->domainService->buildDomainConfig(
-            $imapHost,
-            $imapPort,
-            $imapSsl,
-            $smtpHost,
-            $smtpPort,
-            $smtpSsl,
-            $sieveHost,
-            $sievePort,
-            $sieveSsl,
-            $sieve,
+            $imapHost, $imapPort, $imapSsl,
+            $smtpHost, $smtpPort, $smtpSsl,
+            $sieveHost, $sievePort, $sieveSsl,
+            $sieveEnabled,
         );
         $this->domainService->writeDomainConfig($domain, $domainConfig);
-        $output->writeln("  Domain config: <comment>{$domain}</comment>");
-        $removedDomains = [];
-        $cleanupWarnings = [];
+        $report['actions'][] = ['wrote_domain_config' => $domain];
+
+        // Consolidate to a single active domain
         foreach ($this->domainService->listDomains() as $existing) {
             if ($existing !== $domain) {
                 try {
                     $this->domainService->deleteDomainConfig($existing);
-                    $removedDomains[] = $existing;
-                } catch (\Throwable $cleanupError) {
-                    $cleanupWarnings[] = $existing;
-                    $output->writeln(
-                        '  <comment>Cleanup skipped for ' . $existing . ': '
-                        . $cleanupError->getMessage() . '</comment>'
-                    );
+                    $report['actions'][] = ['removed_legacy_domain' => $existing];
+                } catch (\Throwable $e) {
+                    $report['actions'][] = ['warning' => "could not remove '{$existing}': " . $e->getMessage()];
                 }
             }
         }
-        if ($removedDomains !== []) {
-            $output->writeln(
-                '  Consolidated single-domain config: <comment>'
-                . \implode(', ', $removedDomains) . '</comment> removed'
-            );
-        }
-        if ($cleanupWarnings !== []) {
-            $output->writeln(
-                '  <comment>Some previous domains could not be removed: '
-                . \implode(', ', $cleanupWarnings) . '</comment>'
-            );
-        }
 
-        // NC app config
+        // App config
         $this->appConfig->setValueString(self::APP_ID, 'autologin', '1');
         $this->appConfig->setValueString(self::APP_ID, 'autologin-oidc', '1');
-        $this->appConfig->setValueString(self::APP_ID, self::OIDC_PROVIDER_KEY, $oidcProvider);
-        $oidcAudience = $input->getOption('oidc-audience');
-        if (\is_string($oidcAudience) && $oidcAudience !== '') {
-            $this->appConfig->setValueString(self::APP_ID, 'oidc-exchange-audience', $oidcAudience);
-            $output->writeln('  Token exchange audience: <comment>' . $oidcAudience . '</comment>');
-        } else {
-            $this->appConfig->setValueString(self::APP_ID, 'oidc-exchange-audience', '');
-        }
-        $oidcScopes = $input->getOption('oidc-scopes');
-        $oidcScopes = \is_string($oidcScopes) ? \trim($oidcScopes) : '';
-        if ($oidcScopes !== '') {
-            $this->appConfig->setValueString(self::APP_ID, 'oidc-exchange-scopes', $oidcScopes);
-            $output->writeln('  Token exchange scopes: <comment>' . $oidcScopes . '</comment>');
-        } else {
-            $this->appConfig->setValueString(self::APP_ID, 'oidc-exchange-scopes', '');
+        $this->appConfig->setValueString(self::APP_ID, 'oidc-exchange-audience', $oidcAudience !== '' ? $oidcAudience : $clientId);
+        $this->appConfig->setValueString(self::APP_ID, 'oidc-exchange-scopes', \trim($oidcScopes));
+        $report['actions'][] = ['set_appconfig' => 'autologin, autologin-oidc, oidc-exchange-audience, oidc-exchange-scopes'];
+
+        // Engine config (app_path + default_domain)
+        try {
+            $this->engineHelper->loadApp();
+            $oConfig = \Smail\Engine\Api::Config();
+            $webPath = $this->appManager->getAppWebPath(self::APP_ID);
+            $appPath = \preg_replace('#(?<!:)/+#', '/', \rtrim($webPath, '/') . '/app/');
+            $oConfig->Set('webmail', 'app_path', $appPath);
+            $oConfig->Set('login', 'default_domain', $domain);
+            $oConfig->Save();
+            $report['actions'][] = ['set_engine_config' => ['app_path' => $appPath, 'default_domain' => $domain]];
+        } catch (\Throwable $e) {
+            $report['actions'][] = ['warning' => 'engine config skipped: ' . $e->getMessage()];
         }
 
-        // Engine config (app_path, default_domain)
-        $appDir = \dirname(\dirname(__DIR__)) . '/app';
-        if (\is_dir($appDir)) {
-            try {
-                $this->engineHelper->loadApp();
-                $oConfig = \Smail\Engine\Api::Config();
-                $webPath = $this->appManager->getAppWebPath(self::APP_ID);
-                $appPath = \preg_replace(
-                    '#(?<!:)/+#',
-                    '/',
-                    \rtrim($webPath, '/') . '/app/'
-                );
-                // Only set domain + app_path — all other defaults handled by InstallStep
-                $oConfig->Set('webmail', 'app_path', $appPath);
-                $oConfig->Set('login', 'default_domain', $domain);
-                $oConfig->Save();
-                $output->writeln("  Engine app_path: <comment>{$appPath}</comment>");
-            } catch (\Throwable $e) {
-                $output->writeln('  <comment>Engine config skipped: ' . $e->getMessage() . '</comment>');
+        return $this->finalize($output, $jsonMode, $report);
+    }
+
+    /**
+     * @param array<string, mixed> $report
+     */
+    private function fail(OutputInterface $output, bool $jsonMode, array $report, string $message): int
+    {
+        $report['status'] = 'error';
+        $report['message'] = $message;
+        if ($jsonMode) {
+            $output->writeln((string) \json_encode($report, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
+        } else {
+            $output->writeln('<error>' . $message . '</error>');
+        }
+        return Command::FAILURE;
+    }
+
+    /**
+     * @param array<string, mixed> $report
+     */
+    private function finalize(OutputInterface $output, bool $jsonMode, array $report): int
+    {
+        if ($jsonMode) {
+            $output->writeln((string) \json_encode($report, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT));
+        } else {
+            foreach ($report['actions'] as $action) {
+                foreach ($action as $key => $value) {
+                    $valueStr = \is_array($value) ? \json_encode($value) : (string) $value;
+                    $output->writeln("  <comment>{$key}</comment> {$valueStr}");
+                }
             }
+            $output->writeln('<info>Souvera Mail setup complete</info>');
         }
-
-        // ═══════════════════════════════════════════
-        // SUMMARY
-        // ═══════════════════════════════════════════
-        $output->writeln('');
-        $output->writeln('<info>Setup complete!</info>');
-        $output->writeln('');
-        $output->writeln('  Domain:    ' . $domain);
-        $output->writeln('  IMAP:      ' . $imapHost . ':' . $imapPort . ' (' . \strtoupper($imapSsl) . ')');
-        $output->writeln('  SMTP:      ' . $smtpHost . ':' . $smtpPort . ' (' . \strtoupper($smtpSsl) . ')');
-        if ($sieve) {
-            $output->writeln(
-                '  Sieve:     enabled (' . $sieveHost . ':' . $sievePort . ' ' . \strtoupper($sieveSsl) . ')'
-            );
-        } else {
-            $output->writeln('  Sieve:     disabled');
-        }
-        $output->writeln('  Auth:      OAUTHBEARER (SSO)');
-        $output->writeln('  OIDC:      ' . $oidcProvider);
-
-        $output->writeln('');
-        $output->writeln('<comment>Mail server requirements (your responsibility):</comment>');
-        $output->writeln('  1. IMAP and SMTP submission must support OAUTHBEARER or XOAUTH2 SASL');
-        $output->writeln('  2. IMAP/SMTP server must validate tokens against your OIDC provider (e.g. Keycloak)');
-        $output->writeln('     → Dovecot/Postfix: configure oauth2 validation or token introspection');
-        $output->writeln('  3. OIDC provider must include correct audience in access tokens');
-        $output->writeln('     → Keycloak: add audience mapper to the Nextcloud client');
-        $output->writeln('  4. IMAP username must match the email claim in the OIDC token');
-
-        return 0;
+        return Command::SUCCESS;
     }
 }

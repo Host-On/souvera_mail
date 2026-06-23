@@ -1,17 +1,24 @@
 <?php
 
+declare(strict_types=1);
+
 namespace OCA\Smail\Util;
 
+use OCA\Smail\Service\OidcProviderService;
 use OCP\App\IAppManager;
 use OCP\Config\IUserConfig;
-use OCP\EventDispatcher\Event;
-use OCP\EventDispatcher\IEventDispatcher;
 use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\ISession;
 use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Bridges Nextcloud's runtime (session, user, config) into the bundled
+ * webmail engine. The OIDC access token used for IMAP/SMTP OAUTHBEARER is
+ * obtained from H2CK/oidc via {@see OidcProviderService} — Souvera Mail does
+ * not depend on `user_oidc` or any external IdP at runtime.
+ */
 class EngineHelper
 {
     public function __construct(
@@ -22,7 +29,7 @@ class EngineHelper
         private IUserSession $userSession,
         private IAppManager $appManager,
         private LoggerInterface $logger,
-        private IEventDispatcher $eventDispatcher,
+        private OidcProviderService $oidcProvider,
     ) {
     }
 
@@ -84,8 +91,6 @@ class EngineHelper
     {
         $this->loadApp();
 
-        $oConfig = \Smail\Engine\Api::Config();
-
         if (false !== \stripos(\php_sapi_name(), 'cli')) {
             return;
         }
@@ -101,10 +106,8 @@ class EngineHelper
                         new \Smail\Engine\SensitiveString($aCredentials[2])
                     );
                 } catch (\Smail\Engine\Exceptions\ClientException $e) {
-                    // OIDC login failure — no credentials to clear
                     $this->logger->debug('Souvera Mail SSO login failed: ' . $e->getMessage());
                 } catch (\Throwable $e) {
-                    // Non-login errors — don't touch credentials
                     $this->logger->warning('Souvera Mail engine login error: ' . $e->getMessage());
                 }
             }
@@ -121,8 +124,7 @@ class EngineHelper
 
     /**
      * Whether the engine currently has an authenticated main account.
-     * Call after startApp() — the result is cached by the engine, so this
-     * reflects the outcome of the SSO auto-login attempt without side effects.
+     * Call after startApp() — the result is cached by the engine.
      */
     public function hasAuthenticatedAccount(): bool
     {
@@ -137,21 +139,27 @@ class EngineHelper
     }
 
     /**
-     * Returns the SSO uid stored in the NC session, or null if not set.
+     * Returns the SSO uid stored in the NC session (set by LoginBridgeListener),
+     * or null if no NC user is currently logged in.
      */
     public function getSsoUid(): ?string
     {
         $uid = $this->session->get('smail-uid');
-        return \is_string($uid) && $uid !== '' ? $uid : null;
+        if (\is_string($uid) && $uid !== '') {
+            return $uid;
+        }
+        // Fall back to the live user session — covers callers that run before
+        // LoginBridgeListener has had a chance to set the session marker.
+        $user = $this->userSession->getUser();
+        return $user !== null ? $user->getUID() : null;
     }
 
     /**
      * Returns the current Nextcloud session id, or null if unavailable.
      *
-     * Stable per session (changes only on NC session regeneration), it is the
-     * per-session secret the engine derives its connection/CSRF token from in
-     * place of the former self-set x2mtoken cookie. getId() throws when no
-     * session is active (e.g. CLI), so we guard and return null.
+     * Stable per session (changes only on NC session regeneration). The engine
+     * derives its per-session connection/CSRF token secret from this. getId()
+     * throws when no session is active (e.g. CLI), so we guard and return null.
      */
     public function getNcSessionId(): ?string
     {
@@ -164,14 +172,12 @@ class EngineHelper
     }
 
     /**
-     * Returns the email for the current SSO user, identical to the value
-     * FilterAppData seeds into AppData in the nextcloud engine plugin so the
-     * NC-session reconstruction matches the live login path. Resolution order:
-     *   1. custom smail email: IUserConfig smail/email (overrides everything)
-     *   2. profile email: IUserConfig settings/email
-     *   3. IUser::getEMailAddress() (NC account email)
-     *   4. uid itself (last resort — guarantees a non-empty return)
-     * Returns null when no SSO uid is present in the session.
+     * Returns the email for the current SSO user. Resolution order:
+     *   1. Per-user override: IUserConfig smail/email
+     *   2. NC profile email: IUserConfig settings/email
+     *   3. IUser::getEMailAddress()
+     *   4. uid itself (last-resort guarantee of a non-empty return)
+     * Returns null when no NC user is logged in.
      */
     public function getSsoEmail(): ?string
     {
@@ -201,124 +207,58 @@ class EngineHelper
         return $uid;
     }
 
+    /**
+     * True when the smail OIDC autologin is wired up — i.e. the H2CK/oidc app
+     * is available and a Nextcloud user is currently logged in. Browser-only
+     * (CLI invocations return false: no live NC user).
+     */
     public function isOIDCLogin(): bool
     {
-        if ($this->appConfig->getValueString('smail', 'autologin-oidc', '0') !== '0') {
-            if ($this->appManager->isEnabledForUser('user_oidc')) {
-                if ($this->session->get('is_oidc')) {
-                    if ($this->session->get('oidc_access_token')) {
-                        return true;
-                    }
-                    \Smail\Engine\Log::debug('Nextcloud', 'OIDC access_token missing');
-                } else {
-                    \Smail\Engine\Log::debug('Nextcloud', 'No OIDC login');
-                }
-            } else {
-                \Smail\Engine\Log::debug('Nextcloud', 'OIDC login disabled');
-            }
+        if ($this->appConfig->getValueString('smail', 'autologin-oidc', '0') !== '1') {
+            return false;
         }
-        return false;
+        if ($this->userSession->getUser() === null) {
+            return false;
+        }
+        if (!$this->oidcProvider->isProviderAvailable()) {
+            \Smail\Engine\Log::debug('Nextcloud', 'H2CK/oidc provider not available');
+            return false;
+        }
+        return true;
     }
 
     /**
      * Single source for the OIDC access token used for IMAP/SMTP OAUTHBEARER.
-     * Order: token exchange (if an audience is configured) -> fresh login token
-     * via user_oidc public event -> cached session value (last resort).
+     * Dispatches H2CK/oidc's TokenGenerationRequestEvent for the current NC
+     * user via {@see OidcProviderService}. Returns null when no NC user is
+     * logged in or H2CK/oidc is unavailable.
      *
-     * Pass $audienceOverride / $scopesOverride (e.g. from the setup wizard
-     * Test Login) to use the typed values instead of the stored ones; null
-     * falls back to config.
+     * Pass `$audienceOverride` to log a deploy-time audience expectation; the
+     * H2CK/oidc client itself controls the actual `aud` claim, so this
+     * argument is informational only (kept for engine-plugin compatibility).
      */
     public function getOidcAccessToken(?string $audienceOverride = null, ?string $scopesOverride = null): ?string
     {
-        $audience = $audienceOverride
-            ?? $this->appConfig->getValueString('smail', 'oidc-exchange-audience', '');
-        if ($audience !== '') {
-            $rawScopes = $scopesOverride
-                ?? $this->appConfig->getValueString('smail', 'oidc-exchange-scopes', '');
-            $scopes = \preg_split('/\s+/', \trim($rawScopes), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-            $exchanged = $this->dispatchTokenEvent(
-                'OCA\\UserOIDC\\Event\\ExchangedTokenRequestedEvent',
-                $audience,
-                $scopes
-            );
-            if ($exchanged !== null) {
-                return $exchanged;
-            }
-            $this->logger->warning(
-                'OIDC token exchange for audience "' . $audience . '" yielded no token; '
-                . 'falling back to the login token'
-            );
-        }
+        // $audienceOverride / $scopesOverride are accepted for backward-compat
+        // with engine plugins; H2CK issues tokens for the client we register.
+        unset($audienceOverride, $scopesOverride);
 
-        $fresh = $this->dispatchTokenEvent('OCA\\UserOIDC\\Event\\ExternalTokenRequestedEvent', null);
-        if ($fresh !== null) {
-            return $fresh;
-        }
-
-        $sessionToken = $this->session->get('oidc_access_token');
-        return \is_string($sessionToken) && $sessionToken !== '' ? $sessionToken : null;
-    }
-
-    /** @param list<string> $extraScopes */
-    private function dispatchTokenEvent(string $eventClass, ?string $audienceArg, array $extraScopes = []): ?string
-    {
-        if (!\class_exists($eventClass)) {
+        $uid = $this->getSsoUid();
+        if ($uid === null) {
             return null;
         }
-        try {
-            if ($audienceArg === null) {
-                $event = new $eventClass();
-            } elseif ($extraScopes === []) {
-                $event = new $eventClass($audienceArg);
-            } else {
-                $event = new $eventClass($audienceArg, $extraScopes);
-            }
-            if (!$event instanceof Event) {
-                return null;
-            }
-            $this->eventDispatcher->dispatchTyped($event);
-            if (!\method_exists($event, 'getToken')) {
-                return null;
-            }
-            $token = $event->getToken();
-            if (!\is_object($token) || !\method_exists($token, 'getAccessToken')) {
-                return null;
-            }
-            $access = $token->getAccessToken();
-            if (!\is_string($access) || $access === '') {
-                return null;
-            }
-            if (\method_exists($token, 'getExpiresInFromNow')) {
-                // Visibility for the known "user_oidc reports expires_in=0" realm issue
-                $this->logger->debug(
-                    'OIDC token (' . $eventClass . ') expires in '
-                    . (int)$token->getExpiresInFromNow() . 's'
-                );
-            }
-            return $access;
-        } catch (\Throwable $e) {
-            $message = 'OIDC token event failed (' . $eventClass . '): ' . $e->getMessage();
-            // user_oidc's GetExternalTokenFailedException / TokenExchangeFailedException
-            // carry the IdP error response — surface it for diagnosis.
-            if (\method_exists($e, 'getError') && \method_exists($e, 'getErrorDescription')) {
-                $error = $e->getError();
-                $description = $e->getErrorDescription();
-                if (\is_string($error) || \is_string($description)) {
-                    $message .= ' — IdP: ' . (\is_string($error) ? $error : '')
-                        . ' (' . (\is_string($description) ? $description : '') . ')';
-                }
-            }
-            $this->logger->warning($message);
-            return null;
-        }
+        return $this->oidcProvider->generateAccessToken($uid);
     }
 
     /** @return array{string, string, string} */
     private function getLoginCredentials(): array
     {
-        $sUID = $this->userSession->getUser()->getUID();
-        if ($this->session->get('smail-uid') === $sUID && $this->isOIDCLogin()) {
+        $user = $this->userSession->getUser();
+        if ($user === null) {
+            return ['', '', ''];
+        }
+        $sUID = $user->getUID();
+        if ($this->isOIDCLogin()) {
             $sEmail = $this->userConfig->getValueString($sUID, 'settings', 'email');
             return [$sUID, $sEmail, "oidc_login|{$sUID}"];
         }

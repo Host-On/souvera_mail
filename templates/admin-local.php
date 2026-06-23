@@ -1,124 +1,142 @@
-<?php /** @var \OCP\IL10N $l */ ?>
+<?php
 
-<?php require __DIR__ . '/setup-wizard.php'; ?>
+declare(strict_types=1);
 
-<div class="section x2m-section x2m-section-general">
-    <h2><?php p($l->t('General')); ?></h2>
-    <p class="settings-hint">
-        <?php p($l->t('Core mail features: attachments and end-to-end encryption.')); ?>
+/**
+ * Souvera Mail — read-only admin status panel.
+ *
+ * Every value shown here is informational only. Configuration changes go
+ * through `occ smail:bootstrap` / `occ smail:setup` / `occ smail:oidc:register-client`
+ * — there are no write endpoints reachable from this template.
+ *
+ * @var array<string, mixed> $_
+ * @var \OCP\IL10N $l
+ */
+
+$status = $_['status'] ?? [];
+$issues = $status['issues'] ?? [];
+$oidc = $status['oidc_provider'] ?? [];
+$domain = $status['domain'] ?? [];
+$engine = $status['engine'] ?? [];
+
+\OCP\Util::addStyle('smail', 'embed');
+?>
+<div id="smail-admin-status" class="section">
+    <h2 style="display:flex;align-items:center;gap:0.5em;">
+        <img src="<?php p(image_path('smail', 'logo-64x64.png')); ?>"
+             alt="Souvera Mail" style="height:32px;width:32px;">
+        <?php p($l->t('Souvera Mail — Status')); ?>
+    </h2>
+
+    <p style="color:var(--color-text-maxcontrast);max-width:50em;">
+        <?php p($l->t(
+            'Souvera Mail is configured exclusively through occ. This panel shows the current state '
+            . '— it has no write controls. See the command list below or run `occ smail:status --json` '
+            . 'for a machine-readable report.'
+        )); ?>
     </p>
 
-    <div class="x2m-grid">
-        <label for="x2m-menu-title"><?php p($l->t('Menu title')); ?></label>
-        <div class="x2m-field">
-            <input type="text" id="x2m-menu-title" name="menu_title" maxlength="64"
-                   value="<?php p($_['menu_title']); ?>"
-                   placeholder="<?php p($_['menu_title_default']); ?>">
+    <?php if (!empty($issues)) : ?>
+        <div class="smail-status-section" style="border-left:4px solid var(--color-warning);padding:0.5em 1em;margin:1em 0;background:var(--color-background-hover);">
+            <h3><?php p($l->t('Issues to resolve')); ?></h3>
+            <ul style="margin:0;padding-left:1.5em;">
+                <?php foreach ($issues as $issue) : ?>
+                    <li><?php p($issue); ?></li>
+                <?php endforeach; ?>
+            </ul>
         </div>
-    </div>
-    <p class="settings-hint">
-        <?php p($l->t('Leave empty for the default (Souvera Mail).')); ?>
-        <?php p($l->t('Native NC app menu only — not Custom Menu / side_menu. Reload after save.')); ?>
-    </p>
-
-    <div class="x2m-grid">
-        <label for="x2m-attachment-limit"><?php p($l->t('Attachment size limit')); ?></label>
-        <div class="x2m-field">
-            <input type="number" id="x2m-attachment-limit" name="attachment_size_limit"
-                   min="1" max="2048" value="<?php p($_['attachment_size_limit']); ?>">
-            <span class="x2m-hint">MB</span>
+    <?php else : ?>
+        <div class="smail-status-section" style="border-left:4px solid var(--color-success);padding:0.5em 1em;margin:1em 0;background:var(--color-background-hover);">
+            <strong>✓ <?php p($l->t('All checks passed — Souvera Mail is ready.')); ?></strong>
         </div>
-    </div>
+    <?php endif; ?>
 
-    <p>
-        <input type="checkbox" id="x2m-thumbnails" name="show_attachment_thumbnail" class="checkbox"
-               <?php if ($_['show_attachment_thumbnail']) {
-                    p('checked');
-               } ?>>
-        <label for="x2m-thumbnails"><?php p($l->t('Show attachment thumbnails')); ?></label>
-    </p>
-    <p>
-        <input type="checkbox" id="x2m-openpgp" name="openpgp" class="checkbox"
-               <?php if ($_['openpgp']) {
-                    p('checked');
-               } ?>>
-        <label for="x2m-openpgp"><?php p($l->t('Enable OpenPGP')); ?></label>
-    </p>
-    <p>
-        <input type="checkbox" id="x2m-gnupg" name="gnupg" class="checkbox"
-               <?php if ($_['gnupg']) {
-                    p('checked');
-               } ?>>
-        <label for="x2m-gnupg"><?php p($l->t('Enable GnuPG')); ?></label>
-    </p>
+    <h3><?php p($l->t('OIDC Provider (Nextcloud → H2CK/oidc)')); ?></h3>
+    <table class="grid">
+        <tr>
+            <th><?php p($l->t('H2CK/oidc app')); ?></th>
+            <td>
+                <?php if (!empty($oidc['h2ck_oidc_enabled'])) : ?>
+                    <span style="color:var(--color-success);">✓ <?php p($l->t('installed and enabled')); ?></span>
+                <?php else : ?>
+                    <span style="color:var(--color-error);">✗ <?php p($l->t('not enabled — run')); ?> <code>occ app:install oidc && occ app:enable oidc</code></span>
+                <?php endif; ?>
+            </td>
+        </tr>
+        <tr>
+            <th><?php p($l->t('Smail OIDC client')); ?></th>
+            <td>
+                <?php if (!empty($oidc['client_registered'])) : ?>
+                    <code><?php p($oidc['client_name'] ?? ''); ?></code> — <?php p($l->t('registered')); ?>
+                <?php else : ?>
+                    <span style="color:var(--color-error);">✗ <?php p($l->t('not registered — run')); ?> <code>occ smail:oidc:register-client</code></span>
+                <?php endif; ?>
+            </td>
+        </tr>
+        <tr>
+            <th><?php p($l->t('Access-token type')); ?></th>
+            <td><code><?php p($oidc['default_token_type'] ?? '?'); ?></code> <?php if (($oidc['default_token_type'] ?? '') !== 'jwt') : ?> — <?php p($l->t('expected: jwt')); ?> <?php endif; ?></td>
+        </tr>
+        <tr>
+            <th><?php p($l->t('Discovery URL')); ?></th>
+            <td><a href="<?php p($oidc['discovery_url'] ?? '#'); ?>" target="_blank"><?php p($oidc['discovery_url'] ?? ''); ?></a></td>
+        </tr>
+        <tr>
+            <th><?php p($l->t('JWKS URL (for mail server)')); ?></th>
+            <td><a href="<?php p($oidc['jwks_url'] ?? '#'); ?>" target="_blank"><?php p($oidc['jwks_url'] ?? ''); ?></a></td>
+        </tr>
+    </table>
 
-    <p class="x2m-actions">
-        <button type="button" id="x2m-allgemein-save" class="button primary"><?php p($l->t('Save')); ?></button>
-        <span id="x2m-allgemein-status" class="x2m-status" role="status" aria-live="polite"></span>
-    </p>
-</div>
+    <h3><?php p($l->t('Mail Domain Profile')); ?></h3>
+    <?php $configuredDomains = $domain['configured'] ?? []; ?>
+    <?php if ($configuredDomains === []) : ?>
+        <p><em><?php p($l->t('No domain configured. Run')); ?> <code>occ smail:setup --imap-host … --domain …</code>.</em></p>
+    <?php else : ?>
+        <?php foreach ($configuredDomains as $domainName => $cfg) : ?>
+            <table class="grid">
+                <tr><th><?php p($l->t('Domain')); ?></th><td><code><?php p($domainName); ?></code></td></tr>
+                <?php if (isset($cfg['imap'])) : ?>
+                <tr><th>IMAP</th><td><code><?php p($cfg['imap']['host'] . ':' . $cfg['imap']['port'] . ' (' . $cfg['imap']['ssl'] . ')'); ?></code></td></tr>
+                <tr><th>SMTP</th><td><code><?php p($cfg['smtp']['host'] . ':' . $cfg['smtp']['port'] . ' (' . $cfg['smtp']['ssl'] . ')'); ?></code></td></tr>
+                <tr><th>Sieve</th><td><?php p($cfg['sieve_enabled'] ? $l->t('enabled') : $l->t('disabled')); ?></td></tr>
+                <?php endif; ?>
+            </table>
+        <?php endforeach; ?>
+        <p><strong><?php p($l->t('OIDC audience hint:')); ?></strong> <code><?php p($domain['oidc_audience'] ?? ''); ?></code></p>
+    <?php endif; ?>
 
-<div class="section x2m-section x2m-section-advanced">
-    <h2><?php p($l->t('Advanced')); ?></h2>
-    <p class="settings-hint">
-        <?php p($l->t('SSO behavior, locale, and engine paths. Change only if you know why.')); ?>
-    </p>
+    <h3><?php p($l->t('Engine')); ?></h3>
+    <table class="grid">
+        <?php foreach ($engine as $key => $value) : ?>
+            <tr>
+                <th><?php p($key); ?></th>
+                <td><code><?php p(\is_bool($value) ? ($value ? 'yes' : 'no') : (string) $value); ?></code></td>
+            </tr>
+        <?php endforeach; ?>
+    </table>
 
-    <p>
-        <input id="smail-nc-lang" name="smail-nc-lang" type="checkbox" class="checkbox"
-            <?php if ($_['smail-nc-lang']) {
-                echo 'checked="checked"';
-            } ?>>
-        <label for="smail-nc-lang">
-            <?php p($l->t('Force Nextcloud language')); ?>
-        </label>
-    </p>
-    <p>
-        <input id="smail-debug" name="smail-debug" type="checkbox" class="checkbox"
-            <?php if ($_['smail-debug']) {
-                echo 'checked="checked"';
-            } ?>>
-        <label for="smail-debug">
-            <?php p($l->t('Enable engine debug logging')); ?>
-        </label>
-    </p>
-    <p>
-        <input id="smail-debug-log" name="smail-debug-log" type="checkbox" class="checkbox"
-            <?php if ($_['smail-debug-log']) {
-                echo 'checked="checked"';
-            } ?>>
-        <label for="smail-debug-log">
-            <?php p($l->t('Enable Souvera Mail debug logging (OIDC token events, refresh)')); ?>
-        </label>
-    </p>
+    <h3><?php p($l->t('Configuration commands')); ?></h3>
+    <p><?php p($l->t('All configuration is performed through occ:')); ?></p>
+    <pre style="background:var(--color-background-dark);padding:1em;border-radius:6px;overflow:auto;">
+# One-shot install (idempotent)
+occ smail:bootstrap \
+    --mail-imap-host  mail.example.com --mail-imap-port  993 --mail-imap-ssl  ssl \
+    --mail-smtp-host  mail.example.com --mail-smtp-port  465 --mail-smtp-ssl  ssl \
+    --mail-sieve-host mail.example.com --mail-sieve-port 4190 --mail-sieve-ssl ssl \
+    --domain          example.com \
+    --client-secret-out /etc/souvera_mail/oidc-client-secret \
+    --json
 
-    <div class="x2m-grid">
-        <label for="smail-app-path"><?php p($l->t('app_path')); ?></label>
-        <div class="x2m-field">
-            <input id="smail-app-path" name="smail-app-path" type="text"
-                   value="<?php p($_['smail-app-path']); ?>" autocomplete="off">
-        </div>
-    </div>
+# Individual operations
+occ smail:oidc:register-client --json
+occ smail:setup     --imap-host … --domain … --json
+occ smail:status    --json
+occ smail:reset     --purge-oidc-client --json
 
-    <p class="x2m-actions">
-        <button type="button" id="x2m-advanced-save" class="button primary"><?php p($l->t('Save')); ?></button>
-        <span id="x2m-advanced-status" class="x2m-status" role="status" aria-live="polite"></span>
+# Health-check (returns non-zero on any blocker)
+occ smail:status --json | jq .status</pre>
+
+    <p style="margin-top:2em;color:var(--color-text-maxcontrast);">
+        <small><?php p($l->t('Souvera Mail version:')); ?> <?php p($status['app']['version'] ?? '?'); ?></small>
     </p>
-</div>
-
-<div class="section x2m-section x2m-section-info">
-    <h2><?php p($l->t('Info')); ?></h2>
-    <div class="x2m-info">
-        <img class="x2m-info-logo" src="<?php p(image_path('smail', 'logo-64x64.png')); ?>" alt="Souvera Mail">
-        <div class="x2m-info-meta">
-            <div class="x2m-info-version"><?php p($_['smail_version']); ?></div>
-            <div class="x2m-info-copy">2026 &copy; NK-IT Dev. <?php p($l->t('All rights reserved.')); ?></div>
-            <a class="x2m-info-link"
-               href="https://github.com/PhiGi87/souvera_mail"
-               target="_blank"
-               rel="noopener noreferrer">
-                github.com/PhiGi87/souvera_mail
-            </a>
-        </div>
-    </div>
 </div>

@@ -6,14 +6,12 @@ use OCA\Smail\Dashboard\UnreadMailWidget;
 use OCA\Smail\Listeners\ImpersonateListener;
 use OCA\Smail\Listeners\LoginBridgeListener;
 use OCA\Smail\Listeners\LogoutListener;
-use OCA\Smail\Listeners\TokenBridgeListener;
-use OCA\Smail\Middleware\TokenRefreshMiddleware;
 use OCA\Smail\Search\Provider;
+use OCA\Smail\Util\NavigationTitle;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
-use OCA\Smail\Util\NavigationTitle;
 use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\INavigationManager;
@@ -34,30 +32,26 @@ class Application extends App implements IBootstrap
     public function register(IRegistrationContext $context): void
     {
         // NC 28+: Controllers use autowiring — no manual registerService needed.
-        // The DI container resolves constructor dependencies automatically.
 
         $context->registerSearchProvider(Provider::class);
 
-        // user_oidc TokenObtainedEvent — use string class name to avoid autoload interference
-        $context->registerEventListener(
-            'OCA\\UserOIDC\\Event\\TokenObtainedEvent',
-            TokenBridgeListener::class
-        );
-
-        // UserLoggedInEvent — bridge NC login to engine session
+        // Stamp smail-uid into the session on Nextcloud login. The OIDC access
+        // token itself is issued on-demand by OidcProviderService via the
+        // H2CK/oidc TokenGenerationRequestEvent — no session-side bridging or
+        // pre-warming required.
         $context->registerEventListener(
             UserLoggedInEvent::class,
             LoginBridgeListener::class
         );
 
-        // BeforeUserLoggedOutEvent — engine logout
+        // Engine logout on Nextcloud logout
         $context->registerEventListener(
             BeforeUserLoggedOutEvent::class,
             LogoutListener::class
         );
 
-        // Impersonate begin/end — engine logout
-        // Use string class names to avoid hard dependency on the impersonate app
+        // Impersonate begin/end — engine logout. Use string class names to
+        // avoid a hard dependency on the impersonate app.
         $context->registerEventListener(
             'OCA\\Impersonate\\Events\\BeginImpersonateEvent',
             ImpersonateListener::class
@@ -66,9 +60,6 @@ class Application extends App implements IBootstrap
             'OCA\\Impersonate\\Events\\EndImpersonateEvent',
             ImpersonateListener::class
         );
-
-        // Register middleware for token refresh
-        $context->registerMiddleware(TokenRefreshMiddleware::class);
 
         $context->registerDashboardWidget(UnreadMailWidget::class);
     }
@@ -96,7 +87,5 @@ class Application extends App implements IBootstrap
                 'order' => 4,
             ];
         });
-
-        // APP_PRIVATE_DATA setup happens via EngineHelper::loadApp() on demand
     }
 }

@@ -11,7 +11,6 @@ use OCP\Dashboard\IReloadableWidget;
 use OCP\Dashboard\Model\WidgetItem;
 use OCP\Dashboard\Model\WidgetItems;
 use OCP\IL10N;
-use OCP\ISession;
 use OCP\IURLGenerator;
 use Psr\Log\LoggerInterface;
 
@@ -22,7 +21,6 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
         private IURLGenerator $urlGenerator,
         private LoggerInterface $logger,
         private EngineHelper $engineHelper,
-        private ISession $session,
     ) {
     }
 
@@ -56,27 +54,13 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
     }
 
     /**
-     * Refresh OIDC token before engine bootstrap.
-     *
-     * TokenRefreshMiddleware only runs for Souvera Mail controller requests.
-     * Dashboard OCS API bypasses our middleware entirely (runs in dashboard app context).
-     * We must refresh the token explicitly here.
+     * @param string $userId
+     * @param string|null $since
+     * @param int $limit
      */
-    private function refreshOidcToken(): void
-    {
-        if (!$this->session->get('is_oidc')) {
-            return;
-        }
-        $fresh = $this->engineHelper->getOidcAccessToken();
-        if ($fresh !== null && $fresh !== $this->session->get('oidc_access_token')) {
-            $this->session->set('oidc_access_token', $fresh);
-        }
-    }
-
     public function getItemsV2(string $userId, ?string $since = null, int $limit = 7): WidgetItems
     {
         try {
-            $this->refreshOidcToken();
             $this->engineHelper->startApp();
             $oActions = \Smail\Engine\Api::Actions();
             $oAccount = $oActions->getMainAccountFromToken(false);

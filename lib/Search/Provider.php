@@ -6,7 +6,6 @@ namespace OCA\Smail\Search;
 
 use OCA\Smail\AppInfo\Application;
 use OCA\Smail\Util\EngineHelper;
-use OCP\ISession;
 use OCP\IURLGenerator;
 use OCP\IUser;
 use OCP\Search\IProvider;
@@ -24,7 +23,6 @@ class Provider implements IProvider
         private IURLGenerator $urlGenerator,
         private LoggerInterface $logger,
         private EngineHelper $engineHelper,
-        private ISession $session,
     ) {
     }
 
@@ -48,28 +46,12 @@ class Provider implements IProvider
         return 20;
     }
 
-    /**
-     * Refresh OIDC token before engine bootstrap.
-     * NC Unified Search may run outside Souvera Mail's middleware context.
-     */
-    private function refreshOidcToken(): void
-    {
-        if (!$this->session->get('is_oidc')) {
-            return;
-        }
-        $fresh = $this->engineHelper->getOidcAccessToken();
-        if ($fresh !== null && $fresh !== $this->session->get('oidc_access_token')) {
-            $this->session->set('oidc_access_token', $fresh);
-        }
-    }
-
     public function search(IUser $user, ISearchQuery $query): SearchResult
     {
         $result = [];
         if (2 > \strlen(\trim($query->getTerm()))) {
             return SearchResult::complete($this->getName(), $result);
         }
-        $this->refreshOidcToken();
         $this->engineHelper->startApp();
         $oActions = \Smail\Engine\Api::Actions();
         $oAccount = $oActions->getAccountFromToken(false);

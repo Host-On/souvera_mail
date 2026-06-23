@@ -1,352 +1,240 @@
-# Souvera Mail — Nextcloud Webmail with Native SSO
+# Souvera Mail
 
-Feature-rich webmail client for **Nextcloud 33 and 34** with native Single Sign-On via OAuth2
-SASL (`OAUTHBEARER` / `XOAUTH2`). Users log into Nextcloud via your OIDC provider and open
-webmail without a second login or stored mail password.
+**Nextcloud-native webmail with Nextcloud as the OIDC Provider.**
 
-## How It Works
+Souvera Mail is a fully CLI-configurable webmail app for Nextcloud 33+. It uses
+[H2CK/oidc](https://github.com/H2CK/oidc) — Nextcloud's own OpenID Connect Identity
+Provider — to issue access tokens that authenticate the user against IMAP, SMTP submission,
+and ManageSieve via `OAUTHBEARER` / `XOAUTH2`. No external IdP is required, no
+browser-redirect flow, no second login form.
 
-Souvera Mail reuses the OIDC access token from the Nextcloud SSO session and uses it for mail
-protocol authentication.
+Built for automated deployments (Ansible, Helm, OCI containers, Nextcloud-AIO addons).
+**Everything is configurable through `occ` commands — there is no browser-based setup
+wizard.** A read-only status panel exists for diagnostics only.
+
+---
+
+## Architecture
+
+Nextcloud itself acts as the OIDC Provider for the entire mail stack. Souvera Mail and
+Stalwart (or Dovecot+Postfix) are both relying parties of the same provider.
 
 ```text
-User -> OIDC provider (Keycloak, Authentik, ...)
-     -> Nextcloud (user_oidc)
-     -> Souvera Mail reads access token from session
-     -> IMAP/SMTP/Sieve: AUTHENTICATE OAUTHBEARER <token>
-     -> Mail server validates token (introspection/JWKS)
-     -> Mailbox opens
+                          ┌──────────────────────────────────────┐
+                          │                Nextcloud             │
+                          │                                      │
+   user authenticates ───►│  (any backend: local / LDAP /        │
+   (browser session)      │   user_oidc / SAML / passkey / …)    │
+                          │                                      │
+                          │  ┌────────────────────────────────┐  │
+                          │  │   H2CK/oidc  (OIDC Provider)   │  │
+                          │  │   - /.well-known/openid-       │  │
+                          │  │     configuration              │  │
+                          │  │   - /apps/oidc/jwks            │  │
+                          │  │   - /apps/oidc/token  etc.     │  │
+                          │  └──────────────┬─────────────────┘  │
+                          │                 │ TokenGenerationEvent│
+                          │  ┌──────────────▼─────────────────┐  │
+                          │  │        Souvera Mail            │  │
+                          │  │   gets JWT access token        │  │
+                          │  │   in-process for {client=smail,│  │
+                          │  │   user=<current NC user>}      │  │
+                          │  └──────────────┬─────────────────┘  │
+                          └─────────────────┼────────────────────┘
+                                            │ OAUTHBEARER <jwt>
+                          ┌─────────────────▼────────────────────┐
+                          │           Mail server                │
+                          │  (Stalwart / Dovecot+Postfix)        │
+                          │                                      │
+                          │  validates JWT against               │
+                          │  <NC>/apps/oidc/jwks (cached)        │
+                          │  → mailbox opens                     │
+                          └──────────────────────────────────────┘
 ```
 
-The same token is used for IMAP, SMTP submission, and optional ManageSieve. Souvera Mail refreshes
-it through `user_oidc` before expiry.
+### Why this design
 
-## Goal
+- **One identity provider for the whole stack.** Nextcloud already authenticates the user;
+  the mail server trusts NC's signed JWTs. No second IdP to operate.
+- **No browser redirect for webmail SSO.** Souvera Mail receives its access token via
+  H2CK/oidc's `TokenGenerationRequestEvent` (in-process PHP event dispatch — see
+  [H2CK/oidc README ¶ Token generation](https://github.com/H2CK/oidc#generate-an-access-token-and-id-token)).
+  The token is bound to the currently logged-in Nextcloud user and the registered Souvera
+  Mail client.
+- **Mail server validates offline via JWKS.** Stalwart / Dovecot fetch
+  `<NC>/index.php/apps/oidc/jwks` and verify tokens with the published RS256 public keys —
+  no introspection round-trip per IMAP command.
+- **CLI-first, idempotent.** Every config write is reachable via `occ`; reruns converge to
+  the same state, so the same playbook deploys cleanly to dev, staging, and production.
 
-After Nextcloud SSO login, users should access mail with the **same OIDC access token** —
-no separate webmail password flow.
+---
 
-## What Souvera Mail Requires From The Mail Server
+## Requirements
 
-Souvera Mail is a webmail client. It does not replace your MTA, gateway, or spam stack.
-
-### Required Capabilities
-
-- **IMAP OAuth SASL** — server advertises `AUTH=OAUTHBEARER` and/or `AUTH=XOAUTH2`
-- **SMTP submission OAuth SASL** — authenticated sending with the same token model
-- **OIDC token validation** — mail server validates access tokens against your IdP
-- **Stable mail identity** — token claim maps to mailbox address (typically `email`)
-- **Optional ManageSieve** — if enabled in Souvera Mail, Sieve endpoint must match host/port/TLS mode
-
-
-### Mail servers verified with Souvera Mail (OAuth SASL)
-
-These stacks are **tested end-to-end** with Souvera Mail (IMAP + SMTP submission + optional
-ManageSieve via `OAUTHBEARER` / `XOAUTH2`, Keycloak audience mapping, wizard **Test Login**):
-
-| Stack | Role | Setup guide |
+| Component | Version | Notes |
 |---|---|---|
-| **Dovecot 2.4+ + Postfix** | IMAP on Dovecot; SMTP submission auth via Dovecot SASL (`oauth2` passdb + OIDC introspection/JWKS) | [dovecot-postfix-oauthbearer.md](docs/configs/dovecot-postfix-oauthbearer.md) |
-| **Stalwart 0.16+** | Integrated IMAP, SMTP submission, and ManageSieve; OIDC validation + optional LDAP directory | [stalwart-oauthbearer.md](docs/configs/stalwart-oauthbearer.md) |
+| Nextcloud | 33 – 35 | Tested against current LTS and release-1 |
+| PHP | 8.3+ | Same as Nextcloud's own requirement |
+| [H2CK/oidc](https://github.com/H2CK/oidc) | 1.17+ | Install + enable before `occ smail:bootstrap` |
+| Mail server | Stalwart 0.16+ **or** Dovecot 2.4+ with Postfix 3.7+ | Must advertise `AUTH=OAUTHBEARER` / `AUTH=XOAUTH2` on IMAP + submission |
+| Network | Mail server can reach `<NC>/index.php/apps/oidc/jwks` over HTTPS | TLS to NC must be trusted by the mail server's cert store |
 
-IdP configuration (Keycloak example, audience mapper, `email` claim): [keycloak.md](docs/configs/keycloak.md).
+Souvera Mail is a webmail client. It does **not** replace your MTA, gateway, or spam
+filter — it sits next to whatever mail stack you already operate.
 
-Any other product is **not** listed here unless it exposes the same client-facing OAuth SASL
-on IMAP and submission and you validate it yourself (preflight + wizard **Test Login**).
+---
 
-**Not verified in this project:** integrated stacks such as **mailcow** do not ship a
-supported, persistent OAuth2 SASL path for external IdPs out of the box (community overrides
-only; not equivalent to the Dovecot or Stalwart flows above).
+## Quick start (automated deploy)
 
-### Deployment topologies (independent of mail product)
-
-Same requirements whether services run on one host or many:
-
-- **Split hosts** — Nextcloud, mail server, and IdP on different machines/VLANs/sites
-- **Gateway in transport path** — PMG, Rspamd, or another MTA/filter in front of delivery;
-  Souvera Mail still connects only to the **IMAP**, **SMTP submission**, and **ManageSieve**
-  endpoints of the mail server that performs OAuth SASL
-
-
-## Prerequisites
-
-### 1. Nextcloud with OIDC Login
-
-Install and configure the OIDC app:
-
-- `user_oidc`
+The whole setup is three `occ` commands. They are idempotent — running them again on the
+same instance is safe and a no-op when nothing changes.
 
 ```bash
-occ app:install user_oidc
-occ user_oidc:provider YourProvider \
-  -c YOUR_CLIENT_ID \
-  -s YOUR_CLIENT_SECRET \
-  -d https://idp.example.com/realms/example/.well-known/openid-configuration
+# 1. Install + enable H2CK/oidc (Nextcloud becomes the OIDC Provider)
+occ app:install oidc
+occ app:enable  oidc
+
+# 2. Install + enable Souvera Mail
+occ app:install smail        # or: extract tarball into custom_apps/ and `occ app:enable smail`
+
+# 3. Bootstrap everything (registers the OIDC client, wires up engine config, runs preflight)
+occ smail:bootstrap \
+    --mail-imap-host  mail.example.com --mail-imap-port  993 --mail-imap-ssl  ssl \
+    --mail-smtp-host  mail.example.com --mail-smtp-port  465 --mail-smtp-ssl  ssl \
+    --mail-sieve-host mail.example.com --mail-sieve-port 4190 --mail-sieve-ssl ssl \
+    --domain          example.com \
+    --client-secret-out /etc/souvera_mail/oidc-client-secret \
+    --json
 ```
 
-`occ smail:setup` sets `store_login_token=1` for `user_oidc` when needed.
+`occ smail:bootstrap` is one-shot and does, in order:
 
-### 2. Mail Server OAuth Support
+1. Verifies H2CK/oidc is installed and enabled.
+2. Creates (or updates) an OIDC client named `smail` in H2CK/oidc via `occ oidc:create` —
+   confidential client, JWT access tokens (RFC 9068), 30-minute access-token lifetime,
+   `openid email profile offline_access` scopes, audience `smail`.
+3. Writes the client's `client_id` and `client_secret` into Souvera Mail's app-config and
+   optionally dumps the secret to the path passed via `--client-secret-out` (mode `0600`,
+   owner `www-data`).
+4. Calls `smail:setup` with the IMAP/SMTP/Sieve flags to set the active mail-domain
+   profile.
+5. Runs `smail:status --json` to confirm everything resolves — exits non-zero on any
+   blocker so your deploy pipeline fails fast.
 
-Your mail stack must validate OIDC tokens and accept OAuth SASL on client protocols.
+A full machine-readable report is printed on `--json`.
 
-Stack-specific setup guides (masked examples, in repository `docs/configs/`):
+---
 
-- [Keycloak IdP setup](docs/configs/keycloak.md)
-- [Dovecot + Postfix](docs/configs/dovecot-postfix-oauthbearer.md)
-- [Stalwart](docs/configs/stalwart-oauthbearer.md)
+## `occ` command reference
 
-These guides are published to the [GitHub mirror](https://github.com/PhiGi87/souvera_mail) on
-release (not shipped inside the Nextcloud app package from the App Store).
-
-### 3. OIDC Audience and Claims
-
-The mail server accepts tokens only when:
-
-- `aud` includes the mail-server OIDC client (recommended via audience mapper), or
-- Souvera Mail token exchange is configured (`--oidc-audience`, optionally `--oidc-scopes`)
-
-Required claims:
-
-- user identity for mailbox mapping (typically `email`)
-
-Details: [docs/configs/keycloak.md](docs/configs/keycloak.md)
-
-## Installation
-
-### Nextcloud App Store (recommended)
-
-Install and enable Souvera Mail from the official app catalog:
-
-- [Souvera Mail on apps.nextcloud.com](https://apps.nextcloud.com/apps/smail)
-
-In the Nextcloud web UI: **Apps** → search **Souvera Mail** → **Download and enable**.  
-Nextcloud applies updates automatically when a new signed release is published to the App Store.
-
-After installation, configure mail connectivity in **Settings → Souvera Mail** or with `occ smail:setup`.
-
-### Manual install (tarball)
-
-For manual deployment, download a release tarball from
-[GitHub Releases](https://github.com/PhiGi87/souvera_mail/releases):
-
-```bash
-cd /path/to/nextcloud/custom_apps
-tar xzf smail-*.tar.gz
-chown -R www-data:www-data smail
-occ app:enable smail
-occ smail:setup ...
-```
-
-The App Store and manual tarball install the **same app package**; only the delivery path differs.
-
-### Admin Settings
-
-All Souvera Mail administration lives in **Nextcloud Settings → Souvera Mail**. The settings page exposes:
-
-- **Setup wizard** — IMAP/SMTP/Sieve hosts + ports + TLS modes, OIDC provider, optional token-exchange audience. Built-in connectivity preflight and a *Test Login* button that performs a real OAUTHBEARER login against IMAP, SMTP, and ManageSieve using the admin's current SSO token.
-- **General** — app menu title (default **Souvera Mail**, native NC menu only), attachment size limit, attachment thumbnails, OpenPGP/GnuPG toggles.
-- **Advanced** — Nextcloud language enforcement, engine `app_path`, engine + Souvera Mail debug logging.
-- **Info** — installed Souvera Mail version + project link.
-
-The legacy SnappyMail-style engine admin panel was removed in 0.7.0.
-
-## Setup
-
-### Quick Setup (CLI)
-
-**Dovecot + Postfix** (typical STARTTLS listeners):
-
-```bash
-occ smail:setup \
-  --imap-host mail.example.com \
-  --imap-port 143 --imap-ssl starttls \
-  --smtp-host mail.example.com \
-  --smtp-port 587 --smtp-ssl starttls \
-  --domain example.com \
-  --sieve \
-  --sieve-host mail.example.com \
-  --sieve-port 4190 --sieve-ssl starttls
-```
-
-**Stalwart** (typical implicit-TLS listeners — verified with Souvera Mail):
-
-```bash
-occ smail:setup \
-  --imap-host mail.example.com \
-  --imap-port 993 --imap-ssl ssl \
-  --smtp-host mail.example.com \
-  --smtp-port 465 --smtp-ssl ssl \
-  --domain example.com \
-  --sieve \
-  --sieve-host mail.example.com \
-  --sieve-port 4190 --sieve-ssl ssl
-```
-
-Preflight example (the Sieve line appears only when `--sieve` is enabled):
-
-```text
-✓ IMAP  mail.example.com:143 (XOAUTH2, OAUTHBEARER)
-✓ SMTP  mail.example.com:587 (XOAUTH2, OAUTHBEARER)
-✓ Sieve mail.example.com:4190 (OAUTHBEARER)
-✓ OIDC  user_oidc, token_store=ok
-```
-
-### Setup Wizard (Browser)
-
-Open **Settings -> Souvera Mail**:
-
-- Configure IMAP, SMTP, and Sieve in separate sections
-- **Check connectivity** — reachability + advertised OAuth SASL on IMAP/SMTP/Sieve, plus OIDC apps and your SSO session (no mail login)
-- **Test Login** — a real OAUTHBEARER login to IMAP/SMTP/Sieve with your current SSO token
-
-**Test Login** authenticates as your own admin account — it fails if you have no
-mailbox, even when the configuration is correct for other users. The real
-token-based login test is only available in the wizard, not via `occ` (the CLI
-has no SSO session).
-
-Example wizard output (connectivity check followed by Test Login):
-
-```text
-✓ IMAP  mail.example.com:143 (XOAUTH2, OAUTHBEARER)
-✓ SMTP  mail.example.com:587 (XOAUTH2, OAUTHBEARER)
-✓ Sieve mail.example.com:4190 (OAUTHBEARER)
-✓ OIDC  user_oidc, token_store=ok
-✓ SSO   Active session with valid token
-✓ TOKEN email=user@example.com, aud=nextcloud,mail-service, expires=11min
-✓ IMAP login OK
-✓ SMTP login OK
-✓ Sieve login OK
-```
-
-When a token-exchange audience is configured, the **TOKEN** line warns if that
-audience is missing from the token's `aud` claim.
-
-The release setup keeps one active domain profile. Saving replaces older stored profiles.
-
-### Setup Options
-
-| Option | Default | Description |
+| Command | Purpose | Important flags |
 |---|---|---|
-| `--imap-host` | (required) | IMAP hostname |
-| `--imap-port` | `143` | IMAP port |
-| `--imap-ssl` | `none` | `none`, `ssl`, `tls`/`starttls` |
-| `--smtp-host` | same as IMAP | SMTP hostname |
-| `--smtp-port` | `587` | SMTP port |
-| `--smtp-ssl` | `none` | `none`, `ssl`, `tls`/`starttls` |
-| `--domain` | (required) | Mail domain (`user@domain`) |
-| `--oidc-provider` | `user_oidc` | `user_oidc` |
-| `--oidc-audience` | (empty) | Token exchange audience/client (optional) |
-| `--oidc-scopes` | (empty) | Extra scopes requested during token exchange (optional) |
-| `--sieve` | off | Enable ManageSieve |
-| `--sieve-host` | same as IMAP | ManageSieve hostname |
-| `--sieve-port` | `4190` | ManageSieve port |
-| `--sieve-ssl` | `none` | `none`, `ssl`, `tls`/`starttls` |
-| `--skip-checks` | off | Skip connectivity preflight |
+| `occ smail:bootstrap`   | One-shot install: register OIDC client, set engine defaults, run preflight | `--mail-imap-host`, `--mail-smtp-host`, `--mail-sieve-host`, `--domain`, `--client-secret-out`, `--json`, `--dry-run` |
+| `occ smail:setup`       | Update mail-server profile (IMAP/SMTP/Sieve hosts, ports, TLS modes, audience) | `--imap-host`, `--imap-port`, `--imap-ssl`, `--smtp-host`, `--smtp-port`, `--smtp-ssl`, `--sieve`, `--sieve-host`, `--sieve-port`, `--sieve-ssl`, `--domain`, `--oidc-audience`, `--oidc-scopes`, `--skip-checks`, `--json`, `--dry-run` |
+| `occ smail:oidc:register-client` | Re-register the OIDC client in H2CK/oidc (rotate secret, change redirect URIs) | `--redirect-uri` (multi), `--secret-out`, `--token-lifetime`, `--json`, `--dry-run` |
+| `occ smail:status`      | Diagnose configuration, connectivity, OIDC, mail server preflight | `--json` |
+| `occ smail:reset`       | Remove all Souvera Mail state (app-config, engine domain profile, optional OIDC client) | `--purge-oidc-client`, `--keep-engine-data`, `--json` |
 
-Generated domain config uses OAuth SASL only (`OAUTHBEARER`, `XOAUTH2`) and enables SMTP auth automatically.
+All write-commands accept `--dry-run` to print exactly what would change without touching
+anything, and `--json` to emit machine-readable output (one JSON object per invocation,
+parseable from Ansible's `command:` module).
 
-### Check Status
+Defaults pulled from `occ config:app:set oidc default_token_type jwt` are required and set
+automatically by `smail:bootstrap`.
 
-```bash
-occ smail:status
-```
+---
 
-Shows domain profile, protocol security modes, OIDC provider, and token-store status.
+## Mail server configuration
 
-## SSO Token Flow
+The mail server validates incoming `OAUTHBEARER` tokens against the Nextcloud JWKS
+endpoint. Configuration recipes:
+
+- [`docs/configs/stalwart-oauthbearer.md`](docs/configs/stalwart-oauthbearer.md) — Stalwart 0.16+ (integrated IMAP, SMTP, ManageSieve, JWT validation, optional LDAP directory)
+- [`docs/configs/dovecot-postfix-oauthbearer.md`](docs/configs/dovecot-postfix-oauthbearer.md) — Dovecot 2.4+ + Postfix 3.7+ via Dovecot SASL OAuth2
+
+Both recipes use the same JWKS URL (`<NC>/index.php/apps/oidc/jwks`) and accept tokens
+issued by H2CK/oidc to the `smail` audience.
+
+---
+
+## Read-only admin status panel
+
+Open **Settings → Souvera Mail** in the Nextcloud admin UI. The panel shows the current
+configuration and preflight diagnostics — every interactive element is read-only and
+points the operator at the matching `occ` command:
 
 ```text
-1. User logs into Nextcloud via OIDC
-2. user_oidc stores access token (+ refresh token)
-3. User opens Souvera Mail
-4. Souvera Mail performs IMAP AUTHENTICATE OAUTHBEARER <token>
-5. Mail server validates token with IdP and opens mailbox
-6. Outbound mail uses SMTP AUTH with the same token
-7. Optional Sieve uses the same token model
-8. TokenRefreshMiddleware refreshes token via user_oidc
+✓ H2CK/oidc enabled, client `smail` registered, JWT access tokens, 1800s TTL
+✓ Mail domain: example.com  (active profile)
+✓ IMAP   mail.example.com:993   ssl   (advertises AUTH=OAUTHBEARER, XOAUTH2)
+✓ SMTP   mail.example.com:465   ssl   (advertises AUTH=OAUTHBEARER, XOAUTH2)
+✓ Sieve  mail.example.com:4190  ssl   (advertises AUTH=OAUTHBEARER)
+✓ JWKS   reachable from this Nextcloud, 2 active keys
+✓ Last bootstrap: 2026-01-15 14:22:08 UTC by user `admin` (via occ)
+
+Need to change something? Run:  occ smail:setup --imap-host … (etc.)
 ```
 
-## Features
+The panel has zero write endpoints. Configuration changes happen only via `occ`.
 
-- SSO webmail with OAuth SASL (`OAUTHBEARER` / `XOAUTH2`)
-- Single active domain profile for SSO users
-- Setup wizard with preflight + live token diagnostics
-- Real OAuth login test for IMAP/SMTP/Sieve
-- Automatic token refresh
-- ManageSieve filtering support
-- Nextcloud Contacts / Files / Calendar integration
-- Multiple identities, OpenPGP / S-MIME
-- `occ smail:setup`, `occ smail:status`
+---
 
 ## Troubleshooting
 
-### Login form appears instead of mailbox
-
-- Run `occ smail:status` (autologin/OIDC/domain)
-- Verify `occ config:app:get user_oidc store_login_token` is `1`
-- Ensure login happened via SSO, not local Nextcloud password
-- Domain in config must match mailbox domain (`user@example.com` -> `example.com`)
-
-### IMAP authentication failed
-
-- Check wizard TOKEN line: `email` present?
-- Check `aud` includes your mail-server OIDC client
-- Verify mail server can reach IdP introspection/JWKS endpoint
-- Re-run setup with correct host/port/TLS mode
-
-### SMTP rejected / temporary auth failure
-
-- Confirm submission endpoint advertises `OAUTHBEARER`/`XOAUTH2`
-- Verify generated config has `SMTP.useAuth=true` (default in SSO setup)
-- Check audience and token validation path (same as IMAP)
-
-### Sieve test fails while IMAP/SMTP work
-
-- Align `--sieve-port` and `--sieve-ssl` with server listener mode
-- STARTTLS on `4190` vs implicit TLS on `4190` must match exactly
-- Re-save wizard or re-run `occ smail:setup` with corrected sieve options
-
-### TLS verify failed in wizard
-
-- Install issuing CA in Nextcloud trust store, or use publicly trusted cert
-- Ensure hostname in cert matches configured IMAP/SMTP/Sieve host
-
-### Capability checks
-
+### `occ smail:status` reports H2CK/oidc not installed
+Install and enable the app:
 ```bash
-openssl s_client -connect mail.example.com:143 -starttls imap -quiet
-# CAPABILITY should include AUTH=OAUTHBEARER and/or AUTH=XOAUTH2
-
-openssl s_client -connect mail.example.com:587 -starttls smtp -quiet
-# EHLO should include AUTH ... OAUTHBEARER ... XOAUTH2
+occ app:install oidc && occ app:enable oidc && occ smail:bootstrap …
 ```
 
-For stack-specific failures, see:
+### IMAP login fails with `AUTHENTICATIONFAILED`
+1. Check `occ smail:status --json | jq .oidc` — confirm the `smail` client exists in
+   H2CK/oidc and JWT access tokens are enabled (`default_token_type=jwt`).
+2. Confirm the mail server can resolve and reach
+   `<NC>/index.php/apps/oidc/jwks` (TLS, DNS, firewall).
+3. Verify the mail server's expected `aud` claim matches the smail client's audience
+   (default: `smail`). Override at deploy time:
+   ```bash
+   occ smail:setup --oidc-audience my-custom-audience
+   ```
 
-- [docs/configs/dovecot-postfix-oauthbearer.md](docs/configs/dovecot-postfix-oauthbearer.md)
-- [docs/configs/stalwart-oauthbearer.md](docs/configs/stalwart-oauthbearer.md)
-- [docs/configs/keycloak.md](docs/configs/keycloak.md)
-
-
-## Development
-
+### Token expired during a long mailbox operation
+Souvera Mail's `TokenRefreshMiddleware` re-issues a fresh JWT through H2CK/oidc's
+`TokenGenerationRequestEvent` whenever the cached token is within 60 seconds of expiry.
+Increase the lifetime if your operations regularly exceed the default 30 min:
 ```bash
-git clone https://github.com/PhiGi87/souvera_mail.git
-cd smail
-make build
+occ config:app:set oidc expire_time --value "3600"
 ```
 
-See [CHANGELOG.md](CHANGELOG.md), [RELEASE.md](RELEASE.md), and [SECURITY.md](SECURITY.md).
+### Souvera Mail panel says "JWKS unreachable"
+The Nextcloud host itself runs the preflight; if the panel says JWKS is unreachable, that
+means PHP on Nextcloud cannot fetch its own JWKS URL (proxy, hosts file, TLS interception).
+Check `occ smail:status` output and Nextcloud's `nextcloud.log` for the HTTP error.
 
-## Security
+---
 
-Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+## Why no browser wizard?
+
+This app is built for environments where Nextcloud installs are templated, immutable, and
+recreated from declarative manifests. Browser wizards that hold operator state are
+incompatible with that. Everything Souvera Mail needs to know is expressible as `occ`
+flags; everything Souvera Mail wants to tell you is shipped on `stdout` as JSON when you
+ask. That keeps the app deployable from Ansible, Argo, Helm, Nextcloud-AIO addons, or
+hand-rolled shell scripts without any UI scraping.
+
+---
 
 ## Origin
 
-Permanent fork of [SnappyMail v2.38.2](https://github.com/the-djmaze/snappymail/releases/tag/v2.38.2), rebuilt for Nextcloud 33+ with native OIDC/SSO.
+Souvera Mail is a permanent fork of
+[SnappyMail v2.38.2](https://github.com/the-djmaze/snappymail/releases/tag/v2.38.2),
+rebuilt for Nextcloud 33+ with Nextcloud-OIDC-Provider native SSO. The bundled webmail
+engine (`app/smail/v/current/`) preserves the upstream SnappyMail/RainLoop code structure
+and license; the Nextcloud wrapper (`lib/`) and the H2CK/oidc integration are original
+to this project.
 
 ## License
 
 AGPL-3.0 — see [LICENSE](LICENSE).
+
+See also: [CHANGELOG.md](CHANGELOG.md) · [RELEASE.md](RELEASE.md) · [SECURITY.md](SECURITY.md).
