@@ -2,7 +2,7 @@
 
 ## Versioning
 
-X2Mail follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
+Souvera Mail follows [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`
 
 - **MAJOR** — Breaking changes
 - **MINOR** — New features

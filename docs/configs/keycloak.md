@@ -1,6 +1,6 @@
-# Keycloak OIDC Configuration (X2Mail)
+# Keycloak OIDC Configuration (Souvera Mail)
 
-This guide defines the IdP side for X2Mail with masked example values only.
+This guide defines the IdP side for Souvera Mail with masked example values only.
 
 ## Objective
 
@@ -39,7 +39,7 @@ Expected token excerpt:
 
 ## Optional: Token Exchange (Least Privilege)
 
-Instead of adding the mail audience to every login token, X2Mail can exchange
+Instead of adding the mail audience to every login token, Souvera Mail can exchange
 the login token for a mail-scoped token: `--oidc-audience mail-service`,
 optionally `--oidc-scopes "mail"` (or the matching setup-wizard fields). The
 login token then never works against the mail server — only the exchanged,
@@ -73,4 +73,4 @@ remaining lifetime.
 ## Verification
 
 - Login to Nextcloud via OIDC
-- In X2Mail wizard, run preflight and check TOKEN output includes expected `aud`
+- In Souvera Mail wizard, run preflight and check TOKEN output includes expected `aud`

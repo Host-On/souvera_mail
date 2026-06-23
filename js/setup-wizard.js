@@ -1,5 +1,5 @@
 /**
- * X2Mail Setup Wizard — Mail server configuration (single domain).
+ * Souvera Mail Setup Wizard — Mail server configuration (single domain).
  *
  * SSO uses the email domain from the user's NC profile to resolve the
  * IMAP/SMTP config. One domain config is sufficient for all SSO users

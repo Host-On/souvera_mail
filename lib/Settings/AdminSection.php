@@ -21,7 +21,7 @@ class AdminSection implements IIconSection
 
     public function getName(): string
     {
-        return 'X2Mail';
+        return 'Souvera Mail';
     }
 
     public function getPriority(): int

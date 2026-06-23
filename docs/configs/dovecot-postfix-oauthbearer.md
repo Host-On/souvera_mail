@@ -1,6 +1,6 @@
 # Dovecot + Postfix with OAUTHBEARER/XOAUTH2
 
-Masked reference configuration for using X2Mail with Dovecot IMAP and Postfix
+Masked reference configuration for using Souvera Mail with Dovecot IMAP and Postfix
 submission, where token validation is handled by Dovecot OAuth2.
 
 ## Scope
@@ -67,7 +67,7 @@ service auth {
 }
 ```
 
-## 3) X2Mail Setup Example
+## 3) Souvera Mail Setup Example
 
 ```bash
 occ x2mail:setup \

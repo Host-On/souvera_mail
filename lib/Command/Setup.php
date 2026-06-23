@@ -36,7 +36,7 @@ class Setup extends Command
     {
         $this
             ->setName('x2mail:setup')
-            ->setDescription('Configure X2Mail mail server connection and authentication')
+            ->setDescription('Configure Souvera Mail server connection and authentication')
             ->addOption('imap-host', null, InputOption::VALUE_REQUIRED, 'IMAP server hostname')
             ->addOption('imap-port', null, InputOption::VALUE_REQUIRED, 'IMAP server port', '143')
             ->addOption(

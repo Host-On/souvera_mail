@@ -31,13 +31,13 @@ class Status extends Command
     {
         $this
             ->setName('x2mail:status')
-            ->setDescription('Show X2Mail configuration status')
+            ->setDescription('Show Souvera Mail configuration status')
         ;
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $output->writeln('<info>X2Mail Status</info>');
+        $output->writeln('<info>Souvera Mail Status</info>');
         $output->writeln('');
 
         // Domains
@@ -126,13 +126,13 @@ class Status extends Command
         $output->writeln('');
         $output->writeln(
             '  <comment>Token diagnostics only available in browser wizard'
-            . ' (Admin → X2Mail → Run Checks)</comment>'
+            . ' (Admin → Souvera Mail → Run Checks)</comment>'
         );
 
         $output->writeln('');
 
         // Engine version and app_path
-        $output->writeln('<comment>X2Mail Engine:</comment>');
+        $output->writeln('<comment>Souvera Mail Engine:</comment>');
         $appDir = \dirname(\dirname(__DIR__)) . '/app';
         if (\is_dir($appDir)) {
             try {

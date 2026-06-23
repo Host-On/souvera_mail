@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to X2Mail will be documented in this file.
+All notable changes to Souvera Mail will be documented in this file.
 
 Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
@@ -35,7 +35,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ## [0.7.2] — 2026-06-05
 
 ### Changed
-- Authentication state now lives entirely in the Nextcloud session — X2Mail no longer stores its own authentication cookies
+- Authentication state now lives entirely in the Nextcloud session — Souvera Mail no longer stores its own authentication cookies
 
 ## [0.7.1] — 2026-05-31
 
@@ -51,14 +51,14 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ## [0.7.0] — 2026-05-28
 
 ### Removed
-- Password/plain login — X2Mail is SSO/OIDC-only (`--auth plain`, `occ x2mail:settings`, and the manual password login form are no longer available)
-- Legacy engine admin panel (`/?admin`) — all administration moves to Nextcloud Settings → X2Mail
+- Password/plain login — Souvera Mail is SSO/OIDC-only (`--auth plain`, `occ x2mail:settings`, and the manual password login form are no longer available)
+- Legacy engine admin panel (`/?admin`) — all administration moves to Nextcloud Settings → Souvera Mail
 - SnappyMail legacy domain blocklist seed (`app/domains/disabled`) — fresh installs no longer copy a public-provider deny list into engine data
 
 ### Added
 - Setup wizard **Test Login** — verifies live `OAUTHBEARER` login to IMAP, SMTP submission, and ManageSieve with the current SSO token
 - Configurable ManageSieve in setup: `--sieve-host`, `--sieve-port`, `--sieve-ssl` (CLI) and matching fields in the setup wizard
-- **Allgemein** + **Info** sections in Nextcloud Settings → X2Mail (attachment limits, OpenPGP/GnuPG, version info)
+- **Allgemein** + **Info** sections in Nextcloud Settings → Souvera Mail (attachment limits, OpenPGP/GnuPG, version info)
 - Real OAUTHBEARER auth-test in the setup wizard (replaces the old engine connectivity test)
 
 ### Changed
@@ -98,7 +98,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ### Fixed
 - SMTP OAUTHBEARER authentication now works in SSO mode — `useAuth` is enforced when `authType=oauth` so `SmtpClient::Login()` is no longer skipped
 - Preflight checks now perform real IMAP/SMTP `STARTTLS` negotiation instead of plain TCP reachability checks
-- Preflight TLS checks now inherit current X2Mail SSL defaults and fall back to relaxed diagnostics with a visible warning instead of hard-failing selfhosted certificate setups
+- Preflight TLS checks now inherit current Souvera Mail SSL defaults and fall back to relaxed diagnostics with a visible warning instead of hard-failing selfhosted certificate setups
 - SMTP OAuth capability is now validated when authenticated sending is enabled in SSO mode
 - Setup wizard now writes the new active domain before cleaning up stale profiles and reports cleanup warnings instead of risking config loss
 - Release defaults for `autologout`, `contacts_autosave`, `show_login_alert`, and identity handling are restored through targeted migration/default application
@@ -146,7 +146,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ## [0.6.0] — 2026-03-29
 
 ### Breaking
-- Complete rebrand: SnappyMail/RainLoop → X2Mail across all namespaces, directories, DB tables, config keys, and UI
+- Complete rebrand: SnappyMail/RainLoop → Souvera Mail across all namespaces, directories, DB tables, config keys, and UI
 - Existing installations are migrated automatically
 
 ### Added
@@ -242,7 +242,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - Migrate 47 deprecated `IConfig` calls to `IAppConfig`/`IUserConfig` (NC33 public API)
 - Replace private `OC\Core\Command\Base` with `Symfony\Component\Console\Command\Command`
 - Template escaping: `p()` for values, `print_unescaped()` for engine content
-- Replace "SnappyMail" with "X2Mail" in admin panel UI
+- Replace "SnappyMail" with "Souvera Mail" in admin panel UI
 
 ### Fixed
 - Null-guard for `$this->userId` in FetchController personal settings
@@ -330,7 +330,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 ## [0.4.3] — 2026-03-19
 
 ### Fixed
-- Setup and InstallStep now set title and loading_description to "X2Mail"
+- Setup and InstallStep now set title and loading_description to "Souvera Mail"
 - Restored original minified app.min.js — no more broken JS from unminified overwrites
 - Regenerated compressed .gz/.br static files to match modified JS/CSS
 - Reverted PageController mailto handling to upstream SM ServiceMailto flow
@@ -388,7 +388,7 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 - Version read from info.xml at runtime (single source of truth)
 - Update check against own GitHub releases
 - Auto-update disabled (managed releases only)
-- About page: X2Mail branding with GitHub link
+- About page: Souvera Mail branding with GitHub link
 
 ## [0.3.0] — 2026-03-18
 

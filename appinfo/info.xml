@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <info xmlns:xsi= "http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
 	<id>x2mail</id>
-	<name>X2Mail</name>
+	<name>Souvera Mail</name>
 	<summary>Webmail with native Nextcloud SSO — zero extra passwords, full NC integration</summary>
 	<version>0.8.0</version>
 	<licence>AGPL-3.0-or-later</licence>
@@ -16,7 +16,7 @@
 	<screenshot>https://raw.githubusercontent.com/NK-IT-CLOUD/x2mail/main/img/screenshot-inbox.png</screenshot>
 	<screenshot>https://raw.githubusercontent.com/NK-IT-CLOUD/x2mail/main/img/screenshot-wizard.png</screenshot>
 	<screenshot>https://raw.githubusercontent.com/NK-IT-CLOUD/x2mail/main/img/screenshot-calendar.png</screenshot>
-	<description><![CDATA[**X2Mail** — Webmail for Nextcloud with native SSO integration.
+	<description><![CDATA[**Souvera Mail** — Webmail for Nextcloud with native SSO integration.
 
 Log into Nextcloud via Keycloak or any OIDC provider, open Email — done. No extra passwords, no extra login forms. Your OIDC token authenticates directly against IMAP via OAuth2 (OAUTHBEARER/XOAUTH2).
 

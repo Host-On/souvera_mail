@@ -78,7 +78,7 @@ class PageController extends Controller
         $params = [
             'Admin' => 0,
             'LoadingDescriptionEsc' => \htmlspecialchars(
-                $oConfig->Get('webmail', 'loading_description', 'X2Mail'),
+                $oConfig->Get('webmail', 'loading_description', 'Souvera Mail'),
                 ENT_QUOTES | ENT_IGNORE,
                 'UTF-8'
             ),

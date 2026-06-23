@@ -10,7 +10,7 @@ final class NavigationTitle
 {
     public const APP_CONFIG_KEY = 'menu-title';
 
-    public const DEFAULT = 'X2Mail';
+    public const DEFAULT = 'Souvera Mail';
 
     public static function resolve(IAppConfig $appConfig): string
     {
