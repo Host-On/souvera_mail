@@ -6,6 +6,18 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.9.2] — 2026-01-16
+
+### Fixed
+- `occ smail:bootstrap` exited 1 with `register_client → "oidc:create dispatch failed: …"` against H2CK/oidc 1.17+. Three independent assumptions in `lib/Command/Oidc/RegisterClient.php` were wrong against the actual H2CK CLI signature:
+  - `redirect_uris` is a **positional `IS_ARRAY` argument**, not the `--redirect-uri` option we were sending. The Symfony console rejected the unknown option before the command body ever ran.
+  - The access-token-type flag is `--token_type` (with underscore) and is set **per-client at creation time**, not by flipping the global `default_token_type` app-config after the fact. We now pass `--token_type=jwt` directly to `oidc:create`, so the JWT (RFC 9068) format is requested even when the global default is left at `opaque`.
+  - The created client is emitted as a **pretty-printed JSON object** (`Client::jsonSerialize()` in `lib/Db/Client.php`) with keys `client_id` / `client_secret` — not the human-readable `Client ID: …` / `Client Secret: …` text our regex parser expected. The wrapper now `json_decode()`s the output first and falls back to the regex parser for compatibility with pre-1.14 H2CK builds.
+- The bootstrap error report now includes `raw_oidc_create_output` and `raw_invocation_args` keys so the next-level operator can paste a single JSON blob into a bug report instead of digging through logs.
+
+### Notes for operators
+- If you tried `occ smail:bootstrap` against 0.9.0/0.9.1 and it failed at `register_client`, just re-run after upgrading to 0.9.2 — `smail:bootstrap` is idempotent and resumes cleanly. The OIDC client may already exist in H2CK from the failed run; use `occ oidc:list` to verify, and `occ smail:oidc:register-client --force` to rotate the client_secret if you don't have the old one.
+
 ## [0.9.1] — 2026-01-16
 
 ### Fixed

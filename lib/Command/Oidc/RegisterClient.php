@@ -160,7 +160,7 @@ class RegisterClient extends Command
         }
 
         if ($dryRun) {
-            $report['actions'][] = ['would_invoke' => 'oidc:create', 'name' => $clientName, 'redirect_uri' => $redirectUris];
+            $report['actions'][] = ['would_invoke' => 'oidc:create', 'name' => $clientName, 'redirect_uris' => $redirectUris, 'token_type' => 'jwt'];
             $report['actions'][] = ['would_persist' => self::APP_ID . '/' . OidcProviderService::SMAIL_CLIENT_KEY];
             if (\is_string($secretOut) && $secretOut !== '') {
                 $report['actions'][] = ['would_write_secret_file' => $secretOut];
@@ -168,51 +168,71 @@ class RegisterClient extends Command
             return $this->finalize($output, $jsonMode, $report);
         }
 
-        // 4. Invoke H2CK/oidc oidc:create through Symfony console
+        // 4. Invoke H2CK/oidc's oidc:create. The exact CLI signature (H2CK 1.17+):
+        //   php occ oidc:create <name> <redirect_uri> [<redirect_uri> …]
+        //         [--algorithm RS256|HS256] [--flow code|"code id_token"]
+        //         [--type confidential|public] [--token_type opaque|jwt]
+        //         [--allowed_scopes "openid profile email"] [--email_regex "..."]
+        //         [--client_id <id>] [--client_secret <secret>] [--resource_url <url>]
+        // The command prints the created client as a pretty-printed JSON object
+        // (Client::jsonSerialize()) on success, with the keys client_id / client_secret.
+        // We pass our redirect URIs as the positional IS_ARRAY argument and JWT
+        // access tokens are requested per-client via --token_type=jwt so we never
+        // rely on H2CK's global default_token_type having been flipped.
         $createInputArgs = [
             'name' => $clientName,
-            '--redirect-uri' => $redirectUris[0],
+            'redirect_uris' => $redirectUris,
+            '--type' => 'confidential',
+            '--token_type' => 'jwt',
+            '--flow' => 'code',
+            '--algorithm' => 'RS256',
         ];
-        if (\is_string($tokenLifetime) && \ctype_digit($tokenLifetime)) {
-            // H2CK accepts --token-lifetime via global config not per-client; we set the
-            // global default via config:app:set after registration if requested.
-            $report['actions'][] = ['note' => 'token-lifetime is applied app-globally below'];
-        }
 
         $bufferedOutput = new BufferedOutput();
         try {
             $createCommand = $application->find('oidc:create');
             $returnCode = $createCommand->run(new ArrayInput($createInputArgs), $bufferedOutput);
         } catch (\Throwable $e) {
-            return $this->fail($output, $jsonMode, $report, 'oidc:create dispatch failed: ' . $e->getMessage());
+            $report['raw_invocation_args'] = $createInputArgs;
+            return $this->fail($output, $jsonMode, $report, 'oidc:create dispatch threw: ' . $e->getMessage());
         }
 
         $createOutput = $bufferedOutput->fetch();
         if ($returnCode !== Command::SUCCESS) {
             $report['raw_oidc_create_output'] = $createOutput;
-            return $this->fail($output, $jsonMode, $report, 'H2CK/oidc oidc:create exited non-zero');
+            $report['raw_invocation_args'] = $createInputArgs;
+            return $this->fail($output, $jsonMode, $report, 'oidc:create returned non-zero — raw output preserved in report');
         }
 
-        // 5. Parse client_id + client_secret out of the oidc:create output. H2CK's
-        //    format has historically been one of:
-        //       Client ID: <id>
-        //       Client Secret: <secret>
-        //    Be liberal: also try common alternatives in case of upstream changes.
+        // 5. Parse the JSON object emitted by oidc:create. H2CK 1.14+ outputs
+        //    json_encode($client, JSON_PRETTY_PRINT) where the keys are exactly
+        //    "client_id" and "client_secret" (see Client::jsonSerialize in
+        //    H2CK/oidc 1.17+). Older releases used a "Client ID: <x>" /
+        //    "Client Secret: <y>" text format, which we keep as a defensive
+        //    fallback so the wrapper still works against pre-JSON H2CK builds.
         $clientId = null;
         $clientSecret = null;
-        if (\preg_match('/(?:Client\s*ID|client_id)[:\s]+([A-Za-z0-9._\-]+)/i', $createOutput, $idM) === 1) {
-            $clientId = $idM[1];
-        }
-        if (\preg_match('/(?:Client\s*Secret|client_secret)[:\s]+([A-Za-z0-9._\-]+)/i', $createOutput, $secM) === 1) {
-            $clientSecret = $secM[1];
+        $decoded = \json_decode($createOutput, true);
+        if (\is_array($decoded)) {
+            $clientId = $decoded['client_id'] ?? $decoded['clientIdentifier'] ?? null;
+            $clientSecret = $decoded['client_secret'] ?? $decoded['secret'] ?? null;
         }
         if ($clientId === null || $clientSecret === null) {
+            if (\preg_match('/(?:client_id|Client\s*ID)[:\s"]+([A-Za-z0-9!"#$%&\'()*+,\-./;<=>?@\[\\\\\]^_`{|}~]+)/', $createOutput, $idM) === 1) {
+                $clientId = $idM[1];
+            }
+            if (\preg_match('/(?:client_secret|Client\s*Secret)[:\s"]+([A-Za-z0-9!"#$%&\'()*+,\-./;<=>?@\[\\\\\]^_`{|}~]+)/', $createOutput, $secM) === 1) {
+                $clientSecret = $secM[1];
+            }
+        }
+        if (!\is_string($clientId) || $clientId === '' || !\is_string($clientSecret) || $clientSecret === '') {
             $report['raw_oidc_create_output'] = $createOutput;
+            $report['raw_invocation_args'] = $createInputArgs;
             return $this->fail(
                 $output,
                 $jsonMode,
                 $report,
-                'Could not parse client_id/client_secret from H2CK/oidc output — please file a bug with the raw output.',
+                'Could not parse client_id/client_secret from oidc:create output — raw output preserved in report',
             );
         }
 
