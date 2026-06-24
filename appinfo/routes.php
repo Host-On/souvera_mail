@@ -22,5 +22,10 @@ return [
             'url' => '/app/',
             'verb' => 'POST'
         ],
+        [
+            'name' => 'preference#setDashboardMode',
+            'url' => '/preferences/dashboard-mode',
+            'verb' => 'POST'
+        ],
     ]
 ];

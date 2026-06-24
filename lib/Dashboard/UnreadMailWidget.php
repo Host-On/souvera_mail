@@ -10,15 +10,35 @@ use OCP\Dashboard\IIconWidget;
 use OCP\Dashboard\IReloadableWidget;
 use OCP\Dashboard\Model\WidgetItem;
 use OCP\Dashboard\Model\WidgetItems;
+use OCP\IConfig;
 use OCP\IL10N;
 use OCP\IURLGenerator;
 use Psr\Log\LoggerInterface;
 
+/**
+ * Souvera Mail dashboard widget — shows the user's INBOX, configurable per
+ * user between "unread only" (default) and "all messages" via personal
+ * setting `smail/dashboard-mode`. The setting is persisted with Nextcloud's
+ * standard user-config storage, so operators can also set it from CLI:
+ *
+ *   occ user:setting <uid> smail dashboard-mode all
+ *   occ user:setting <uid> smail dashboard-mode unread
+ *
+ * Each item links to the message inside the Souvera Mail app via the
+ * engine's hash-router (`#/mailbox/INBOX/m<UID>`), so a click goes straight
+ * to the open message.
+ */
 class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 {
+    public const MODE_UNREAD = 'unread';
+    public const MODE_ALL = 'all';
+    public const MODE_DEFAULT = self::MODE_UNREAD;
+    public const USER_CONFIG_MODE = 'dashboard-mode';
+
     public function __construct(
         private IL10N $l10n,
         private IURLGenerator $urlGenerator,
+        private IConfig $config,
         private LoggerInterface $logger,
         private EngineHelper $engineHelper,
     ) {
@@ -31,7 +51,10 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function getTitle(): string
     {
-        return $this->l10n->t('Unread mail');
+        // Title is mode-agnostic — the widget item list itself communicates
+        // whether the user is currently in "unread only" or "all" mode via
+        // the empty-content message.
+        return $this->l10n->t('Souvera Mail · Inbox');
     }
 
     public function getOrder(): int
@@ -46,11 +69,24 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function getUrl(): ?string
     {
-        return $this->urlGenerator->getAbsoluteURL($this->urlGenerator->linkToRoute('smail.page.index'));
+        return $this->urlGenerator->getAbsoluteURL(
+            $this->urlGenerator->linkToRoute('smail.page.index')
+        );
     }
 
     public function load(): void
     {
+    }
+
+    private function resolveMode(string $userId): string
+    {
+        $mode = $this->config->getUserValue(
+            $userId,
+            'smail',
+            self::USER_CONFIG_MODE,
+            self::MODE_DEFAULT,
+        );
+        return $mode === self::MODE_ALL ? self::MODE_ALL : self::MODE_UNREAD;
     }
 
     /**
@@ -60,6 +96,8 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
      */
     public function getItemsV2(string $userId, ?string $since = null, int $limit = 7): WidgetItems
     {
+        $mode = $this->resolveMode($userId);
+
         try {
             $this->engineHelper->startApp();
             $oActions = \Smail\Engine\Api::Actions();
@@ -79,7 +117,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
             $oParams = new \Smail\Mail\Client\MessageListParams();
             $oParams->sFolderName = 'INBOX';
-            $oParams->sSearch = 'unseen';
+            $oParams->sSearch = $mode === self::MODE_UNREAD ? 'unseen' : '';
             $oParams->oCacher = ($oConfig->Get('cache', 'enable', true) && $oConfig->Get('cache', 'server_uids', false))
                 ? $oActions->Cacher($oAccount) : null;
             $oParams->bUseSort = !!$oConfig->Get('labs', 'use_imap_sort', true);
@@ -93,7 +131,9 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
             $MessageCollection = $oMailClient->MessageList($oParams);
 
             $items = [];
-            $baseURL = $this->urlGenerator->linkToRoute('smail.page.index') . '#';
+            $baseURL = $this->urlGenerator->getAbsoluteURL(
+                $this->urlGenerator->linkToRoute('smail.page.index')
+            ) . '#';
 
             foreach ($MessageCollection as $Message) {
                 $items[] = new WidgetItem(
@@ -106,7 +146,10 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
             }
 
             if (empty($items)) {
-                return new WidgetItems([], '', $this->l10n->t('No unread mail'));
+                $empty = $mode === self::MODE_UNREAD
+                    ? $this->l10n->t('No unread mail')
+                    : $this->l10n->t('Inbox is empty');
+                return new WidgetItems([], '', $empty);
             }
 
             return new WidgetItems($items);

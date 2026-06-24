@@ -6,6 +6,23 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.9.4] — 2026-02-16
+
+### Added
+- **Dashboard widget mode toggle.** The Souvera Mail dashboard widget (`smail-unread`) now reads a per-user preference `smail/dashboard-mode` and switches between two modes:
+  - `unread` (default): only unread INBOX messages — matches the previous behaviour.
+  - `all`: the most recent INBOX messages regardless of seen state — useful for users who treat the dashboard as a glance-pane for everything new.
+- Each widget row links straight to the message via the engine hash-router (`#/mailbox/INBOX/m<UID>`) — one click opens the mail in Souvera Mail.
+- **Personal settings UI** at *Settings → Souvera Mail* exposes the toggle as two radio buttons, persists via a new `POST /preferences/dashboard-mode` endpoint (`OCA\Smail\Controller\PreferenceController`), and shows an inline ✓/✗ confirmation. Stored via Nextcloud's standard `IConfig::setUserValue()`, so the same setting is also reachable from the CLI for declarative deploys:
+  ```
+  occ user:setting <uid> smail dashboard-mode all
+  occ user:setting <uid> smail dashboard-mode unread
+  ```
+
+### Changed
+- Widget title is now `Souvera Mail · Inbox` (was `Unread mail`) — the title is mode-agnostic; the empty-state message communicates the active mode (`No unread mail` vs `Inbox is empty`).
+- Widget item links now use `getAbsoluteURL()` instead of the relative `linkToRoute()` result, so the dashboard's anchor follow works from any embed context (Nextcloud Talk smart picker, public dashboards, etc.).
+
 ## [0.9.3] — 2026-02-16
 
 ### Changed
