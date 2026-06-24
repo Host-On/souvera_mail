@@ -1,0 +1,25 @@
+{
+    "name": "souvera/smail",
+    "description": "Souvera Mail — Nextcloud webmail with NC-as-OIDC-Provider",
+    "type": "nextcloud-app",
+    "license": "AGPL-3.0-or-later",
+    "homepage": "https://github.com/PhiGi87/souvera_mail",
+    "config": {
+        "platform": {
+            "php": "8.3"
+        },
+        "sort-packages": true,
+        "optimize-autoloader": true
+    },
+    "autoload": {
+        "psr-4": {
+            "OCA\\Smail\\": "lib/"
+        },
+        "classmap": [
+            "app/smail/v/current/app/libraries/Smail/"
+        ]
+    },
+    "scripts": {
+        "post-autoload-dump": []
+    }
+}

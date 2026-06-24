@@ -2,6 +2,23 @@
 
 namespace OCA\Smail\AppInfo;
 
+/*
+ * Load the bundled composer autoloader (engine + wrapper classmap) before any
+ * Nextcloud service-container lookup so repair-steps that run during
+ * `occ app:enable smail` can resolve `Smail\Engine\*` classes immediately.
+ *
+ * The classmap (built by `composer dump-autoload --optimize`) hard-codes the
+ * lowercase-filename → CamelCase-class mapping that the upstream SnappyMail
+ * library uses, so we do not rely on EngineHelper::loadApp() having been
+ * invoked first. EngineHelper::loadApp() still registers a defensive fallback
+ * autoloader for installs that ship without `vendor/` (e.g. checkout from
+ * source rather than the released tarball).
+ */
+$vendorAutoload = \dirname(__DIR__, 2) . '/vendor/autoload.php';
+if (\is_file($vendorAutoload)) {
+    require_once $vendorAutoload;
+}
+
 use OCA\Smail\Dashboard\UnreadMailWidget;
 use OCA\Smail\Listeners\ImpersonateListener;
 use OCA\Smail\Listeners\LoginBridgeListener;

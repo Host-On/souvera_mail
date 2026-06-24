@@ -53,13 +53,13 @@ class EngineHelper
         \spl_autoload_register(function ($sClassName) {
             if (\str_starts_with($sClassName, 'Smail\\Engine\\')) {
                 $file = SMAIL_LIBRARIES_PATH . 'Smail/Engine/'
-                    . \strtolower(\strtr(\substr($sClassName, 14), '\\', DIRECTORY_SEPARATOR))
+                    . \strtolower(\strtr(\substr($sClassName, 13), '\\', DIRECTORY_SEPARATOR))
                     . '.php';
                 if (\is_file($file)) {
                     include_once $file;
                     return;
                 }
-                $parts = \explode('\\', \substr($sClassName, 14));
+                $parts = \explode('\\', \substr($sClassName, 13));
                 $fileName = \array_pop($parts);
                 $dirPath = \implode(DIRECTORY_SEPARATOR, \array_map('strtolower', $parts));
                 $file = SMAIL_LIBRARIES_PATH . 'Smail/Engine/'
