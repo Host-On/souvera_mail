@@ -6,6 +6,11 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.9.3] — 2026-02-16
+
+### Changed
+- Version bump-only release. No code changes vs. 0.9.2. Required so Nextcloud's repair step / `occ upgrade` re-processes the app after the 0.9.2 `RegisterClient.php` patch was applied on top of an already-installed 0.9.2 build. The H2CK/oidc `oidc:create` signature implemented in 0.9.2 has been verified against the upstream `lib/Command/Clients/OIDCCreate.php` (positional `name` + `redirect_uris` `REQUIRED|IS_ARRAY` argument, `--token_type` option with underscore, JSON-encoded `Client::jsonSerialize()` output with keys `client_id` / `client_secret`).
+
 ## [0.9.2] — 2026-01-16
 
 ### Fixed
