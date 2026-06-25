@@ -6,6 +6,14 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.10.2] — 2026-02-16
+
+### Fixed
+- **`templates/not_configured.php` no longer points users at a non-existent setup wizard.** The empty-state page used to render a primary button labelled *Setup Wizard* that linked to `/settings/admin/smail`. That link contradicts the project's CLI-only doctrine (the browser wizard was removed in 0.9.0), and on real deployments it also surfaced a completely unrelated TypeError from a sibling app (`souvera_shield::PersonalSection::getName()` → `LazyL10N::t()` → `array_merge(null)`) because the personal-settings page enumerates every installed app's section. Replacing the button with a static CLI snippet (`sudo -u www-data php occ smail:bootstrap …`) sidesteps both the doctrinal mismatch and the third-party crash entry-point.
+
+### Documentation
+- The empty-state page now explicitly states the prerequisites for `occ smail:bootstrap` (H2CK/oidc 1.17+ enabled with a signing key, Stalwart mailbox provisioned by souvera_central) and points operators at `occ smail:status` for inspection and `occ smail:reset` for re-running. After bootstrap, SSO via H2CK/oidc is automatic — no per-user configuration is required (answering the recurring deployment question).
+
 ## [0.10.1] — 2026-02-16
 
 ### Added
