@@ -42,5 +42,10 @@ return [
             'url' => '/app-passwords/{id}',
             'verb' => 'DELETE'
         ],
+        [
+            'name' => 'quota#index',
+            'url' => '/quota',
+            'verb' => 'GET'
+        ],
     ]
 ];

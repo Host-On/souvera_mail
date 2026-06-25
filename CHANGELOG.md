@@ -6,6 +6,28 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-02-16
+
+### Added
+- **Live mailbox-quota pill** in the Souvera Mail engine UI (top-right). Reads `usedDiskQuota` + `quotas.MaxDiskQuota` for the current user from Stalwart 0.16 via a single `x:Account/get` JMAP call. Shown as a small pill `"382 MB / 5 GB"` that turns orange at ≥75 % and red at ≥90 %. Hidden gracefully if any prerequisite is missing (no `souvera_central`, no Stalwart URL, no H2CK/oidc) — the regular UI is unaffected.
+
+#### Architecture
+- **`OCA\Smail\Service\StalwartUserContext`** (NEW) — shared helper. Extracts `resolveAccountId(string $userId)` + `resolveBearer(string $userId)` from the previous `AppPasswordService` into one reusable class so both AppPassword + Quota flows share the souvera_central principal lookup + H2CK/oidc token acquisition without duplication.
+- **`OCA\Smail\Service\StalwartAdminService::extractMethodResponse()`** is now a public reusable helper (moved from `AppPasswordService`).
+- **`OCA\Smail\Service\QuotaService`** (NEW) — wraps `x:Account/get` with `properties: ['usedDiskQuota', 'quotas']`. Result cached in NC's distributed cache for 60 s per user (Stalwart's quota numbers do not change every second; engine polls every 60 s anyway).
+- **`OCA\Smail\Controller\QuotaController`** (NEW) — single endpoint `GET /index.php/apps/smail/quota` returning `{ status, used, total, percentage, unlimited, formatted: { used, total } }`. `#[NoAdminRequired]`, session-cookie auth, no CSRF needed (GET).
+- **Engine plugin** (`app/smail/v/current/app/plugins/nextcloud/`):
+  - `index.php` `FilterAppData` hook now emits `Nextcloud.SmailQuotaUrl = absoluteUrl('smail.quota.index')` so the engine JS can reach the endpoint without hard-coding the NC webroot.
+  - **`js/quota.js`** (NEW, ~100 LoC) — fetches the URL on engine boot (1.5 s delay to avoid racing the login flow) and every 60 s afterwards, renders a `position: fixed` pill in the top-right corner with traffic-light colours based on percentage. Idempotent — removes the pill on any error so the UI never shows stale info.
+
+#### Refactored
+- `AppPasswordService` constructor signature simplified: now injects `StalwartAdminService` + `StalwartUserContext` instead of (Oidc + UserManager + Container). Private `resolveAccountId` / `resolveBearer` / `extractMethodResponse` methods removed (now on `StalwartUserContext` / `StalwartAdminService`). No behaviour change.
+
+#### Routes added
+```
+GET /quota → quota#index
+```
+
 ## [0.10.0] — 2026-02-16
 
 ### Added

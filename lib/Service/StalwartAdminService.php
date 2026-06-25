@@ -109,4 +109,35 @@ class StalwartAdminService
         }
         return $decoded;
     }
+
+    /**
+     * Extracts the response body of a specific method call from a full JMAP
+     * response envelope. Throws on JMAP-level errors or missing method.
+     *
+     * @param array<string, mixed> $jmapResponse
+     * @return array<string, mixed>
+     */
+    public function extractMethodResponse(array $jmapResponse, string $expectedMethod): array
+    {
+        $calls = $jmapResponse['methodResponses'] ?? [];
+        if (!\is_array($calls)) {
+            throw new \RuntimeException('Stalwart JMAP envelope missing methodResponses');
+        }
+        foreach ($calls as $call) {
+            if (!\is_array($call) || \count($call) < 2) {
+                continue;
+            }
+            $name = (string) ($call[0] ?? '');
+            if ($name === 'error') {
+                $err = $call[1] ?? [];
+                throw new \RuntimeException(
+                    'Stalwart JMAP error: ' . \json_encode($err, JSON_UNESCAPED_SLASHES)
+                );
+            }
+            if ($name === $expectedMethod && \is_array($call[1])) {
+                return $call[1];
+            }
+        }
+        throw new \RuntimeException("Stalwart JMAP response did not include {$expectedMethod}");
+    }
 }

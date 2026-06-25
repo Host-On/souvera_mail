@@ -33,6 +33,8 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 
 			$this->addJs('js/messagelist.js');
 
+			$this->addJs('js/quota.js');
+
 			$this->addTemplate('templates/PopupsNextcloudFiles.html');
 			$this->addTemplate('templates/PopupsNextcloudCalendars.html');
 
@@ -221,7 +223,12 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			$aResult['Nextcloud'] = [
 				'UID' => $sUID,
 				'WebDAV' => $sWebDAV,
-				'CalDAV' => $this->Config()->Get('plugin', 'calendar', false)
+				'CalDAV' => $this->Config()->Get('plugin', 'calendar', false),
+				// URL of the smail mailbox-quota JSON endpoint — consumed by
+				// app/plugins/nextcloud/js/quota.js to render the live quota
+				// pill in the engine UI. Always emitted; the JS gates on the
+				// fetch response (gracefully hides if 503 / endpoint missing).
+				'SmailQuotaUrl' => $oUrlGen->getAbsoluteURL($oUrlGen->linkToRoute('smail.quota.index'))
 //				'WebDAV_files' => $sWebDAV . '/files/' . $sUID
 			];
 			if (empty($aResult['Auth'])) {
