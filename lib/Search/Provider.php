@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Search;
+namespace OCA\SouveraMail\Search;
 
-use OCA\Smail\AppInfo\Application;
-use OCA\Smail\Util\EngineHelper;
+use OCA\SouveraMail\AppInfo\Application;
+use OCA\SouveraMail\Util\EngineHelper;
 use OCP\IURLGenerator;
 use OCP\IUser;
 use OCP\Search\IProvider;
@@ -76,7 +76,7 @@ class Provider implements IProvider
 
             $MessageCollection = $oMailClient->MessageList($oParams);
 
-            $baseURL = $this->urlGenerator->linkToRoute('smail.page.index');
+            $baseURL = $this->urlGenerator->linkToRoute('souvera_mail.page.index');
             $baseURL .= '#';
             $search = \rawurlencode($oParams->sSearch);
 

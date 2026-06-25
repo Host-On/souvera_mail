@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Service;
+namespace OCA\SouveraMail\Service;
 
 use OCP\App\IAppManager;
 use OCP\EventDispatcher\IEventDispatcher;
@@ -22,7 +22,7 @@ use Psr\Log\LoggerInterface;
  *
  * That token is obtained by dispatching H2CK/oidc's `TokenGenerationRequestEvent`
  * (in-process PHP event — no browser redirect, no HTTP round-trip). H2CK returns
- * a fresh RFC 9068 JWT bound to (smail-client, current-NC-user). The mail server
+ * a fresh RFC 9068 JWT bound to (souvera_mail-client, current-NC-user). The mail server
  * then validates the JWT signature against `<NC>/index.php/apps/oidc/jwks`.
  *
  * Defensive: every public method tolerates the H2CK/oidc app being missing or
@@ -38,11 +38,11 @@ use Psr\Log\LoggerInterface;
 class OidcProviderService
 {
     public const OIDC_APP_ID = 'oidc';
-    public const SMAIL_CLIENT_KEY = 'oidc-client-id';
-    public const SMAIL_CLIENT_NAME_DEFAULT = 'smail';
+    public const SOUVERA_MAIL_CLIENT_KEY = 'oidc-client-id';
+    public const SOUVERA_MAIL_CLIENT_NAME_DEFAULT = 'souvera_mail';
     public const TOKEN_GENERATION_EVENT_FQN = 'OCA\\OIDCIdentityProvider\\Event\\TokenGenerationRequestEvent';
 
-    private const CACHE_PREFIX = 'smail.oidc.token.';
+    private const CACHE_PREFIX = 'souvera_mail.oidc.token.';
     private const CACHE_SAFETY_MARGIN_SECONDS = 60;
     private const FALLBACK_TTL_SECONDS = 60;
 
@@ -55,7 +55,7 @@ class OidcProviderService
         private LoggerInterface $logger,
         ICacheFactory $cacheFactory,
     ) {
-        $this->cache = $cacheFactory->createDistributed('smail/oidc');
+        $this->cache = $cacheFactory->createDistributed('souvera_mail/oidc');
     }
 
     /**
@@ -74,14 +74,14 @@ class OidcProviderService
     }
 
     /**
-     * Returns the smail OIDC client identifier registered in H2CK/oidc.
-     * Defaults to `smail` when the operator has not overridden it via
-     * `occ smail:oidc:register-client --name <custom>`.
+     * Returns the souvera_mail OIDC client identifier registered in H2CK/oidc.
+     * Defaults to `souvera_mail` when the operator has not overridden it via
+     * `occ souvera_mail:oidc:register-client --name <custom>`.
      */
     public function getClientIdentifier(): string
     {
-        $custom = $this->appConfig->getValueString('smail', self::SMAIL_CLIENT_KEY, '');
-        return $custom !== '' ? $custom : self::SMAIL_CLIENT_NAME_DEFAULT;
+        $custom = $this->appConfig->getValueString('souvera_mail', self::SOUVERA_MAIL_CLIENT_KEY, '');
+        return $custom !== '' ? $custom : self::SOUVERA_MAIL_CLIENT_NAME_DEFAULT;
     }
 
     /**
@@ -129,7 +129,7 @@ class OidcProviderService
                     'Souvera Mail: H2CK/oidc returned an empty access token for user '
                     . $userId . ' / client ' . $clientId
                     . ' — is the client registered and `default_token_type=jwt` set?'
-                    . ' Run `occ smail:status` for diagnostics.'
+                    . ' Run `occ souvera_mail:status` for diagnostics.'
                 );
                 return null;
             }
@@ -175,7 +175,7 @@ class OidcProviderService
 
     /**
      * Invalidate cached tokens for one user (called on logout) or all users
-     * (passed `null` — used by `occ smail:reset`).
+     * (passed `null` — used by `occ souvera_mail:reset`).
      */
     public function invalidate(?string $userId = null): void
     {

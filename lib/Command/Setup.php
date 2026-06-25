@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Command;
+namespace OCA\SouveraMail\Command;
 
-use OCA\Smail\Service\ConnectivityCheckService;
-use OCA\Smail\Service\DomainConfigService;
-use OCA\Smail\Service\OidcProviderService;
-use OCA\Smail\Util\EngineHelper;
-use OCA\Smail\Util\SetupResolvers;
+use OCA\SouveraMail\Service\ConnectivityCheckService;
+use OCA\SouveraMail\Service\DomainConfigService;
+use OCA\SouveraMail\Service\OidcProviderService;
+use OCA\SouveraMail\Util\EngineHelper;
+use OCA\SouveraMail\Util\SetupResolvers;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
 use Symfony\Component\Console\Command\Command;
@@ -20,7 +20,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * Write (or update) Souvera Mail's single active mail-domain profile —
  * IMAP/SMTP/Sieve hosts, ports, TLS modes, OIDC audience hint. The
  * authoritative OIDC client lives in H2CK/oidc and is managed by
- * `smail:oidc:register-client` / `smail:bootstrap`; this command only writes
+ * `souvera_mail:oidc:register-client` / `souvera_mail:bootstrap`; this command only writes
  * the mail-server side of the profile.
  *
  * Idempotent and deploy-friendly: `--json` returns a single-line machine
@@ -31,7 +31,7 @@ class Setup extends Command
 {
     use SetupResolvers;
 
-    private const APP_ID = 'smail';
+    private const APP_ID = 'souvera_mail';
 
     public function __construct(
         private IAppConfig $appConfig,
@@ -47,7 +47,7 @@ class Setup extends Command
     protected function configure(): void
     {
         $this
-            ->setName('smail:setup')
+            ->setName('souvera_mail:setup')
             ->setDescription('Configure Souvera Mail mail-server profile (IMAP/SMTP/Sieve + OIDC audience)')
             ->addOption('imap-host', null, InputOption::VALUE_REQUIRED, 'IMAP server hostname')
             ->addOption('imap-port', null, InputOption::VALUE_REQUIRED, 'IMAP server port', '993')
@@ -76,7 +76,7 @@ class Setup extends Command
         $runChecks = (bool) $input->getOption('check');
 
         $report = [
-            'command' => 'smail:setup',
+            'command' => 'souvera_mail:setup',
             'dry_run' => $dryRun,
             'checks' => [],
             'actions' => [],
@@ -120,7 +120,7 @@ class Setup extends Command
             return $this->fail(
                 $output, $jsonMode, $report,
                 'H2CK/oidc is not installed/enabled. Run `occ app:install oidc && occ app:enable oidc`'
-                . ' and then `occ smail:oidc:register-client` (or `occ smail:bootstrap`).',
+                . ' and then `occ souvera_mail:oidc:register-client` (or `occ souvera_mail:bootstrap`).',
             );
         }
         $clientId = $this->oidcProvider->getClientIdentifier();

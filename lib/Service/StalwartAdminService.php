@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Service;
+namespace OCA\SouveraMail\Service;
 
 use OCP\Http\Client\IClientService;
 use OCP\IConfig;
@@ -29,7 +29,7 @@ use Psr\Log\LoggerInterface;
  *  - Admin-scoped operations would use HTTP Basic with the credentials in
  *    `souvera_central.stalwart_admin_user` / `…_password`, but Stalwart 0.16
  *    explicitly forbids admins from *creating* AppPasswords on behalf of a
- *    user (only view + revoke), so smail uses user JWTs exclusively.
+ *    user (only view + revoke), so souvera_mail uses user JWTs exclusively.
  */
 class StalwartAdminService
 {
@@ -97,7 +97,7 @@ class StalwartAdminService
         } catch (\Throwable $e) {
             $this->logger->warning(
                 'Souvera Mail: Stalwart JMAP call failed: ' . $e->getMessage(),
-                ['app' => 'smail', 'exception' => $e]
+                ['app' => 'souvera_mail', 'exception' => $e]
             );
             throw new \RuntimeException('Stalwart JMAP request failed: ' . $e->getMessage(), 0, $e);
         }

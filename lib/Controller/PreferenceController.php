@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Controller;
+namespace OCA\SouveraMail\Controller;
 
-use OCA\Smail\Dashboard\UnreadMailWidget;
+use OCA\SouveraMail\Dashboard\UnreadMailWidget;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -18,7 +18,7 @@ use OCP\IRequest;
  * The only preference we expose today is the dashboard widget mode
  * ({@see UnreadMailWidget::USER_CONFIG_MODE}: `unread` | `all`). Stored via
  * Nextcloud's standard {@see IConfig::setUserValue()} so operators can also
- * manage it via `occ user:setting <uid> smail dashboard-mode <value>`.
+ * manage it via `occ user:setting <uid> souvera_mail dashboard-mode <value>`.
  */
 class PreferenceController extends Controller
 {
@@ -44,7 +44,7 @@ class PreferenceController extends Controller
 
         $this->config->setUserValue(
             $this->userId,
-            'smail',
+            'souvera_mail',
             UnreadMailWidget::USER_CONFIG_MODE,
             $mode,
         );

@@ -6,6 +6,41 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-02-16
+
+### Breaking
+- **App ID renamed `smail` → `souvera_mail`.** The Nextcloud `<id>` in `appinfo/info.xml`, the PHP wrapper namespace (`OCA\Smail\…` → `OCA\SouveraMail\…`), all URL paths (`/apps/smail/…` → `/apps/souvera_mail/…`), every `IConfig` app-domain key, every `IL10N` / logger context, every cache namespace and every CLI command name (`occ smail:bootstrap` → `occ souvera_mail:bootstrap`, etc.) now use the long form. This is a fresh install — there is no automatic migration of old `smail` config values. Operators redeploying an existing `smail` install must run `occ app:remove smail` followed by `occ app:install souvera_mail` and re-run `occ souvera_mail:bootstrap …`.
+- **Personal Settings section removed.** Souvera Mail no longer registers a `<personal>` settings section under Nextcloud's `/settings/user/souvera_mail`. The user-facing configuration UI (App Passwords, Dashboard widget mode) now lives **inside the app** at `/index.php/apps/souvera_mail/settings`. This sidesteps two long-standing issues: (a) it puts settings where the user already is (the mailbox), and (b) it removes the only entry path to a recurring L10N TypeError in an unrelated sibling app (`souvera_shield::PersonalSection::getName`) that was triggered whenever Nextcloud enumerated all Personal Sections to render the page.
+
+### Added
+- **In-app Settings page** at `/apps/souvera_mail/settings` rendered as a full-page TemplateResponse with NC's standard `'user'` chrome. Shows the existing Dashboard widget mode toggle and the App Password management UI. Includes a "← Back to inbox" breadcrumb that returns the user to the mailbox.
+- **Quota pill is now an entry-point to settings.** Clicking the live mailbox-quota pill in the engine's top-right corner opens the in-app settings page in a new tab. When the quota endpoint is unavailable (no `souvera_central` mailbox, no Stalwart URL), the pill degrades to a `⚙ Settings` button so the entry-point is always visible.
+- Engine plugin's `FilterAppData` hook now emits `Nextcloud.SmailSettingsUrl` in addition to `Nextcloud.SmailQuotaUrl`, consumed by `app/plugins/nextcloud/js/quota.js`.
+
+### Changed
+- All NC-wrapper PHP files updated to namespace `OCA\SouveraMail`. Composer PSR-4 mapping updated to `OCA\\SouveraMail\\` → `lib/`. Autoload classmap regenerated.
+- All 137 L10N JS/JSON files now register against `OC.L10N.register("souvera_mail", …)`.
+- Engine plugin (`app/smail/v/current/app/plugins/nextcloud/`) updated to reference `OCA\SouveraMail\Util\EngineHelper` and read app-config from the `'souvera_mail'` domain.
+- Internal HTML / CSS / `data-testid` identifiers use the `souvera-mail-` (hyphenated) prefix for full consistency with the new app id.
+- Engine namespace `Smail\Engine\…` and the physical engine directory `app/smail/v/current/` are intentionally **not** renamed — they are internal engine identifiers, not exposed as the app id; renaming would force 700+ unrelated file touches without any user-visible benefit.
+
+### Removed
+- `lib/Settings/PersonalSettings.php`, `lib/Settings/PersonalSection.php`, `templates/personal_settings.php` — replaced by the in-app `SettingsController` + `templates/settings.php`.
+- `css/setup-wizard.css` — leftover stylesheet from the long-removed browser setup wizard, no references anywhere.
+
+### Migration notes for operators
+| Old | New |
+|---|---|
+| App URL `https://nc/index.php/apps/smail/` | `https://nc/index.php/apps/souvera_mail/` |
+| Settings URL `https://nc/settings/user/smail` | `https://nc/index.php/apps/souvera_mail/settings` |
+| OCC command `occ smail:bootstrap` | `occ souvera_mail:bootstrap` |
+| OCC command `occ smail:status` | `occ souvera_mail:status` |
+| OCC command `occ smail:reset` | `occ souvera_mail:reset` |
+| OCC command `occ smail:setup` | `occ souvera_mail:setup` |
+| OCC command `occ smail:oidc:register-client` | `occ souvera_mail:oidc:register-client` |
+| User preference `occ user:setting <uid> smail dashboard-mode …` | `occ user:setting <uid> souvera_mail dashboard-mode …` |
+| App data directory `appdata_smail/` | `appdata_souvera_mail/` |
+
 ## [0.10.2] — 2026-02-16
 
 ### Fixed

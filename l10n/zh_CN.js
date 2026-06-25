@@ -1,5 +1,5 @@
 OC.L10N.register(
-    "smail",
+    "souvera_mail",
     {
     "Email" : "电子邮箱",
     "Error" : "错误",

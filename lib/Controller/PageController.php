@@ -1,10 +1,10 @@
 <?php
 
-namespace OCA\Smail\Controller;
+namespace OCA\SouveraMail\Controller;
 
-use OCA\Smail\Service\DomainConfigService;
-use OCA\Smail\Util\EngineHelper;
-use OCA\Smail\ContentSecurityPolicy;
+use OCA\SouveraMail\Service\DomainConfigService;
+use OCA\SouveraMail\Util\EngineHelper;
+use OCA\SouveraMail\ContentSecurityPolicy;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
@@ -37,7 +37,7 @@ class PageController extends Controller
         // No domain configured → show setup hint instead of useless login form
         if (empty($this->domainService->listDomains())) {
             $isAdmin = $this->userId && $this->groupManager->isAdmin($this->userId);
-            return new TemplateResponse('smail', 'not_configured', [
+            return new TemplateResponse('souvera_mail', 'not_configured', [
                 'isAdmin' => $isAdmin,
             ]);
         }
@@ -50,9 +50,9 @@ class PageController extends Controller
             return;
         }
 
-        $this->navigationManager->setActiveEntry('smail');
+        $this->navigationManager->setActiveEntry('souvera_mail');
 
-        \OCP\Util::addStyle('smail', 'embed');
+        \OCP\Util::addStyle('souvera_mail', 'embed');
 
         $this->engineHelper->startApp();
 
@@ -60,9 +60,9 @@ class PageController extends Controller
         // (expired/invalid OIDC token), show a clear error instead of the
         // engine's useless login form (LoginProcess rejects passwords anyway).
         if (!$this->engineHelper->hasAuthenticatedAccount()) {
-            return new TemplateResponse('smail', 'auth_error', [
+            return new TemplateResponse('souvera_mail', 'auth_error', [
                 'isOidcLogin' => $this->engineHelper->isOIDCLogin(),
-                'reloadUrl' => $this->urlGenerator->linkToRoute('smail.page.index'),
+                'reloadUrl' => $this->urlGenerator->linkToRoute('souvera_mail.page.index'),
             ]);
         }
 
@@ -104,7 +104,7 @@ class PageController extends Controller
             'href' => \Smail\Engine\Utils::WebStaticPath('css/app.css'),
         ], '');
 
-        $response = new TemplateResponse('smail', 'index_embed', $params);
+        $response = new TemplateResponse('souvera_mail', 'index_embed', $params);
 
         $response->setContentSecurityPolicy($csp);
 

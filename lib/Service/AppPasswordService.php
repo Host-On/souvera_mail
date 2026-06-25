@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Service;
+namespace OCA\SouveraMail\Service;
 
 use Psr\Log\LoggerInterface;
 

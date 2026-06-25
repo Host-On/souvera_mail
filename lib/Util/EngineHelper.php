@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Util;
+namespace OCA\SouveraMail\Util;
 
-use OCA\Smail\Service\OidcProviderService;
+use OCA\SouveraMail\Service\OidcProviderService;
 use OCP\App\IAppManager;
 use OCP\Config\IUserConfig;
 use OCP\IAppConfig;
@@ -75,7 +75,7 @@ class EngineHelper
 
         if (!\defined('APP_DATA_FOLDER_PATH')) {
             $dataDir = \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/');
-            \define('APP_DATA_FOLDER_PATH', $dataDir . '/appdata_smail/');
+            \define('APP_DATA_FOLDER_PATH', $dataDir . '/appdata_souvera_mail/');
         }
 
         $app_dir = \dirname(\dirname(__DIR__)) . '/app';
@@ -144,7 +144,7 @@ class EngineHelper
      */
     public function getSsoUid(): ?string
     {
-        $uid = $this->session->get('smail-uid');
+        $uid = $this->session->get('souvera_mail-uid');
         if (\is_string($uid) && $uid !== '') {
             return $uid;
         }
@@ -173,7 +173,7 @@ class EngineHelper
 
     /**
      * Returns the email for the current SSO user. Resolution order:
-     *   1. Per-user override: IUserConfig smail/email
+     *   1. Per-user override: IUserConfig souvera_mail/email
      *   2. NC profile email: IUserConfig settings/email
      *   3. IUser::getEMailAddress()
      *   4. uid itself (last-resort guarantee of a non-empty return)
@@ -186,7 +186,7 @@ class EngineHelper
             return null;
         }
 
-        $custom = $this->userConfig->getValueString($uid, 'smail', 'email', '');
+        $custom = $this->userConfig->getValueString($uid, 'souvera_mail', 'email', '');
         if ($custom !== '') {
             return $custom;
         }
@@ -208,13 +208,13 @@ class EngineHelper
     }
 
     /**
-     * True when the smail OIDC autologin is wired up — i.e. the H2CK/oidc app
+     * True when the souvera_mail OIDC autologin is wired up — i.e. the H2CK/oidc app
      * is available and a Nextcloud user is currently logged in. Browser-only
      * (CLI invocations return false: no live NC user).
      */
     public function isOIDCLogin(): bool
     {
-        if ($this->appConfig->getValueString('smail', 'autologin-oidc', '0') !== '1') {
+        if ($this->appConfig->getValueString('souvera_mail', 'autologin-oidc', '0') !== '1') {
             return false;
         }
         if ($this->userSession->getUser() === null) {

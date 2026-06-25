@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Command;
+namespace OCA\SouveraMail\Command;
 
-use OCA\Smail\Service\OidcProviderService;
+use OCA\SouveraMail\Service\OidcProviderService;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
 use Symfony\Component\Console\Command\Command;
@@ -19,8 +19,8 @@ use Symfony\Component\Console\Output\OutputInterface;
  * order, each idempotent:
  *
  *   1. Verifies the H2CK/oidc app is installed + enabled and `default_token_type=jwt`.
- *   2. Registers a smail OIDC client in H2CK/oidc (skips if already present).
- *   3. Writes the IMAP/SMTP/Sieve domain profile via `smail:setup` (skips
+ *   2. Registers a souvera_mail OIDC client in H2CK/oidc (skips if already present).
+ *   3. Writes the IMAP/SMTP/Sieve domain profile via `souvera_mail:setup` (skips
  *      preflight unless `--check`, lets the operator decide whether to fail
  *      the deploy on network hiccups).
  *
@@ -41,13 +41,13 @@ class Bootstrap extends Command
     protected function configure(): void
     {
         $this
-            ->setName('smail:bootstrap')
+            ->setName('souvera_mail:bootstrap')
             ->setDescription('One-shot setup for automated deploys: register OIDC client + configure mail-server profile')
-            // OIDC client options (forwarded to smail:oidc:register-client)
-            ->addOption('client-name', null, InputOption::VALUE_REQUIRED, 'OIDC client name in H2CK/oidc', 'smail')
+            // OIDC client options (forwarded to souvera_mail:oidc:register-client)
+            ->addOption('client-name', null, InputOption::VALUE_REQUIRED, 'OIDC client name in H2CK/oidc', 'souvera_mail')
             ->addOption('client-secret-out', null, InputOption::VALUE_REQUIRED, 'Write the generated client_secret to this file (0600)')
             ->addOption('token-lifetime', null, InputOption::VALUE_REQUIRED, 'OIDC access-token lifetime in seconds (sets app-global oidc/expire_time)', '1800')
-            // Mail server options (forwarded to smail:setup)
+            // Mail server options (forwarded to souvera_mail:setup)
             ->addOption('mail-imap-host', null, InputOption::VALUE_REQUIRED, 'IMAP hostname')
             ->addOption('mail-imap-port', null, InputOption::VALUE_REQUIRED, 'IMAP port', '993')
             ->addOption('mail-imap-ssl', null, InputOption::VALUE_REQUIRED, 'IMAP SSL mode (none|ssl|starttls)', 'ssl')
@@ -71,7 +71,7 @@ class Bootstrap extends Command
         $dryRun = (bool) $input->getOption('dry-run');
 
         $report = [
-            'command' => 'smail:bootstrap',
+            'command' => 'souvera_mail:bootstrap',
             'dry_run' => $dryRun,
             'steps' => [],
             'status' => 'ok',
@@ -100,12 +100,12 @@ class Bootstrap extends Command
             return $this->fail($output, $jsonMode, $report, 'Symfony console application unavailable');
         }
 
-        // ─── Step 2: register OIDC client (idempotent via smail:oidc:register-client) ──
-        if (!$application->has('smail:oidc:register-client')) {
-            return $this->fail($output, $jsonMode, $report, 'Internal: smail:oidc:register-client is not registered');
+        // ─── Step 2: register OIDC client (idempotent via souvera_mail:oidc:register-client) ──
+        if (!$application->has('souvera_mail:oidc:register-client')) {
+            return $this->fail($output, $jsonMode, $report, 'Internal: souvera_mail:oidc:register-client is not registered');
         }
         try {
-            $registerCmd = $application->find('smail:oidc:register-client');
+            $registerCmd = $application->find('souvera_mail:oidc:register-client');
             $registerArgs = [
                 '--name' => (string) $input->getOption('client-name'),
                 '--json' => true,
@@ -125,18 +125,18 @@ class Bootstrap extends Command
             $decoded = \json_decode($bufferedOutput->fetch(), true);
             $report['steps'][] = ['register_client' => $decoded ?? ['rc' => $rc]];
             if ($rc !== Command::SUCCESS) {
-                return $this->fail($output, $jsonMode, $report, 'smail:oidc:register-client failed (see register_client section)');
+                return $this->fail($output, $jsonMode, $report, 'souvera_mail:oidc:register-client failed (see register_client section)');
             }
         } catch (\Throwable $e) {
             return $this->fail($output, $jsonMode, $report, 'register-client dispatch failed: ' . $e->getMessage());
         }
 
-        // ─── Step 3: domain profile (smail:setup) ──────────────────────────────
-        if (!$application->has('smail:setup')) {
-            return $this->fail($output, $jsonMode, $report, 'Internal: smail:setup is not registered');
+        // ─── Step 3: domain profile (souvera_mail:setup) ──────────────────────────────
+        if (!$application->has('souvera_mail:setup')) {
+            return $this->fail($output, $jsonMode, $report, 'Internal: souvera_mail:setup is not registered');
         }
         try {
-            $setupCmd = $application->find('smail:setup');
+            $setupCmd = $application->find('souvera_mail:setup');
             $setupArgs = [
                 '--imap-host' => $imapHost,
                 '--imap-port' => (string) ($input->getOption('mail-imap-port') ?? '993'),
@@ -169,16 +169,16 @@ class Bootstrap extends Command
             $decoded = \json_decode($bufferedOutput->fetch(), true);
             $report['steps'][] = ['setup' => $decoded ?? ['rc' => $rc]];
             if ($rc !== Command::SUCCESS) {
-                return $this->fail($output, $jsonMode, $report, 'smail:setup failed (see setup section)');
+                return $this->fail($output, $jsonMode, $report, 'souvera_mail:setup failed (see setup section)');
             }
         } catch (\Throwable $e) {
-            return $this->fail($output, $jsonMode, $report, 'smail:setup dispatch failed: ' . $e->getMessage());
+            return $this->fail($output, $jsonMode, $report, 'souvera_mail:setup dispatch failed: ' . $e->getMessage());
         }
 
         // ─── Step 4: final status check ────────────────────────────────────────
-        if ($application->has('smail:status')) {
+        if ($application->has('souvera_mail:status')) {
             try {
-                $statusCmd = $application->find('smail:status');
+                $statusCmd = $application->find('souvera_mail:status');
                 $bufferedOutput = new BufferedOutput();
                 $statusCmd->run(new ArrayInput(['--json' => true]), $bufferedOutput);
                 $decoded = \json_decode($bufferedOutput->fetch(), true);

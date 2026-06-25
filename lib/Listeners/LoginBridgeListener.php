@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Listeners;
+namespace OCA\SouveraMail\Listeners;
 
-use OCA\Smail\Service\LogService;
+use OCA\SouveraMail\Service\LogService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\ISession;
 use OCP\User\Events\UserLoggedInEvent;
 
 /**
- * Stamps the Nextcloud user id into the session under `smail-uid` on login,
+ * Stamps the Nextcloud user id into the session under `souvera_mail-uid` on login,
  * so the engine helper can pick it up when issuing H2CK/oidc access tokens.
  *
  * The legacy `is_oidc` / `oidc_access_token` session markers (set by
@@ -36,7 +36,7 @@ class LoginBridgeListener implements IEventListener
         }
 
         $uid = $event->getUser()->getUID();
-        $this->session->set('smail-uid', $uid);
-        $this->logService->debug("Login bridge: smail-uid set to {$uid}");
+        $this->session->set('souvera_mail-uid', $uid);
+        $this->logService->debug("Login bridge: souvera_mail-uid set to {$uid}");
     }
 }

@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Souvera Mail — read-only admin status panel.
  *
  * Every value shown here is informational only. Configuration changes go
- * through `occ smail:bootstrap` / `occ smail:setup` / `occ smail:oidc:register-client`
+ * through `occ souvera_mail:bootstrap` / `occ souvera_mail:setup` / `occ souvera_mail:oidc:register-client`
  * — there are no write endpoints reachable from this template.
  *
  * @var array<string, mixed> $_
@@ -19,11 +19,11 @@ $oidc = $status['oidc_provider'] ?? [];
 $domain = $status['domain'] ?? [];
 $engine = $status['engine'] ?? [];
 
-\OCP\Util::addStyle('smail', 'embed');
+\OCP\Util::addStyle('souvera_mail', 'embed');
 ?>
-<div id="smail-admin-status" class="section">
+<div id="souvera_mail-admin-status" class="section">
     <h2 style="display:flex;align-items:center;gap:0.5em;">
-        <img src="<?php p(image_path('smail', 'logo-64x64.png')); ?>"
+        <img src="<?php p(image_path('souvera_mail', 'logo-64x64.png')); ?>"
              alt="Souvera Mail" style="height:32px;width:32px;">
         <?php p($l->t('Souvera Mail — Status')); ?>
     </h2>
@@ -31,13 +31,13 @@ $engine = $status['engine'] ?? [];
     <p style="color:var(--color-text-maxcontrast);max-width:50em;">
         <?php p($l->t(
             'Souvera Mail is configured exclusively through occ. This panel shows the current state '
-            . '— it has no write controls. See the command list below or run `occ smail:status --json` '
+            . '— it has no write controls. See the command list below or run `occ souvera_mail:status --json` '
             . 'for a machine-readable report.'
         )); ?>
     </p>
 
     <?php if (!empty($issues)) : ?>
-        <div class="smail-status-section" style="border-left:4px solid var(--color-warning);padding:0.5em 1em;margin:1em 0;background:var(--color-background-hover);">
+        <div class="souvera_mail-status-section" style="border-left:4px solid var(--color-warning);padding:0.5em 1em;margin:1em 0;background:var(--color-background-hover);">
             <h3><?php p($l->t('Issues to resolve')); ?></h3>
             <ul style="margin:0;padding-left:1.5em;">
                 <?php foreach ($issues as $issue) : ?>
@@ -46,7 +46,7 @@ $engine = $status['engine'] ?? [];
             </ul>
         </div>
     <?php else : ?>
-        <div class="smail-status-section" style="border-left:4px solid var(--color-success);padding:0.5em 1em;margin:1em 0;background:var(--color-background-hover);">
+        <div class="souvera_mail-status-section" style="border-left:4px solid var(--color-success);padding:0.5em 1em;margin:1em 0;background:var(--color-background-hover);">
             <strong>✓ <?php p($l->t('All checks passed — Souvera Mail is ready.')); ?></strong>
         </div>
     <?php endif; ?>
@@ -69,7 +69,7 @@ $engine = $status['engine'] ?? [];
                 <?php if (!empty($oidc['client_registered'])) : ?>
                     <code><?php p($oidc['client_name'] ?? ''); ?></code> — <?php p($l->t('registered')); ?>
                 <?php else : ?>
-                    <span style="color:var(--color-error);">✗ <?php p($l->t('not registered — run')); ?> <code>occ smail:oidc:register-client</code></span>
+                    <span style="color:var(--color-error);">✗ <?php p($l->t('not registered — run')); ?> <code>occ souvera_mail:oidc:register-client</code></span>
                 <?php endif; ?>
             </td>
         </tr>
@@ -90,7 +90,7 @@ $engine = $status['engine'] ?? [];
     <h3><?php p($l->t('Mail Domain Profile')); ?></h3>
     <?php $configuredDomains = $domain['configured'] ?? []; ?>
     <?php if ($configuredDomains === []) : ?>
-        <p><em><?php p($l->t('No domain configured. Run')); ?> <code>occ smail:setup --imap-host … --domain …</code>.</em></p>
+        <p><em><?php p($l->t('No domain configured. Run')); ?> <code>occ souvera_mail:setup --imap-host … --domain …</code>.</em></p>
     <?php else : ?>
         <?php foreach ($configuredDomains as $domainName => $cfg) : ?>
             <table class="grid">
@@ -119,7 +119,7 @@ $engine = $status['engine'] ?? [];
     <p><?php p($l->t('All configuration is performed through occ:')); ?></p>
     <pre style="background:var(--color-background-dark);padding:1em;border-radius:6px;overflow:auto;">
 # One-shot install (idempotent)
-occ smail:bootstrap \
+occ souvera_mail:bootstrap \
     --mail-imap-host  mail.example.com --mail-imap-port  993 --mail-imap-ssl  ssl \
     --mail-smtp-host  mail.example.com --mail-smtp-port  465 --mail-smtp-ssl  ssl \
     --mail-sieve-host mail.example.com --mail-sieve-port 4190 --mail-sieve-ssl ssl \
@@ -128,13 +128,13 @@ occ smail:bootstrap \
     --json
 
 # Individual operations
-occ smail:oidc:register-client --json
-occ smail:setup     --imap-host … --domain … --json
-occ smail:status    --json
-occ smail:reset     --purge-oidc-client --json
+occ souvera_mail:oidc:register-client --json
+occ souvera_mail:setup     --imap-host … --domain … --json
+occ souvera_mail:status    --json
+occ souvera_mail:reset     --purge-oidc-client --json
 
 # Health-check (returns non-zero on any blocker)
-occ smail:status --json | jq .status</pre>
+occ souvera_mail:status --json | jq .status</pre>
 
     <p style="margin-top:2em;color:var(--color-text-maxcontrast);">
         <small><?php p($l->t('Souvera Mail version:')); ?> <?php p($status['app']['version'] ?? '?'); ?></small>

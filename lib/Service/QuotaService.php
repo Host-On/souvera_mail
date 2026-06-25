@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Service;
+namespace OCA\SouveraMail\Service;
 
 use OCP\ICache;
 use OCP\ICacheFactory;
@@ -34,7 +34,7 @@ class QuotaService
         ICacheFactory $cacheFactory,
         private LoggerInterface $logger,
     ) {
-        $this->cache = $cacheFactory->createDistributed('smail/quota');
+        $this->cache = $cacheFactory->createDistributed('souvera_mail/quota');
     }
 
     public function isAvailable(): bool

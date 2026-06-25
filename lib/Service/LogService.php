@@ -2,21 +2,21 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Service;
+namespace OCA\SouveraMail\Service;
 
 use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\IUserSession;
 
 /**
- * Souvera Mail debug logger — writes to appdata_smail/smail.log
+ * Souvera Mail debug logger — writes to appdata_souvera_mail/souvera_mail.log
  * Independent from NC log level. Enable via:
- *   occ config:app:set smail debug_log --value=1
+ *   occ config:app:set souvera_mail debug_log --value=1
  *   or Admin -> Souvera Mail -> Enable debug logging
  */
 class LogService
 {
-    private const APP_ID = 'smail';
+    private const APP_ID = 'souvera_mail';
     private ?bool $enabled = null;
     private ?string $logFile = null;
 
@@ -43,11 +43,11 @@ class LogService
     {
         if ($this->logFile === null) {
             $dataDir = \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/');
-            $logDir = $dataDir . '/appdata_smail';
+            $logDir = $dataDir . '/appdata_souvera_mail';
             if (!\is_dir($logDir)) {
                 @\mkdir($logDir, 0750, true);
             }
-            $this->logFile = $logDir . '/smail.log';
+            $this->logFile = $logDir . '/souvera_mail.log';
         }
         return $this->logFile;
     }

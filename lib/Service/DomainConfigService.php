@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Service;
+namespace OCA\SouveraMail\Service;
 
-use OCA\Smail\Util\EngineHelper;
+use OCA\SouveraMail\Util\EngineHelper;
 use OCP\IConfig;
 
 /**
  * Service to programmatically read/write engine domain config files.
  *
  * Domain configs are stored as JSON in:
- *   {datadir}/appdata_smail/_data_/_default_/domains/{domain}.json
+ *   {datadir}/appdata_souvera_mail/_data_/_default_/domains/{domain}.json
  */
 class DomainConfigService
 {
@@ -62,11 +62,11 @@ class DomainConfigService
     }
 
     /**
-     * Get the appdata_smail path.
+     * Get the appdata_souvera_mail path.
      */
     public function getDataPath(): string
     {
-        return \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/') . '/appdata_smail';
+        return \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/') . '/appdata_souvera_mail';
     }
 
     /**

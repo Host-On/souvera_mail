@@ -43,7 +43,7 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			$this->addHook('sieve.before-login', 'beforeLogin');
 		} else {
 			\Smail\Engine\Log::debug('Nextcloud', 'NOT integrated');
-			// \OC::$server->getConfig()->getAppValue('smail', 'smail-no-embed');
+			// \OC::$server->getConfig()->getAppValue('souvera_mail', 'smail-no-embed');
 			$this->addHook('main.content-security-policy', 'ContentSecurityPolicy');
 		}
 	}
@@ -76,10 +76,10 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 		// it is enabled in config, the user is currently logged in with OIDC,
 		// the current Smail account is the OIDC account and no account defined explicitly
 		if ($oAccount instanceof \Smail\Engine\Model\MainAccount
-		 && \OCP\Server::get(\OCA\Smail\Util\EngineHelper::class)->isOIDCLogin()
+		 && \OCP\Server::get(\OCA\SouveraMail\Util\EngineHelper::class)->isOIDCLogin()
 		 && \str_starts_with($oSettings->passphrase, 'oidc_login|')
 		) {
-			$sToken = \OCP\Server::get(\OCA\Smail\Util\EngineHelper::class)->getOidcAccessToken();
+			$sToken = \OCP\Server::get(\OCA\SouveraMail\Util\EngineHelper::class)->getOidcAccessToken();
 			if (!$sToken) {
 				return;
 			}
@@ -228,14 +228,18 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 				// app/plugins/nextcloud/js/quota.js to render the live quota
 				// pill in the engine UI. Always emitted; the JS gates on the
 				// fetch response (gracefully hides if 503 / endpoint missing).
-				'SmailQuotaUrl' => $oUrlGen->getAbsoluteURL($oUrlGen->linkToRoute('smail.quota.index'))
+				'SmailQuotaUrl' => $oUrlGen->getAbsoluteURL($oUrlGen->linkToRoute('souvera_mail.quota.index')),
+				// URL of the in-app settings page (App Passwords + Dashboard
+				// widget mode). The quota pill in the engine UI links here on
+				// click so users find it without having to leave the mail UI.
+				'SmailSettingsUrl' => $oUrlGen->getAbsoluteURL($oUrlGen->linkToRoute('souvera_mail.settings.index'))
 //				'WebDAV_files' => $sWebDAV . '/files/' . $sUID
 			];
 			if (empty($aResult['Auth'])) {
 				$config = \OCP\Server::get(\OCP\IConfig::class);
 				$sEmail = '';
-				if ($config->getAppValue('smail', 'autologin', false)
-					|| $config->getAppValue('smail', 'autologin-with-email', false)) {
+				if ($config->getAppValue('souvera_mail', 'autologin', false)
+					|| $config->getAppValue('souvera_mail', 'autologin-with-email', false)) {
 					// Always use NC profile email, never bare UID
 					$sEmail = $config->getUserValue($sUID, 'settings', 'email', '')
 						?: $ocUser->getEMailAddress()
@@ -243,7 +247,7 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 				} else {
 					\Smail\Engine\Log::debug('Nextcloud', 'autologin is off');
 				}
-				$sCustomEmail = $config->getUserValue($sUID, 'smail', 'email', '');
+				$sCustomEmail = $config->getUserValue($sUID, 'souvera_mail', 'email', '');
 				if ($sCustomEmail) {
 					$sEmail = $sCustomEmail;
 				}
@@ -251,7 +255,7 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 					$sEmail = $ocUser->getEMailAddress();
 				}
 /*
-				if ($config->getAppValue('smail', 'autologin-oidc', false)) {
+				if ($config->getAppValue('souvera_mail', 'autologin-oidc', false)) {
 					if (\OC::$server->getSession()->get('is_oidc')) {
 						$sEmail = "{$sUID}@nextcloud";
 						$aResult['DevPassword'] = \OC::$server->getSession()->get('oidc_access_token');

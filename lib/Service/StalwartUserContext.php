@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Service;
+namespace OCA\SouveraMail\Service;
 
 use OCP\IUser;
 use OCP\IUserManager;
@@ -80,7 +80,7 @@ class StalwartUserContext
         $token = $this->oidc->generateAccessToken($userId);
         if (!\is_string($token) || $token === '') {
             throw new \RuntimeException(
-                "Could not obtain OIDC access token for user '{$userId}' (H2CK/oidc missing or smail client not registered?)"
+                "Could not obtain OIDC access token for user '{$userId}' (H2CK/oidc missing or souvera_mail client not registered?)"
             );
         }
         return $token;

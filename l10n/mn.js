@@ -1,5 +1,5 @@
 OC.L10N.register(
-    "smail",
+    "souvera_mail",
     {
     "Email" : "Цахим шуудан",
     "Error" : "Алдаа",

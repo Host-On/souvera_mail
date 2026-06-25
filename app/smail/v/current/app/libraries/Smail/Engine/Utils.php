@@ -77,7 +77,7 @@ class Utils
 		// ServiceActions validates on later POSTs. Fall back to the SSO uid, then to
 		// a per-process-stable value so a single CLI/no-session request stays
 		// consistent (under the SSO web app an NC session is always present).
-		$helper = \OCP\Server::get(\OCA\Smail\Util\EngineHelper::class);
+		$helper = \OCP\Server::get(\OCA\SouveraMail\Util\EngineHelper::class);
 		$sSeed = $helper->getNcSessionId() ?: $helper->getSsoUid();
 		if (!$sSeed) {
 			static $sFallback = null;

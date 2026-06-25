@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Controller;
+namespace OCA\SouveraMail\Controller;
 
-use OCA\Smail\Service\AppPasswordService;
+use OCA\SouveraMail\Service\AppPasswordService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -55,7 +55,7 @@ class AppPasswordController extends Controller
         } catch (\Throwable $e) {
             $this->logger->warning(
                 'App password list failed: ' . $e->getMessage(),
-                ['app' => 'smail', 'exception' => $e]
+                ['app' => 'souvera_mail', 'exception' => $e]
             );
             return $this->error($e->getMessage(), Http::STATUS_BAD_GATEWAY);
         }
@@ -85,7 +85,7 @@ class AppPasswordController extends Controller
         } catch (\Throwable $e) {
             $this->logger->warning(
                 'App password create failed: ' . $e->getMessage(),
-                ['app' => 'smail', 'exception' => $e]
+                ['app' => 'souvera_mail', 'exception' => $e]
             );
             return $this->error($e->getMessage(), Http::STATUS_BAD_GATEWAY);
         }
@@ -114,7 +114,7 @@ class AppPasswordController extends Controller
         } catch (\Throwable $e) {
             $this->logger->warning(
                 'App password revoke failed: ' . $e->getMessage(),
-                ['app' => 'smail', 'exception' => $e]
+                ['app' => 'souvera_mail', 'exception' => $e]
             );
             return $this->error($e->getMessage(), Http::STATUS_BAD_GATEWAY);
         }

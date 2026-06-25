@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Dashboard;
+namespace OCA\SouveraMail\Dashboard;
 
-use OCA\Smail\Util\EngineHelper;
+use OCA\SouveraMail\Util\EngineHelper;
 use OCP\Dashboard\IAPIWidgetV2;
 use OCP\Dashboard\IIconWidget;
 use OCP\Dashboard\IReloadableWidget;
@@ -18,11 +18,11 @@ use Psr\Log\LoggerInterface;
 /**
  * Souvera Mail dashboard widget — shows the user's INBOX, configurable per
  * user between "unread only" (default) and "all messages" via personal
- * setting `smail/dashboard-mode`. The setting is persisted with Nextcloud's
+ * setting `souvera_mail/dashboard-mode`. The setting is persisted with Nextcloud's
  * standard user-config storage, so operators can also set it from CLI:
  *
- *   occ user:setting <uid> smail dashboard-mode all
- *   occ user:setting <uid> smail dashboard-mode unread
+ *   occ user:setting <uid> souvera_mail dashboard-mode all
+ *   occ user:setting <uid> souvera_mail dashboard-mode unread
  *
  * Each item links to the message inside the Souvera Mail app via the
  * engine's hash-router (`#/mailbox/INBOX/m<UID>`), so a click goes straight
@@ -46,7 +46,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function getId(): string
     {
-        return 'smail-unread';
+        return 'souvera_mail-unread';
     }
 
     public function getTitle(): string
@@ -70,7 +70,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
     public function getUrl(): ?string
     {
         return $this->urlGenerator->getAbsoluteURL(
-            $this->urlGenerator->linkToRoute('smail.page.index')
+            $this->urlGenerator->linkToRoute('souvera_mail.page.index')
         );
     }
 
@@ -82,7 +82,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
     {
         $mode = $this->config->getUserValue(
             $userId,
-            'smail',
+            'souvera_mail',
             self::USER_CONFIG_MODE,
             self::MODE_DEFAULT,
         );
@@ -108,7 +108,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
             if (!$oAccount) {
                 $this->logger->info(
                     'Souvera Mail widget: no engine session — showing fallback',
-                    ['app' => 'smail']
+                    ['app' => 'souvera_mail']
                 );
                 return new WidgetItems([], $this->l10n->t('Open Souvera Mail to connect'));
             }
@@ -132,7 +132,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
             $items = [];
             $baseURL = $this->urlGenerator->getAbsoluteURL(
-                $this->urlGenerator->linkToRoute('smail.page.index')
+                $this->urlGenerator->linkToRoute('souvera_mail.page.index')
             ) . '#';
 
             foreach ($MessageCollection as $Message) {
@@ -140,7 +140,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
                     $Message->From()->ToString(),
                     $Message->Subject(),
                     $baseURL . '/mailbox/INBOX/m' . $Message->Uid(),
-                    $this->urlGenerator->imagePath('smail', 'logo-64x64.png'),
+                    $this->urlGenerator->imagePath('souvera_mail', 'logo-64x64.png'),
                     $Message->ETag('')
                 );
             }
@@ -156,7 +156,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
         } catch (\Throwable $e) {
             $this->logger->warning(
                 'Souvera Mail widget error: ' . $e->getMessage(),
-                ['app' => 'smail', 'exception' => $e]
+                ['app' => 'souvera_mail', 'exception' => $e]
             );
             return new WidgetItems([], $this->l10n->t('Open Souvera Mail to connect'));
         }
@@ -169,6 +169,6 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function getIconUrl(): string
     {
-        return $this->urlGenerator->imagePath('smail', 'logo-64x64.png');
+        return $this->urlGenerator->imagePath('souvera_mail', 'logo-64x64.png');
     }
 }

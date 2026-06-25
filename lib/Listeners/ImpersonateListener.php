@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Listeners;
+namespace OCA\SouveraMail\Listeners;
 
-use OCA\Smail\Service\LogService;
+use OCA\SouveraMail\Service\LogService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\ISession;
@@ -28,7 +28,7 @@ class ImpersonateListener implements IEventListener
             return;
         }
 
-        $this->session->remove('smail-uid');
+        $this->session->remove('souvera_mail-uid');
         $this->logService->debug("Session cleared on impersonate: {$class}");
     }
 }

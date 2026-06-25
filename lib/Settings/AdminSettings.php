@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Settings;
+namespace OCA\SouveraMail\Settings;
 
-use OCA\Smail\Service\DomainConfigService;
-use OCA\Smail\Service\LogService;
-use OCA\Smail\Service\OidcProviderService;
-use OCA\Smail\Util\EngineHelper;
+use OCA\SouveraMail\Service\DomainConfigService;
+use OCA\SouveraMail\Service\LogService;
+use OCA\SouveraMail\Service\OidcProviderService;
+use OCA\SouveraMail\Util\EngineHelper;
 use OCP\App\IAppManager;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IAppConfig;
@@ -15,14 +15,14 @@ use OCP\IURLGenerator;
 use OCP\Settings\ISettings;
 
 /**
- * Read-only admin settings page. Mirrors `occ smail:status` and renders the
+ * Read-only admin settings page. Mirrors `occ souvera_mail:status` and renders the
  * same data through `templates/admin-local.php`. No write actions live here:
  * every interactive element in the rendered template is informational only,
  * and the configuration is changed exclusively through `occ` commands.
  */
 class AdminSettings implements ISettings
 {
-    private const APP_ID = 'smail';
+    private const APP_ID = 'souvera_mail';
 
     public function __construct(
         private IAppConfig $appConfig,
@@ -71,7 +71,7 @@ class AdminSettings implements ISettings
             'engine' => $engine,
             'debug_log' => [
                 'enabled' => $this->logService->isEnabled(),
-                'file' => $this->domainService->getDataPath() . '/smail.log',
+                'file' => $this->domainService->getDataPath() . '/souvera_mail.log',
             ],
             'issues' => $issues,
         ];
@@ -87,7 +87,7 @@ class AdminSettings implements ISettings
         $enabled = $this->appManager->isEnabledForUser(OidcProviderService::OIDC_APP_ID);
         $available = $this->oidcProvider->isProviderAvailable();
         $clientName = $this->oidcProvider->getClientIdentifier();
-        $clientRegistered = $this->appConfig->getValueString(self::APP_ID, OidcProviderService::SMAIL_CLIENT_KEY, '') !== '';
+        $clientRegistered = $this->appConfig->getValueString(self::APP_ID, OidcProviderService::SOUVERA_MAIL_CLIENT_KEY, '') !== '';
         $defaultTokenType = $this->appConfig->getValueString('oidc', 'default_token_type', 'opaque');
 
         if (!$installed) {
@@ -97,7 +97,7 @@ class AdminSettings implements ISettings
         } elseif (!$available) {
             $issues[] = 'H2CK/oidc version mismatch — TokenGenerationRequestEvent unavailable (need 1.17+)';
         } elseif (!$clientRegistered) {
-            $issues[] = 'Souvera Mail OIDC client is not registered (run: occ smail:oidc:register-client)';
+            $issues[] = 'Souvera Mail OIDC client is not registered (run: occ souvera_mail:oidc:register-client)';
         }
         if ($defaultTokenType !== 'jwt') {
             $issues[] = "H2CK/oidc default_token_type is '{$defaultTokenType}' — set to 'jwt' for RFC 9068";
@@ -123,7 +123,7 @@ class AdminSettings implements ISettings
     {
         $domains = $this->domainService->listDomains();
         if ($domains === []) {
-            $issues[] = 'No mail domain configured (run: occ smail:setup --imap-host … --domain …)';
+            $issues[] = 'No mail domain configured (run: occ souvera_mail:setup --imap-host … --domain …)';
             return ['configured' => []];
         }
         $entries = [];

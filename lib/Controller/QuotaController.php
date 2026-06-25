@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Controller;
+namespace OCA\SouveraMail\Controller;
 
-use OCA\Smail\Service\QuotaService;
+use OCA\SouveraMail\Service\QuotaService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -16,7 +16,7 @@ use Psr\Log\LoggerInterface;
  * Read-only endpoint that exposes the current user's Stalwart mailbox quota
  * usage to the embedded webmail engine's JS layer for live display.
  *
- * GET /index.php/apps/smail/quota → { status, used, total, percentage, ... }
+ * GET /index.php/apps/souvera_mail/quota → { status, used, total, percentage, ... }
  *
  * Same-origin from the engine iframe → cookie auth, no CSRF needed for GET.
  */
@@ -53,7 +53,7 @@ class QuotaController extends Controller
         } catch (\Throwable $e) {
             $this->logger->warning(
                 'Souvera Mail quota fetch failed: ' . $e->getMessage(),
-                ['app' => 'smail', 'exception' => $e]
+                ['app' => 'souvera_mail', 'exception' => $e]
             );
             return new DataResponse(
                 ['status' => 'error', 'message' => $e->getMessage()],

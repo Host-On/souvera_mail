@@ -1,36 +1,42 @@
 /*
- * Souvera Mail — live mailbox-quota pill.
+ * Souvera Mail — live mailbox-quota pill + in-app settings entry-point.
  *
- * Reads the URL of the quota JSON endpoint from the FilterAppData payload
- * (`rl.settings.get('Nextcloud').SmailQuotaUrl`), fetches it on engine
- * startup and after every mailbox switch, then renders a small pill in
- * the top-right corner of the engine UI.
+ * Reads two URLs from the FilterAppData payload:
+ *   - rl.settings.get('Nextcloud').SmailQuotaUrl     → JSON quota endpoint
+ *   - rl.settings.get('Nextcloud').SmailSettingsUrl  → in-app settings page
  *
- * Gracefully hides on any failure (503 service unavailable, network
- * error, missing config) — so users running without souvera_central /
- * H2CK/oidc / Stalwart still get the regular mail UI.
+ * Renders a small pill in the top-right corner of the engine UI. Clicking
+ * the pill (or its fallback ⚙ icon when quota is unavailable) opens the
+ * Souvera Mail in-app settings page (App Passwords, Dashboard widget mode)
+ * in a new tab. Falls back gracefully when the quota endpoint returns 503.
  */
 (rl => {
 	'use strict';
 
 	const cfg = rl && rl.settings && rl.settings.get && rl.settings.get('Nextcloud');
-	if (!cfg || !cfg.SmailQuotaUrl) {
+	if (!cfg) {
 		return;
 	}
 
-	const PILL_ID = 'smail-quota-pill';
-	const REFRESH_MS = 60000; // server caches for 60 s anyway
+	const PILL_ID = 'souvera-mail-quota-pill';
+	const REFRESH_MS = 60000;
 
-	const fmt = data => {
+	const settingsUrl = cfg.SmailSettingsUrl || '';
+	const quotaUrl = cfg.SmailQuotaUrl || '';
+
+	const fmtPill = data => {
+		if (!data) {
+			return '\u2699'; // gear glyph as fallback when no quota
+		}
 		if (data.unlimited) {
 			return `${data.formatted.used} used`;
 		}
 		return `${data.formatted.used} / ${data.formatted.total}`;
 	};
 
-	const pillStyle = pct => {
-		const warn = pct >= 90;
-		const high = pct >= 75 && !warn;
+	const pillStyle = (pct, hasQuota) => {
+		const warn = hasQuota && pct >= 90;
+		const high = hasQuota && pct >= 75 && !warn;
 		const bg = warn ? '#c0392b' : (high ? '#e67e22' : 'rgba(0,0,0,0.55)');
 		return [
 			'position:fixed',
@@ -45,19 +51,39 @@
 			'box-shadow:0 2px 8px rgba(0,0,0,0.18)',
 			'pointer-events:auto',
 			'user-select:none',
-			'cursor:default',
+			'cursor:' + (settingsUrl ? 'pointer' : 'default'),
 			'backdrop-filter:blur(8px)',
-			'-webkit-backdrop-filter:blur(8px)'
+			'-webkit-backdrop-filter:blur(8px)',
+			'text-decoration:none',
+			'display:inline-flex',
+			'align-items:center',
+			'gap:6px',
+			'transition:transform 100ms ease, box-shadow 100ms ease'
 		].join(';');
 	};
 
 	const ensurePill = () => {
 		let el = document.getElementById(PILL_ID);
 		if (!el) {
-			el = document.createElement('div');
+			el = document.createElement(settingsUrl ? 'a' : 'div');
 			el.id = PILL_ID;
 			el.setAttribute('role', 'status');
 			el.setAttribute('aria-live', 'polite');
+			el.setAttribute('data-testid', 'souvera-mail-quota-pill');
+			if (settingsUrl) {
+				el.href = settingsUrl;
+				el.target = '_blank';
+				el.rel = 'noopener';
+				el.title = 'Open Souvera Mail settings';
+				el.addEventListener('mouseenter', function () {
+					el.style.transform = 'translateY(-1px)';
+					el.style.boxShadow = '0 4px 14px rgba(0,0,0,0.25)';
+				});
+				el.addEventListener('mouseleave', function () {
+					el.style.transform = '';
+					el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.18)';
+				});
+			}
 			document.body.appendChild(el);
 		}
 		return el;
@@ -70,43 +96,60 @@
 		}
 	};
 
-	const render = data => {
+	const renderQuota = data => {
 		const el = ensurePill();
-		el.style.cssText = pillStyle(data.percentage);
-		el.textContent = fmt(data);
-		if (!data.unlimited) {
+		el.style.cssText = pillStyle(data.percentage, true);
+		el.textContent = fmtPill(data);
+		if (settingsUrl) {
+			// re-set after textContent wipe
+			el.title = `${data.percentage}% used · Click for settings`;
+		} else if (!data.unlimited) {
 			el.title = data.percentage + '% used';
 		} else {
 			el.title = 'No quota limit configured';
 		}
 	};
 
+	const renderSettingsOnly = () => {
+		// Quota unavailable but we still want a settings entry-point.
+		if (!settingsUrl) {
+			removePill();
+			return;
+		}
+		const el = ensurePill();
+		el.style.cssText = pillStyle(0, false);
+		el.textContent = '\u2699 ' + 'Settings';
+		el.title = 'Open Souvera Mail settings';
+	};
+
 	const refresh = () => {
-		fetch(cfg.SmailQuotaUrl, {
+		if (!quotaUrl) {
+			renderSettingsOnly();
+			return;
+		}
+		fetch(quotaUrl, {
 			credentials: 'same-origin',
 			headers: { 'Accept': 'application/json' },
 			cache: 'no-store'
 		})
 		.then(resp => {
 			if (!resp.ok) {
-				removePill();
+				renderSettingsOnly();
 				return null;
 			}
 			return resp.json();
 		})
 		.then(body => {
 			if (!body || body.status !== 'ok') {
-				removePill();
+				renderSettingsOnly();
 				return;
 			}
-			render(body);
+			renderQuota(body);
 		})
-		.catch(() => removePill());
+		.catch(() => renderSettingsOnly());
 	};
 
-	// Initial fetch shortly after engine boot to avoid racing the login flow.
 	setTimeout(refresh, 1500);
-	// Periodic refresh (server-side cache keeps this cheap).
 	setInterval(refresh, REFRESH_MS);
 
 })(window.rl);

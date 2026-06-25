@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Service;
+namespace OCA\SouveraMail\Service;
 
-use OCA\Smail\Util\EngineHelper;
+use OCA\SouveraMail\Util\EngineHelper;
 
 class ConnectivityCheckService
 {

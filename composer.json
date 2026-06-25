@@ -13,7 +13,7 @@
     },
     "autoload": {
         "psr-4": {
-            "OCA\\Smail\\": "lib/"
+            "OCA\\SouveraMail\\": "lib/"
         },
         "classmap": [
             "app/smail/v/current/app/libraries/Smail/"

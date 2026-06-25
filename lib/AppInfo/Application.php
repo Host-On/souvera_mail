@@ -1,11 +1,11 @@
 <?php
 
-namespace OCA\Smail\AppInfo;
+namespace OCA\SouveraMail\AppInfo;
 
 /*
  * Load the bundled composer autoloader (engine + wrapper classmap) before any
  * Nextcloud service-container lookup so repair-steps that run during
- * `occ app:enable smail` can resolve `Smail\Engine\*` classes immediately.
+ * `occ app:enable souvera_mail` can resolve `Smail\Engine\*` classes immediately.
  *
  * The classmap (built by `composer dump-autoload --optimize`) hard-codes the
  * lowercase-filename → CamelCase-class mapping that the upstream SnappyMail
@@ -19,12 +19,12 @@ if (\is_file($vendorAutoload)) {
     require_once $vendorAutoload;
 }
 
-use OCA\Smail\Dashboard\UnreadMailWidget;
-use OCA\Smail\Listeners\ImpersonateListener;
-use OCA\Smail\Listeners\LoginBridgeListener;
-use OCA\Smail\Listeners\LogoutListener;
-use OCA\Smail\Search\Provider;
-use OCA\Smail\Util\NavigationTitle;
+use OCA\SouveraMail\Dashboard\UnreadMailWidget;
+use OCA\SouveraMail\Listeners\ImpersonateListener;
+use OCA\SouveraMail\Listeners\LoginBridgeListener;
+use OCA\SouveraMail\Listeners\LogoutListener;
+use OCA\SouveraMail\Search\Provider;
+use OCA\SouveraMail\Util\NavigationTitle;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -38,7 +38,7 @@ use OCP\User\Events\UserLoggedInEvent;
 
 class Application extends App implements IBootstrap
 {
-    public const APP_ID = 'smail';
+    public const APP_ID = 'souvera_mail';
 
     /** @param array<string, mixed> $urlParams */
     public function __construct(array $urlParams = [])
@@ -52,7 +52,7 @@ class Application extends App implements IBootstrap
 
         $context->registerSearchProvider(Provider::class);
 
-        // Stamp smail-uid into the session on Nextcloud login. The OIDC access
+        // Stamp souvera_mail-uid into the session on Nextcloud login. The OIDC access
         // token itself is issued on-demand by OidcProviderService via the
         // H2CK/oidc TokenGenerationRequestEvent — no session-side bridging or
         // pre-warming required.
@@ -87,7 +87,7 @@ class Application extends App implements IBootstrap
 
         $config = $serverContainer->get(IConfig::class);
         $dataDir = \rtrim(\trim($config->getSystemValue('datadirectory', '')), '\\/');
-        if (!\is_dir($dataDir . '/appdata_smail')) {
+        if (!\is_dir($dataDir . '/appdata_souvera_mail')) {
             return;
         }
 
@@ -99,7 +99,7 @@ class Application extends App implements IBootstrap
             return [
                 'id' => self::APP_ID,
                 'name' => NavigationTitle::resolve($appConfig),
-                'href' => $urlGenerator->linkToRoute('smail.page.index'),
+                'href' => $urlGenerator->linkToRoute('souvera_mail.page.index'),
                 'icon' => $urlGenerator->imagePath(self::APP_ID, 'logo-white-64x64.png'),
                 'order' => 4,
             ];

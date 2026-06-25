@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Command;
+namespace OCA\SouveraMail\Command;
 
-use OCA\Smail\Service\DomainConfigService;
-use OCA\Smail\Service\OidcProviderService;
-use OCA\Smail\Util\EngineHelper;
+use OCA\SouveraMail\Service\DomainConfigService;
+use OCA\SouveraMail\Service\OidcProviderService;
+use OCA\SouveraMail\Util\EngineHelper;
 use OCP\IAppConfig;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\ArrayInput;
@@ -16,24 +16,24 @@ use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Tear down a Souvera Mail install so a fresh `smail:bootstrap` can rebuild
+ * Tear down a Souvera Mail install so a fresh `souvera_mail:bootstrap` can rebuild
  * from scratch. Designed for declarative deploys: same playbook on a clean
  * Nextcloud and on a previously-configured one converges to the same result.
  *
  * What gets removed:
- *   - All app-config entries under the `smail` namespace
+ *   - All app-config entries under the `souvera_mail` namespace
  *   - The single active domain config in the engine
- *   - The smail OIDC client in H2CK/oidc (only with --purge-oidc-client)
+ *   - The souvera_mail OIDC client in H2CK/oidc (only with --purge-oidc-client)
  *   - Cached OIDC access tokens
  *   - Engine config keys (webmail/title, theme, etc.) ARE NOT touched here —
- *     re-running `smail:bootstrap` will rewrite them via InstallStep.
+ *     re-running `souvera_mail:bootstrap` will rewrite them via InstallStep.
  *
- * The engine data directory `appdata_smail/` (mail caches, attachment cache,
+ * The engine data directory `appdata_souvera_mail/` (mail caches, attachment cache,
  * S/MIME keys) stays put unless `--purge-engine-data` is supplied.
  */
 class Reset extends Command
 {
-    private const APP_ID = 'smail';
+    private const APP_ID = 'souvera_mail';
 
     public function __construct(
         private IAppConfig $appConfig,
@@ -47,19 +47,19 @@ class Reset extends Command
     protected function configure(): void
     {
         $this
-            ->setName('smail:reset')
-            ->setDescription('Remove all Souvera Mail configuration so a fresh smail:bootstrap can start clean')
+            ->setName('souvera_mail:reset')
+            ->setDescription('Remove all Souvera Mail configuration so a fresh souvera_mail:bootstrap can start clean')
             ->addOption(
                 'purge-oidc-client',
                 null,
                 InputOption::VALUE_NONE,
-                'Also remove the smail client from H2CK/oidc (otherwise the client remains registered)',
+                'Also remove the souvera_mail client from H2CK/oidc (otherwise the client remains registered)',
             )
             ->addOption(
                 'purge-engine-data',
                 null,
                 InputOption::VALUE_NONE,
-                'Delete the engine data directory (appdata_smail/) — all mail caches, attachments, S/MIME state gone',
+                'Delete the engine data directory (appdata_souvera_mail/) — all mail caches, attachments, S/MIME state gone',
             )
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Print what would be removed without touching anything')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Emit a single machine-readable JSON object to stdout')
@@ -74,7 +74,7 @@ class Reset extends Command
         $purgeEngine = (bool) $input->getOption('purge-engine-data');
 
         $report = [
-            'command' => 'smail:reset',
+            'command' => 'souvera_mail:reset',
             'dry_run' => $dryRun,
             'actions' => [],
             'status' => 'ok',
@@ -95,7 +95,7 @@ class Reset extends Command
             }
         }
 
-        // 2. App config — wipe every smail/* key
+        // 2. App config — wipe every souvera_mail/** key
         try {
             $keys = $this->appConfig->getKeys(self::APP_ID);
             foreach ($keys as $key) {

@@ -2,16 +2,16 @@
     'use strict';
 
     // ─── 1. Dashboard widget mode toggle ────────────────────────────────────
-    var modeForm = document.getElementById('smail-dashboard-mode-form');
+    var modeForm = document.getElementById('souvera-mail-dashboard-mode-form');
     if (modeForm) {
-        var modeStatus = document.getElementById('smail-dashboard-mode-status');
+        var modeStatus = document.getElementById('souvera-mail-dashboard-mode-status');
         var modeEndpoint = modeForm.dataset.endpoint;
         var modeLabelUnread = modeForm.dataset.labelUnread || 'Unread only';
         var modeLabelAll = modeForm.dataset.labelAll || 'Full inbox';
         var modeLabelFail = modeForm.dataset.labelFail || 'Save failed';
 
         modeForm.addEventListener('change', function (event) {
-            if (!event.target || event.target.name !== 'smail-dashboard-mode') {
+            if (!event.target || event.target.name !== 'souvera-mail-dashboard-mode') {
                 return;
             }
             var value = event.target.value;
@@ -41,7 +41,7 @@
     }
 
     // ─── 2. App passwords (IMAP/POP3/SMTP) ──────────────────────────────────
-    var apSection = document.getElementById('smail-app-passwords-section');
+    var apSection = document.getElementById('souvera-mail-app-passwords-section');
     if (!apSection || apSection.dataset.available !== '1') {
         return;
     }
@@ -61,9 +61,9 @@
         createdWarning: apSection.dataset.labelCreatedWarning
     };
 
-    var tbody = document.getElementById('smail-app-passwords-tbody');
-    var newlyCreated = document.getElementById('smail-app-password-newly-created');
-    var createForm = document.getElementById('smail-app-password-create-form');
+    var tbody = document.getElementById('souvera-mail-app-passwords-tbody');
+    var newlyCreated = document.getElementById('souvera-mail-app-password-newly-created');
+    var createForm = document.getElementById('souvera-mail-app-password-create-form');
 
     function csrfHeaders(contentType) {
         var h = {
@@ -105,15 +105,15 @@
                 + '<td style="padding:8px;border-top:1px solid var(--color-border,#eee);font-size:13px;color:var(--color-text-maxcontrast,#888);">'
                 + escapeHtml(formatDate(it.createdAt)) + '</td>'
                 + '<td style="padding:8px;border-top:1px solid var(--color-border,#eee);text-align:right;">'
-                + '<button type="button" class="smail-ap-revoke" '
+                + '<button type="button" class="souvera-mail-ap-revoke" '
                 + 'data-id="' + escapeHtml(it.id) + '" '
-                + 'data-testid="smail-app-password-revoke-' + escapeHtml(it.id) + '" '
+                + 'data-testid="souvera-mail-app-password-revoke-' + escapeHtml(it.id) + '" '
                 + 'style="padding:4px 12px;border-radius:100px;border:1px solid var(--color-error,#c44);background:transparent;color:var(--color-error,#c44);cursor:pointer;font-size:13px;">'
                 + escapeHtml(labels.revoke) + '</button></td></tr>';
         });
         tbody.innerHTML = rows.join('');
 
-        tbody.querySelectorAll('.smail-ap-revoke').forEach(function (btn) {
+        tbody.querySelectorAll('.souvera-mail-ap-revoke').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 if (!window.confirm(labels.confirmRevoke)) { return; }
                 revoke(btn.dataset.id);
@@ -146,10 +146,10 @@
         newlyCreated.innerHTML = ''
             + '<div style="font-weight:600;margin-bottom:4px;">' + escapeHtml(description) + '</div>'
             + '<div style="display:flex;gap:8px;align-items:center;">'
-            +   '<code data-testid="smail-app-password-secret" '
+            +   '<code data-testid="souvera-mail-app-password-secret" '
             +     'style="flex:1;padding:8px 12px;border-radius:6px;background:var(--color-background-dark,#222);color:var(--color-main-text,#fff);font-family:monospace;font-size:14px;word-break:break-all;">'
             +     escapeHtml(secret) + '</code>'
-            +   '<button type="button" data-testid="smail-app-password-copy" '
+            +   '<button type="button" data-testid="souvera-mail-app-password-copy" '
             +     'style="padding:8px 14px;border-radius:100px;border:0;background:var(--color-primary-element,#0077C7);color:#fff;cursor:pointer;">'
             +     escapeHtml(labels.copy) + '</button>'
             + '</div>'
@@ -158,7 +158,7 @@
             + '</div>';
         newlyCreated.style.display = 'block';
 
-        var copyBtn = newlyCreated.querySelector('[data-testid="smail-app-password-copy"]');
+        var copyBtn = newlyCreated.querySelector('[data-testid="souvera-mail-app-password-copy"]');
         copyBtn.addEventListener('click', function () {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(secret).then(function () {

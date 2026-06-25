@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Util;
+namespace OCA\SouveraMail\Util;
 
 /**
  * Shared SSL-mode helper used by the setup command (and any future command

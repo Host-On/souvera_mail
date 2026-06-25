@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Migration;
+namespace OCA\SouveraMail\Migration;
 
-use OCA\Smail\AppInfo\Application;
-use OCA\Smail\Util\EngineHelper;
+use OCA\SouveraMail\AppInfo\Application;
+use OCA\SouveraMail\Util\EngineHelper;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
 use OCP\Config\IUserConfig;
@@ -66,7 +66,7 @@ class InstallStep implements IRepairStep
 
         if (!$oConfig->Get('webmail', 'app_path')) {
             $output->info('Set config [webmail]app_path');
-            $appWebPath = $this->appManager->getAppWebPath('smail');
+            $appWebPath = $this->appManager->getAppWebPath('souvera_mail');
             $appPath = \preg_replace('#(?<!:)/+#', '/', \rtrim($appWebPath, '/') . '/app/');
             $oConfig->Set('webmail', 'app_path', $appPath);
         }
@@ -130,14 +130,14 @@ class InstallStep implements IRepairStep
             $customConfigFile = $this->appConfig->getValueString(Application::APP_ID, 'custom_config_file');
             if ($customConfigFile) {
                 $output->info("Load custom config: {$customConfigFile}");
-                // Security: restrict to appdata_smail/ directory
+                // Security: restrict to appdata_souvera_mail/ directory
                 $resolved = \realpath($customConfigFile);
                 $dataDir = \rtrim(\trim($this->config->getSystemValue('datadirectory', '')), '\\/');
-                $allowedDir = \realpath($dataDir . '/appdata_smail');
+                $allowedDir = \realpath($dataDir . '/appdata_souvera_mail');
                 if ($resolved && $allowedDir && \str_starts_with($resolved, $allowedDir . '/')) {
                     require $resolved;
                 } else {
-                    throw new \Exception("custom config must be inside appdata_smail/");
+                    throw new \Exception("custom config must be inside appdata_souvera_mail/");
                 }
             }
         } catch (\Throwable $e) {
@@ -149,7 +149,7 @@ class InstallStep implements IRepairStep
         try {
             $migrationKey = 'migration-passphrase-cleared-v061';
             if ($this->appConfig->getValueString(Application::APP_ID, $migrationKey, '0') !== '1') {
-                $this->userConfig->deleteKey('smail', 'passphrase');
+                $this->userConfig->deleteKey('souvera_mail', 'passphrase');
                 $this->appConfig->setValueString(Application::APP_ID, $migrationKey, '1');
                 $output->info('Cleared legacy password storage (re-encrypted on next login)');
             }
@@ -189,7 +189,7 @@ class InstallStep implements IRepairStep
             $config,
             'webmail',
             'theme',
-            'smail',
+            'souvera_mail',
             ['', 'Default', 'NextcloudV25+'],
             $output,
             'Set theme to smail',

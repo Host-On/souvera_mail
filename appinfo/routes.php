@@ -23,6 +23,11 @@ return [
             'verb' => 'POST'
         ],
         [
+            'name' => 'settings#index',
+            'url' => '/settings',
+            'verb' => 'GET'
+        ],
+        [
             'name' => 'preference#setDashboardMode',
             'url' => '/preferences/dashboard-mode',
             'verb' => 'POST'

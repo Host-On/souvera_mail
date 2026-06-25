@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Command;
+namespace OCA\SouveraMail\Command;
 
-use OCA\Smail\Service\DomainConfigService;
-use OCA\Smail\Service\LogService;
-use OCA\Smail\Service\OidcProviderService;
-use OCA\Smail\Util\EngineHelper;
+use OCA\SouveraMail\Service\DomainConfigService;
+use OCA\SouveraMail\Service\LogService;
+use OCA\SouveraMail\Service\OidcProviderService;
+use OCA\SouveraMail\Util\EngineHelper;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
 use OCP\IURLGenerator;
@@ -23,7 +23,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class Status extends Command
 {
-    private const APP_ID = 'smail';
+    private const APP_ID = 'souvera_mail';
 
     public function __construct(
         private IAppConfig $appConfig,
@@ -40,7 +40,7 @@ class Status extends Command
     protected function configure(): void
     {
         $this
-            ->setName('smail:status')
+            ->setName('souvera_mail:status')
             ->setDescription('Inspect Souvera Mail configuration and OIDC provider health')
             ->addOption('json', null, InputOption::VALUE_NONE, 'Emit a single machine-readable JSON object')
         ;
@@ -51,7 +51,7 @@ class Status extends Command
         $jsonMode = (bool) $input->getOption('json');
         $issues = [];
         $report = [
-            'command' => 'smail:status',
+            'command' => 'souvera_mail:status',
             'app' => [
                 'version' => $this->appManager->getAppVersion(self::APP_ID),
                 'enabled' => $this->appManager->isInstalled(self::APP_ID),
@@ -61,8 +61,8 @@ class Status extends Command
             'engine' => $this->engineReport(),
             'debug_log' => [
                 'enabled' => $this->logService->isEnabled(),
-                'file' => $this->domainService->getDataPath() . '/smail.log',
-                'toggle_cmd' => 'occ config:app:set smail debug_log --value=1|0',
+                'file' => $this->domainService->getDataPath() . '/souvera_mail.log',
+                'toggle_cmd' => 'occ config:app:set souvera_mail debug_log --value=1|0',
             ],
             'issues' => $issues,
             'status' => $issues === [] ? 'ok' : 'issues',
@@ -86,7 +86,7 @@ class Status extends Command
         $enabled = $this->appManager->isEnabledForUser(OidcProviderService::OIDC_APP_ID);
         $available = $this->oidcProvider->isProviderAvailable();
         $clientName = $this->oidcProvider->getClientIdentifier();
-        $clientRegistered = $this->appConfig->getValueString(self::APP_ID, OidcProviderService::SMAIL_CLIENT_KEY, '') !== '';
+        $clientRegistered = $this->appConfig->getValueString(self::APP_ID, OidcProviderService::SOUVERA_MAIL_CLIENT_KEY, '') !== '';
         $jwksUrl = $this->urlGenerator->getAbsoluteURL('/index.php/apps/oidc/jwks');
         $discoveryUrl = $this->urlGenerator->getAbsoluteURL('/index.php/apps/oidc/openid-configuration');
 
@@ -97,7 +97,7 @@ class Status extends Command
         } elseif (!$available) {
             $issues[] = 'H2CK/oidc event class not loadable — possible version mismatch (need 1.17+)';
         } elseif (!$clientRegistered) {
-            $issues[] = 'No OIDC client registered for smail (`occ smail:oidc:register-client`)';
+            $issues[] = 'No OIDC client registered for souvera_mail (`occ souvera_mail:oidc:register-client`)';
         }
 
         $defaultTokenType = $this->appConfig->getValueString('oidc', 'default_token_type', 'opaque');
@@ -125,7 +125,7 @@ class Status extends Command
     {
         $domains = $this->domainService->listDomains();
         if ($domains === []) {
-            $issues[] = 'No mail domain configured (`occ smail:setup --imap-host … --domain …`)';
+            $issues[] = 'No mail domain configured (`occ souvera_mail:setup --imap-host … --domain …`)';
             return ['configured' => []];
         }
         $entries = [];
@@ -200,7 +200,7 @@ class Status extends Command
         $output->writeln('');
         $output->writeln('<comment>Domain Profile:</comment>');
         if (($report['domain']['configured'] ?? []) === []) {
-            $output->writeln('  (none — run occ smail:setup)');
+            $output->writeln('  (none — run occ souvera_mail:setup)');
         } else {
             foreach ($report['domain']['configured'] as $name => $cfg) {
                 $output->writeln('  ' . $name);

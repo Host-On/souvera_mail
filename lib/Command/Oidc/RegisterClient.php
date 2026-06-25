@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\Smail\Command\Oidc;
+namespace OCA\SouveraMail\Command\Oidc;
 
-use OCA\Smail\Service\OidcProviderService;
+use OCA\SouveraMail\Service\OidcProviderService;
 use OCP\App\IAppManager;
 use OCP\IAppConfig;
 use OCP\IURLGenerator;
@@ -29,7 +29,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class RegisterClient extends Command
 {
-    private const APP_ID = 'smail';
+    private const APP_ID = 'souvera_mail';
 
     public function __construct(
         private IAppConfig $appConfig,
@@ -43,20 +43,20 @@ class RegisterClient extends Command
     protected function configure(): void
     {
         $this
-            ->setName('smail:oidc:register-client')
+            ->setName('souvera_mail:oidc:register-client')
             ->setDescription('Register Souvera Mail as an OIDC client inside the Nextcloud OIDC Provider (H2CK/oidc)')
             ->addOption(
                 'name',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'OIDC client identifier (default: "smail")',
-                OidcProviderService::SMAIL_CLIENT_NAME_DEFAULT,
+                'OIDC client identifier (default: "souvera_mail")',
+                OidcProviderService::SOUVERA_MAIL_CLIENT_NAME_DEFAULT,
             )
             ->addOption(
                 'redirect-uri',
                 null,
                 InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
-                'OAuth redirect URI (repeat to add several). Defaults to <NC>/index.php/apps/smail/',
+                'OAuth redirect URI (repeat to add several). Defaults to <NC>/index.php/apps/souvera_mail/',
             )
             ->addOption(
                 'secret-out',
@@ -74,7 +74,7 @@ class RegisterClient extends Command
                 'force',
                 null,
                 InputOption::VALUE_NONE,
-                'Recreate the client and rotate the client_secret even if a smail client already exists',
+                'Recreate the client and rotate the client_secret even if a souvera_mail client already exists',
             )
             ->addOption(
                 'dry-run',
@@ -100,9 +100,9 @@ class RegisterClient extends Command
         if (\is_array($supplied) && $supplied !== []) {
             return $supplied;
         }
-        // Default to the smail index page so a future browser flow (if ever needed) works out of the box
+        // Default to the souvera_mail index page so a future browser flow (if ever needed) works out of the box
         $default = $this->urlGenerator->getAbsoluteURL(
-            $this->urlGenerator->linkToRoute('smail.page.index')
+            $this->urlGenerator->linkToRoute('souvera_mail.page.index')
         );
         return [$default];
     }
@@ -118,7 +118,7 @@ class RegisterClient extends Command
         $redirectUris = $this->buildRedirectUris($input);
 
         $report = [
-            'command' => 'smail:oidc:register-client',
+            'command' => 'souvera_mail:oidc:register-client',
             'dry_run' => $dryRun,
             'client_name' => $clientName,
             'redirect_uris' => $redirectUris,
@@ -152,8 +152,8 @@ class RegisterClient extends Command
             );
         }
 
-        // 3. Idempotency — is smail already registered?
-        $existingClient = $this->appConfig->getValueString(self::APP_ID, OidcProviderService::SMAIL_CLIENT_KEY, '');
+        // 3. Idempotency — is souvera_mail already registered?
+        $existingClient = $this->appConfig->getValueString(self::APP_ID, OidcProviderService::SOUVERA_MAIL_CLIENT_KEY, '');
         if ($existingClient !== '' && !$force) {
             $report['actions'][] = ['skip' => "Client '{$existingClient}' already registered (use --force to rotate)"];
             return $this->finalize($output, $jsonMode, $report);
@@ -161,7 +161,7 @@ class RegisterClient extends Command
 
         if ($dryRun) {
             $report['actions'][] = ['would_invoke' => 'oidc:create', 'name' => $clientName, 'redirect_uris' => $redirectUris, 'token_type' => 'jwt'];
-            $report['actions'][] = ['would_persist' => self::APP_ID . '/' . OidcProviderService::SMAIL_CLIENT_KEY];
+            $report['actions'][] = ['would_persist' => self::APP_ID . '/' . OidcProviderService::SOUVERA_MAIL_CLIENT_KEY];
             if (\is_string($secretOut) && $secretOut !== '') {
                 $report['actions'][] = ['would_write_secret_file' => $secretOut];
             }
@@ -237,7 +237,7 @@ class RegisterClient extends Command
         }
 
         // 6. Persist
-        $this->appConfig->setValueString(self::APP_ID, OidcProviderService::SMAIL_CLIENT_KEY, $clientId);
+        $this->appConfig->setValueString(self::APP_ID, OidcProviderService::SOUVERA_MAIL_CLIENT_KEY, $clientId);
         $report['actions'][] = ['registered' => $clientName, 'client_id' => $clientId];
 
         // 7. Optional secret file
