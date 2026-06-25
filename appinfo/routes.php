@@ -27,5 +27,20 @@ return [
             'url' => '/preferences/dashboard-mode',
             'verb' => 'POST'
         ],
+        [
+            'name' => 'appPassword#index',
+            'url' => '/app-passwords',
+            'verb' => 'GET'
+        ],
+        [
+            'name' => 'appPassword#create',
+            'url' => '/app-passwords',
+            'verb' => 'POST'
+        ],
+        [
+            'name' => 'appPassword#destroy',
+            'url' => '/app-passwords/{id}',
+            'verb' => 'DELETE'
+        ],
     ]
 ];

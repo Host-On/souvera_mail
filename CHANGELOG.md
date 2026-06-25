@@ -6,6 +6,36 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-02-16
+
+### Added
+- **App Passwords for legacy mail clients.** Souvera Mail now talks to the Stalwart 0.16+ management surface (JMAP under `urn:stalwart:jmap` capability) so end users can self-issue IMAP / POP3 / SMTP credentials directly from *Settings → Souvera Mail* for mail apps that do not support OAUTHBEARER (older Thunderbird, Apple Mail iOS, Outlook, automated scripts, …). Verified against upstream `crates/registry/src/schema/structs.rs` (`AppPassword`) and `crates/jmap-proto/src/request/method.rs` line 238 (`x:<ObjectType>/<function>` method name format).
+
+#### Architecture
+- **`OCA\Smail\Service\StalwartAdminService`** — minimal JMAP HTTP wrapper. Reads the API URL from system config `souvera_central.stalwart_api_url`, posts to `<url>/jmap` with `Authorization: Bearer <jwt>`, 8 s timeout.
+- **`OCA\Smail\Service\AppPasswordService`** — domain logic. Resolves the user's mail address via the parallel-installed Souvera Central app's `OCA\SouveraCentral\Service\StalwartService::mailFor(IUser)`, looks up the opaque Stalwart account ID via `findAccountId($email, 'User')`, acquires a user-scoped JWT via H2CK/oidc, then dispatches `x:AppPassword/get` and `x:AppPassword/set`. All operations run as the user — Stalwart 0.16 explicitly forbids admins from creating AppPasswords on behalf of users (`stalw.art/docs/auth/authentication/app-password/`).
+- **`OCA\Smail\Controller\AppPasswordController`** — CSRF-protected, `#[NoAdminRequired]`, never accepts a user id from the client (always derives from session). Three endpoints under `/index.php/apps/smail/`:
+  - `GET    /app-passwords`           — list (description + createdAt only, no secrets)
+  - `POST   /app-passwords`           — create, returns `{id, secret, description}` (plaintext secret ONCE — Stalwart stores only the hash)
+  - `DELETE /app-passwords/{id}`      — revoke
+- **Personal Settings UI** — adds a third section listing existing app passwords (description / created / Revoke button) and a create form. On successful creation the plaintext secret is rendered in a one-time card with a copy-to-clipboard button and an explicit "save now — you'll never see this again" warning.
+
+#### Permissions
+The created AppPassword carries `permissions = {"@type": "Inherit"}`, i.e. it grants exactly the same access scope as the user's primary account (IMAP + POP3 + SMTP + JMAP for that mailbox). No per-protocol toggle in this release (per user choice).
+
+#### Routes added
+```
+GET    /app-passwords        → appPassword#index
+POST   /app-passwords        → appPassword#create
+DELETE /app-passwords/{id}   → appPassword#destroy
+```
+
+#### Notes for operators
+- Required system-config keys (set by Souvera Central in production deploys):
+  - `souvera_central.stalwart_api_url` — e.g. `http://stalwart:8080`
+- Required apps enabled in the same Nextcloud instance: `oidc` (H2CK), `souvera_central` (for the mail-address ⇆ Stalwart-principal mapping).
+- The Personal Settings page degrades gracefully: if any prerequisite is missing it shows a yellow banner ("App passwords are not available — Souvera Central and the Stalwart API URL must be configured by the administrator first") and hides the form.
+
 ## [0.9.4] — 2026-02-16
 
 ### Added

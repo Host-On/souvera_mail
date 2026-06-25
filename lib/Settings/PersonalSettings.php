@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\Smail\Settings;
 
 use OCA\Smail\Dashboard\UnreadMailWidget;
+use OCA\Smail\Service\AppPasswordService;
 use OCA\Smail\Util\EngineHelper;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IConfig;
@@ -19,6 +20,7 @@ class PersonalSettings implements ISettings
         private IConfig $config,
         private IUserSession $userSession,
         private EngineHelper $engineHelper,
+        private AppPasswordService $appPasswordService,
     ) {
     }
 
@@ -42,6 +44,13 @@ class PersonalSettings implements ISettings
             'dashboardModeUnread' => UnreadMailWidget::MODE_UNREAD,
             'dashboardModeAll' => UnreadMailWidget::MODE_ALL,
             'dashboardModeUrl' => $this->urlGenerator->linkToRoute('smail.preference.setDashboardMode'),
+            'appPasswordsAvailable' => $this->appPasswordService->isAvailable(),
+            'appPasswordsListUrl' => $this->urlGenerator->linkToRoute('smail.appPassword.index'),
+            'appPasswordsCreateUrl' => $this->urlGenerator->linkToRoute('smail.appPassword.create'),
+            // Route template for DELETE — JS substitutes `{id}` at runtime.
+            'appPasswordsDestroyUrlTemplate' => $this->urlGenerator->linkToRoute(
+                'smail.appPassword.destroy', ['id' => '__ID__']
+            ),
         ], '');
     }
 
