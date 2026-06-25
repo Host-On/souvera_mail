@@ -62,7 +62,7 @@
 
         <?php if ($_['isAdmin']) { ?>
             <p class="lead">
-                <?php p($l->t('This Nextcloud instance has Souvera Mail installed, but no mail domain is configured yet. Souvera Mail is a CLI-managed application: there is no browser setup wizard. Run the following command on the Nextcloud host to register the OIDC client with H2CK/oidc, persist the mail domain, and finalise the bootstrap:')); ?>
+                <?php p($l->t('This Nextcloud instance has Souvera Mail installed, but no mail domain is configured yet. Souvera Mail is a CLI-managed application: there is no browser-based setup UI. Run the following command on the Nextcloud host to register the OIDC client with H2CK/oidc, persist the mail domain, and finalise the bootstrap:')); ?>
             </p>
 
 <pre data-testid="smail-bootstrap-snippet">sudo -u www-data php occ smail:bootstrap \
