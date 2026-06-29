@@ -42,6 +42,27 @@ class Application extends App implements IBootstrap
 {
     public const APP_ID = 'souvera_mail';
 
+    /**
+     * Nextcloud group id that the app is restricted to.
+     *
+     * Every account that should be able to see the "Mail" navigation entry
+     * and open `/apps/souvera_mail/…` must be a member of this group.
+     * Enforced by:
+     *  - {@see \OCA\SouveraMail\Migration\EnforceGroupRestriction} (install
+     *    repair-step: ensures the group exists and binds the app to it on
+     *    fresh installs).
+     *  - Nextcloud's built-in app-permission layer, which rejects URL access
+     *    for non-members once the binding is in place.
+     *  - {@see Application::boot()} navigation closure, which additionally
+     *    hides the menu entry via `IAppManager::isEnabledForUser()`.
+     *
+     * Admins who want a different group restriction can re-run
+     * `occ app:enable souvera_mail --groups <other-group>` — the repair-step
+     * respects an existing group restriction on post-update runs and only
+     * enforces the default on the very first install.
+     */
+    public const RESTRICTED_GROUP_ID = 'souvera-users';
+
     /** @param array<string, mixed> $urlParams */
     public function __construct(array $urlParams = [])
     {
