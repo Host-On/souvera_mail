@@ -152,8 +152,12 @@ foreach (['connectedDevicesListUrl', 'connectedDevicesDestroyUrlTemplate', 'conn
 }
 assertTrue(str_contains($settingsCtrlSrc, "souvera_mail.connectedDevices.index"),
     "SettingsController links to souvera_mail.connectedDevices.index route", $passes, $failures);
-assertTrue(str_contains($settingsCtrlSrc, "souvera_mail.connectedDevices.destroy"),
-    "SettingsController links to souvera_mail.connectedDevices.destroy route", $passes, $failures);
+// 0.13.2: destroy URL is built as `<index>/__ID__` to bypass Symfony's
+// requirement-regex check on linkToRoute(['id' => '__ID__']).
+assertTrue(str_contains($settingsCtrlSrc, "souvera_mail.connectedDevices.index') . '/__ID__'")
+       || str_contains($settingsCtrlSrc, "linkToRoute('souvera_mail.connectedDevices.destroy', ['id' => '__ID__'])"),
+    "SettingsController builds connectedDevices destroy-URL template (concat or linkToRoute)",
+    $passes, $failures);
 assertTrue(str_contains($settingsCtrlSrc, "souvera_mail.connectedDevices.signOutOthers"),
     "SettingsController links to souvera_mail.connectedDevices.signOutOthers route", $passes, $failures);
 

@@ -70,13 +70,19 @@ class SettingsController extends Controller
             'appPasswordsAvailable' => $this->appPasswordService->isAvailable(),
             'appPasswordsListUrl' => $this->urlGenerator->linkToRoute('souvera_mail.appPassword.index'),
             'appPasswordsCreateUrl' => $this->urlGenerator->linkToRoute('souvera_mail.appPassword.create'),
-            'appPasswordsDestroyUrlTemplate' => $this->urlGenerator->linkToRoute(
-                'souvera_mail.appPassword.destroy', ['id' => '__ID__']
-            ),
+            // The DELETE URL is built as `<index-url>/__ID__` instead of
+            // `linkToRoute(..., ['id' => '__ID__'])` because Symfony's URL
+            // generator validates the `requirements` regex at generation
+            // time, not just at routing time — `__ID__` does not match
+            // `\d+` and crashes with InvalidParameterException. Building
+            // the template by string concatenation skips the generator
+            // check while keeping the server-side `\d+` constraint
+            // (enforced when the JS substitutes a real numeric id).
+            'appPasswordsDestroyUrlTemplate' =>
+                $this->urlGenerator->linkToRoute('souvera_mail.appPassword.index') . '/__ID__',
             'connectedDevicesListUrl' => $this->urlGenerator->linkToRoute('souvera_mail.connectedDevices.index'),
-            'connectedDevicesDestroyUrlTemplate' => $this->urlGenerator->linkToRoute(
-                'souvera_mail.connectedDevices.destroy', ['id' => '__ID__']
-            ),
+            'connectedDevicesDestroyUrlTemplate' =>
+                $this->urlGenerator->linkToRoute('souvera_mail.connectedDevices.index') . '/__ID__',
             'connectedDevicesSignOutOthersUrl' => $this->urlGenerator->linkToRoute(
                 'souvera_mail.connectedDevices.signOutOthers'
             ),
