@@ -199,8 +199,8 @@ assertTrue($inCommon >= 9,
 // ============================================================
 $info = file_get_contents('/app/appinfo/info.xml');
 preg_match('#<version>([^<]+)</version>#', $info, $vm);
-assertTrue(($vm[1] ?? '') === '0.12.0',
-    "info.xml <version> == 0.12.0 (got: " . ($vm[1] ?? '') . ")", $passes, $failures);
+assertTrue(($vm[1] ?? '') === '0.13.1',
+    "info.xml <version> == 0.13.1 (got: " . ($vm[1] ?? '') . ")", $passes, $failures);
 
 $changelog = file_get_contents('/app/CHANGELOG.md');
 assertTrue(str_contains($changelog, '[0.12.0]'),
@@ -238,7 +238,7 @@ assertTrue(count($lintFails) === 0,
     $passes, $failures);
 
 // ============================================================
-// 10. Composer classmap — 2 new classes + count == 272
+// 10. Composer classmap — 2 new classes + count == 273 (after 0.13.0 added EnforceGroupRestriction)
 // ============================================================
 $classmap = require '/app/vendor/composer/autoload_classmap.php';
 assertTrue(isset($classmap['OCA\\SouveraMail\\Service\\ConnectedDevicesService']),
@@ -246,8 +246,8 @@ assertTrue(isset($classmap['OCA\\SouveraMail\\Service\\ConnectedDevicesService']
 assertTrue(isset($classmap['OCA\\SouveraMail\\Controller\\ConnectedDevicesController']),
     "Classmap contains OCA\\SouveraMail\\Controller\\ConnectedDevicesController", $passes, $failures);
 $classmapCount = count($classmap);
-assertTrue($classmapCount === 272,
-    "Classmap class count == 272 (was 270 + 2 new) (got: $classmapCount)", $passes, $failures);
+assertTrue($classmapCount === 273,
+    "Classmap class count == 273 (was 270 + 2 connected-devices + 1 enforce-group-restriction) (got: $classmapCount)", $passes, $failures);
 
 // ============================================================
 // 11. Existing regression suites still pass

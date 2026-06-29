@@ -10,7 +10,19 @@ final class NavigationTitle
 {
     public const APP_CONFIG_KEY = 'menu-title';
 
-    public const DEFAULT = 'Souvera Mail';
+    /**
+     * Default label rendered in Nextcloud's left navigation sidebar.
+     *
+     * Deliberately the short form `Mail` — the long brand name
+     * `Souvera Mail` overflows / wraps in the NC sidebar at smaller
+     * widths, which looks broken. The product brand stays
+     * `Souvera Mail` everywhere else (info.xml `<name>`, settings
+     * page heading, breadcrumb, dashboard widget title, About page,
+     * App Store listing). Operators who want a different sidebar
+     * label can set it via `occ config:app:set souvera_mail
+     * menu-title --value '<label>'`.
+     */
+    public const DEFAULT = 'Mail';
 
     public static function resolve(IAppConfig $appConfig): string
     {

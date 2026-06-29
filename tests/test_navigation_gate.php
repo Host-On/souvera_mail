@@ -189,7 +189,7 @@ assertTrue(str_contains((string)$lintOut, 'No syntax errors'), "php -l passes on
 // info.xml version is 0.11.1
 $infoXml = file_get_contents('/app/appinfo/info.xml');
 preg_match('#<version>([^<]+)</version>#', $infoXml, $vm);
-assertTrue(($vm[1] ?? '') === '0.12.0', "info.xml <version> == 0.11.1 (got: ".($vm[1] ?? '').")", $passes, $failures);
+assertTrue(($vm[1] ?? '') === '0.13.1', "info.xml <version> == 0.13.1 (got: ".($vm[1] ?? '').")", $passes, $failures);
 
 // CHANGELOG has 0.11.1 entry mentioning the navigation/group fix
 $changelog = file_get_contents('/app/CHANGELOG.md');

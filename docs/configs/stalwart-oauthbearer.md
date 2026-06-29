@@ -1,79 +1,173 @@
-# Stalwart with OAUTHBEARER/XOAUTH2
+# Stalwart 0.16+ with Nextcloud as OIDC Provider
 
-Masked reference for running Souvera Mail against Stalwart with OIDC token validation
-and optional LDAP directory backend.
+Reference configuration for running **Souvera Mail** against
+**Stalwart 0.16+** where **Nextcloud itself is the OIDC Provider** via the
+[H2CK/oidc](https://github.com/H2CK/oidc) app — no external IdP required.
+
+This is the supported architecture as of Souvera Mail 0.13.0. For setups
+that still front their stack with Keycloak / Authentik / Authelia in
+addition to H2CK/oidc, see [keycloak.md](keycloak.md) (kept as an
+appendix; not the recommended path).
 
 ## Scope
 
-- IMAP auth: Stalwart (`OAUTHBEARER` / `XOAUTH2`)
-- SMTP submission auth: Stalwart (`OAUTHBEARER` / `XOAUTH2`)
-- ManageSieve auth: Stalwart (`OAUTHBEARER` / `XOAUTH2`)
-- IdP example: Keycloak
-- Directory example: LDAP/LLDAP
+| Concern             | Component                                         |
+|---------------------|---------------------------------------------------|
+| IdP / OIDC OP       | Nextcloud + H2CK/oidc 1.17+ (`apps/oidc`)         |
+| Token validation    | Stalwart 0.16+ OIDC directory, JWKS               |
+| IMAP auth           | Stalwart (`OAUTHBEARER` / `XOAUTH2`)              |
+| SMTP submission     | Stalwart (`OAUTHBEARER` / `XOAUTH2`)              |
+| ManageSieve auth    | Stalwart (`OAUTHBEARER` / `XOAUTH2`)              |
+| Mailbox provisioner | `souvera_central` (separate Nextcloud app)        |
+| Webmail client      | Souvera Mail (this app)                           |
 
-## 1) Stalwart Requirements
+## 1) Token shape
 
-- Stalwart configured with OIDC provider (issuer/JWKS or introspection)
-- Mail domain exists and is enabled
-- User identity mapping aligns with token claim (`email` recommended)
-- TLS certificates valid for hostnames used by Nextcloud
+Souvera Mail never asks the browser for a token. It receives access
+tokens **in-process** by dispatching H2CK/oidc's
+`TokenGenerationRequestEvent` for the logged-in NC user, then uses the
+JWT for OAUTHBEARER against Stalwart.
 
-## 2) Listener Strategy
+The JWT carries (as configured by H2CK/oidc when `--token_type=jwt`):
 
-Pick one TLS strategy and keep Souvera Mail values aligned:
-
-- STARTTLS style (example):
-  - IMAP `143` + `--imap-ssl starttls`
-  - SMTP `587` + `--smtp-ssl starttls`
-  - Sieve `4190` + `--sieve-ssl starttls`
-
-- Implicit TLS style (example):
-  - IMAP `993` + `--imap-ssl ssl`
-  - SMTP `465` + `--smtp-ssl ssl`
-  - Sieve `4190` (if implicit configured) + `--sieve-ssl ssl`
-
-## 3) Souvera Mail Setup Example
-
-```bash
-occ smail:setup \
-  --imap-host mail.example.com \
-  --imap-port 993 --imap-ssl ssl \
-  --smtp-host mail.example.com \
-  --smtp-port 465 --smtp-ssl ssl \
-  --domain example.com \
-  --sieve \
-  --sieve-host mail.example.com \
-  --sieve-port 4190 --sieve-ssl ssl
+```jsonc
+{
+  "iss":    "https://nextcloud.example.com",
+  "aud":    "souvera_mail",       // the OIDC client_id registered by `occ souvera_mail:oidc:register-client`
+  "sub":    "<NC user id>",
+  "email":  "user@example.com",   // routed via souvera_central -> Stalwart principal email
+  "scope":  "openid profile email",
+  "exp":    <unix ts>
+}
 ```
 
-## 4) Identity and Audience
+JWKS endpoint that Stalwart validates against:
 
-Token must contain:
+```
+https://nextcloud.example.com/index.php/apps/oidc/jwks
+```
 
-- `aud` including your **mail** OIDC client id (dedicated Keycloak client or audience mapper — not a Webadmin-only client)
-- stable mailbox identity claim (typically `email`; set Stalwart `claimUsername` to `email`)
+## 2) Stalwart OIDC directory
 
-Keycloak (external IdP) checklist:
+`/etc/stalwart/config.toml` (excerpt — adapt host names):
 
-1. Create a mail-scoped client (example id: `mail-service`) or add an **Audience** mapper on the Nextcloud client so access tokens include that client in `aud`.
-2. In Stalwart: OIDC directory with the same issuer as Nextcloud, `requireAudience` matching that client id, `claimUsername` = `email`.
-3. Souvera Mail domain profile must match the mailbox domain (e.g. `example.com` for `user@example.com`).
-4. Optional: `--oidc-audience mail-service` when the login token does not already carry the mail audience (token exchange).
+```toml
+[directory."oidc"]
+type            = "oidc"
+issuer          = "https://nextcloud.example.com"
+jwks-url        = "https://nextcloud.example.com/index.php/apps/oidc/jwks"
+audience        = "souvera_mail"
+claim-username  = "email"
+cache           = "5m"
+```
 
-Stalwart Webadmin/Management uses Stalwart’s internal OAuth; external IdP SSO for the admin UI is not supported in current releases — configure mail via OIDC + optional LDAP; use Stalwart’s recovery/fallback admin for server management.
+```toml
+[server.listener."imap"]
+protocol = "imap"
+bind     = "[::]:993"
+tls.implicit = true
+```
 
-## 5) Troubleshooting Patterns
+```toml
+[storage]
+directory = "oidc"          # use the OIDC directory above for principal lookup
+```
 
-- `AUTHENTICATIONFAILED` + domain errors:
-  - missing/disabled mail domain in Stalwart
-- Sieve TLS/auth mismatch:
-  - Souvera Mail `--sieve-ssl` does not match listener mode
-- TLS verify failures from Nextcloud:
-  - missing CA trust chain for mail certificate issuer
-- SMTP temporary auth failure:
-  - OIDC validation path broken or audience mismatch
+Mailbox / quota objects themselves are provisioned by `souvera_central`
+through Stalwart's management JMAP. The OIDC directory is only used for
+authentication — never for storing mailboxes.
 
-## 6) LDAP/LLDAP Note
+## 3) Listener strategy
 
-LDAP/LLDAP can back mailbox directory lookups, but OAuth auth success still depends
-on token validation and identity mapping consistency.
+Pick one TLS strategy and keep Souvera Mail values aligned.
+
+- **STARTTLS**: IMAP `143` + SMTP `587` + Sieve `4190` (all `starttls`)
+- **Implicit TLS**: IMAP `993` + SMTP `465` + Sieve `4190` (implicit
+  listener configured)
+
+## 4) Souvera Mail setup
+
+The browser-based setup wizard was removed in 0.9.0; configuration is
+CLI-only via the renamed `souvera_mail` command set:
+
+```bash
+sudo -u www-data php occ souvera_mail:bootstrap \
+  --nc-base-url https://nextcloud.example.com \
+  --imap-host  mail.example.com --imap-port 993  --imap-ssl ssl \
+  --smtp-host  mail.example.com --smtp-port 465  --smtp-ssl ssl \
+  --sieve --sieve-host mail.example.com --sieve-port 4190 --sieve-ssl ssl \
+  --domain     example.com \
+  --json
+```
+
+`souvera_mail:bootstrap` is **idempotent** — re-running converges to the
+desired state. It will:
+
+1. Verify H2CK/oidc is installed and has a signing key.
+2. Register Souvera Mail as a confidential OIDC client (`client_id =
+   souvera_mail`, `token_type = jwt`) via `occ oidc:create`.
+3. Write the IMAP/SMTP/Sieve domain profile to Souvera Mail's app-config.
+4. Run `occ souvera_mail:status` to confirm the result.
+
+Other commands:
+
+| Command                                        | Purpose                                                                  |
+|------------------------------------------------|--------------------------------------------------------------------------|
+| `occ souvera_mail:setup`                       | Update the IMAP/SMTP/Sieve domain profile without re-running OIDC steps  |
+| `occ souvera_mail:status [--json]`             | Diagnostic dump; exits non-zero on any blocker                           |
+| `occ souvera_mail:oidc:register-client`        | (Re-)register Souvera Mail as an H2CK/oidc client                        |
+| `occ souvera_mail:reset`                       | Tear down all Souvera Mail config; optional `--purge-oidc-client`        |
+
+## 5) Group restriction
+
+Souvera Mail 0.13.0+ binds itself to the Nextcloud group
+**`souvera-users`** automatically on every `app:enable` and `upgrade`
+(via `OCA\SouveraMail\Migration\EnforceGroupRestriction`). Members of
+other groups never see the navigation entry and cannot open
+`/index.php/apps/souvera_mail/…`. To grant a user access:
+
+```bash
+sudo -u www-data php occ group:adduser souvera-users <uid>
+```
+
+To use a different allowed group, override the constant
+`OCA\SouveraMail\AppInfo\Application::RESTRICTED_GROUP_ID` in your build
+or contact the maintainers — `occ app:enable souvera_mail --groups
+<other>` works at runtime but is reset on every upgrade by the repair
+step.
+
+## 6) Identity and audience checklist
+
+The H2CK/oidc client registration done by `souvera_mail:bootstrap`
+already sets these correctly. The list below is for operators
+debugging an existing setup.
+
+- `aud` includes `souvera_mail` — set by H2CK at client registration
+  time.
+- `email` claim present and matches the mailbox principal — H2CK pulls
+  it from NC's user account; `souvera_central` is responsible for
+  keeping that NC user ↔ Stalwart principal mapping in sync.
+- Stalwart `audience` setting matches the H2CK client id
+  (`souvera_mail`).
+- Stalwart `claim-username` is `email` (or the claim your
+  `souvera_central` provisions principals against).
+
+## 7) Troubleshooting patterns
+
+| Symptom                                         | Likely cause                                                                                          |
+|-------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| `AUTHENTICATIONFAILED` + domain errors          | mail domain missing/disabled in Stalwart, or `souvera_central` has not provisioned the mailbox        |
+| `AUTHENTICATIONFAILED` + `aud` mismatch         | H2CK client id was rotated; re-run `occ souvera_mail:oidc:register-client --force`                    |
+| `OIDC: jwks-url unreachable`                    | Stalwart cannot reach `<NC>/index.php/apps/oidc/jwks` — firewall, DNS, or wrong base URL              |
+| `Mail` nav entry missing for an existing user   | user not in `souvera-users`: `occ group:adduser souvera-users <uid>`                                  |
+| Sieve TLS/auth mismatch                         | `--sieve-ssl` does not match the Stalwart Sieve listener TLS mode                                     |
+| App passwords UI shows "not available"          | `souvera_central.stalwart_api_url` not set, or `souvera_central` app is missing                       |
+| Quota pill never appears                        | same prerequisites as App passwords + JMAP capability `urn:stalwart:jmap` must be enabled in Stalwart |
+
+## 8) References
+
+- H2CK/oidc — <https://github.com/H2CK/oidc>
+- Stalwart Mail Server — <https://github.com/stalwartlabs/mail-server>
+- Stalwart App Passwords spec — <https://stalw.art/docs/auth/authentication/app-password/>
+- Souvera Central — internal Nextcloud app responsible for the NC ↔
+  Stalwart principal mapping (mailbox provisioning, quota)

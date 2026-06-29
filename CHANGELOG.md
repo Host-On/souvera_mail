@@ -6,6 +6,35 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.1] — 2026-02-17
+
+### Changed
+- **Sidebar nav label shortened to "Mail".** The Nextcloud sidebar (top navigation bar / left rail in mobile) now shows the short label `Mail` instead of the full `Souvera Mail`. The long brand name wrapped / overflowed at typical NC sidebar widths and looked broken. The product brand stays `Souvera Mail` everywhere else (info.xml `<name>`, settings page heading, breadcrumb, dashboard widget title, App Store listing, About page). Operators who want a different sidebar label can still override it via `occ config:app:set souvera_mail menu-title --value '<label>'` — only the *default* changed.
+
+### Architecture
+- `NavigationTitle::DEFAULT` (in `lib/Util/NavigationTitle.php`) changed from `'Souvera Mail'` to `'Mail'`. Everything else (`menu-title` app-config key, `resolve()` semantics, `validate()` checks) is unchanged.
+
+### Verification
+- **`tests/test_navigation_title.php`: 15/15 PASS** (NEW) — confirms `DEFAULT === 'Mail'`, `resolve()` returns the short default when no override is stored, returns the operator override when one is, trims whitespace, falls back when override is whitespace-only, `validate()` still rejects > 64 chars + control chars, info.xml `<name>` still says `Souvera Mail` (no full-app rename), `SettingsController` still seeds the long brand for the in-app settings header, and the navigation closure in `Application::boot()` does NOT hard-code a brand name (would override the operator's `menu-title` setting).
+- Full regression suite (`test_souvera_mail_rename.php`, `test_navigation_gate.php`, `test_connected_devices.php`, `test_enforce_group_restriction.php`, `test_docs_alignment.php`): **228/228 PASS** after version bump.
+
+## [0.13.0] — 2026-02-17
+
+### Added
+- **Strict group-restriction enforcement.** Souvera Mail is now bound to the Nextcloud group `souvera-users` automatically on every `occ app:enable souvera_mail` and every `occ upgrade`. Members of any other group never see the navigation entry and cannot open `/index.php/apps/souvera_mail/…` — Nextcloud's built-in app-permission layer rejects the request before any controller runs. The binding converges towards the desired state every time the repair-step executes; manual `occ app:enable souvera_mail --groups <other-group>` deviations are reset on the next upgrade. The allowed group id lives in a single constant (`Application::RESTRICTED_GROUP_ID`) so downstream builds can patch it in one place.
+
+### Architecture
+- **`OCA\SouveraMail\Migration\EnforceGroupRestriction`** (NEW, ~95 LoC). Implements `OCP\Migration\IRepairStep`. Registered in `appinfo/info.xml` under both `<install>` and `<post-update>` `<repair-steps>` blocks so fresh installs *and* every upgrade re-converge:
+  - Ensures the `souvera-users` group exists (`IGroupManager::createGroup()`); throws a verbose `RuntimeException` if the group manager refuses (LDAP read-only backend, misconfigured group manager — gives the operator the exact `occ group:add souvera-users` recovery command).
+  - Calls `IAppManager::enableAppForGroups('souvera_mail', [$group])` to bind the app. Any `Throwable` from the binding is swallowed: a `warning()` is emitted on the `IOutput` and logged via `LoggerInterface` (so the rest of `occ upgrade` keeps going), but the failure is loud enough that a deploy pipeline can detect it via the `occ upgrade --verbose` output.
+- **`Application::RESTRICTED_GROUP_ID = 'souvera-users'`** — single source of truth for the allowed group id. Referenced by the new repair-step and documented at the constant declaration.
+
+### Verification
+- `php -l` clean on all touched files.
+- `composer dump-autoload -o` regenerated; classmap holds 273 classes (was 272 — exactly +1 for the new class).
+- **`/app/tests/test_enforce_group_restriction.php`: 27/27 PASS** — file/namespace/interface, info.xml `<install>` + `<post-update>` registration with InstallStep regression guard, classmap entry, constant value, version + CHANGELOG checks, and a four-state behavioural sim of `run()` (group exists, group missing-but-created, `createGroup` returns null → helpful error, `enableAppForGroups` throws → swallowed + warning).
+- **Regression: `/app/tests/test_souvera_mail_rename.php` and `test_navigation_gate.php` and `test_connected_devices.php`** updated for version `0.12.0 → 0.13.0` and pass.
+
 ## [0.12.0] — 2026-02-16
 
 ### Added
