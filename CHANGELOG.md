@@ -6,6 +6,11 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.11.1] — 2026-02-16
+
+### Fixed
+- **Navigation entry honours group restrictions.** When the app was restricted to a group (e.g. `occ app:enable souvera_mail --groups mail-users`), members of *other* groups still saw a "Mail" entry in Nextcloud's top navigation. Clicking it landed on a Nextcloud "App is not enabled" error page. The lazy closure registered against `INavigationManager` in `Application::boot()` unconditionally returned the entry payload for every authenticated request. The closure now consults `OCP\App\IAppManager::isEnabledForUser($appId, $user)` first and returns an empty array when the user is unauthenticated *or* outside the allowed group set — Nextcloud's NavigationManager then drops the provider for this request, so the misleading menu item never appears.
+
 ## [0.11.0] — 2026-02-16
 
 ### Breaking

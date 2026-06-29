@@ -25,6 +25,7 @@ use OCA\SouveraMail\Listeners\LoginBridgeListener;
 use OCA\SouveraMail\Listeners\LogoutListener;
 use OCA\SouveraMail\Search\Provider;
 use OCA\SouveraMail\Util\NavigationTitle;
+use OCP\App\IAppManager;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -33,6 +34,7 @@ use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\INavigationManager;
 use OCP\IURLGenerator;
+use OCP\IUserSession;
 use OCP\User\Events\BeforeUserLoggedOutEvent;
 use OCP\User\Events\UserLoggedInEvent;
 
@@ -93,6 +95,27 @@ class Application extends App implements IBootstrap
 
         $navigationManager = $serverContainer->get(INavigationManager::class);
         $navigationManager->add(function () use ($serverContainer) {
+            // Respect per-user app-enable status (group restrictions etc.).
+            // Without this guard, every authenticated user — including
+            // accounts NOT in the allowed groups configured via
+            // `occ app:enable souvera_mail --groups …` — would still see
+            // a navigation entry for Souvera Mail and get redirected to
+            // an "App is not enabled" page on click. `IAppManager::
+            // isEnabledForUser()` returns false for users outside the
+            // configured group set and for users disabled altogether,
+            // so it is exactly the right gate here.
+            $userSession = $serverContainer->get(IUserSession::class);
+            $user = $userSession->getUser();
+            if ($user === null) {
+                // Pre-auth navigation rendering (e.g. login page). Don't
+                // surface a mailbox link there either.
+                return [];
+            }
+            $appManager = $serverContainer->get(IAppManager::class);
+            if (!$appManager->isEnabledForUser(self::APP_ID, $user)) {
+                return [];
+            }
+
             $appConfig = $serverContainer->get(IAppConfig::class);
             $urlGenerator = $serverContainer->get(IURLGenerator::class);
 

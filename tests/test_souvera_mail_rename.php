@@ -1,6 +1,6 @@
 <?php
 /**
- * Static verification for Souvera Mail v0.11.0 rename.
+ * Static verification for Souvera Mail v0.11.1 rename.
  * Covers:
  *  - info.xml id/namespace/version/settings block
  *  - composer.json PSR-4 mapping
@@ -46,7 +46,7 @@ assertTrue(($im[1] ?? '') === 'souvera_mail', "info.xml <id> == souvera_mail (go
 preg_match('#<namespace>([^<]+)</namespace>#', $infoXml, $nm);
 assertTrue(($nm[1] ?? '') === 'SouveraMail', "info.xml <namespace> == SouveraMail", $passes, $failures);
 preg_match('#<version>([^<]+)</version>#', $infoXml, $vm);
-assertTrue(($vm[1] ?? '') === '0.11.0', "info.xml <version> == 0.11.0 (got: '".($vm[1]??'')."')", $passes, $failures);
+assertTrue(($vm[1] ?? '') === '0.11.1', "info.xml <version> == 0.11.1 (got: '".($vm[1]??'')."')", $passes, $failures);
 assertTrue(str_contains($infoXml, '<admin>OCA\\SouveraMail\\Settings\\AdminSettings</admin>'), "info.xml <admin> uses new namespace", $passes, $failures);
 assertTrue(str_contains($infoXml, '<admin-section>'), "info.xml has <admin-section>", $passes, $failures);
 assertTrue(!str_contains($infoXml, '<personal>'), "info.xml has NO <personal>", $passes, $failures);
