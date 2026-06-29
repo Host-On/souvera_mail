@@ -120,91 +120,73 @@ assertTrue(
 );
 
 // ============================================================
-// 5. templates/settings.php — IDs + literals
+// 5. Connected-Devices UI moved to the in-engine Settings tab in 0.13.2.
+//    The old NC-chrome templates/settings.php + js/personal-settings.js
+//    were deleted; the new owner is the engine plugin's Knockout VM.
 // ============================================================
-$tmplSrc = file_get_contents('/app/templates/settings.php');
-foreach ([
-    'souvera-mail-connected-devices-section',
-    'souvera-mail-connected-devices-tbody',
-    'souvera-mail-sign-out-others-btn',
-] as $id) {
-    assertTrue(str_contains($tmplSrc, "id=\"$id\""),
-        "Template contains element id=\"$id\"", $passes, $failures);
-}
-foreach ([
-    'connectedDevicesListUrl',
-    'connectedDevicesDestroyUrlTemplate',
-    'connectedDevicesSignOutOthersUrl',
-] as $k) {
-    assertTrue(str_contains($tmplSrc, "\$_['$k']"),
-        "Template references \$_['$k']", $passes, $failures);
-}
-assertTrue(str_contains($tmplSrc, 'Sign out all other devices'),
-    "Template contains literal 'Sign out all other devices'", $passes, $failures);
-
-// ============================================================
-// 6. SettingsController passes the 3 new template params
-// ============================================================
-$settingsCtrlSrc = file_get_contents('/app/lib/Controller/SettingsController.php');
-foreach (['connectedDevicesListUrl', 'connectedDevicesDestroyUrlTemplate', 'connectedDevicesSignOutOthersUrl'] as $k) {
-    assertTrue(str_contains($settingsCtrlSrc, "'$k' =>"),
-        "SettingsController passes template param '$k'", $passes, $failures);
-}
-assertTrue(str_contains($settingsCtrlSrc, "souvera_mail.connectedDevices.index"),
-    "SettingsController links to souvera_mail.connectedDevices.index route", $passes, $failures);
-// 0.13.2: destroy URL is built as `<index>/__ID__` to bypass Symfony's
-// requirement-regex check on linkToRoute(['id' => '__ID__']).
-assertTrue(str_contains($settingsCtrlSrc, "souvera_mail.connectedDevices.index') . '/__ID__'")
-       || str_contains($settingsCtrlSrc, "linkToRoute('souvera_mail.connectedDevices.destroy', ['id' => '__ID__'])"),
-    "SettingsController builds connectedDevices destroy-URL template (concat or linkToRoute)",
+assertTrue(!file_exists('/app/templates/settings.php'),
+    "templates/settings.php DELETED (Connected Devices section moved to in-engine tab)",
     $passes, $failures);
-assertTrue(str_contains($settingsCtrlSrc, "souvera_mail.connectedDevices.signOutOthers"),
-    "SettingsController links to souvera_mail.connectedDevices.signOutOthers route", $passes, $failures);
+assertTrue(!file_exists('/app/js/personal-settings.js'),
+    "js/personal-settings.js DELETED (logic ported to settings-account.js)",
+    $passes, $failures);
+
+$tmplSrc = file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/templates/SettingsSouveraAccount.html');
+foreach ([
+    'Verbundene Geräte',                // section heading (de)
+    'Alle anderen Geräte abmelden',     // sign-out-others button label
+    'foreach: devices',                 // Knockout binding
+    'dieses Gerät',                     // current-session badge
+] as $needle) {
+    assertTrue(str_contains($tmplSrc, $needle),
+        "Engine-tab template contains '$needle'", $passes, $failures);
+}
 
 // ============================================================
-// 7. personal-settings.js — section bootstrap + functions + click handler
+// 6. Plugin-side (index.php) emits the 3 ConnectedDevices URLs to JS
 // ============================================================
-$jsSrc = file_get_contents('/app/js/personal-settings.js');
+$pluginSrc = file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/index.php');
 foreach ([
-    "getElementById('souvera-mail-connected-devices-section')" => "JS bootstraps from #souvera-mail-connected-devices-section",
-    "getElementById('souvera-mail-connected-devices-tbody')"   => "JS reads #souvera-mail-connected-devices-tbody",
-    "getElementById('souvera-mail-sign-out-others-btn')"       => "JS reads #souvera-mail-sign-out-others-btn",
-    "function renderConnectedDevices"                          => "JS defines renderConnectedDevices()",
-    "function cdLoadList"                                      => "JS defines cdLoadList()",
-    "function cdRevoke"                                        => "JS defines cdRevoke()",
-    "function cdSignOutOthers"                                 => "JS defines cdSignOutOthers()",
+    "'SmailConnectedDevicesListUrl'",
+    "'SmailConnectedDevicesDestroyUrlTemplate'",
+    "'SmailConnectedDevicesSignOutOthersUrl'",
+] as $k) {
+    assertTrue(str_contains($pluginSrc, $k),
+        "Engine plugin FilterAppData emits $k", $passes, $failures);
+}
+assertTrue(str_contains($pluginSrc, "linkToRoute('souvera_mail.connectedDevices.index')"),
+    "Engine plugin links to souvera_mail.connectedDevices.index route", $passes, $failures);
+assertTrue(str_contains($pluginSrc, "linkToRoute('souvera_mail.connectedDevices.signOutOthers')"),
+    "Engine plugin links to souvera_mail.connectedDevices.signOutOthers route", $passes, $failures);
+
+// ============================================================
+// 7. settings-account.js — Knockout VM + ConnectedDevices methods
+// ============================================================
+$jsSrc = file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/js/settings-account.js');
+foreach ([
+    "rl.addSettingsViewModel"     => "JS registers a Snappymail Settings ViewModel",
+    "'souvera-account'"           => "JS uses 'souvera-account' as the hash route",
+    "loadDevices"                 => "JS defines loadDevices()",
+    "revokeDevice"                => "JS defines revokeDevice()",
+    "signOutOthers"               => "JS defines signOutOthers()",
+    "SmailConnectedDevicesListUrl" => "JS reads SmailConnectedDevicesListUrl from cfg",
+    "SmailConnectedDevicesDestroyUrlTemplate" => "JS reads SmailConnectedDevicesDestroyUrlTemplate from cfg",
+    "SmailConnectedDevicesSignOutOthersUrl"   => "JS reads SmailConnectedDevicesSignOutOthersUrl from cfg",
 ] as $needle => $label) {
     assertTrue(str_contains($jsSrc, $needle), $label, $passes, $failures);
 }
 
-// click handler on cdSignOutBtn that calls window.confirm + cdSignOutOthers
-assertTrue((bool)preg_match(
-    '/cdSignOutBtn\.addEventListener\(\s*[\'"]click[\'"].*?window\.confirm.*?cdSignOutOthers\s*\(\s*\)/s',
-    $jsSrc
-), "JS click handler on cdSignOutBtn calls window.confirm + cdSignOutOthers()", $passes, $failures);
-
-// Cross-reference: every getElementById id in JS must also have id="..." in template
-preg_match_all("/getElementById\(['\"]([^'\"]+)['\"]\)/", $jsSrc, $jsIds);
-$jsIdList = array_unique($jsIds[1]);
-$missing = [];
-$inCommon = 0;
-foreach ($jsIdList as $id) {
-    if (str_contains($tmplSrc, "id=\"$id\"")) { $inCommon++; }
-    else { $missing[] = $id; }
-}
-assertTrue(count($missing) === 0,
-    "Every JS getElementById has a matching template id (missing: " . implode(',', $missing) . ")",
-    $passes, $failures);
-assertTrue($inCommon >= 9,
-    "At least 9 IDs are shared between JS and template (got: $inCommon)", $passes, $failures);
+// confirm() guard on destructive sign-out
+assertTrue((bool)preg_match("/signOutOthers[\s\S]{0,1000}confirm\(/", $jsSrc),
+    "JS signOutOthers() has a confirm() guard before firing", $passes, $failures);
 
 // ============================================================
 // 8. info.xml version + CHANGELOG
 // ============================================================
 $info = file_get_contents('/app/appinfo/info.xml');
 preg_match('#<version>([^<]+)</version>#', $info, $vm);
-assertTrue(($vm[1] ?? '') === '0.13.1',
-    "info.xml <version> == 0.13.1 (got: " . ($vm[1] ?? '') . ")", $passes, $failures);
+assertTrue(($vm[1] ?? '') === '0.13.2',
+    "info.xml <version> == 0.13.2 (got: " . ($vm[1] ?? '') . ")", $passes, $failures);
 
 $changelog = file_get_contents('/app/CHANGELOG.md');
 assertTrue(str_contains($changelog, '[0.12.0]'),
@@ -257,7 +239,7 @@ assertTrue($classmapCount === 273,
 // 11. Existing regression suites still pass
 // ============================================================
 foreach (['/app/tests/test_navigation_gate.php' => 29,
-          '/app/tests/test_souvera_mail_rename.php' => 58] as $tf => $expected) {
+          '/app/tests/test_souvera_mail_rename.php' => 55] as $tf => $expected) {
     $out = shell_exec("php " . escapeshellarg($tf) . " 2>&1");
     $ok = preg_match('/PASSED:\s*' . $expected . '\s*\/\s*' . $expected . '/', (string)$out)
         && str_contains((string)$out, 'ALL TESTS PASSED');

@@ -90,16 +90,19 @@ assertTrue(str_contains($info, 'Nextcloud-native webmail'),
     "info.xml summary still uses the long product description", $passes, $failures);
 
 // 10. The settings page header still shows the long brand
-$tpl = file_get_contents('/app/templates/settings.php');
-assertTrue(str_contains($tpl, '$_[\'brandName\']') || str_contains($tpl, "\$_['brandName']")
-        || str_contains($tpl, 'brandName'),
-    "settings.php still uses brandName param (which the controller fills with 'Souvera Mail')",
+//     0.13.2: the NC-chrome settings.php was deleted; the brand
+//     now lives in the engine-side Settings tab template.
+$tplPath = '/app/app/smail/v/current/app/plugins/nextcloud/templates/SettingsSouveraAccount.html';
+assertTrue(file_exists($tplPath), "Engine plugin ships SettingsSouveraAccount.html template", $passes, $failures);
+$tpl = file_get_contents($tplPath);
+assertTrue(str_contains($tpl, 'Sicherheit') && str_contains($tpl, 'Geräte'),
+    "Settings tab template header is 'Sicherheit & Geräte' (the short, fitting label)",
     $passes, $failures);
 
-// 11. SettingsController seeds brandName with 'Souvera Mail'
+// 11. SettingsController is now a redirect-only entry point — no brand string needed.
 $sc = file_get_contents('/app/lib/Controller/SettingsController.php');
-assertTrue(str_contains($sc, "'Souvera Mail'") || str_contains($sc, '"Souvera Mail"'),
-    "SettingsController still hard-codes 'Souvera Mail' as the brand name",
+assertTrue(str_contains($sc, 'RedirectResponse') && str_contains($sc, '#/settings/souvera-account'),
+    "SettingsController is a RedirectResponse to the in-engine #/settings/souvera-account route",
     $passes, $failures);
 
 // 12. Application.php still uses NavigationTitle::resolve() (no regression)

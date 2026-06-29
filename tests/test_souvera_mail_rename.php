@@ -46,7 +46,7 @@ assertTrue(($im[1] ?? '') === 'souvera_mail', "info.xml <id> == souvera_mail (go
 preg_match('#<namespace>([^<]+)</namespace>#', $infoXml, $nm);
 assertTrue(($nm[1] ?? '') === 'SouveraMail', "info.xml <namespace> == SouveraMail", $passes, $failures);
 preg_match('#<version>([^<]+)</version>#', $infoXml, $vm);
-assertTrue(($vm[1] ?? '') === '0.13.1', "info.xml <version> == 0.13.1 (got: '".($vm[1]??'')."')", $passes, $failures);
+assertTrue(($vm[1] ?? '') === '0.13.2', "info.xml <version> == 0.13.2 (got: '".($vm[1]??'')."')", $passes, $failures);
 assertTrue(str_contains($infoXml, '<admin>OCA\\SouveraMail\\Settings\\AdminSettings</admin>'), "info.xml <admin> uses new namespace", $passes, $failures);
 assertTrue(str_contains($infoXml, '<admin-section>'), "info.xml has <admin-section>", $passes, $failures);
 assertTrue(!str_contains($infoXml, '<personal>'), "info.xml has NO <personal>", $passes, $failures);
@@ -94,44 +94,18 @@ assertTrue(empty($syntaxErrors), "All /app/lib PHP files pass `php -l` (errors: 
 if (!empty($syntaxErrors)) { foreach ($syntaxErrors as $se) echo "  $se\n"; }
 
 // ============================================================
-// 5. templates/settings.php — render BOTH branches
+// 5. templates/settings.php DELETED in 0.13.2 — the in-app settings
+//    page was replaced by an in-engine Snappymail Settings Tab
+//    (#/settings/souvera-account, registered by
+//     app/plugins/nextcloud/js/settings-account.js). See
+//    /app/tests/test_settings_tab_integration.php for that suite.
 // ============================================================
-$tplSettings = '/app/templates/settings.php';
-$tplParams = [
-    'brandName'                     => 'Souvera Mail',
-    'backUrl'                       => '/index.php/apps/souvera_mail/',
-    'dashboardMode'                 => 'unread',
-    'dashboardModeUnread'           => 'unread',
-    'dashboardModeAll'              => 'all',
-    'dashboardModeUrl'              => '/index.php/apps/souvera_mail/preferences/dashboard-mode',
-    'appPasswordsAvailable'         => true,
-    'appPasswordsListUrl'           => '/index.php/apps/souvera_mail/app-passwords',
-    'appPasswordsCreateUrl'         => '/index.php/apps/souvera_mail/app-passwords',
-    'appPasswordsDestroyUrlTemplate'=> '/index.php/apps/souvera_mail/app-passwords/{id}',
-];
-
-// 5a. appPasswordsAvailable=true
-$_ = $tplParams;
-ob_start();
-$renderErr = null;
-try { include $tplSettings; } catch (Throwable $t) { $renderErr = $t->getMessage(); }
-$outAvail = ob_get_clean();
-assertTrue($renderErr === null, "settings.php renders WITHOUT error when appPasswordsAvailable=true (err: ".($renderErr??'')."')", $passes, $failures);
-assertTrue(str_contains($outAvail, 'Back to inbox'), "settings.php contains 'Back to inbox' breadcrumb", $passes, $failures);
-assertTrue(str_contains($outAvail, 'App passwords'), "settings.php contains App Passwords section heading", $passes, $failures);
-assertTrue(str_contains($outAvail, 'Dashboard widget'), "settings.php contains Dashboard widget section", $passes, $failures);
-assertTrue(str_contains($outAvail, 'souvera-mail-app-password-create-form'), "settings.php (avail=true) renders create form", $passes, $failures);
-assertTrue(str_contains($outAvail, 'souvera-mail-app-passwords-table'), "settings.php (avail=true) renders passwords table", $passes, $failures);
-
-// 5b. appPasswordsAvailable=false
-$_ = array_merge($tplParams, ['appPasswordsAvailable' => false]);
-ob_start();
-$renderErr = null;
-try { include $tplSettings; } catch (Throwable $t) { $renderErr = $t->getMessage(); }
-$outNoAvail = ob_get_clean();
-assertTrue($renderErr === null, "settings.php renders WITHOUT error when appPasswordsAvailable=false (err: ".($renderErr??'')."')", $passes, $failures);
-assertTrue(str_contains($outNoAvail, 'not available'), "settings.php (avail=false) shows degraded-mode banner ('not available')", $passes, $failures);
-assertTrue(!str_contains($outNoAvail, 'souvera-mail-app-password-create-form'), "settings.php (avail=false) does NOT render create form", $passes, $failures);
+assertTrue(!file_exists('/app/templates/settings.php'),
+    "templates/settings.php DELETED (replaced by in-engine Settings tab)",
+    $passes, $failures);
+assertTrue(!file_exists('/app/js/personal-settings.js'),
+    "js/personal-settings.js DELETED (logic moved into engine plugin JS)",
+    $passes, $failures);
 
 // ============================================================
 // 6. templates/not_configured.php
@@ -168,15 +142,16 @@ $routesSrc = file_get_contents('/app/appinfo/routes.php');
 assertTrue(!preg_match("#'name'\s*=>\s*'smail#", $routesSrc), "routes.php has no route name starting with 'smail'", $passes, $failures);
 
 // ============================================================
-// 8. SettingsController
+// 8. SettingsController — REDIRECT in 0.13.2 (was TemplateResponse)
 // ============================================================
 $scPath = '/app/lib/Controller/SettingsController.php';
 assertTrue(file_exists($scPath), "SettingsController.php exists", $passes, $failures);
 $scSrc = file_get_contents($scPath);
 assertTrue(str_contains($scSrc, 'namespace OCA\\SouveraMail\\Controller'), "SettingsController declares OCA\\SouveraMail\\Controller namespace", $passes, $failures);
-assertTrue(preg_match('#public function index\(\)\s*:\s*TemplateResponse#', $scSrc) === 1, "SettingsController has index(): TemplateResponse", $passes, $failures);
+assertTrue(preg_match('#public function index\(\)\s*:\s*RedirectResponse#', $scSrc) === 1, "SettingsController has index(): RedirectResponse (legacy entry-point redirect)", $passes, $failures);
 assertTrue(str_contains($scSrc, '#[NoAdminRequired]'), "SettingsController has #[NoAdminRequired]", $passes, $failures);
 assertTrue(str_contains($scSrc, '#[NoCSRFRequired]'), "SettingsController has #[NoCSRFRequired]", $passes, $failures);
+assertTrue(str_contains($scSrc, '#/settings/souvera-account'), "SettingsController redirects to in-engine Settings tab", $passes, $failures);
 
 // ============================================================
 // 9. Deleted files
@@ -219,21 +194,29 @@ assertTrue(str_contains($epSrc, "linkToRoute('souvera_mail.settings.index')"), "
 $quotaJs = file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/js/quota.js');
 assertTrue(str_contains($quotaJs, 'cfg.SmailSettingsUrl'), "quota.js reads cfg.SmailSettingsUrl from FilterAppData payload", $passes, $failures);
 assertTrue(preg_match("#createElement\(\s*settingsUrl\s*\?\s*'a'\s*:\s*'div'\s*\)#", $quotaJs) === 1, "quota.js creates <a> when settingsUrl present, else <div>", $passes, $failures);
-assertTrue(str_contains($quotaJs, "el.target = '_blank'") || str_contains($quotaJs, 'el.target="_blank"'), "quota.js sets target='_blank' on <a> element", $passes, $failures);
+// 0.13.2: quota pill now navigates to the in-engine Settings tab (same tab)
+// instead of the NC-chrome page (new tab).
+assertTrue(str_contains($quotaJs, "el.target = '_self'") || str_contains($quotaJs, 'el.target="_self"'),
+    "quota.js sets target='_self' (navigates to in-engine settings tab)", $passes, $failures);
+assertTrue(str_contains($quotaJs, '#/settings/souvera-account'),
+    "quota.js link target points at the in-engine #/settings/souvera-account route", $passes, $failures);
 
 // ============================================================
-// 13. personal-settings.js IDs match settings.php IDs
+// 13. js/personal-settings.js DELETED in 0.13.2 — its logic was ported
+//     into app/plugins/nextcloud/js/settings-account.js (Knockout VM).
 // ============================================================
-$psJs = file_get_contents('/app/js/personal-settings.js');
-$tplSrc = file_get_contents('/app/templates/settings.php');
-preg_match_all("#getElementById\(\s*['\"]([^'\"]+)['\"]\s*\)#", $psJs, $idMatches);
-$jsIds = array_unique($idMatches[1]);
-$missingIds = [];
-foreach ($jsIds as $id) {
-    if (!preg_match('#id\s*=\s*["\']' . preg_quote($id, '#') . '["\']#', $tplSrc)) $missingIds[] = $id;
-}
-assertTrue(empty($missingIds), "All getElementById IDs in personal-settings.js exist in settings.php (missing: ".implode(',', $missingIds).")", $passes, $failures);
-assertTrue(count($jsIds) >= 5, "personal-settings.js has >= 5 getElementById calls (got: ".count($jsIds).")", $passes, $failures);
+assertTrue(!file_exists('/app/js/personal-settings.js'),
+    "js/personal-settings.js DELETED (ported into in-engine Knockout ViewModel)",
+    $passes, $failures);
+$saJs = '/app/app/smail/v/current/app/plugins/nextcloud/js/settings-account.js';
+assertTrue(file_exists($saJs), "Engine plugin ships settings-account.js", $passes, $failures);
+$saSrc = file_get_contents($saJs);
+assertTrue(str_contains($saSrc, "rl.addSettingsViewModel"),
+    "settings-account.js registers a Snappymail Settings ViewModel via rl.addSettingsViewModel",
+    $passes, $failures);
+assertTrue(str_contains($saSrc, "'souvera-account'"),
+    "settings-account.js registers the tab under the 'souvera-account' hash route",
+    $passes, $failures);
 
 // ============================================================
 // 14. No stray 'smail' refs in lib/, templates/, appinfo/, composer.json
@@ -247,7 +230,6 @@ foreach ($lines as $ln) {
     if (str_contains($ln, 'app/smail/v/current')) continue;
     if (str_contains($ln, 'InstallStep.php')) continue;
     if (preg_match('#composer\.json:\d+:\s+"name":\s*"souvera/smail"#', $ln)) continue; // composer package name (not app id)
-    if (preg_match('#templates/settings\.php.*souvera-mail#i', $ln)) continue;
     $violations[] = $ln;
 }
 assertTrue(empty($violations), "No stray 'smail' references in lib/templates/appinfo/composer.json (violations: ".count($violations).")", $passes, $failures);

@@ -4,90 +4,45 @@ declare(strict_types=1);
 
 namespace OCA\SouveraMail\Controller;
 
-use OCA\SouveraMail\Dashboard\UnreadMailWidget;
-use OCA\SouveraMail\Service\AppPasswordService;
-use OCA\SouveraMail\Util\EngineHelper;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
-use OCP\AppFramework\Http\TemplateResponse;
-use OCP\IConfig;
-use OCP\INavigationManager;
+use OCP\AppFramework\Http\RedirectResponse;
 use OCP\IRequest;
 use OCP\IURLGenerator;
 
 /**
- * In-app settings page reachable at `/index.php/apps/souvera_mail/settings`.
+ * Legacy entry-point for `/index.php/apps/souvera_mail/settings`.
  *
- * Replaces the Nextcloud Personal-Settings section that used to live at
- * `/settings/user/souvera_mail`. Rendered as a full-page TemplateResponse
- * with NC's own chrome (header + navigation), so the user perceives it as
- * "inside Souvera Mail" rather than as a foreign Personal-Settings tab.
+ * Up to Souvera Mail 0.13.2 this controller rendered a full Nextcloud-chrome
+ * settings page (templates/settings.php). Per product feedback the user-facing
+ * settings now live inside the Snappymail engine as a native Settings tab at
+ * the hash route `#/settings/souvera-account` ("Sicherheit & Geräte"), so that
+ * the user does not leave the mailbox UI to manage Dashboard widget mode,
+ * App Passwords and Connected Devices.
+ *
+ * This controller is kept as a backward-compatible redirect — operator
+ * bookmarks pointing at `/apps/souvera_mail/settings` continue to resolve,
+ * they just land in the in-engine tab instead of a separate page.
  */
 class SettingsController extends Controller
 {
-    public function __construct(
-        string $appName,
-        IRequest $request,
-        private INavigationManager $navigationManager,
-        private IURLGenerator $urlGenerator,
-        private IConfig $config,
-        private EngineHelper $engineHelper,
-        private AppPasswordService $appPasswordService,
-        private ?string $userId,
-    ) {
-        parent::__construct($appName, $request);
-    }
+	public function __construct(
+		string $appName,
+		IRequest $request,
+		private IURLGenerator $urlGenerator,
+	) {
+		parent::__construct($appName, $request);
+	}
 
-    #[NoAdminRequired]
-    #[NoCSRFRequired]
-    public function index(): TemplateResponse
-    {
-        $this->navigationManager->setActiveEntry('souvera_mail');
-        $this->engineHelper->loadApp();
-        $brandName = \Smail\Engine\Api::Config()->Get('webmail', 'title', 'Souvera Mail');
-
-        $userId = $this->userId ?? '';
-        $dashboardMode = $userId !== ''
-            ? $this->config->getUserValue(
-                $userId,
-                'souvera_mail',
-                UnreadMailWidget::USER_CONFIG_MODE,
-                UnreadMailWidget::MODE_DEFAULT,
-            )
-            : UnreadMailWidget::MODE_DEFAULT;
-        if ($dashboardMode !== UnreadMailWidget::MODE_ALL) {
-            $dashboardMode = UnreadMailWidget::MODE_UNREAD;
-        }
-
-        $params = [
-            'brandName' => $brandName,
-            'backUrl' => $this->urlGenerator->linkToRoute('souvera_mail.page.index'),
-            'dashboardMode' => $dashboardMode,
-            'dashboardModeUnread' => UnreadMailWidget::MODE_UNREAD,
-            'dashboardModeAll' => UnreadMailWidget::MODE_ALL,
-            'dashboardModeUrl' => $this->urlGenerator->linkToRoute('souvera_mail.preference.setDashboardMode'),
-            'appPasswordsAvailable' => $this->appPasswordService->isAvailable(),
-            'appPasswordsListUrl' => $this->urlGenerator->linkToRoute('souvera_mail.appPassword.index'),
-            'appPasswordsCreateUrl' => $this->urlGenerator->linkToRoute('souvera_mail.appPassword.create'),
-            // The DELETE URL is built as `<index-url>/__ID__` instead of
-            // `linkToRoute(..., ['id' => '__ID__'])` because Symfony's URL
-            // generator validates the `requirements` regex at generation
-            // time, not just at routing time — `__ID__` does not match
-            // `\d+` and crashes with InvalidParameterException. Building
-            // the template by string concatenation skips the generator
-            // check while keeping the server-side `\d+` constraint
-            // (enforced when the JS substitutes a real numeric id).
-            'appPasswordsDestroyUrlTemplate' =>
-                $this->urlGenerator->linkToRoute('souvera_mail.appPassword.index') . '/__ID__',
-            'connectedDevicesListUrl' => $this->urlGenerator->linkToRoute('souvera_mail.connectedDevices.index'),
-            'connectedDevicesDestroyUrlTemplate' =>
-                $this->urlGenerator->linkToRoute('souvera_mail.connectedDevices.index') . '/__ID__',
-            'connectedDevicesSignOutOthersUrl' => $this->urlGenerator->linkToRoute(
-                'souvera_mail.connectedDevices.signOutOthers'
-            ),
-        ];
-
-        return new TemplateResponse('souvera_mail', 'settings', $params, 'user');
-    }
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
+	public function index(): RedirectResponse
+	{
+		// Build the engine URL + Snappymail hash route. The engine is mounted
+		// at `souvera_mail.page.index` and uses HASH-based client routing, so
+		// we cannot let Symfony build the fragment for us — concatenate it.
+		$base = $this->urlGenerator->linkToRoute('souvera_mail.page.index');
+		return new RedirectResponse($base . '#/settings/souvera-account');
+	}
 }

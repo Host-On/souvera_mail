@@ -6,6 +6,37 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.2] — 2026-02-17
+
+### Fixed (P0 reported by operator on 2026-06-29)
+- **`/index.php/apps/souvera_mail/settings` no longer crashes with `Symfony\Component\Routing\Exception\InvalidParameterException`** (`Parameter "id" for route "souvera_mail.connecteddevices.destroy" must match "\d+" ("__ID__" given)`). Symfony's URL generator validates the route `requirements` regex *at generation time*, not just at routing time — `linkToRoute('…connectedDevices.destroy', ['id' => '__ID__'])` therefore blew up because `__ID__` does not match `\d+`. The destroy-URL templates are now built by string concatenation (`linkToRoute('…connectedDevices.index') . '/__ID__'`), which skips the generator's requirement check while keeping the server-side `\d+` constraint enforced at routing time. Same fix applied to the AppPasswords destroy template for consistency.
+
+### Changed (UX consolidation)
+- **Settings live inside the mailbox.** Per product feedback the user-facing settings (Dashboard widget mode, App Passwords for legacy IMAP/POP3/SMTP clients, Connected Devices) are no longer a separate Nextcloud-chrome page at `/index.php/apps/souvera_mail/settings`. They are now a **native Snappymail Settings tab** registered via `rl.addSettingsViewModel(...)` at the hash route `#/settings/souvera-account`, labelled **"Sicherheit & Geräte"**, appearing next to *Allgemein / Kontakte / Filter / Sicherheit / Ordner* in the mailbox's own Settings sidebar. The user never leaves the inbox to manage these any more.
+- **Legacy URL still works.** `/index.php/apps/souvera_mail/settings` now serves a `RedirectResponse` to the in-engine hash route, so existing operator bookmarks continue to resolve.
+- **Quota pill is in-tab.** Clicking the live mailbox-quota pill in the engine UI now opens the new Settings tab in the *same* browser tab (`target="_self"` + hash navigation), instead of opening a separate NC settings page in a new tab.
+
+### Architecture
+- **`OCA\SouveraMail\Controller\SettingsController`** rewritten as a thin redirect controller (~50 LoC). Removes its dependencies on `INavigationManager`, `IConfig`, `EngineHelper`, `AppPasswordService`, `UnreadMailWidget` constants and `userId`. The behaviour-bearing logic is now owned by the engine plugin.
+- **`app/smail/v/current/app/plugins/nextcloud/js/settings-account.js`** (NEW, ~320 LoC). Vanilla JS Knockout ViewModel class `SouveraAccountSettings`. Reads all URLs + `appPasswordsAvailable` + initial dashboard mode from `rl.settings.get('Nextcloud')`. Implements the full CRUD for the three sections — POST to `…/preferences/dashboard-mode`, GET/POST/DELETE on `…/app-passwords`, GET/DELETE/POST on `…/connected-devices`. CSRF header (`requesttoken`) populated from `OC.requestToken`.
+- **`app/smail/v/current/app/plugins/nextcloud/templates/SettingsSouveraAccount.html`** (NEW, ~150 LoC). Knockout-bound HTML template; matches Snappymail's existing settings-tab styling conventions (`.form-horizontal`, `.legend`, `.control-group`, `.button-vue`).
+- **`app/smail/v/current/app/plugins/nextcloud/index.php`**:
+  - `Init()`: registers the new JS + template via `addJs('js/settings-account.js')` + `addTemplate('templates/SettingsSouveraAccount.html')`.
+  - `FilterAppData()`: emits 9 new `Smail*` keys into the Nextcloud payload so the JS finds every URL it needs in `rl.settings.get('Nextcloud')`. Destroy templates use the `…/index . '/__ID__'` pattern for the P0 fix above.
+  - Two new helpers — `resolveDashboardModeForNextcloud(uid)` and `isAppPasswordsAvailable()` — wrap the existing NC services defensively (silent fallback if `souvera_central` / H2CK/oidc are missing, so the engine boot never crashes).
+
+### Removed
+- `templates/settings.php` — replaced by the in-engine Knockout template.
+- `js/personal-settings.js` — its full CRUD logic is now in `settings-account.js`.
+
+### Verification
+- `php -l` clean on all changed files (`SettingsController.php`, `app/plugins/nextcloud/index.php`).
+- `eslint` clean on the new `settings-account.js` (after declaring `rl`, `ko`, `OC` as globals, matching the pattern in the existing `quota.js`).
+- **`tests/test_settings_tab_integration.php`: 47/47 PASS** (NEW) — covers the redirect controller, the ViewModel registration, the Knockout template bindings, the engine-plugin wiring, FilterAppData payload, quota.js navigation behaviour, deletion of the old NC-chrome assets, and the version bump.
+- **`tests/test_settings_url_template_regression.php`** updated to verify the URL templates now live in the engine plugin (not in `SettingsController`), still asserts that the broken `linkToRoute(['id' => '__ID__'])` pattern is forbidden in either location, and still asserts that `routes.php` keeps the server-side `\d+` requirement.
+- **`tests/test_connected_devices.php` (74→71 assertions)**: ConnectedDevices UI assertions retargeted from the deleted NC-chrome template + JS to the new Knockout template + ViewModel. Behavioural sims on the PHP service layer are unchanged (covered: 3 states of `revoke()` + 3 states of `revokeAllOthers()`).
+- **`tests/test_souvera_mail_rename.php` (58→55)** and **`tests/test_navigation_title.php` (15→16)** updated for the redirect controller and the absence of the legacy NC-chrome template.
+
 ## [0.13.1] — 2026-02-17
 
 ### Changed

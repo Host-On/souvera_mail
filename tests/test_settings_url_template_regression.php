@@ -31,20 +31,27 @@ function assertTrue(bool $c, string $m, array &$p, array &$f): void
 
 $src = file_get_contents('/app/lib/Controller/SettingsController.php');
 
-// 1. The forbidden patterns are NOT used any more.
-//    These are exactly the calls that crash Symfony.
+// 1. SettingsController is now a redirect-only controller; the
+//    crashing URL-template generation has been moved into the
+//    engine plugin at app/plugins/nextcloud/index.php :: FilterAppData.
+//    The forbidden pattern must not appear in either location.
 assertTrue(!preg_match("#linkToRoute\(\s*'souvera_mail\.connectedDevices\.destroy'\s*,\s*\[\s*'id'\s*=>\s*'__ID__'\s*\]\s*\)#", $src),
-    "SettingsController does NOT call linkToRoute('connectedDevices.destroy', ['id' => '__ID__']) — that crashes Symfony",
+    "SettingsController does NOT call linkToRoute('connectedDevices.destroy', ['id' => '__ID__'])",
     $passes, $failures);
 
-// 2. The destroy-URL template is built by string concatenation.
-assertTrue(str_contains($src, "linkToRoute('souvera_mail.connectedDevices.index') . '/__ID__'"),
-    "SettingsController builds connectedDevices destroy template via index-URL + '/__ID__'",
+$plugin = file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/index.php');
+assertTrue(!preg_match("#linkToRoute\(\s*'souvera_mail\.connectedDevices\.destroy'\s*,\s*\[\s*'id'\s*=>\s*'__ID__'\s*\]\s*\)#", $plugin),
+    "Engine plugin does NOT call linkToRoute('connectedDevices.destroy', ['id' => '__ID__']) either",
+    $passes, $failures);
+
+// 2. The destroy-URL template is built by string concatenation in the engine plugin.
+assertTrue(str_contains($plugin, "linkToRoute('souvera_mail.connectedDevices.index') . '/__ID__'"),
+    "Engine plugin builds connectedDevices destroy template via index-URL + '/__ID__'",
     $passes, $failures);
 
 // 3. The same fix is applied to appPasswords for consistency.
-assertTrue(str_contains($src, "linkToRoute('souvera_mail.appPassword.index') . '/__ID__'"),
-    "SettingsController builds appPasswords destroy template via index-URL + '/__ID__'",
+assertTrue(str_contains($plugin, "linkToRoute('souvera_mail.appPassword.index') . '/__ID__'"),
+    "Engine plugin builds appPasswords destroy template via index-URL + '/__ID__'",
     $passes, $failures);
 
 // 4. routes.php still enforces `\d+` on /connected-devices/{id} — the
@@ -79,13 +86,14 @@ assertTrue(preg_match('#/connected-devices/\d+$#', $result) === 1,
 
 // 7. Test that the JS side actually does `.replace('__ID__', …)`
 //    so the template-string fix has an actual consumer.
-$psJs = file_get_contents('/app/js/personal-settings.js');
-assertTrue(str_contains($psJs, "'__ID__'") || str_contains($psJs, '"__ID__"'),
-    "personal-settings.js uses the '__ID__' placeholder for substitution",
+//    0.13.2: ported into the engine plugin's settings-account.js
+//    (was: /app/js/personal-settings.js).
+$saJs = file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/js/settings-account.js');
+assertTrue(str_contains($saJs, "'__ID__'") || str_contains($saJs, '"__ID__"'),
+    "settings-account.js uses the '__ID__' placeholder for substitution",
     $passes, $failures);
-assertTrue(preg_match("#replace\(\s*['\"]__ID__['\"]\s*,#", $psJs) === 1
-        || preg_match("#\.replace\(\s*['\"]__ID__['\"]#", $psJs) === 1,
-    "personal-settings.js calls .replace('__ID__', …) on a URL template",
+assertTrue(preg_match("#\.replace\(\s*['\"]__ID__['\"]#", $saJs) === 1,
+    "settings-account.js calls .replace('__ID__', …) on a URL template",
     $passes, $failures);
 
 echo "\n========================================\n";

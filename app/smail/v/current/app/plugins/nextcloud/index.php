@@ -34,9 +34,11 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			$this->addJs('js/messagelist.js');
 
 			$this->addJs('js/quota.js');
+			$this->addJs('js/settings-account.js');
 
 			$this->addTemplate('templates/PopupsNextcloudFiles.html');
 			$this->addTemplate('templates/PopupsNextcloudCalendars.html');
+			$this->addTemplate('templates/SettingsSouveraAccount.html');
 
 			$this->addHook('imap.before-login', 'beforeLogin');
 			$this->addHook('smtp.before-login', 'beforeLogin');
@@ -229,9 +231,24 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 				// pill in the engine UI. Always emitted; the JS gates on the
 				// fetch response (gracefully hides if 503 / endpoint missing).
 				'SmailQuotaUrl' => $oUrlGen->getAbsoluteURL($oUrlGen->linkToRoute('souvera_mail.quota.index')),
-				// URL of the in-app settings page (App Passwords + Dashboard
-				// widget mode). The quota pill in the engine UI links here on
-				// click so users find it without having to leave the mail UI.
+				// URLs consumed by app/plugins/nextcloud/js/settings-account.js —
+				// the in-engine "Sicherheit & Geräte" Settings tab (Snappymail-
+				// native Knockout ViewModel registered via rl.addSettingsViewModel).
+				// Destroy URLs are built via index-URL + '/__ID__' to avoid
+				// Symfony's UrlGenerator validating the `\d+` requirement against
+				// the literal '__ID__' placeholder.
+				'SmailDashboardModeUrl' => $oUrlGen->linkToRoute('souvera_mail.preference.setDashboardMode'),
+				'SmailDashboardMode' => $this->resolveDashboardModeForNextcloud($sUID),
+				'SmailAppPasswordsListUrl' => $oUrlGen->linkToRoute('souvera_mail.appPassword.index'),
+				'SmailAppPasswordsCreateUrl' => $oUrlGen->linkToRoute('souvera_mail.appPassword.create'),
+				'SmailAppPasswordsDestroyUrlTemplate' => $oUrlGen->linkToRoute('souvera_mail.appPassword.index') . '/__ID__',
+				'SmailAppPasswordsAvailable' => $this->isAppPasswordsAvailable(),
+				'SmailConnectedDevicesListUrl' => $oUrlGen->linkToRoute('souvera_mail.connectedDevices.index'),
+				'SmailConnectedDevicesDestroyUrlTemplate' => $oUrlGen->linkToRoute('souvera_mail.connectedDevices.index') . '/__ID__',
+				'SmailConnectedDevicesSignOutOthersUrl' => $oUrlGen->linkToRoute('souvera_mail.connectedDevices.signOutOthers'),
+				// Legacy entry-point retained for browser bookmarks pointing at
+				// /apps/souvera_mail/settings — the controller now redirects to
+				// the engine-internal hash route #/settings/souvera-account.
 				'SmailSettingsUrl' => $oUrlGen->getAbsoluteURL($oUrlGen->linkToRoute('souvera_mail.settings.index'))
 //				'WebDAV_files' => $sWebDAV . '/files/' . $sUID
 			];
@@ -339,6 +356,40 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 				->SetType(\Smail\Engine\Enumerations\PluginPropertyType::BOOL)
 				->SetDefaultValue(false)
 		);
+	}
+
+	/**
+	 * Read the current Souvera Mail dashboard widget mode for the given NC
+	 * user — emitted into the FilterAppData payload so the Snappymail-side
+	 * Settings tab can render the radio group with the correct initial
+	 * selection (defaults to 'unread' for parity with the widget itself).
+	 */
+	protected function resolveDashboardModeForNextcloud(string $sUID) : string
+	{
+		try {
+			$config = \OCP\Server::get(\OCP\IConfig::class);
+			$mode = $config->getUserValue($sUID, 'souvera_mail', 'dashboard-mode', 'unread');
+			return ('all' === $mode) ? 'all' : 'unread';
+		} catch (\Throwable $e) {
+			return 'unread';
+		}
+	}
+
+	/**
+	 * True if the App-Passwords feature can be offered to the user. Matches
+	 * the gating used by lib/Service/AppPasswordService::isAvailable() —
+	 * Stalwart API URL configured by souvera_central AND H2CK/oidc present.
+	 * Tested defensively so the Settings tab never crashes the engine boot
+	 * just because souvera_central is missing.
+	 */
+	protected function isAppPasswordsAvailable() : bool
+	{
+		try {
+			$svc = \OCP\Server::get(\OCA\SouveraMail\Service\AppPasswordService::class);
+			return $svc->isAvailable();
+		} catch (\Throwable $e) {
+			return false;
+		}
 	}
 
 }

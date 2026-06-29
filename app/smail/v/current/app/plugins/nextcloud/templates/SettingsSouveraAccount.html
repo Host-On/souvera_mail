@@ -1,0 +1,164 @@
+<div class="legend">
+	<span>Sicherheit &amp; Geräte</span>
+</div>
+
+<!-- ============================================================ -->
+<!-- Dashboard widget -->
+<!-- ============================================================ -->
+<div class="form-horizontal" style="margin-top: 0.5em;">
+	<div class="legend">Dashboard-Widget</div>
+	<div class="control-group">
+		<label style="display: inline-flex; gap: 0.5em; align-items: center; margin-right: 1.5em;">
+			<input type="radio" name="souvera-mail-dashboard-mode"
+				value="unread"
+				data-bind="checked: dashboardMode, click: pickModeUnread">
+			<span>Nur ungelesene Nachrichten <small>(Standard)</small></span>
+		</label>
+		<label style="display: inline-flex; gap: 0.5em; align-items: center;">
+			<input type="radio" name="souvera-mail-dashboard-mode"
+				value="all"
+				data-bind="checked: dashboardMode, click: pickModeAll">
+			<span>Vollständiger Posteingang</span>
+		</label>
+		<span data-bind="visible: dashboardModeStatus() === 'saving'" style="color:#666; margin-left:1em;">…</span>
+		<span data-bind="visible: dashboardModeStatus() === 'saved'" style="color:#27ae60; margin-left:1em;">✓ gespeichert</span>
+		<span data-bind="visible: dashboardModeStatus() === 'error'" style="color:#c0392b; margin-left:1em;">✗ Fehler</span>
+	</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- App Passwords -->
+<!-- ============================================================ -->
+<div class="form-horizontal" style="margin-top: 2em;">
+	<div class="legend">App-Passwörter <small>(IMAP / POP3 / SMTP)</small></div>
+
+	<!-- Available banner -->
+	<div data-bind="visible: !appPasswordsAvailable"
+		style="padding: 0.75em 1em; border-left: 3px solid #e67e22; background: rgba(230,126,34,0.08);">
+		App-Passwörter sind aktuell nicht verfügbar — Souvera Central muss zusammen mit
+		der Stalwart-API-URL durch den Administrator konfiguriert sein.
+	</div>
+
+	<!-- Create form -->
+	<div data-bind="visible: appPasswordsAvailable">
+		<div class="control-group" style="margin-top: 0.5em;">
+			<label>Beschreibung</label>
+			<input type="text"
+				placeholder="z. B. iPhone Mail"
+				maxlength="80"
+				data-bind="value: newAppPasswordDescription, valueUpdate: 'input'"
+				style="width: 16em;">
+			<button class="button-vue"
+				data-bind="click: createAppPassword,
+				           disable: appPasswordsCreating,
+				           text: appPasswordsCreating() ? 'erzeuge …' : 'Erzeugen'">
+				Erzeugen
+			</button>
+		</div>
+
+		<!-- Error -->
+		<div data-bind="visible: appPasswordError() !== ''"
+			style="color: #c0392b; margin-top: 0.5em;">
+			<span data-bind="text: appPasswordError"></span>
+		</div>
+
+		<!-- One-time secret card -->
+		<div data-bind="visible: justCreatedSecret() !== ''"
+			style="margin-top: 1em; padding: 0.75em 1em; border: 1px solid #27ae60; border-radius: 6px; background: rgba(39,174,96,0.06);">
+			<strong>Neues App-Passwort:</strong>
+			<code data-bind="text: justCreatedSecret"
+				style="display: block; margin-top: 0.5em; padding: 0.5em; background: #fff; border-radius: 4px; font-family: monospace; word-break: break-all;"></code>
+			<div style="margin-top: 0.5em; font-size: 0.9em; color: #555;">
+				Für „<span data-bind="text: justCreatedDescription"></span>“ — bitte jetzt speichern.
+				<strong>Das Passwort wird nur einmal angezeigt.</strong>
+			</div>
+			<div style="margin-top: 0.5em;">
+				<button class="button-vue" data-bind="click: copySecret">In Zwischenablage kopieren</button>
+				<button class="button-vue" data-bind="click: dismissNewSecret">Schließen</button>
+			</div>
+		</div>
+
+		<!-- List -->
+		<div style="margin-top: 1em;">
+			<div data-bind="visible: appPasswordsLoading" style="color: #666;">… laden</div>
+			<div data-bind="visible: !hasAppPasswords() && !appPasswordsLoading()" style="color: #666;">
+				Noch keine App-Passwörter angelegt.
+			</div>
+			<table data-bind="visible: hasAppPasswords()" style="width: 100%; margin-top: 0.5em;">
+				<thead>
+					<tr style="text-align: left; border-bottom: 1px solid #ddd;">
+						<th style="padding: 0.5em;">Beschreibung</th>
+						<th style="padding: 0.5em;">Erstellt</th>
+						<th style="padding: 0.5em; width: 8em;"></th>
+					</tr>
+				</thead>
+				<tbody data-bind="foreach: appPasswords">
+					<tr style="border-bottom: 1px solid #eee;">
+						<td style="padding: 0.5em;" data-bind="text: description"></td>
+						<td style="padding: 0.5em;" data-bind="text: createdAt"></td>
+						<td style="padding: 0.5em;">
+							<button class="button-vue"
+								data-bind="click: $root.revokeAppPassword.bind($root, $data)"
+								style="color: #c0392b;">Widerrufen</button>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Connected Devices -->
+<!-- ============================================================ -->
+<div class="form-horizontal" style="margin-top: 2em;">
+	<div class="legend" style="display: flex; justify-content: space-between; align-items: center;">
+		<span>Verbundene Geräte</span>
+		<button class="button-vue"
+			data-bind="click: signOutOthers, disable: signOutOthersBusy, visible: hasDevices()"
+			style="font-size: 0.9em;">
+			Alle anderen Geräte abmelden
+		</button>
+	</div>
+
+	<div data-bind="visible: devicesError() !== ''"
+		style="color: #c0392b; margin-top: 0.5em;">
+		<span data-bind="text: devicesError"></span>
+	</div>
+
+	<div data-bind="visible: devicesLoading" style="color: #666; margin-top: 0.5em;">… laden</div>
+
+	<div data-bind="visible: !hasDevices() && !devicesLoading()" style="color: #666; margin-top: 0.5em;">
+		Keine aktiven Sitzungen gefunden.
+	</div>
+
+	<table data-bind="visible: hasDevices()" style="width: 100%; margin-top: 0.5em;">
+		<thead>
+			<tr style="text-align: left; border-bottom: 1px solid #ddd;">
+				<th style="padding: 0.5em;">Sitzung</th>
+				<th style="padding: 0.5em;">Typ</th>
+				<th style="padding: 0.5em;">Letzte Aktivität</th>
+				<th style="padding: 0.5em; width: 8em;"></th>
+			</tr>
+		</thead>
+		<tbody data-bind="foreach: devices">
+			<tr style="border-bottom: 1px solid #eee;">
+				<td style="padding: 0.5em;">
+					<span data-bind="text: name"></span>
+					<span data-bind="visible: isCurrent"
+						style="margin-left: 0.5em; padding: 0.1em 0.4em; background: #27ae60; color: #fff; border-radius: 3px; font-size: 0.8em;">dieses Gerät</span>
+				</td>
+				<td style="padding: 0.5em;" data-bind="text: type"></td>
+				<td style="padding: 0.5em;" data-bind="text: lastActivity"></td>
+				<td style="padding: 0.5em;">
+					<button class="button-vue"
+						data-bind="click: $root.revokeDevice.bind($root, $data),
+						           visible: !isCurrent,
+						           enable: !isCurrent"
+						style="color: #c0392b;">Abmelden</button>
+					<span data-bind="visible: isCurrent" style="color: #999;">—</span>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>

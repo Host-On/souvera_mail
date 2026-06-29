@@ -21,7 +21,9 @@
 	const PILL_ID = 'souvera-mail-quota-pill';
 	const REFRESH_MS = 60000;
 
-	const settingsUrl = cfg.SmailSettingsUrl || '';
+	const settingsUrl = cfg.SmailSettingsUrl
+		? (cfg.SmailSettingsUrl.split('#')[0] + '#/settings/souvera-account')
+		: '';
 	const quotaUrl = cfg.SmailQuotaUrl || '';
 
 	const fmtPill = data => {
@@ -72,7 +74,11 @@
 			el.setAttribute('data-testid', 'souvera-mail-quota-pill');
 			if (settingsUrl) {
 				el.href = settingsUrl;
-				el.target = '_blank';
+				// Same-tab navigation: the URL is the engine itself with a
+				// hash route. If the user is already on the mailbox page,
+				// it is a hash-only change (no reload). If they opened the
+				// pill from another NC app, the engine takes over the tab.
+				el.target = '_self';
 				el.rel = 'noopener';
 				el.title = 'Open Souvera Mail settings';
 				el.addEventListener('mouseenter', function () {
