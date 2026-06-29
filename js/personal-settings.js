@@ -227,4 +227,158 @@
     }
 
     loadList();
+
+    // ─── 3. Connected devices (Nextcloud sessions) ──────────────────────────
+    var cdSection = document.getElementById('souvera-mail-connected-devices-section');
+    if (!cdSection) {
+        return;
+    }
+    var cdTbody = document.getElementById('souvera-mail-connected-devices-tbody');
+    var cdSignOutBtn = document.getElementById('souvera-mail-sign-out-others-btn');
+    var cdListUrl = cdSection.dataset.listUrl;
+    var cdDestroyTpl = cdSection.dataset.destroyUrlTemplate;
+    var cdSignOutOthersUrl = cdSection.dataset.signOutOthersUrl;
+    var cdLabels = {
+        loadFail: cdSection.dataset.labelLoadFail,
+        revokeFail: cdSection.dataset.labelRevokeFail,
+        signOutOthersFail: cdSection.dataset.labelSignOutOthersFail,
+        confirmRevoke: cdSection.dataset.labelConfirmRevoke,
+        confirmSignOutOthers: cdSection.dataset.labelConfirmSignOutOthers,
+        revoke: cdSection.dataset.labelRevoke,
+        signOutOthers: cdSection.dataset.labelSignOutOthers,
+        current: cdSection.dataset.labelCurrent,
+        empty: cdSection.dataset.labelEmpty,
+        revokedCount: cdSection.dataset.labelRevokedCount,
+        typeBrowser: cdSection.dataset.labelTypeBrowser,
+        typeApp: cdSection.dataset.labelTypeApp
+    };
+
+    function formatRelative(epochSeconds) {
+        if (!epochSeconds) { return ''; }
+        var d = new Date(epochSeconds * 1000);
+        if (isNaN(d.getTime())) { return ''; }
+        var diff = (Date.now() - d.getTime()) / 1000;
+        if (diff < 60) { return 'just now'; }
+        if (diff < 3600) { return Math.floor(diff / 60) + 'm ago'; }
+        if (diff < 86400) { return Math.floor(diff / 3600) + 'h ago'; }
+        if (diff < 604800) { return Math.floor(diff / 86400) + 'd ago'; }
+        return d.toLocaleString();
+    }
+
+    function renderConnectedDevices(items) {
+        if (!items || items.length === 0) {
+            cdTbody.innerHTML = '<tr><td colspan="3" style="padding:12px;color:var(--color-text-maxcontrast,#888);font-size:13px;">'
+                + escapeHtml(cdLabels.empty) + '</td></tr>';
+            return;
+        }
+        var rows = items.map(function (it) {
+            var typeBadge = it.type === 'app'
+                ? '<span style="display:inline-block;padding:2px 8px;border-radius:100px;background:var(--color-primary-light,#e8f0fe);color:var(--color-primary-element,#0077C7);font-size:11px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;margin-right:6px;">'
+                  + escapeHtml(cdLabels.typeApp) + '</span>'
+                : '<span style="display:inline-block;padding:2px 8px;border-radius:100px;background:var(--color-background-hover,#f0f0f0);color:var(--color-text-maxcontrast,#666);font-size:11px;font-weight:600;letter-spacing:0.02em;text-transform:uppercase;margin-right:6px;">'
+                  + escapeHtml(cdLabels.typeBrowser) + '</span>';
+            var currentBadge = it.current
+                ? ' <span style="display:inline-block;padding:2px 8px;border-radius:100px;background:var(--color-success-hover,#e8f5e9);color:var(--color-success,#388e3c);font-size:11px;font-weight:600;letter-spacing:0.02em;margin-left:6px;">'
+                  + escapeHtml(cdLabels.current) + '</span>'
+                : '';
+            var actionsCell = it.current
+                ? '<td style="padding:8px;border-top:1px solid var(--color-border,#eee);text-align:right;color:var(--color-text-maxcontrast,#aaa);font-size:12px;font-style:italic;">—</td>'
+                : '<td style="padding:8px;border-top:1px solid var(--color-border,#eee);text-align:right;">'
+                  + '<button type="button" class="souvera-mail-cd-revoke" '
+                  + 'data-id="' + escapeHtml(String(it.id)) + '" '
+                  + 'data-testid="souvera-mail-cd-revoke-' + escapeHtml(String(it.id)) + '" '
+                  + 'style="padding:4px 12px;border-radius:100px;border:1px solid var(--color-error,#c44);background:transparent;color:var(--color-error,#c44);cursor:pointer;font-size:13px;">'
+                  + escapeHtml(cdLabels.revoke) + '</button></td>';
+            return '<tr data-id="' + escapeHtml(String(it.id)) + '">'
+                + '<td style="padding:8px;border-top:1px solid var(--color-border,#eee);">'
+                + typeBadge + escapeHtml(it.name) + currentBadge + '</td>'
+                + '<td style="padding:8px;border-top:1px solid var(--color-border,#eee);font-size:13px;color:var(--color-text-maxcontrast,#888);">'
+                + escapeHtml(formatRelative(it.lastActivity)) + '</td>'
+                + actionsCell
+                + '</tr>';
+        });
+        cdTbody.innerHTML = rows.join('');
+
+        cdTbody.querySelectorAll('.souvera-mail-cd-revoke').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                if (!window.confirm(cdLabels.confirmRevoke)) { return; }
+                cdRevoke(btn.dataset.id);
+            });
+        });
+    }
+
+    function cdLoadList() {
+        return fetch(cdListUrl, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: csrfHeaders()
+        })
+        .then(function (resp) { return resp.json().then(function (body) { return { ok: resp.ok, body: body }; }); })
+        .then(function (r) {
+            if (r.ok && r.body && r.body.status === 'ok') {
+                renderConnectedDevices(r.body.items || []);
+            } else {
+                cdTbody.innerHTML = '<tr><td colspan="3" style="padding:12px;color:var(--color-error,#c44);font-size:13px;">'
+                    + escapeHtml(cdLabels.loadFail + ': ' + ((r.body && r.body.message) || '')) + '</td></tr>';
+            }
+        })
+        .catch(function (err) {
+            cdTbody.innerHTML = '<tr><td colspan="3" style="padding:12px;color:var(--color-error,#c44);font-size:13px;">'
+                + escapeHtml(cdLabels.loadFail + ': ' + err.message) + '</td></tr>';
+        });
+    }
+
+    function cdRevoke(id) {
+        var url = cdDestroyTpl.replace('__ID__', encodeURIComponent(id));
+        return fetch(url, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: csrfHeaders()
+        })
+        .then(function (resp) { return resp.json().then(function (body) { return { ok: resp.ok, body: body }; }); })
+        .then(function (r) {
+            if (r.ok && r.body && r.body.status === 'ok') {
+                return cdLoadList();
+            }
+            window.alert(cdLabels.revokeFail + ': ' + ((r.body && r.body.message) || ''));
+        })
+        .catch(function (err) {
+            window.alert(cdLabels.revokeFail + ': ' + err.message);
+        });
+    }
+
+    function cdSignOutOthers() {
+        return fetch(cdSignOutOthersUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: csrfHeaders('application/x-www-form-urlencoded'),
+            body: ''
+        })
+        .then(function (resp) { return resp.json().then(function (body) { return { ok: resp.ok, body: body }; }); })
+        .then(function (r) {
+            if (r.ok && r.body && r.body.status === 'ok') {
+                var revoked = (r.body.revoked !== undefined) ? r.body.revoked : '?';
+                if (revoked === 0) {
+                    window.alert(cdLabels.empty);
+                } else {
+                    window.alert(revoked + ' ' + cdLabels.revokedCount);
+                }
+                return cdLoadList();
+            }
+            window.alert(cdLabels.signOutOthersFail + ': ' + ((r.body && r.body.message) || ''));
+        })
+        .catch(function (err) {
+            window.alert(cdLabels.signOutOthersFail + ': ' + err.message);
+        });
+    }
+
+    if (cdSignOutBtn) {
+        cdSignOutBtn.addEventListener('click', function () {
+            if (!window.confirm(cdLabels.confirmSignOutOthers)) { return; }
+            cdSignOutOthers();
+        });
+    }
+
+    cdLoadList();
+
 })();

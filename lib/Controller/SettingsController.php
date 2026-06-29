@@ -73,6 +73,13 @@ class SettingsController extends Controller
             'appPasswordsDestroyUrlTemplate' => $this->urlGenerator->linkToRoute(
                 'souvera_mail.appPassword.destroy', ['id' => '__ID__']
             ),
+            'connectedDevicesListUrl' => $this->urlGenerator->linkToRoute('souvera_mail.connectedDevices.index'),
+            'connectedDevicesDestroyUrlTemplate' => $this->urlGenerator->linkToRoute(
+                'souvera_mail.connectedDevices.destroy', ['id' => '__ID__']
+            ),
+            'connectedDevicesSignOutOthersUrl' => $this->urlGenerator->linkToRoute(
+                'souvera_mail.connectedDevices.signOutOthers'
+            ),
         ];
 
         return new TemplateResponse('souvera_mail', 'settings', $params, 'user');

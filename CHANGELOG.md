@@ -6,6 +6,32 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-02-16
+
+### Added
+- **Connected Devices section** in the in-app Settings page (`/apps/souvera_mail/settings`). Lists every active Nextcloud session belonging to the current user — browsers + NC client apps (Files, Talk, Calendar, …) — with last-activity timestamp and per-row "Sign out" action. The current session is detected via `ISession::getId()` → `ITokenProvider::getToken()` and pinned to the top with a green "this device" badge; its "Sign out" button is disabled to prevent self-revocation mid-request (server also refuses with HTTP 400). A prominent **"Sign out all other devices"** button at the section header revokes every session except the current one in a single round-trip — the key security feature for shared-computer scenarios, lost phones, and post-password-reset cleanup.
+
+#### Architecture
+- **`OCA\SouveraMail\Service\ConnectedDevicesService`** (NEW, ~120 LoC). Pure Nextcloud-scoped — does **not** touch Stalwart. Wraps `OCP\Authentication\Token\IProvider`:
+  - `listForUser($userId)`: enumerates tokens, classifies as `app` vs `browser`, sorts current-first then most-recent-activity-first.
+  - `revoke($userId, $tokenId)`: refuses self-revocation, otherwise `invalidateTokenById`.
+  - `revokeAllOthers($userId)`: loops tokens, skips current, swallows per-token failures (logged with `souvera_mail` app context).
+- **`OCA\SouveraMail\Controller\ConnectedDevicesController`** (NEW). 3 endpoints, all `#[NoAdminRequired]`, CSRF-enforced for the mutating ones:
+  - `GET    /connected-devices`
+  - `DELETE /connected-devices/{id}` (numeric-id constrained via routes.php `requirements`)
+  - `POST   /connected-devices/sign-out-others`
+- Template + JS extended: a fourth row of `data-*` attributes on the section bootstraps the JS, which mirrors the existing App-Passwords pattern (XSS-safe row rendering, confirm-revoke dialog, inline traffic-light badges).
+
+#### Reality check vs. original sketch
+- The original "Nice-to-have" mentioned reading active mail-client sessions from a Stalwart `x:UserSession/query` JMAP endpoint. **No such endpoint exists in Stalwart 0.16** — verified against upstream `crates/jmap/src/registry/get.rs` (no `Session` / `Login` / `AuthToken` variant in the public ObjectType list; the only "session" object is `MtaInboundSession`, which is SMTP-server config). Stalwart treats mail-client identity persistently via `AppPassword` (already covered) and only ephemerally via raw IMAP/SMTP TCP connections (not exposed as queryable JMAP). So this release implements the Nextcloud half — the higher-value half, because users routinely keep browsers logged in on shared machines — and explicitly documents in the UI ("App Passwords are not part of this list") that mail-client revocation lives in the section above.
+
+#### Routes added
+```
+GET    /connected-devices                  → connectedDevices#index
+DELETE /connected-devices/{id}             → connectedDevices#destroy   (id constrained to \d+)
+POST   /connected-devices/sign-out-others  → connectedDevices#signOutOthers
+```
+
 ## [0.11.1] — 2026-02-16
 
 ### Fixed

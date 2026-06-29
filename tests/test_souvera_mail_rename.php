@@ -1,6 +1,6 @@
 <?php
 /**
- * Static verification for Souvera Mail v0.11.1 rename.
+ * Static verification for Souvera Mail v0.12.0 rename.
  * Covers:
  *  - info.xml id/namespace/version/settings block
  *  - composer.json PSR-4 mapping
@@ -8,7 +8,7 @@
  *  - lib/ namespace declarations + php -l
  *  - templates/settings.php renders with stubbed deps (both appPasswordsAvailable branches)
  *  - templates/not_configured.php renders + contains 'occ souvera_mail:bootstrap'
- *  - appinfo/routes.php exactly 10 routes incl. settings#index
+ *  - appinfo/routes.php exactly 13 routes incl. settings#index
  *  - SettingsController.php
  *  - PersonalSettings/PersonalSection/personal_settings.php deleted
  *  - l10n register key is 'souvera_mail'
@@ -46,7 +46,7 @@ assertTrue(($im[1] ?? '') === 'souvera_mail', "info.xml <id> == souvera_mail (go
 preg_match('#<namespace>([^<]+)</namespace>#', $infoXml, $nm);
 assertTrue(($nm[1] ?? '') === 'SouveraMail', "info.xml <namespace> == SouveraMail", $passes, $failures);
 preg_match('#<version>([^<]+)</version>#', $infoXml, $vm);
-assertTrue(($vm[1] ?? '') === '0.11.1', "info.xml <version> == 0.11.1 (got: '".($vm[1]??'')."')", $passes, $failures);
+assertTrue(($vm[1] ?? '') === '0.12.0', "info.xml <version> == 0.12.0 (got: '".($vm[1]??'')."')", $passes, $failures);
 assertTrue(str_contains($infoXml, '<admin>OCA\\SouveraMail\\Settings\\AdminSettings</admin>'), "info.xml <admin> uses new namespace", $passes, $failures);
 assertTrue(str_contains($infoXml, '<admin-section>'), "info.xml has <admin-section>", $passes, $failures);
 assertTrue(!str_contains($infoXml, '<personal>'), "info.xml has NO <personal>", $passes, $failures);
@@ -157,7 +157,7 @@ assertTrue(strlen($ncUser) > 0, "not_configured.php (non-admin) renders some out
 $routes = require '/app/appinfo/routes.php';
 assertTrue(is_array($routes) && isset($routes['routes']), "routes.php returns array with 'routes' key", $passes, $failures);
 $routeCount = count($routes['routes']);
-assertTrue($routeCount === 10, "routes.php registers exactly 10 routes (got: $routeCount)", $passes, $failures);
+assertTrue($routeCount === 13, "routes.php registers exactly 13 routes (got: $routeCount)", $passes, $failures);
 $routeNames = array_column($routes['routes'], 'name');
 assertTrue(in_array('settings#index', $routeNames, true), "routes.php has settings#index", $passes, $failures);
 $settingsRoute = null;

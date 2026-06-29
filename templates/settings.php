@@ -177,4 +177,61 @@
             </table>
         <?php } ?>
     </section>
+
+    <section id="souvera-mail-connected-devices-section"
+             data-list-url="<?php p($_['connectedDevicesListUrl']); ?>"
+             data-destroy-url-template="<?php p($_['connectedDevicesDestroyUrlTemplate']); ?>"
+             data-sign-out-others-url="<?php p($_['connectedDevicesSignOutOthersUrl']); ?>"
+             data-label-load-fail="<?php p($l->t('Could not load connected devices')); ?>"
+             data-label-revoke-fail="<?php p($l->t('Could not revoke session')); ?>"
+             data-label-sign-out-others-fail="<?php p($l->t('Could not sign out other sessions')); ?>"
+             data-label-confirm-revoke="<?php p($l->t('Sign out this device? Its Nextcloud session and any open mail tabs there will be terminated immediately.')); ?>"
+             data-label-confirm-sign-out-others="<?php p($l->t('Sign out every device except the one you are using right now? Open Nextcloud and mail tabs on other browsers/phones will be logged out immediately.')); ?>"
+             data-label-revoke="<?php p($l->t('Sign out')); ?>"
+             data-label-sign-out-others="<?php p($l->t('Sign out all other devices')); ?>"
+             data-label-current="<?php p($l->t('this device')); ?>"
+             data-label-empty="<?php p($l->t('No active Nextcloud sessions found.')); ?>"
+             data-label-revoked-count="<?php p($l->t('sessions signed out')); ?>"
+             data-label-type-browser="<?php p($l->t('Browser')); ?>"
+             data-label-type-app="<?php p($l->t('App')); ?>">
+        <h2><?php p($l->t('Connected devices (Nextcloud sessions)')); ?></h2>
+        <p class="section-desc">
+            <?php p($l->t('Every browser and Nextcloud client app that has logged into this account. Use this list if you forgot to sign out on a shared computer, lost your phone, or rotated your password and want to invalidate everything else in one click. (Mail clients using IMAP/POP3/SMTP App Passwords are managed in the section above — App Passwords are not part of this list.)')); ?>
+        </p>
+
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+            <button type="button"
+                    id="souvera-mail-sign-out-others-btn"
+                    data-testid="souvera-mail-sign-out-others-btn"
+                    style="padding:8px 18px;border-radius:100px;border:1px solid var(--color-error,#c44);
+                           background:transparent;color:var(--color-error,#c44);font-weight:500;
+                           cursor:pointer;font-size:13px;">
+                <?php p($l->t('Sign out all other devices')); ?>
+            </button>
+        </div>
+
+        <table id="souvera-mail-connected-devices-table"
+               data-testid="souvera-mail-connected-devices-table"
+               style="width:100%;border-collapse:collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align:left;padding:6px 8px;font-size:12px;color:var(--color-text-maxcontrast,#888);text-transform:uppercase;letter-spacing:0.04em;">
+                        <?php p($l->t('Device')); ?>
+                    </th>
+                    <th style="text-align:left;padding:6px 8px;font-size:12px;color:var(--color-text-maxcontrast,#888);text-transform:uppercase;letter-spacing:0.04em;">
+                        <?php p($l->t('Last activity')); ?>
+                    </th>
+                    <th style="text-align:right;padding:6px 8px;font-size:12px;color:var(--color-text-maxcontrast,#888);text-transform:uppercase;letter-spacing:0.04em;">
+                        <?php p($l->t('Actions')); ?>
+                    </th>
+                </tr>
+            </thead>
+            <tbody id="souvera-mail-connected-devices-tbody"
+                   data-testid="souvera-mail-connected-devices-tbody">
+                <tr><td colspan="3" style="padding:12px;color:var(--color-text-maxcontrast,#888);font-size:13px;">
+                    <?php p($l->t('Loading…')); ?>
+                </td></tr>
+            </tbody>
+        </table>
+    </section>
 </div>

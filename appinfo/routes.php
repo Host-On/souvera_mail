@@ -52,5 +52,21 @@ return [
             'url' => '/quota',
             'verb' => 'GET'
         ],
+        [
+            'name' => 'connectedDevices#index',
+            'url' => '/connected-devices',
+            'verb' => 'GET'
+        ],
+        [
+            'name' => 'connectedDevices#destroy',
+            'url' => '/connected-devices/{id}',
+            'verb' => 'DELETE',
+            'requirements' => ['id' => '\d+']
+        ],
+        [
+            'name' => 'connectedDevices#signOutOthers',
+            'url' => '/connected-devices/sign-out-others',
+            'verb' => 'POST'
+        ],
     ]
 ];
