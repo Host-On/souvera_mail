@@ -6,6 +6,65 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.15] — 2026-02-17 (live-fix)
+
+### Fixed — P0: `/apps/souvera_mail/` "Seite nicht gefunden" (operator-reported live)
+
+**Live incident** (operator-reported, 2026-06-30 17:17–17:24 UTC):
+Nextcloud returned "Seite nicht gefunden" on `/apps/souvera_mail/`. `nextcloud.log` showed two stacked failures:
+```
+include(.../lib/AppInfo/Application.php): Permission denied
+  at /var/www/nextcloud/lib/composer/composer/ClassLoader.php  (stale paths)
+Could not resolve OCA\Souvera_mail\Controller\PageController!
+  Class "OCA\Souvera_mail\Controller\PageController" does not exist
+```
+
+**Live root-cause analysis (via `qm guest exec` against VM 256 on prod-fra7-wk06):**
+1. NC34's `OC_App::registerAutoloading()` (`lib/private/legacy/OC_App.php` line 116) does:
+   ```php
+   if (file_exists($path . '/composer/autoload.php')) {
+       require_once $path . '/composer/autoload.php';
+   } else {
+       \OC::$composerAutoloader->addPsr4($appNamespace . '\\', $path . '/lib/', true);
+   }
+   ```
+   It checks for `<app-root>/composer/autoload.php` (NOT `vendor/autoload.php`).
+2. The operator deploys by rsync-ing the git tree to `/mnt/nc-shared/custom_apps/souvera_mail/` without ever running `composer install` — so neither `vendor/` nor `composer/` exist.
+3. `lib-bridge/namespace-bridge.php` is loaded ONLY via `vendor/composer/autoload_files.php`, which doesn't exist on the operator deploy. The bridge therefore never runs in production.
+4. NC34's `IAppManager::getAppNamespace()` then falls back to `ucfirst('souvera_mail') = 'Souvera_mail'` (with underscore) because its memcache-cached `core.appinfo` is stale and missing the `<namespace>` tag. NC's PSR-4 loader is registered against the wrong namespace; controllers can't be resolved; entire app down.
+
+**Fix (live-deployed + verified):**
+- **NEW `composer/autoload.php`** at the app-root. NC `require_once`s this file BEFORE its own PSR-4 fallback fires. The file:
+  1. Calls `\OC::$composerAutoloader->addPsr4()` for BOTH the canonical `OCA\SouveraMail\` AND the broken-fallback `OCA\Souvera_mail\` namespaces, pointing both at `<app-root>/lib/`.
+  2. Registers an `spl_autoload_register` hook for `OCA\SouveraMail\` as a defensive PSR-4 fallback in case `\OC::$composerAutoloader` wasn't yet set when we ran.
+  3. Registers an `spl_autoload_register` hook for `OCA\Souvera_mail\<X>` that `class_alias()`es to `OCA\SouveraMail\<X>` at lookup time — so the underscore-namespace classes resolve to the canonical implementations WITHOUT forking every controller file.
+  4. Idempotent under repeated `require_once` (re-entrancy guard).
+  5. Defensive against upstream ClassLoader API changes (try/catch around `addPsr4`).
+- The file lives OUTSIDE `vendor/` so it ships unconditionally with the tarball.
+
+**Live verification (17:41 UTC):**
+- Deployed `composer/autoload.php` to BOTH `/mnt/nc-shared/custom_apps/souvera_mail/composer/` AND `/var/www/nextcloud/custom_apps/souvera_mail/composer/`.
+- Flushed opcache + APCu + Redis `*appinfo*` keys; reloaded php-fpm; `occ maintenance:repair`.
+- Probe to `http://localhost/apps/souvera_mail/` → **HTTP 401 "Current user is not logged in"** (clean auth gate). Previously: 500 / ClassNotFound.
+- Zero new `Could not resolve OCA\Souvera_mail\*` log entries after the deploy timestamp.
+
+### Architecture
+| File | Change |
+|---|---|
+| `composer/autoload.php` | NEW — vendor-less bootstrap loaded by `OC_App::registerAutoloading()`. Installs PSR-4 for both namespace variants + spl_autoload safety net + underscore→canonical class_alias hook. |
+| `appinfo/info.xml` | Version 0.13.14 → 0.13.15. |
+| `tests/test_composer_autoload_bootstrap.php` | NEW — 18 assertions: file existence, syntax, re-entrancy guard, addPsr4 for both variants, spl_autoload prepend=false, behavioural sim with stubbed `\OC::$composerAutoloader`, idempotency, info.xml still declares canonical namespace. |
+| `memory/operator_access.md` | Augmented with live-debug workflow that found this bug (VM 256 lives on `prod-fra7-wk06`, accessed via two-hop SSH + `qm guest exec`). |
+
+### Verification (Step 26)
+- `php -l` clean on `composer/autoload.php`.
+- **`tests/test_composer_autoload_bootstrap.php`: 18/18 PASS** (NEW).
+- Full local suite: **22/22 PASS files, 737/737 PASS assertions** (was 21/21 + 719/719).
+- **Live HTTP 401** on `/apps/souvera_mail/` after deploy + cache flush — was the broken `ClassNotFound` 500 before.
+
+### Why this doesn't regress 0.13.14
+0.13.14's `lib-bridge/namespace-bridge.php` PSR-4 fallback is still there as a SECOND defense layer — it now never has to fire because `composer/autoload.php` runs first and installs the canonical PSR-4 entries on NC's global loader. If a future change accidentally drops `composer/autoload.php`, namespace-bridge.php will silently take over (provided `vendor/` is present).
+
 ## [0.13.14] — 2026-02-17
 
 ### Fixed (P0 — `Could not resolve OCA\SouveraMail\Service\DomainConfigService` + `Class "OCA\SouveraMail\Util\NavigationTitle" not found`, reported 2026-07-01)
