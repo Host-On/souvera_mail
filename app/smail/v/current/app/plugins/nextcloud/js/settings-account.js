@@ -163,18 +163,28 @@
 				headers: csrfHeaders('application/x-www-form-urlencoded'),
 				body: 'description=' + encodeURIComponent(desc)
 			})
-				.then(function (resp) { return resp.ok ? resp.json() : null; })
-				.then(function (body) {
-					if (!body || body.status !== 'ok' || !body.item) {
-						self.appPasswordError((body && body.message) || 'Creation failed');
+				.then(function (resp) {
+					// Read body regardless of HTTP status so we can surface the
+					// server's error message (the backend always returns JSON,
+					// even on 4xx / 5xx).
+					return resp.json().then(function (b) { return { ok: resp.ok, body: b }; });
+				})
+				.then(function (r) {
+					var body = r.body || {};
+					if (!r.ok || body.status !== 'ok') {
+						self.appPasswordError(body.message || ('HTTP ' + (r.body ? '' : 'error')) || 'Creation failed');
 						return;
 					}
-					self.justCreatedSecret(String(body.item.secret || ''));
-					self.justCreatedDescription(String(body.item.description || desc));
+					// Backend returns { status:'ok', created:{ id, secret, description } }
+					var created = body.created || {};
+					self.justCreatedSecret(String(created.secret || ''));
+					self.justCreatedDescription(String(created.description || desc));
 					self.newAppPasswordDescription('');
 					self.loadAppPasswords();
 				})
-				.catch(function () { self.appPasswordError('Network error'); })
+				.catch(function (err) {
+					self.appPasswordError('Network error: ' + (err && err.message ? err.message : 'unknown'));
+				})
 				.then(function () { self.appPasswordsCreating(false); });
 		},
 
@@ -225,10 +235,14 @@
 				credentials: 'same-origin',
 				headers: csrfHeaders()
 			})
-				.then(function (resp) { return resp.ok ? resp.json() : null; })
-				.then(function (body) {
-					if (!body || body.status !== 'ok') {
-						self.devicesError('Failed to load devices');
+				.then(function (resp) {
+					return resp.json().then(function (b) { return { ok: resp.ok, body: b }; })
+						.catch(function () { return { ok: resp.ok, body: null }; });
+				})
+				.then(function (r) {
+					var body = r.body || {};
+					if (!r.ok || body.status !== 'ok') {
+						self.devicesError(body.message || 'Failed to load devices');
 						return;
 					}
 					self.devices((body.items || []).map(function (it) {
@@ -241,7 +255,7 @@
 						};
 					}));
 				})
-				.catch(function () { self.devicesError('Network error'); })
+				.catch(function (err) { self.devicesError('Network error: ' + (err && err.message ? err.message : 'unknown')); })
 				.then(function () { self.devicesLoading(false); });
 		},
 

@@ -54,13 +54,23 @@ class ConnectedDevicesService
         $currentTokenId = $this->resolveCurrentTokenId();
         $items = [];
         foreach ($this->tokenProvider->getTokenByUser($user) as $tok) {
-            $id = $tok->getId();
+            try {
+                $id = $tok->getId();
+            } catch (\Throwable $e) {
+                // Skip un-readable token entries — better to drop one row
+                // than to fail the whole list.
+                $this->logger->warning(
+                    'Souvera Mail: skipping unreadable token: ' . $e->getMessage(),
+                    ['app' => 'souvera_mail', 'exception' => $e]
+                );
+                continue;
+            }
             $items[] = [
                 'id' => $id,
-                'name' => $tok->getName() ?: 'Unknown device',
-                'type' => $tok->getType() === IToken::PERMANENT_TOKEN ? 'app' : 'browser',
-                'lastActivity' => (int) $tok->getLastActivity(),
-                'scope' => \is_array($tok->getScopeAsArray()) ? $tok->getScopeAsArray() : [],
+                'name' => $this->safeName($tok),
+                'type' => $this->safeType($tok),
+                'lastActivity' => $this->safeLastActivity($tok),
+                'scope' => $this->safeScope($tok),
                 'current' => $currentTokenId !== null && $id === $currentTokenId,
             ];
         }
@@ -72,6 +82,54 @@ class ConnectedDevicesService
             return $b['lastActivity'] <=> $a['lastActivity'];
         });
         return $items;
+    }
+
+    private function safeName(IToken $tok): string
+    {
+        try {
+            $n = $tok->getName();
+            return $n !== null && $n !== '' ? (string) $n : 'Unknown device';
+        } catch (\Throwable $e) {
+            return 'Unknown device';
+        }
+    }
+
+    private function safeType(IToken $tok): string
+    {
+        try {
+            return $tok->getType() === IToken::PERMANENT_TOKEN ? 'app' : 'browser';
+        } catch (\Throwable $e) {
+            return 'browser';
+        }
+    }
+
+    private function safeLastActivity(IToken $tok): int
+    {
+        try {
+            return (int) $tok->getLastActivity();
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * NC token implementations differ on whether they expose
+     * `getScopeAsArray()`: PublicKeyToken implements it; DefaultToken
+     * implements it only since 27.x; some older / 3rd-party providers
+     * skip it entirely or return null. Wrap so a missing/throwing
+     * method never poisons the whole device list.
+     */
+    private function safeScope(IToken $tok): array
+    {
+        if (!\method_exists($tok, 'getScopeAsArray')) {
+            return [];
+        }
+        try {
+            $scope = $tok->getScopeAsArray();
+            return \is_array($scope) ? $scope : [];
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     public function revoke(string $userId, int $tokenId): void

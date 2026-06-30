@@ -120,7 +120,7 @@ assertTrue(
 );
 
 // ============================================================
-// 5. Connected-Devices UI moved to the in-engine Settings tab in 0.13.3.
+// 5. Connected-Devices UI moved to the in-engine Settings tab in 0.13.4.
 //    The old NC-chrome templates/settings.php + js/personal-settings.js
 //    were deleted; the new owner is the engine plugin's Knockout VM.
 // ============================================================
@@ -134,7 +134,7 @@ assertTrue(!file_exists('/app/js/personal-settings.js'),
 $tmplSrc = file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/templates/SettingsSouveraAccount.html');
 foreach ([
     'Verbundene Geräte',                // section heading (de)
-    'Alle anderen Geräte abmelden',     // sign-out-others button label
+    'Alle anderen abmelden',            // sign-out-others button label (shortened in 0.13.4)
     'foreach: devices',                 // Knockout binding
     'dieses Gerät',                     // current-session badge
 ] as $needle) {
@@ -185,8 +185,8 @@ assertTrue((bool)preg_match("/signOutOthers[\s\S]{0,1000}confirm\(/", $jsSrc),
 // ============================================================
 $info = file_get_contents('/app/appinfo/info.xml');
 preg_match('#<version>([^<]+)</version>#', $info, $vm);
-assertTrue(($vm[1] ?? '') === '0.13.3',
-    "info.xml <version> == 0.13.3 (got: " . ($vm[1] ?? '') . ")", $passes, $failures);
+assertTrue(($vm[1] ?? '') === '0.13.4',
+    "info.xml <version> == 0.13.4 (got: " . ($vm[1] ?? '') . ")", $passes, $failures);
 
 $changelog = file_get_contents('/app/CHANGELOG.md');
 assertTrue(str_contains($changelog, '[0.12.0]'),

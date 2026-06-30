@@ -1,164 +1,371 @@
-<div class="legend">
-	<span>Sicherheit &amp; Geräte</span>
-</div>
+<div class="souvera-settings">
 
-<!-- ============================================================ -->
-<!-- Dashboard widget -->
-<!-- ============================================================ -->
-<div class="form-horizontal" style="margin-top: 0.5em;">
-	<div class="legend">Dashboard-Widget</div>
-	<div class="control-group">
-		<label style="display: inline-flex; gap: 0.5em; align-items: center; margin-right: 1.5em;">
-			<input type="radio" name="souvera-mail-dashboard-mode"
-				value="unread"
-				data-bind="checked: dashboardMode, click: pickModeUnread">
-			<span>Nur ungelesene Nachrichten <small>(Standard)</small></span>
-		</label>
-		<label style="display: inline-flex; gap: 0.5em; align-items: center;">
-			<input type="radio" name="souvera-mail-dashboard-mode"
-				value="all"
-				data-bind="checked: dashboardMode, click: pickModeAll">
-			<span>Vollständiger Posteingang</span>
-		</label>
-		<span data-bind="visible: dashboardModeStatus() === 'saving'" style="color:#666; margin-left:1em;">…</span>
-		<span data-bind="visible: dashboardModeStatus() === 'saved'" style="color:#27ae60; margin-left:1em;">✓ gespeichert</span>
-		<span data-bind="visible: dashboardModeStatus() === 'error'" style="color:#c0392b; margin-left:1em;">✗ Fehler</span>
-	</div>
-</div>
-
-<!-- ============================================================ -->
-<!-- App Passwords -->
-<!-- ============================================================ -->
-<div class="form-horizontal" style="margin-top: 2em;">
-	<div class="legend">App-Passwörter <small>(IMAP / POP3 / SMTP)</small></div>
-
-	<!-- Available banner -->
-	<div data-bind="visible: !appPasswordsAvailable"
-		style="padding: 0.75em 1em; border-left: 3px solid #e67e22; background: rgba(230,126,34,0.08);">
-		App-Passwörter sind aktuell nicht verfügbar — Souvera Central muss zusammen mit
-		der Stalwart-API-URL durch den Administrator konfiguriert sein.
+	<!-- Header strip (Central-style) -->
+	<div class="sv-header">
+		<div class="sv-header-icon">
+			<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+				<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+				<path d="M9 12l2 2 4-4"></path>
+			</svg>
+		</div>
+		<div>
+			<div class="sv-header-title">Sicherheit &amp; Geräte</div>
+			<div class="sv-header-sub">Dashboard-Widget, App-Passwörter und aktive Sitzungen</div>
+		</div>
 	</div>
 
-	<!-- Create form -->
-	<div data-bind="visible: appPasswordsAvailable">
-		<div class="control-group" style="margin-top: 0.5em;">
-			<label>Beschreibung</label>
-			<input type="text"
-				placeholder="z. B. iPhone Mail"
-				maxlength="80"
-				data-bind="value: newAppPasswordDescription, valueUpdate: 'input'"
-				style="width: 16em;">
-			<button class="button-vue"
-				data-bind="click: createAppPassword,
-				           disable: appPasswordsCreating,
-				           text: appPasswordsCreating() ? 'erzeuge …' : 'Erzeugen'">
-				Erzeugen
+	<!-- ============================================================ -->
+	<!-- Dashboard widget -->
+	<!-- ============================================================ -->
+	<section class="sv-card">
+		<header class="sv-card-h">
+			<span class="sv-card-h-icon">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+			</span>
+			<span>Dashboard-Widget</span>
+			<span data-bind="visible: dashboardModeStatus() === 'saving'" class="sv-pill sv-pill-muted">speichere…</span>
+			<span data-bind="visible: dashboardModeStatus() === 'saved'" class="sv-pill sv-pill-ok">✓ gespeichert</span>
+			<span data-bind="visible: dashboardModeStatus() === 'error'" class="sv-pill sv-pill-err">Fehler</span>
+		</header>
+		<div class="sv-card-b">
+			<p class="sv-card-desc">Was zeigt das Souvera-Mail-Widget auf der Nextcloud-Startseite?</p>
+			<div class="sv-options">
+				<label class="sv-option" data-bind="css: { 'sv-option-on': dashboardMode() === 'unread' }">
+					<input type="radio" name="souvera-mail-dashboard-mode" value="unread"
+						data-bind="checked: dashboardMode, click: pickModeUnread">
+					<div>
+						<div class="sv-option-title">Nur ungelesene Nachrichten <span class="sv-tag">Standard</span></div>
+						<div class="sv-option-sub">Kompakte Liste, ideal für vielbeschäftigte Posteingänge.</div>
+					</div>
+				</label>
+				<label class="sv-option" data-bind="css: { 'sv-option-on': dashboardMode() === 'all' }">
+					<input type="radio" name="souvera-mail-dashboard-mode" value="all"
+						data-bind="checked: dashboardMode, click: pickModeAll">
+					<div>
+						<div class="sv-option-title">Vollständiger Posteingang</div>
+						<div class="sv-option-sub">Auch bereits gelesene Mails, neueste zuerst.</div>
+					</div>
+				</label>
+			</div>
+		</div>
+	</section>
+
+	<!-- ============================================================ -->
+	<!-- App Passwords -->
+	<!-- ============================================================ -->
+	<section class="sv-card">
+		<header class="sv-card-h">
+			<span class="sv-card-h-icon">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+			</span>
+			<span>App-Passwörter</span>
+			<small class="sv-card-h-note">für IMAP, POP3 und SMTP</small>
+		</header>
+		<div class="sv-card-b">
+
+			<!-- Unavailable banner -->
+			<div data-bind="visible: !appPasswordsAvailable" class="sv-banner sv-banner-warn">
+				<strong>Aktuell nicht verfügbar.</strong> Souvera&nbsp;Central und die Stalwart-API-URL müssen vom Administrator konfiguriert sein.
+			</div>
+
+			<!-- Create form -->
+			<div data-bind="visible: appPasswordsAvailable">
+				<p class="sv-card-desc">Erzeuge ein eigenes Passwort für jede Mail-App. Du kannst es jederzeit widerrufen, ohne dein Hauptpasswort zu ändern.</p>
+				<div class="sv-form-row">
+					<input type="text"
+						placeholder="z. B. iPhone Mail, Thunderbird, Outlook"
+						maxlength="80"
+						class="sv-input"
+						data-bind="value: newAppPasswordDescription, valueUpdate: 'input'">
+					<button class="sv-btn sv-btn-primary"
+						data-bind="click: createAppPassword,
+						           disable: appPasswordsCreating,
+						           text: appPasswordsCreating() ? 'erzeuge…' : 'Erzeugen'">
+						Erzeugen
+					</button>
+				</div>
+
+				<!-- Error -->
+				<div data-bind="visible: appPasswordError() !== ''" class="sv-banner sv-banner-err">
+					<span data-bind="text: appPasswordError"></span>
+				</div>
+
+				<!-- One-time secret card -->
+				<div data-bind="visible: justCreatedSecret() !== ''" class="sv-banner sv-banner-ok">
+					<div class="sv-secret-head">Neues App-Passwort für „<span data-bind="text: justCreatedDescription"></span>“</div>
+					<code class="sv-secret" data-bind="text: justCreatedSecret"></code>
+					<div class="sv-secret-foot">
+						<span>Bitte jetzt speichern — das Passwort wird nur <strong>einmal</strong> angezeigt.</span>
+						<span>
+							<button class="sv-btn" data-bind="click: copySecret">Kopieren</button>
+							<button class="sv-btn" data-bind="click: dismissNewSecret">Fertig</button>
+						</span>
+					</div>
+				</div>
+
+				<!-- List -->
+				<div class="sv-list-wrap">
+					<div data-bind="visible: appPasswordsLoading" class="sv-list-muted">… laden</div>
+					<div data-bind="visible: !hasAppPasswords() &amp;&amp; !appPasswordsLoading()" class="sv-list-empty">
+						Noch keine App-Passwörter angelegt.
+					</div>
+					<table data-bind="visible: hasAppPasswords()" class="sv-table">
+						<thead><tr><th>Beschreibung</th><th>Erstellt</th><th></th></tr></thead>
+						<tbody data-bind="foreach: appPasswords">
+							<tr>
+								<td><span class="sv-mono" data-bind="text: description"></span></td>
+								<td class="sv-table-muted" data-bind="text: createdAt"></td>
+								<td class="sv-table-right">
+									<button class="sv-btn sv-btn-danger" data-bind="click: $root.revokeAppPassword.bind($root, $data)">Widerrufen</button>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- ============================================================ -->
+	<!-- Connected Devices -->
+	<!-- ============================================================ -->
+	<section class="sv-card">
+		<header class="sv-card-h">
+			<span class="sv-card-h-icon">
+				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+			</span>
+			<span>Verbundene Geräte</span>
+			<button class="sv-btn sv-btn-danger sv-card-h-action"
+				data-bind="click: signOutOthers, disable: signOutOthersBusy, visible: hasDevices()">
+				Alle anderen abmelden
 			</button>
-		</div>
+		</header>
+		<div class="sv-card-b">
+			<p class="sv-card-desc">Browser-Sitzungen und Nextcloud-Clients (Files, Calendar, Talk …), die deinen Account derzeit nutzen.</p>
 
-		<!-- Error -->
-		<div data-bind="visible: appPasswordError() !== ''"
-			style="color: #c0392b; margin-top: 0.5em;">
-			<span data-bind="text: appPasswordError"></span>
-		</div>
+			<div data-bind="visible: devicesError() !== ''" class="sv-banner sv-banner-err">
+				<span data-bind="text: devicesError"></span>
+			</div>
+			<div data-bind="visible: devicesLoading" class="sv-list-muted">… laden</div>
+			<div data-bind="visible: !hasDevices() &amp;&amp; !devicesLoading() &amp;&amp; devicesError() === ''" class="sv-list-empty">
+				Keine aktiven Sitzungen gefunden.
+			</div>
 
-		<!-- One-time secret card -->
-		<div data-bind="visible: justCreatedSecret() !== ''"
-			style="margin-top: 1em; padding: 0.75em 1em; border: 1px solid #27ae60; border-radius: 6px; background: rgba(39,174,96,0.06);">
-			<strong>Neues App-Passwort:</strong>
-			<code data-bind="text: justCreatedSecret"
-				style="display: block; margin-top: 0.5em; padding: 0.5em; background: #fff; border-radius: 4px; font-family: monospace; word-break: break-all;"></code>
-			<div style="margin-top: 0.5em; font-size: 0.9em; color: #555;">
-				Für „<span data-bind="text: justCreatedDescription"></span>“ — bitte jetzt speichern.
-				<strong>Das Passwort wird nur einmal angezeigt.</strong>
-			</div>
-			<div style="margin-top: 0.5em;">
-				<button class="button-vue" data-bind="click: copySecret">In Zwischenablage kopieren</button>
-				<button class="button-vue" data-bind="click: dismissNewSecret">Schließen</button>
-			</div>
-		</div>
-
-		<!-- List -->
-		<div style="margin-top: 1em;">
-			<div data-bind="visible: appPasswordsLoading" style="color: #666;">… laden</div>
-			<div data-bind="visible: !hasAppPasswords() && !appPasswordsLoading()" style="color: #666;">
-				Noch keine App-Passwörter angelegt.
-			</div>
-			<table data-bind="visible: hasAppPasswords()" style="width: 100%; margin-top: 0.5em;">
-				<thead>
-					<tr style="text-align: left; border-bottom: 1px solid #ddd;">
-						<th style="padding: 0.5em;">Beschreibung</th>
-						<th style="padding: 0.5em;">Erstellt</th>
-						<th style="padding: 0.5em; width: 8em;"></th>
-					</tr>
-				</thead>
-				<tbody data-bind="foreach: appPasswords">
-					<tr style="border-bottom: 1px solid #eee;">
-						<td style="padding: 0.5em;" data-bind="text: description"></td>
-						<td style="padding: 0.5em;" data-bind="text: createdAt"></td>
-						<td style="padding: 0.5em;">
-							<button class="button-vue"
-								data-bind="click: $root.revokeAppPassword.bind($root, $data)"
-								style="color: #c0392b;">Widerrufen</button>
+			<table data-bind="visible: hasDevices()" class="sv-table">
+				<thead><tr><th>Sitzung</th><th>Typ</th><th>Letzte Aktivität</th><th></th></tr></thead>
+				<tbody data-bind="foreach: devices">
+					<tr data-bind="css: { 'sv-row-current': isCurrent }">
+						<td>
+							<span class="sv-mono" data-bind="text: name"></span>
+							<span data-bind="visible: isCurrent" class="sv-pill sv-pill-current">dieses Gerät</span>
+						</td>
+						<td class="sv-table-muted" data-bind="text: type"></td>
+						<td class="sv-table-muted" data-bind="text: lastActivity"></td>
+						<td class="sv-table-right">
+							<button class="sv-btn sv-btn-danger"
+								data-bind="click: $root.revokeDevice.bind($root, $data), visible: !isCurrent">Abmelden</button>
+							<span data-bind="visible: isCurrent" class="sv-table-muted">—</span>
 						</td>
 					</tr>
 				</tbody>
 			</table>
 		</div>
-	</div>
+	</section>
+
 </div>
 
-<!-- ============================================================ -->
-<!-- Connected Devices -->
-<!-- ============================================================ -->
-<div class="form-horizontal" style="margin-top: 2em;">
-	<div class="legend" style="display: flex; justify-content: space-between; align-items: center;">
-		<span>Verbundene Geräte</span>
-		<button class="button-vue"
-			data-bind="click: signOutOthers, disable: signOutOthersBusy, visible: hasDevices()"
-			style="font-size: 0.9em;">
-			Alle anderen Geräte abmelden
-		</button>
-	</div>
+<style>
+/* ==========================================================
+ * Souvera Mail — Settings tab styling
+ * Card-based layout, Central-aligned palette.
+ * Confined to .souvera-settings so it never leaks into the
+ * rest of the engine UI.
+ * ========================================================== */
+.souvera-settings {
+	--sv-fg: var(--main-text, #1f2733);
+	--sv-fg-muted: var(--text-muted, #6c7886);
+	--sv-bg: var(--card-bg, #ffffff);
+	--sv-border: var(--border, rgba(0, 0, 0, 0.08));
+	--sv-accent: #3b82f6;
+	--sv-accent-soft: rgba(59, 130, 246, 0.10);
+	--sv-ok: #16a34a;
+	--sv-ok-soft: rgba(22, 163, 74, 0.10);
+	--sv-warn: #d97706;
+	--sv-warn-soft: rgba(217, 119, 6, 0.10);
+	--sv-err: #dc2626;
+	--sv-err-soft: rgba(220, 38, 38, 0.08);
+	--sv-radius: 12px;
+	--sv-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.04);
+	display: flex; flex-direction: column; gap: 1.25em;
+	max-width: 880px;
+	padding: 0.25em 0.5em 1.5em;
+	color: var(--sv-fg);
+	font-size: 14px;
+}
 
-	<div data-bind="visible: devicesError() !== ''"
-		style="color: #c0392b; margin-top: 0.5em;">
-		<span data-bind="text: devicesError"></span>
-	</div>
+.sv-header {
+	display: flex; align-items: center; gap: 0.85em;
+	padding: 0.9em 1.1em;
+	border-radius: var(--sv-radius);
+	background: linear-gradient(135deg, var(--sv-accent-soft) 0%, transparent 60%);
+	border: 1px solid var(--sv-border);
+}
+.sv-header-icon {
+	width: 38px; height: 38px;
+	border-radius: 50%;
+	background: var(--sv-accent); color: #fff;
+	display: flex; align-items: center; justify-content: center;
+	flex-shrink: 0;
+}
+.sv-header-title { font-size: 1.2em; font-weight: 600; }
+.sv-header-sub { color: var(--sv-fg-muted); font-size: 0.92em; margin-top: 0.1em; }
 
-	<div data-bind="visible: devicesLoading" style="color: #666; margin-top: 0.5em;">… laden</div>
+.sv-card {
+	background: var(--sv-bg);
+	border: 1px solid var(--sv-border);
+	border-radius: var(--sv-radius);
+	box-shadow: var(--sv-shadow);
+	overflow: hidden;
+}
+.sv-card-h {
+	display: flex; align-items: center; gap: 0.6em;
+	padding: 0.85em 1.1em;
+	border-bottom: 1px solid var(--sv-border);
+	font-weight: 600;
+	background: rgba(0,0,0,0.015);
+}
+.sv-card-h-icon {
+	display: inline-flex; align-items: center; justify-content: center;
+	width: 26px; height: 26px;
+	color: var(--sv-accent);
+	background: var(--sv-accent-soft);
+	border-radius: 6px;
+}
+.sv-card-h-note { color: var(--sv-fg-muted); font-weight: 400; font-size: 0.9em; }
+.sv-card-h-action { margin-left: auto; }
+.sv-card-b { padding: 1em 1.1em 1.1em; }
+.sv-card-desc { color: var(--sv-fg-muted); margin: 0 0 0.85em; font-size: 0.94em; }
 
-	<div data-bind="visible: !hasDevices() && !devicesLoading()" style="color: #666; margin-top: 0.5em;">
-		Keine aktiven Sitzungen gefunden.
-	</div>
+/* Radio "cards" — Central-style selectable rows */
+.sv-options { display: flex; flex-direction: column; gap: 0.55em; }
+.sv-option {
+	display: flex; align-items: flex-start; gap: 0.75em;
+	padding: 0.75em 0.9em;
+	border: 1px solid var(--sv-border);
+	border-radius: 10px;
+	cursor: pointer;
+	transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.sv-option:hover { border-color: var(--sv-accent); background: rgba(59,130,246,0.03); }
+.sv-option-on  { border-color: var(--sv-accent); background: var(--sv-accent-soft); box-shadow: 0 0 0 1px var(--sv-accent) inset; }
+.sv-option > input[type="radio"] { margin-top: 0.25em; accent-color: var(--sv-accent); }
+.sv-option-title { font-weight: 500; }
+.sv-option-sub { color: var(--sv-fg-muted); font-size: 0.88em; margin-top: 0.15em; }
+.sv-tag {
+	display: inline-block; margin-left: 0.4em; padding: 0.05em 0.5em;
+	background: var(--sv-fg); color: var(--sv-bg);
+	border-radius: 6px; font-size: 0.75em; font-weight: 500;
+}
 
-	<table data-bind="visible: hasDevices()" style="width: 100%; margin-top: 0.5em;">
-		<thead>
-			<tr style="text-align: left; border-bottom: 1px solid #ddd;">
-				<th style="padding: 0.5em;">Sitzung</th>
-				<th style="padding: 0.5em;">Typ</th>
-				<th style="padding: 0.5em;">Letzte Aktivität</th>
-				<th style="padding: 0.5em; width: 8em;"></th>
-			</tr>
-		</thead>
-		<tbody data-bind="foreach: devices">
-			<tr style="border-bottom: 1px solid #eee;">
-				<td style="padding: 0.5em;">
-					<span data-bind="text: name"></span>
-					<span data-bind="visible: isCurrent"
-						style="margin-left: 0.5em; padding: 0.1em 0.4em; background: #27ae60; color: #fff; border-radius: 3px; font-size: 0.8em;">dieses Gerät</span>
-				</td>
-				<td style="padding: 0.5em;" data-bind="text: type"></td>
-				<td style="padding: 0.5em;" data-bind="text: lastActivity"></td>
-				<td style="padding: 0.5em;">
-					<button class="button-vue"
-						data-bind="click: $root.revokeDevice.bind($root, $data),
-						           visible: !isCurrent,
-						           enable: !isCurrent"
-						style="color: #c0392b;">Abmelden</button>
-					<span data-bind="visible: isCurrent" style="color: #999;">—</span>
-				</td>
-			</tr>
-		</tbody>
-	</table>
-</div>
+/* Pills */
+.sv-pill {
+	display: inline-block; padding: 0.1em 0.55em;
+	border-radius: 999px; font-size: 0.78em; font-weight: 500;
+}
+.sv-pill-muted   { background: rgba(0,0,0,0.05); color: var(--sv-fg-muted); }
+.sv-pill-ok      { background: var(--sv-ok-soft); color: var(--sv-ok); }
+.sv-pill-err     { background: var(--sv-err-soft); color: var(--sv-err); }
+.sv-pill-current { background: var(--sv-accent); color: #fff; margin-left: 0.5em; }
+
+/* Form row */
+.sv-form-row { display: flex; gap: 0.5em; margin-bottom: 0.5em; flex-wrap: wrap; }
+.sv-input {
+	flex: 1 1 16em; min-width: 12em;
+	padding: 0.5em 0.7em;
+	border: 1px solid var(--sv-border);
+	border-radius: 8px;
+	background: var(--sv-bg);
+	color: var(--sv-fg);
+	font-size: 0.95em;
+	transition: border-color .15s, box-shadow .15s;
+}
+.sv-input:focus {
+	outline: none;
+	border-color: var(--sv-accent);
+	box-shadow: 0 0 0 3px var(--sv-accent-soft);
+}
+
+/* Buttons */
+.sv-btn {
+	display: inline-flex; align-items: center; gap: 0.35em;
+	padding: 0.5em 0.9em;
+	border: 1px solid var(--sv-border);
+	border-radius: 8px;
+	background: var(--sv-bg);
+	color: var(--sv-fg);
+	cursor: pointer;
+	font-size: 0.9em;
+	font-weight: 500;
+	transition: background .15s, border-color .15s, color .15s;
+}
+.sv-btn:hover { background: rgba(0,0,0,0.04); }
+.sv-btn-primary { background: var(--sv-accent); border-color: var(--sv-accent); color: #fff; }
+.sv-btn-primary:hover { filter: brightness(1.05); background: var(--sv-accent); }
+.sv-btn-danger { color: var(--sv-err); }
+.sv-btn-danger:hover { background: var(--sv-err-soft); border-color: var(--sv-err); }
+.sv-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Banners */
+.sv-banner {
+	margin: 0.6em 0;
+	padding: 0.75em 0.95em;
+	border-radius: 10px;
+	font-size: 0.93em;
+	line-height: 1.45;
+}
+.sv-banner-warn { background: var(--sv-warn-soft); border: 1px solid rgba(217,119,6,.2); color: #92400e; }
+.sv-banner-err  { background: var(--sv-err-soft);  border: 1px solid rgba(220,38,38,.2); color: var(--sv-err); }
+.sv-banner-ok   { background: var(--sv-ok-soft);   border: 1px solid rgba(22,163,74,.2); color: #14532d; }
+
+.sv-secret-head { font-weight: 600; margin-bottom: 0.5em; }
+.sv-secret {
+	display: block;
+	padding: 0.65em 0.8em;
+	background: #fff;
+	border: 1px solid rgba(22,163,74,.25);
+	border-radius: 8px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 0.95em;
+	color: #14532d;
+	word-break: break-all;
+}
+.sv-secret-foot {
+	display: flex; justify-content: space-between; gap: 1em;
+	margin-top: 0.6em; align-items: center;
+	font-size: 0.88em;
+}
+
+/* Tables */
+.sv-list-wrap   { margin-top: 0.5em; }
+.sv-list-muted  { color: var(--sv-fg-muted); padding: 0.5em 0; }
+.sv-list-empty  { color: var(--sv-fg-muted); padding: 0.65em 0.8em; background: rgba(0,0,0,0.02); border-radius: 8px; }
+.sv-table       { width: 100%; border-collapse: collapse; }
+.sv-table th    { text-align: left; padding: 0.6em 0.5em; color: var(--sv-fg-muted); font-weight: 500; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--sv-border); }
+.sv-table td    { padding: 0.7em 0.5em; border-bottom: 1px solid var(--sv-border); }
+.sv-table tr:last-child td { border-bottom: 0; }
+.sv-table-muted { color: var(--sv-fg-muted); }
+.sv-table-right { text-align: right; }
+.sv-row-current td { background: var(--sv-accent-soft); }
+.sv-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.95em; }
+
+/* Dark theme tweaks via prefers-color-scheme — only when Snappymail
+   variables aren't already overriding us. */
+@media (prefers-color-scheme: dark) {
+	.souvera-settings {
+		--sv-bg: rgba(255,255,255,0.04);
+		--sv-border: rgba(255,255,255,0.10);
+	}
+	.sv-card-h { background: rgba(255,255,255,0.02); }
+	.sv-secret { background: rgba(255,255,255,0.06); color: #86efac; border-color: rgba(34,197,94,.35); }
+}
+</style>

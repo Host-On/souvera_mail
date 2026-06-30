@@ -245,6 +245,13 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			$sUID = $ocUser->getUID();
 			$oUrlGen = \OCP\Server::get(\OCP\IURLGenerator::class);
 			$sWebDAV = $oUrlGen->getAbsoluteURL($oUrlGen->linkTo('', 'remote.php') . '/dav');
+
+			// Seed a default mail identity using the NC display name on the
+			// very first request after first login — saves the user from the
+			// "please enter your name in Settings → Identities" gating dialog
+			// the engine shows when no identity exists yet. No-op on every
+			// subsequent request (already-set identity is preserved verbatim).
+			$this->seedDefaultIdentityFromNcProfile($ocUser);
 //			$sWebDAV = \OCP\Util::linkToRemote('dav');
 			$aResult['Nextcloud'] = [
 				'UID' => $sUID,
@@ -413,6 +420,66 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			return $svc->isAvailable();
 		} catch (\Throwable $e) {
 			return false;
+		}
+	}
+
+	/**
+	 * On the very first request after a fresh login, write a default mail
+	 * identity using the Nextcloud user's profile display-name so the user
+	 * is not prompted for it in the engine's compose UI ("Please set your
+	 * name in Settings → Identities"). Cheap no-op on every subsequent
+	 * request — already-stored identities are preserved verbatim (we never
+	 * overwrite a user-edited identity).
+	 *
+	 * Best-effort: any exception is swallowed. Failing to seed is annoying
+	 * but never breaks the boot. The engine's normal identity-empty path
+	 * keeps working.
+	 */
+	protected function seedDefaultIdentityFromNcProfile(\OCP\IUser $ocUser) : void
+	{
+		try {
+			$displayName = \trim((string) $ocUser->getDisplayName());
+			if ($displayName === '') {
+				return;
+			}
+			$actions = \Smail\Engine\Api::Actions();
+			$account = $actions->getMainAccountFromToken(false);
+			if (!$account) {
+				return;
+			}
+			$email = $account->Email();
+			if ($email === '') {
+				return;
+			}
+			$storage = $actions->LocalStorageProvider();
+			$type = \Smail\Engine\Providers\Storage\Enumerations\StorageType::CONFIG->value;
+			$existingRaw = $storage->Get($account, $type, 'identities');
+			$existing = \json_decode((string) $existingRaw, true);
+			if (\is_array($existing) && !empty($existing)) {
+				// User (or a previous seed) already has at least one identity — leave it alone.
+				return;
+			}
+
+			// Shape mirrors Smail\Engine\Model\Identity::ToSimpleJSON().
+			$identity = [
+				'Id' => '',
+				'Label' => '',
+				'Email' => $email,
+				'Name' => $displayName,
+				'ReplyTo' => '',
+				'Bcc' => '',
+				'Signature' => '',
+				'SignatureInsertBefore' => false,
+				'sentFolder' => '',
+				'pgpEncrypt' => false,
+				'pgpSign' => false,
+				'smimeKey' => '',
+				'smimeCertificate' => '',
+			];
+			$storage->Put($account, $type, 'identities', \json_encode([$identity]));
+			\Smail\Engine\Log::info('Nextcloud', 'seeded default identity for ' . $ocUser->getUID() . ' (' . $email . ')');
+		} catch (\Throwable $e) {
+			\Smail\Engine\Log::warning('Nextcloud', 'identity seed skipped: ' . $e->getMessage());
 		}
 	}
 

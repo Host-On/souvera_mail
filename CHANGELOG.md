@@ -6,6 +6,32 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.4] — 2026-02-17
+
+### Fixed (three live bugs reported by operator)
+- **App-Password creation silently failed with "Creation failed".** The JS read `body.item.secret` while `AppPasswordController::create()` returns `{status:'ok', created:{secret,...}}`. JS now reads `body.created.secret`. Also surfaces the actual server-side error message (`body.message`) instead of always showing the generic literal — operators now see the real reason ("Stalwart refused…", "description must not be empty", etc.).
+- **"Verbundene Geräte" showed `Failed to load devices` and an empty list.** `ConnectedDevicesService::listForUser()` blew up on tokens whose `getScopeAsArray()` did not exist (NC34 token-provider variants) or whose other getters threw. Service hardened with `safeName/safeType/safeLastActivity/safeScope` wrappers; `safeScope` uses `method_exists()` before calling, so token providers that don't implement it return an empty array instead of crashing the whole request. Un-readable token entries are now skipped with a logger warning rather than failing the whole list. The JS surfaces `body.message` so operators see the actual server-side reason.
+- **First-time engine login no longer asks for the display name.** The plugin's `FilterAppData` hook now seeds a default mail Identity from the NC profile (`$ocUser->getDisplayName()` + `$account->Email()`) on the very first request after first login. Idempotent — once the user has any stored identity, the seed is a no-op (we never overwrite a user-edited identity). Wrapped in try/catch — never breaks engine boot.
+
+### Changed (UI polish — Souvera Central-aligned)
+- **Settings tab redesigned**: card-based layout, accent palette aligned with Souvera Central, Lucide-style line icons in section headers, radio "cards" instead of inline radios (clickable rows that highlight on selection), proper banner styles for warn/error/success states, sleeker buttons (primary / danger), modern table with current-session row highlighting, scoped CSS via `.souvera-settings { … }` so nothing leaks into the rest of the engine UI. Dark-mode tweaks via `prefers-color-scheme: dark`.
+
+### Architecture
+- **`lib/Service/ConnectedDevicesService.php`**: 4 new private `safe*` helpers wrap each NC IToken getter. Listing loop also try/catches around `getId()` (worst-case: that row is silently dropped, never the whole call).
+- **`app/smail/v/current/app/plugins/nextcloud/index.php`**: new `seedDefaultIdentityFromNcProfile(IUser)` helper (~50 LoC). Reads existing identities via `Smail\Engine\Api::Actions()->LocalStorageProvider()`, writes a default only when none exists. Shape mirrors `Smail\Engine\Model\Identity::ToSimpleJSON()`. Logs success/failure via `Smail\Engine\Log` so operators can see what happened in the engine log.
+- **`app/smail/v/current/app/plugins/nextcloud/js/settings-account.js`**: `createAppPassword` and `loadDevices` now read JSON bodies even on non-2xx responses (the NC controllers always return JSON, even on 4xx/5xx) — error display surfaces the actual `body.message` from the server.
+- **`app/smail/v/current/app/plugins/nextcloud/templates/SettingsSouveraAccount.html`**: rewritten with card-based markup + ~200 lines of scoped CSS. All Knockout bindings preserved.
+
+### Verification
+- `php -l` clean on all touched files.
+- `eslint` clean on `settings-account.js`.
+- **`tests/test_settings_three_bugs.php`: 42/42 PASS** (NEW). Covers all three bug fixes and the UI polish:
+  - App-Password: JS no longer reads `body.item`, reads `body.created.{secret,description}` instead; controller still returns the `created` key.
+  - Devices: 4 `safe*` wrappers exist, `safeScope` method_exists-guards, listing loop skips un-readable tokens, JS surfaces `body.message`.
+  - Identity seed: helper exists, called from FilterAppData, reads existing identities first, bails on existing identity, sources name from `getDisplayName()`, bails on empty name, uses account email, swallows Throwable, full shape match against `Identity::ToSimpleJSON()`.
+  - UI polish: card classes present, all Knockout bindings preserved.
+- Full regression — **361/361 PASS** across 10 test files.
+
 ## [0.13.3] — 2026-02-17
 
 ### Fixed (P0 — IMAP/SMTP/Sieve subrequest auth)
