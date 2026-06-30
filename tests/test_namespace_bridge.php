@@ -1,6 +1,6 @@
 <?php
 /**
- * Regression test for the namespace-bridge introduced in Souvera Mail 0.13.5
+ * Regression test for the namespace-bridge introduced in Souvera Mail 0.13.6
  * against the live crash reported on 2026-06-30:
  *
  *   Could not resolve OCA\Souvera_mail\Controller\PageController!

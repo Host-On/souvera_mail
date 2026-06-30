@@ -165,22 +165,33 @@ assertTrue(str_contains($appSrc, 'use OCP\\INavigationManager;'),
 $addCount = substr_count($appSrc, '$navigationManager->add(');
 assertTrue($addCount === 1, "Application.php has exactly ONE \$navigationManager->add() call (got: $addCount)", $passes, $failures);
 
-// Closure must contain the gate BEFORE constructing the payload array.
-// Find positions and assert ordering.
+// 0.13.6: the user + group gate is now OUTSIDE the closure (the
+// pre-0.13.6 design put it INSIDE and returned `[]`, which crashed
+// NC34 with TypeError on `$entry['id']` = null). Lock the new shape:
+//   * getUser() called in boot() BEFORE the closure
+//   * `$user === null` -> bare `return;` BEFORE the closure
+//   * `isEnabledForUser(self::APP_ID, $user)` -> bare `return;` BEFORE the closure
+//   * closure ALWAYS returns the full 5-key payload, no `return [];` anywhere
 $posClosureStart = strpos($appSrc, '$navigationManager->add(function');
-$posUserSession  = strpos($appSrc, 'getUser()', $posClosureStart !== false ? $posClosureStart : 0);
-$posIfNull       = strpos($appSrc, '$user === null', $posClosureStart !== false ? $posClosureStart : 0);
-$posIsEnabled    = strpos($appSrc, 'isEnabledForUser(self::APP_ID', $posClosureStart !== false ? $posClosureStart : 0);
-$posReturnArr    = strpos($appSrc, "'id' => self::APP_ID", $posClosureStart !== false ? $posClosureStart : 0);
+$posUserSession  = strpos($appSrc, 'getUser()');
+$posIfNull       = strpos($appSrc, '$user === null');
+$posIsEnabled    = strpos($appSrc, 'isEnabledForUser(self::APP_ID');
+$posReturnArr    = strpos($appSrc, "'id' => self::APP_ID");
 assertTrue($posClosureStart !== false, "Closure declaration found", $passes, $failures);
-assertTrue($posUserSession !== false && $posUserSession > $posClosureStart, "getUser() invoked inside closure", $passes, $failures);
-assertTrue($posIfNull !== false && $posIfNull > $posUserSession, "user===null guard appears after getUser()", $passes, $failures);
-assertTrue($posIsEnabled !== false && $posIsEnabled > $posIfNull, "isEnabledForUser(self::APP_ID,…) appears AFTER user-null guard", $passes, $failures);
-assertTrue($posReturnArr !== false && $posReturnArr > $posIsEnabled, "Payload array constructed AFTER isEnabledForUser guard", $passes, $failures);
+assertTrue($posUserSession !== false && $posUserSession < $posClosureStart,
+    "getUser() invoked BEFORE the closure (gate moved out for NC34 crash-safety)", $passes, $failures);
+assertTrue($posIfNull !== false && $posIfNull > $posUserSession && $posIfNull < $posClosureStart,
+    "user===null guard appears BEFORE the closure", $passes, $failures);
+assertTrue($posIsEnabled !== false && $posIsEnabled > $posIfNull && $posIsEnabled < $posClosureStart,
+    "isEnabledForUser(self::APP_ID,…) gate appears BEFORE the closure", $passes, $failures);
+assertTrue($posReturnArr !== false && $posReturnArr > $posClosureStart,
+    "Payload array constructed inside the closure", $passes, $failures);
 
-// Two early `return []` statements (null-user + disabled)
-$emptyReturns = preg_match_all('#return\s*\[\s*\]\s*;#', substr($appSrc, $posClosureStart ?: 0));
-assertTrue($emptyReturns >= 2, "Closure has >= 2 early 'return [];' statements (got: $emptyReturns)", $passes, $failures);
+// 0.13.6: NO `return [];` anywhere in boot() — that was the TypeError trap
+$emptyReturns = preg_match_all('#return\s*\[\s*\]\s*;#', $appSrc);
+assertTrue($emptyReturns === 0,
+    "boot() has ZERO 'return [];' statements anywhere (got: $emptyReturns) — the NC34 crash trap",
+    $passes, $failures);
 
 // php -l on Application.php
 $lintOut = shell_exec('php -l /app/lib/AppInfo/Application.php 2>&1');
@@ -189,7 +200,7 @@ assertTrue(str_contains((string)$lintOut, 'No syntax errors'), "php -l passes on
 // info.xml version is 0.11.1
 $infoXml = file_get_contents('/app/appinfo/info.xml');
 preg_match('#<version>([^<]+)</version>#', $infoXml, $vm);
-assertTrue(($vm[1] ?? '') === '0.13.5', "info.xml <version> == 0.13.5 (got: ".($vm[1] ?? '').")", $passes, $failures);
+assertTrue(version_compare($vm[1] ?? '0.0.0', '0.13.6', '>='), "info.xml <version> >= 0.13.6 (got: ".($vm[1] ?? '').")", $passes, $failures);
 
 // CHANGELOG has 0.11.1 entry mentioning the navigation/group fix
 $changelog = file_get_contents('/app/CHANGELOG.md');

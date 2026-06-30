@@ -115,28 +115,43 @@ class Application extends App implements IBootstrap
         }
 
         $navigationManager = $serverContainer->get(INavigationManager::class);
-        $navigationManager->add(function () use ($serverContainer) {
-            // Respect per-user app-enable status (group restrictions etc.).
-            // Without this guard, every authenticated user — including
-            // accounts NOT in the allowed groups configured via
-            // `occ app:enable souvera_mail --groups …` — would still see
-            // a navigation entry for Souvera Mail and get redirected to
-            // an "App is not enabled" page on click. `IAppManager::
-            // isEnabledForUser()` returns false for users outside the
-            // configured group set and for users disabled altogether,
-            // so it is exactly the right gate here.
-            $userSession = $serverContainer->get(IUserSession::class);
-            $user = $userSession->getUser();
-            if ($user === null) {
-                // Pre-auth navigation rendering (e.g. login page). Don't
-                // surface a mailbox link there either.
-                return [];
-            }
-            $appManager = $serverContainer->get(IAppManager::class);
-            if (!$appManager->isEnabledForUser(self::APP_ID, $user)) {
-                return [];
-            }
 
+        // ------------------------------------------------------------------
+        // Navigation entry registration.
+        //
+        // NC34's NavigationManager::add() does `$id = $entry['id']` and then
+        // `IAppManager::isEnabledForUser($id)` (strict `string $appId` since
+        // 30+). If we return `[]` from the closure for the pre-auth case,
+        // `$id` is null, the strict type-check throws TypeError, and the
+        // crash trips layout.guest.php — taking down /login, public shares,
+        // every guest-rendered page (operator report, 2026-06-30).
+        //
+        // The correct shape is therefore: **never register a closure unless
+        // the resulting entry is going to be valid**. We branch HERE,
+        // outside the closure:
+        //   - pre-auth (no NC user)            -> do not register
+        //   - user not in souvera-users group  -> do not register
+        //   - otherwise                        -> register a closure that
+        //     ALWAYS returns a complete entry with `id`, `name`, `href`,
+        //     `icon`, `order`. Never `[]`.
+        // ------------------------------------------------------------------
+        $userSession = $serverContainer->get(IUserSession::class);
+        $user = $userSession->getUser();
+        if ($user === null) {
+            // Pre-auth (login page, public shares, OIDC redirect leg, …) —
+            // no user means no per-user navigation. Skipping the registration
+            // entirely is the only crash-safe option in NC34: a stub closure
+            // returning `[]` here still trips `add()`'s `$entry['id']` access.
+            return;
+        }
+        $appManager = $serverContainer->get(IAppManager::class);
+        if (!$appManager->isEnabledForUser(self::APP_ID, $user)) {
+            // User exists but is outside the `souvera-users` group restriction.
+            // Same crash-safety rule: don't register a closure at all.
+            return;
+        }
+
+        $navigationManager->add(function () use ($serverContainer) {
             $appConfig = $serverContainer->get(IAppConfig::class);
             $urlGenerator = $serverContainer->get(IURLGenerator::class);
 

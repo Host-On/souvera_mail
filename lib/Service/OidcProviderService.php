@@ -43,7 +43,16 @@ class OidcProviderService
     public const TOKEN_GENERATION_EVENT_FQN = 'OCA\\OIDCIdentityProvider\\Event\\TokenGenerationRequestEvent';
 
     private const CACHE_PREFIX = 'souvera_mail.oidc.token.';
+    // Refuse to hand out (or cache for longer than) any JWT with less than this
+    // many seconds of remaining lifetime. Mirrors the IMAP/SMTP/Sieve subrequest
+    // path's worst-case roundtrip: token minted on the NC web request → sent on
+    // the engine subrequest → received and validated by Stalwart. 60 s buys
+    // generous headroom against clock drift between NC and Stalwart.
     private const CACHE_SAFETY_MARGIN_SECONDS = 60;
+    // Only used for opaque (non-JWT) tokens — H2CK pre-1.x default. JWT tokens
+    // always get an exp-derived TTL. NEVER use this as a fallback for a parsed
+    // JWT that is already (near-)expired — that would extend the cached entry
+    // past the token's lifetime and trigger Stalwart's ExpiredSignature reject.
     private const FALLBACK_TTL_SECONDS = 60;
 
     private ICache $cache;
@@ -88,6 +97,15 @@ class OidcProviderService
      * Issue (or fetch from cache) an OIDC access token for the given user.
      * Returns null when H2CK/oidc is unavailable or the event dispatch fails;
      * never throws — admins see a friendly message via the surrounding code.
+     *
+     * Caching is *defence-in-depth* TTL-aware: we honour the distributed
+     * cache's TTL AND re-validate the cached JWT's `exp` claim on every hit.
+     * Different cache backends (Redis, APCu, Memcached, NoLocal) honour TTLs
+     * with subtly different semantics, and minor clock drift between the NC
+     * pod and Stalwart can compound — so the only safe contract is to refuse
+     * to hand out any JWT whose remaining lifetime is below the safety margin.
+     * This is exactly what the IMAP/SMTP/Sieve subrequest path needs: a fresh
+     * (or near-fresh) token on every connect, never a stale one.
      */
     public function generateAccessToken(string $userId): ?string
     {
@@ -106,8 +124,14 @@ class OidcProviderService
         $cacheKey = self::CACHE_PREFIX . $clientId . '.' . $userId;
 
         $cached = $this->cache->get($cacheKey);
-        if (\is_string($cached) && $cached !== '') {
+        if (\is_string($cached) && $cached !== '' && $this->isJwtStillSafe($cached)) {
             return $cached;
+        }
+        // Cached entry was either missing, opaque, or its `exp` is too close
+        // (or past) — evict so we don't keep handing the same dead token out
+        // to other workers hitting this code path within the same second.
+        if ($cached !== null && $cached !== false) {
+            $this->cache->remove($cacheKey);
         }
 
         try {
@@ -135,7 +159,12 @@ class OidcProviderService
             }
 
             $ttl = $this->extractCacheTtl($accessToken);
-            $this->cache->set($cacheKey, $accessToken, $ttl);
+            // Only persist tokens that buy callers at least one second of
+            // usable lifetime — anything tighter is a "we'll be re-minting in
+            // a flash" race we'd rather not bake into the distributed cache.
+            if ($ttl > 0) {
+                $this->cache->set($cacheKey, $accessToken, $ttl);
+            }
 
             return $accessToken;
         } catch (\Throwable $e) {
@@ -148,29 +177,67 @@ class OidcProviderService
     }
 
     /**
-     * Decode the JWT `exp` claim and compute a safe TTL for the cache entry.
-     * Falls back to `FALLBACK_TTL_SECONDS` when the token is opaque or has no
-     * parseable expiry — opaque tokens are H2CK's pre-JWT default and should
-     * be migrated via `occ config:app:set oidc default_token_type --value jwt`.
+     * True when the given JWT can still be safely handed out for OAUTHBEARER
+     * — i.e. its `exp` claim is at least {@see CACHE_SAFETY_MARGIN_SECONDS}
+     * seconds in the future. Opaque tokens (no parseable `exp`) are treated
+     * as safe because we have no expiry hint and the surrounding cache TTL
+     * (60 s {@see FALLBACK_TTL_SECONDS}) keeps the blast radius small.
      */
-    private function extractCacheTtl(string $jwt): int
+    private function isJwtStillSafe(string $jwt): bool
+    {
+        $exp = $this->extractJwtExp($jwt);
+        if ($exp === null) {
+            // Opaque token — no way to verify, trust the cache TTL.
+            return true;
+        }
+        return ($exp - \time()) >= self::CACHE_SAFETY_MARGIN_SECONDS;
+    }
+
+    /**
+     * Parse the JWT `exp` claim (UNIX seconds) without verifying the
+     * signature — we already know the token came from H2CK/oidc, and
+     * Stalwart re-verifies the signature on its side. Returns null when
+     * the token is opaque (not a 3-part dot-separated JWT) or the
+     * payload has no integer `exp` claim.
+     */
+    private function extractJwtExp(string $jwt): ?int
     {
         $parts = \explode('.', $jwt);
         if (\count($parts) < 2) {
-            return self::FALLBACK_TTL_SECONDS;
+            return null;
         }
         $b64 = \strtr($parts[1], '-_', '+/');
         $b64 .= \str_repeat('=', (4 - \strlen($b64) % 4) % 4);
         $decoded = \base64_decode($b64, true);
         if ($decoded === false) {
-            return self::FALLBACK_TTL_SECONDS;
+            return null;
         }
         $payload = \json_decode($decoded, true);
         if (!\is_array($payload) || !isset($payload['exp']) || !\is_int($payload['exp'])) {
+            return null;
+        }
+        return $payload['exp'];
+    }
+
+    /**
+     * Decode the JWT `exp` claim and compute a safe TTL for the cache entry.
+     * Falls back to {@see FALLBACK_TTL_SECONDS} ONLY for opaque tokens (no
+     * parseable `exp`). A JWT whose remaining lifetime is at or under the
+     * safety margin gets a TTL of 0 — caller must not cache it, otherwise
+     * the cache entry would outlive the token and Stalwart would reject the
+     * subsequent connect with ExpiredSignature (exactly the bug this method
+     * is here to prevent).
+     */
+    private function extractCacheTtl(string $jwt): int
+    {
+        $exp = $this->extractJwtExp($jwt);
+        if ($exp === null) {
+            // Opaque (pre-JWT) token — admin should run
+            // `occ config:app:set oidc default_token_type --value jwt`.
             return self::FALLBACK_TTL_SECONDS;
         }
-        $remaining = $payload['exp'] - \time() - self::CACHE_SAFETY_MARGIN_SECONDS;
-        return $remaining > 0 ? $remaining : self::FALLBACK_TTL_SECONDS;
+        $remaining = $exp - \time() - self::CACHE_SAFETY_MARGIN_SECONDS;
+        return $remaining > 0 ? $remaining : 0;
     }
 
     /**

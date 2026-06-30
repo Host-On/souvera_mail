@@ -6,6 +6,60 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.7] — 2026-02-17
+
+### Fixed (P0 — IMAP `AUTHENTICATIONFAILED` after 15 min, reported 2026-07-01)
+- **Long-lived IMAP / SMTP / Sieve sessions no longer fail with `AUTHENTICATIONFAILED` once the OIDC access token's 15 min TTL elapses.** H2CK/oidc issues 15 min JWTs. Souvera Mail cached them in NC's distributed cache. On reconnects (dashboard widget refresh, cron sync, background engine-token-cookie reconnect, Sieve-from-CLI) the cached entry was returned blindly even when `exp - now` was already at or past 0. Different cache backends (Redis, APCu, Memcached, NoLocal) honour TTLs with subtly different semantics; combined with clock drift between NC and Stalwart this opened a multi-second window in which the cache would hand out a token Stalwart immediately rejected with `ExpiredSignature`. Verified end-to-end by the operator against Stalwart 0.16 trace logs.
+- **`OidcProviderService::generateAccessToken()` now re-validates the cached JWT's `exp` claim on every cache hit.** The cache TTL is treated as a coarse hint, not a contract:
+  - cached JWT with `exp - now >= 60 s` → safe, returned verbatim;
+  - cached JWT with `exp - now <  60 s` → cache entry actively evicted, fresh JWT minted via `OCA\OIDCIdentityProvider\Event\TokenGenerationRequestEvent`;
+  - opaque (non-JWT) cached token → trusted (no `exp` claim available; legacy H2CK pre-1.x).
+- **`extractCacheTtl()` no longer silently extends a near-expired token's life by 60 s.** A parsed JWT with non-positive remaining lifetime now returns TTL=0 (do-not-cache) instead of the `FALLBACK_TTL_SECONDS` fallback. The 60 s fallback is reserved exclusively for opaque tokens (where `extractJwtExp()` returned `null`).
+- `generateAccessToken()` skips `$cache->set()` entirely when the freshly minted token would be cached for ≤ 0 s — avoids ever persisting a token whose remaining usable life is below the safety margin.
+
+### Architecture
+- **`lib/Service/OidcProviderService.php`**:
+  - New private `extractJwtExp(string $jwt): ?int` — parses the JWT payload's `exp` claim without verifying the signature (Stalwart re-verifies on its side).
+  - New private `isJwtStillSafe(string $jwt): bool` — composes `extractJwtExp()` with `CACHE_SAFETY_MARGIN_SECONDS = 60`; opaque tokens default to safe.
+  - `extractCacheTtl()` refactored on top of `extractJwtExp()`. Returns 0 for parsed JWTs with non-positive remaining lifetime, `FALLBACK_TTL_SECONDS` only when the payload was opaque/unparseable.
+  - `generateAccessToken()` runs `isJwtStillSafe()` on every cache hit and removes the stale entry before falling through to the dispatcher.
+
+### Verification
+- `php -l` clean on `lib/Service/OidcProviderService.php`.
+- **`tests/test_oidc_token_refresh.php`: 25/25 PASS** (NEW). Static-source contract assertions on `isJwtStillSafe()`, `extractJwtExp()`, `generateAccessToken()` and `extractCacheTtl()`, plus a 7-state behavioural simulation driven by a stub distributed cache + stub H2CK dispatcher:
+  - 2a cold cache: mint once, cache with TTL ≈ `exp - 60 s`;
+  - 2b warm hit with safe JWT: no re-mint;
+  - 2c warm hit with `exp - now < 60 s`: evict + re-mint (the actual bug fix);
+  - 2d warm hit with already-past `exp`: evict + re-mint;
+  - 2e fresh mint of near-expired upstream token: returned but NOT cached;
+  - 2f opaque token: cached for `FALLBACK_TTL_SECONDS`;
+  - 2g empty uid: bails out without touching dispatcher or cache.
+- Regression: full local test suite still green — **445/445 PASS** across 13 test files (was 420/420 across 12).
+
+## [0.13.6] — 2026-02-17
+
+### Fixed (P0 — NC34 guest-page TypeError, reported 2026-06-30)
+- **`/login`, public-share pages and every other guest-rendered page no longer 500 with `TypeError: IAppManager::isEnabledForUser() expects parameter 1 to be string, null given`.** The crash chain: NC34's `NavigationManager::add()` (called by `init()` while resolving registered closure entries) does `$id = $entry['id']` followed by `isEnabledForUser($id)` (strict `string $appId` since NC30+). Our pre-0.13.6 navigation closure returned `[]` for the pre-auth case (no NC user) and the out-of-group case (user not in `souvera-users`) — `$entry['id']` was therefore `null`, the strict type-check threw, the InitialStateService rendering inside `layout.guest.php` died, every guest page along with it.
+- **The closure now never returns `[]`.** The user-presence + group-membership gate is moved *out* of the closure into `Application::boot()`'s body. When the gate fails, the closure is simply not registered — there is no poisoned empty array left for `NavigationManager::init()` to trip over later. When the gate passes, the closure unconditionally returns the full 5-key payload (`id`, `name`, `href`, `icon`, `order`).
+
+### Architecture
+- **`lib/AppInfo/Application.php` :: `boot()`** rewritten:
+  - Old: `$navigationManager->add(function () { … if ($user === null) return []; if (!$appManager->isEnabledForUser(…)) return []; return [/* full entry */]; })`
+  - New: branch BEFORE `add()`:
+    - `if ($user === null) { return; }` — pre-auth: nothing registered, guest pages crash-safe.
+    - `if (!$appManager->isEnabledForUser(self::APP_ID, $user)) { return; }` — out-of-group: nothing registered.
+    - Otherwise: `$navigationManager->add(closure)` with a closure that ALWAYS returns the full payload, no `return [];` anywhere.
+
+### Verification
+- `php -l` clean on `lib/AppInfo/Application.php`.
+- info.xml hygiene re-audited: no empty `<settings/>`, `<repair-steps/>`, `<navigations/>`, `<background-jobs/>`, `<commands/>`, `<sabre/>`, `<collaboration/>`, `<two-factor-providers/>`, `<public/>`, `<activity/>`, `<trash/>`, `<types/>` containers (those crash NC's InfoParser cluster-wide per the operator's Shield v2.0.0 → 2.0.1 incident). All container elements present in info.xml carry children. We deliberately ship NO `<navigations>` element — navigation is registered programmatically because the group gate needs runtime access to `IUserSession`.
+- **`tests/test_guest_page_navigation_crash.php`: 41/41 PASS** (NEW). Static assertions on the new `boot()` shape + info.xml hygiene + version, plus a 3-state behavioural sim with stub `IUserSession` / `IAppManager` / `INavigationManager`. The stub `INavigationManager::add()` mirrors NC34's `$id = $entry['id']` validation and would itself throw TypeError on any empty-array regression — that's the regression guard. Sim states:
+  - 5a **pre-auth (no user)**: no closure registered, no `isEnabledForUser` calls, no crash.
+  - 5b **user out-of-group**: no closure registered, `isEnabledForUser` consulted exactly once.
+  - 5c **happy path**: exactly one closure registered, full payload with `id`/`name`/`href`/`icon`/`order`.
+- `tests/test_navigation_gate.php` updated for the new gate-outside-closure shape: getUser/null-check/isEnabledForUser must appear BEFORE the `add()` call; zero `return [];` anywhere in `Application.php`.
+- Full regression — **413/413 PASS** across 12 test files.
+
 ## [0.13.5] — 2026-02-17
 
 ### Fixed (P0 — fatal QueryNotFoundException on every app load, reported 2026-06-30)

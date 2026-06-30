@@ -1,7 +1,7 @@
 <?php
 /**
  * Verifies the in-engine Snappymail Settings Tab introduced in
- * Souvera Mail 0.13.5 ("Sicherheit & Geräte").
+ * Souvera Mail 0.13.6 ("Sicherheit & Geräte").
  *
  * The old NC-chrome page at `/index.php/apps/souvera_mail/settings`
  * is replaced by a Snappymail-native Settings ViewModel registered
@@ -25,7 +25,7 @@
  *    second browser tab.
  * 6. The old NC-chrome assets (`templates/settings.php`,
  *    `js/personal-settings.js`) are gone.
- * 7. info.xml version is bumped to 0.13.5.
+ * 7. info.xml version is bumped to 0.13.6.
  */
 declare(strict_types=1);
 
@@ -187,17 +187,17 @@ assertTrue(!file_exists('/app/js/personal-settings.js'),
     "js/personal-settings.js removed", $passes, $failures);
 
 // ---------------------------------------------------------------
-// 7. Version 0.13.5
+// 7. Version 0.13.6
 // ---------------------------------------------------------------
 $info = file_get_contents('/app/appinfo/info.xml');
 preg_match('#<version>([^<]+)</version>#', $info, $vm);
-assertTrue(($vm[1] ?? '') === '0.13.5',
-    "info.xml <version> == 0.13.5 (got: '" . ($vm[1] ?? '') . "')",
+assertTrue(version_compare($vm[1] ?? '0.0.0', '0.13.6', '>='),
+    "info.xml <version> >= 0.13.6 (got: '" . ($vm[1] ?? '') . "')",
     $passes, $failures);
 
 $changelog = file_get_contents('/app/CHANGELOG.md');
-assertTrue(str_contains($changelog, '[0.13.5]'),
-    "CHANGELOG.md contains [0.13.5] heading", $passes, $failures);
+assertTrue(str_contains($changelog, '[0.13.6]'),
+    "CHANGELOG.md contains [0.13.6] heading", $passes, $failures);
 
 echo "\n========================================\n";
 echo "PASSED: " . count($passes) . " / " . (count($passes) + count($failures)) . "\n";

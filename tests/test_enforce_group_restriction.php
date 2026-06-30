@@ -111,8 +111,8 @@ assertTrue(($cm[1] ?? '') === 'souvera-users',
 // 5. version bumped to 0.13.0
 // ---------------------------------------------------------------
 preg_match('#<version>([^<]+)</version>#', $info, $vm);
-assertTrue(($vm[1] ?? '') === '0.13.5',
-    "info.xml <version> == 0.13.5 (got: '" . ($vm[1] ?? '') . "')", $passes, $failures);
+assertTrue(version_compare($vm[1] ?? '0.0.0', '0.13.6', '>='),
+    "info.xml <version> >= 0.13.6 (got: '" . ($vm[1] ?? '') . "')", $passes, $failures);
 
 // ---------------------------------------------------------------
 // 6. CHANGELOG mentions the group restriction
