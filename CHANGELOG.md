@@ -6,6 +6,37 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.11] — 2026-02-17
+
+### Added — Stalwart shared-mailbox identity auto-sync (operator-requested 2026-07-01)
+- **The compose-window "Von:" dropdown now lists every shared mailbox Stalwart has granted the user `EmailSubmission` rights for, automatically.** No more manual identity-creation per shared inbox. When the operator adds someone to `team@buxtehude.email` on the Stalwart side, that user sees `Team Buxtehude [Stalwart]` in their "Neue Nachricht" From-dropdown within 15 minutes — no Souvera Mail restart, no NC cron, no user action.
+
+### Architecture
+- **`lib/Service/SharedIdentitySyncService.php`** (NEW) — orchestrates the JMAP `Identity/get` round-trip (RFC 8621 `urn:ietf:params:jmap:submission` capability) against Stalwart, parses the response, and exposes a pure `reconcile()` method that merges the result into the engine's per-account identity blob. Throttled to ONCE per 15 min per user via the NC distributed cache; 99% of engine boots are a microsecond cache hit. `forceSync()` is available for future "Jetzt neu synchronisieren" buttons.
+- **`lib/Service/StalwartAdminService.php`** — `jmapCall()` gained an optional `array $extraCapabilities = []` parameter. RFC 8621 methods outside the default core + Stalwart-extension scope (Identity/get → `submission`, Mailbox/get → `mail`) can now declare their capability requirements without forcing every other caller to include them.
+- **Engine plugin** (`app/smail/v/current/app/plugins/nextcloud/index.php`) — new `syncStalwartIdentitiesIfStale(IUser)` method wired into `FilterAppData()` immediately AFTER `seedDefaultIdentityFromNcProfile()`. Pulls the throttled list via the new service, calls `reconcile()`, writes back to `StorageType::CONFIG` ONLY if the reconciled blob differs from what's already stored.
+
+### Reconciliation rules (`SharedIdentitySyncService::reconcile()`)
+1. **Manual identities are preserved verbatim.** Any record whose `Id` does NOT start with `stalwart:` is treated as user-owned — its signature, ReplyTo, Bcc, sentFolder, S/MIME and PGP settings survive every sync run untouched. (Operator choice b.)
+2. **Stalwart-managed identities are marked with `Id = 'stalwart:<stalwartIdentityId>'`.** That marker is the sync engine's exclusive ownership signal — manual identities never use it.
+3. **Stalwart-managed identities get `Label = '<name> [Stalwart]'`** so the user can tell them apart in the Settings → Identities list and in the From-dropdown. The `Name` field (= the actual outgoing-header display name) is the bare Stalwart description, unchanged. (Operator choice c.)
+4. **Manual-email collision wins for the user.** If a manual identity's email matches one of Stalwart's entries, the Stalwart entry is silently skipped — the user gets to keep their hand-tuned signature for their own primary mailbox. (Edge case worth pinning: the user's primary inbox is one of Stalwart's `Identity/get` entries, but they may already have a manual identity for it that they hand-customised post-first-login.)
+5. **Removed-from-Stalwart entries are dropped from the engine on the next sync window.** When the operator revokes send-as on a shared mailbox, the next engine boot ≥ 15 min later reconciles the removal — no more stale entries cluttering the From-dropdown.
+6. **Display-name / email changes are picked up in place.** The `stalwart:<id>` marker stays stable across renames; only Email / Name / Label fields update. No duplicates, no Id churn, no signature loss.
+
+### Verification
+- `php -l` clean on all three touched PHP files.
+- **`tests/test_shared_identity_sync.php`: 32/32 PASS** (NEW). Static-source contract on the new service + adapted `StalwartAdminService` + engine-plugin wiring, plus a 7-state behavioural simulation that drives `reconcile()` through cold-start, manual+Stalwart merge, manual-email collision, Stalwart-revocation, rename-in-place, double-reconcile idempotency, and missing-description fallback.
+- Full local suite **548/548 PASS** across 16 test files (was 516/516 across 15). Zero regressions.
+
+### Operator decisions captured (2026-07-01)
+| Choice | Value | Mapped to |
+|---|---|---|
+| a) Cadence | every 15 min, lazy on engine boot | `THROTTLE_SECONDS = 900` + `syncIfStale()` on every `FilterAppData()` |
+| b) Conflict policy | manual stays, Stalwart marked "Stalwart-verwaltet" | reconcile rules #1–#4 above |
+| c) Display name | Stalwart `Identity.name` | `name` field forwarded verbatim, ` [Stalwart]` only in `Label` |
+| d) Scope | (decided by main agent) | every entry `Identity/get` returns — Stalwart already gates by send-as permission |
+
 ## [0.13.10] — 2026-02-17
 
 ### Fixed (P0 follow-up — email-as-username for App Passwords, requested 2026-07-01)

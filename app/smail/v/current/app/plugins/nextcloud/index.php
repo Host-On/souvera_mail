@@ -252,6 +252,12 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			// the engine shows when no identity exists yet. No-op on every
 			// subsequent request (already-set identity is preserved verbatim).
 			$this->seedDefaultIdentityFromNcProfile($ocUser);
+
+			// Reconcile Stalwart-managed shared-mailbox identities with the
+			// engine's local identity storage. Throttled to once per 15 min
+			// per user inside the service — 99% of boots are a microsecond
+			// cache hit. See {@see SharedIdentitySyncService::syncIfStale}.
+			$this->syncStalwartIdentitiesIfStale($ocUser);
 //			$sWebDAV = \OCP\Util::linkToRemote('dav');
 			$aResult['Nextcloud'] = [
 				'UID' => $sUID,
@@ -480,6 +486,66 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			\Smail\Engine\Log::info('Nextcloud', 'seeded default identity for ' . $ocUser->getUID() . ' (' . $email . ')');
 		} catch (\Throwable $e) {
 			\Smail\Engine\Log::warning('Nextcloud', 'identity seed skipped: ' . $e->getMessage());
+		}
+	}
+
+	/**
+	 * Pulls the user's Stalwart-managed identities (own mailbox + every
+	 * shared mailbox where they have send-as permission) and reconciles
+	 * them into the engine's per-account `identities` blob. Idempotent +
+	 * throttled to once per 15 min per user inside the service — every
+	 * other engine boot is a microsecond cache hit. Manual identities
+	 * (Id not prefixed `stalwart:`) are preserved verbatim; Stalwart-
+	 * managed entries that no longer exist on the server are removed;
+	 * display-name / email changes are picked up on the next sync window.
+	 *
+	 * Best-effort: any exception is swallowed at WARN level. A failed
+	 * sync simply leaves the engine's identity list as-is.
+	 */
+	protected function syncStalwartIdentitiesIfStale(\OCP\IUser $ocUser) : void
+	{
+		try {
+			if (!\class_exists(\OCA\SouveraMail\Service\SharedIdentitySyncService::class)) {
+				return;
+			}
+			$svc = \OCP\Server::get(\OCA\SouveraMail\Service\SharedIdentitySyncService::class);
+			if (!$svc->isAvailable()) {
+				return;
+			}
+			$stalwart = $svc->syncIfStale($ocUser->getUID());
+			if ($stalwart === null) {
+				// Cache hit — engine's stored identities are still authoritative.
+				return;
+			}
+
+			$actions = \Smail\Engine\Api::Actions();
+			$account = $actions->getMainAccountFromToken(false);
+			if (!$account) {
+				return;
+			}
+			$storage = $actions->LocalStorageProvider();
+			$type = \Smail\Engine\Providers\Storage\Enumerations\StorageType::CONFIG->value;
+
+			$existingRaw = $storage->Get($account, $type, 'identities');
+			$existing = \json_decode((string) $existingRaw, true);
+			if (!\is_array($existing)) {
+				$existing = [];
+			}
+
+			$reconciled = $svc->reconcile($existing, $stalwart);
+
+			// Only write back when something actually changed — avoids
+			// spurious LocalStorageProvider churn on the first run after
+			// a fresh JMAP sync that happens to return the same payload.
+			if (\json_encode($reconciled) !== \json_encode($existing)) {
+				$storage->Put($account, $type, 'identities', \json_encode($reconciled));
+				\Smail\Engine\Log::info(
+					'Nextcloud',
+					'reconciled ' . \count($stalwart) . ' Stalwart-managed identities for ' . $ocUser->getUID()
+				);
+			}
+		} catch (\Throwable $e) {
+			\Smail\Engine\Log::warning('Nextcloud', 'Stalwart identity sync skipped: ' . $e->getMessage());
 		}
 	}
 

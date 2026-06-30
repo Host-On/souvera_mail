@@ -67,18 +67,29 @@ class StalwartAdminService
      *
      * @param non-empty-string $bearerToken RFC 9068 JWT acquired via H2CK/oidc
      * @param list<array{0: string, 1: array<string, mixed>, 2: string}> $methodCalls
+     * @param list<string> $extraCapabilities Additional capability URIs to include
+     *     in the `using` array — required for methods outside the default core +
+     *     Stalwart extension scope (e.g. `urn:ietf:params:jmap:submission` for
+     *     `Identity/get`, `urn:ietf:params:jmap:mail` for `Mailbox/get`).
      * @return array<string, mixed> Decoded JMAP response
      * @throws \RuntimeException on HTTP / JMAP / connectivity failure
      */
-    public function jmapCall(string $bearerToken, array $methodCalls): array
+    public function jmapCall(string $bearerToken, array $methodCalls, array $extraCapabilities = []): array
     {
         $url = $this->getApiUrl();
         if ($url === null) {
             throw new \RuntimeException('Stalwart API URL not configured (souvera_central.stalwart_api_url)');
         }
 
+        $using = ['urn:ietf:params:jmap:core', self::CAPABILITY];
+        foreach ($extraCapabilities as $cap) {
+            if (\is_string($cap) && $cap !== '' && !\in_array($cap, $using, true)) {
+                $using[] = $cap;
+            }
+        }
+
         $envelope = [
-            'using' => ['urn:ietf:params:jmap:core', self::CAPABILITY],
+            'using' => $using,
             'methodCalls' => $methodCalls,
         ];
 
