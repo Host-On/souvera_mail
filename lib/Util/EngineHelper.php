@@ -214,10 +214,32 @@ class EngineHelper
      */
     public function isOIDCLogin(): bool
     {
-        if ($this->appConfig->getValueString('souvera_mail', 'autologin-oidc', '0') !== '1') {
+        if (!$this->isOIDCEnabledServerSide()) {
             return false;
         }
         if ($this->userSession->getUser() === null) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Session-free variant of {@see isOIDCLogin()} — true when the
+     * server-side prerequisites for OIDC tokens are present, regardless
+     * of whether an interactive NC user is currently logged in.
+     *
+     * Used by IMAP/SMTP/Sieve subrequest paths (engine plugin's
+     * `beforeLogin` hook) where the connect is driven by an account
+     * record (e.g. cached engine-token re-connect, cron, dashboard
+     * widget background refresh, Sieve-from-CLI) and the NC session
+     * may not be active even though the user is conceptually "logged
+     * in" — `OidcProviderService::generateAccessToken($uid)` works
+     * just fine without a session because it dispatches an in-process
+     * PHP event scoped to (souvera_mail-client, $uid).
+     */
+    public function isOIDCEnabledServerSide(): bool
+    {
+        if ($this->appConfig->getValueString('souvera_mail', 'autologin-oidc', '0') !== '1') {
             return false;
         }
         if (!$this->oidcProvider->isProviderAvailable()) {
@@ -245,6 +267,40 @@ class EngineHelper
 
         $uid = $this->getSsoUid();
         if ($uid === null) {
+            return null;
+        }
+        return $this->oidcProvider->generateAccessToken($uid);
+    }
+
+    /**
+     * Session-free variant of {@see getOidcAccessToken()}: generate an
+     * OIDC access token for an explicit user id, without consulting the
+     * NC session.
+     *
+     * Required for the engine plugin's `beforeLogin` hook on the IMAP /
+     * SMTP / Sieve subrequest paths: the engine fires that hook on
+     * every connect, including background refreshes where the NC
+     * session is *not* the source of identity — the identity is the
+     * MainAccount's stored sentinel `oidc_login|<uid>` (set by
+     * `accountFromNcSession()` at first login and persisted in the
+     * engine's encrypted account store). Without this method we used
+     * to fall back to `getSsoUid()` which returned `null` outside the
+     * session, the literal sentinel was then sent to Stalwart as a
+     * password, and IMAP rejected the connect with `AUTHENTICATIONFAILED`.
+     *
+     * Behaviour contract:
+     *  - Returns `null` (no exception) when `$uid` is empty, when the
+     *    server-side prerequisites are not met (autologin-oidc disabled
+     *    or H2CK/oidc missing), or when H2CK refuses to mint the token.
+     *  - Caching is owned by {@see OidcProviderService} — re-calls
+     *    within the JWT's `exp - 60s` window hit the distributed cache.
+     */
+    public function getOidcAccessTokenForUid(string $uid): ?string
+    {
+        if ($uid === '') {
+            return null;
+        }
+        if (!$this->isOIDCEnabledServerSide()) {
             return null;
         }
         return $this->oidcProvider->generateAccessToken($uid);

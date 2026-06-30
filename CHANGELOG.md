@@ -6,6 +6,30 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.3] — 2026-02-17
+
+### Fixed (P0 — IMAP/SMTP/Sieve subrequest auth)
+- **Background mail-server reconnects no longer fail with `AUTHENTICATIONFAILED`.** The engine plugin's `beforeLogin` hook used to swap the in-engine sentinel password `oidc_login|<uid>` for a fresh H2CK/oidc JWT *only* when `EngineHelper::isOIDCLogin()` returned true. That helper required `IUserSession::getUser() !== null` — i.e. an active Nextcloud session in the current request. On every code path where the IMAP/SMTP/Sieve connect was driven by an account record *without* an active NC session — dashboard widget background refresh, cron, engine-token-cookie reconnects, Sieve-from-CLI — the guard returned false, the literal sentinel was sent to Stalwart as the password, and Stalwart rejected the connect with `AUTHENTICATIONFAILED`. Operators saw the failure as "Mailbox connection failed after a while" or "Dashboard widget shows 0 unread until I reload the page".
+
+### Architecture
+- **`OCA\SouveraMail\Util\EngineHelper`** gains two session-free helpers (alongside the existing `isOIDCLogin()` / `getOidcAccessToken()` which keep their semantics for live-session callers):
+  - `isOIDCEnabledServerSide(): bool` — config flag (`autologin-oidc='1'`) AND H2CK/oidc app available. Does **not** consult `IUserSession`.
+  - `getOidcAccessTokenForUid(string $uid): ?string` — dispatches `OidcProviderService::generateAccessToken($uid)` with an explicit uid (the new bug-fix entry point). Guards on `isOIDCEnabledServerSide()`. Returns null cleanly (never throws) when prerequisites are missing or H2CK refuses to mint the token.
+- **Engine plugin `beforeLogin` hook** rewritten:
+  - Removed `isOIDCLogin()` guard — the sentinel itself (`oidc_login|<uid>`, written by `Smail\Engine\Actions\UserAuth::accountFromNcSession()` at first login and persisted in the encrypted account store) is now the authoritative identity marker for OIDC-based accounts.
+  - Parses `<uid>` directly out of the sentinel via `substr` + `strlen('oidc_login|')`.
+  - Calls `EngineHelper::getOidcAccessTokenForUid($uid)` instead of the session-coupled `getOidcAccessToken()`.
+  - Bails cleanly on malformed sentinel (empty `<uid>`) — the original sentinel is preserved so the engine's normal IMAP error path surfaces a useful diagnostic rather than us silently masking a corrupt account record.
+- **`isOIDCLogin()` itself** is refactored to delegate to `isOIDCEnabledServerSide()` for the operator-controlled checks (no duplication) and only adds the live-session check on top. Semantics for browser callers (`PageController`, `UserAuth::accountFromNcSession`) are unchanged.
+
+### Verification
+- `php -l` clean on both touched files (`lib/Util/EngineHelper.php`, `app/smail/v/current/app/plugins/nextcloud/index.php`).
+- **`tests/test_before_login_token_swap.php`: 31/31 PASS** (NEW). Covers:
+  - All three `EngineHelper` methods do/do-not consult `IUserSession`/`getSsoUid()` as appropriate.
+  - The plugin `beforeLogin` hook no longer calls `isOIDCLogin()`, parses the sentinel correctly, calls the new `getOidcAccessTokenForUid()`, and no longer calls the legacy session-coupled `getOidcAccessToken()`.
+  - 6-state behavioural simulation: happy session-full path, **happy session-FREE path (the bug fix)**, H2CK refuses → sentinel preserved + no SASL leak, regular password account untouched, additional account untouched, malformed sentinel untouched.
+- Full regression — **319/319 PASS** across 9 test files.
+
 ## [0.13.2] — 2026-02-17
 
 ### Fixed (P0 reported by operator on 2026-06-29)

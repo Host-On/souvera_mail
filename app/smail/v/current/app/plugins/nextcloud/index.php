@@ -74,22 +74,46 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 
 	public function beforeLogin(\Smail\Engine\Model\Account $oAccount, \Smail\Mail\Net\NetClient $oClient, \Smail\Mail\Net\ConnectSettings $oSettings) : void
 	{
-		// Only login with OIDC access token if
-		// it is enabled in config, the user is currently logged in with OIDC,
-		// the current Smail account is the OIDC account and no account defined explicitly
-		if ($oAccount instanceof \Smail\Engine\Model\MainAccount
-		 && \OCP\Server::get(\OCA\SouveraMail\Util\EngineHelper::class)->isOIDCLogin()
-		 && \str_starts_with($oSettings->passphrase, 'oidc_login|')
-		) {
-			$sToken = \OCP\Server::get(\OCA\SouveraMail\Util\EngineHelper::class)->getOidcAccessToken();
-			if (!$sToken) {
-				return;
-			}
-			$oSettings->passphrase = $sToken;
-			$oSettings->SASLMechanisms = \array_values(\array_unique(
-				\array_merge(array('OAUTHBEARER'), $oSettings->SASLMechanisms)
-			));
+		// Swap the `oidc_login|<uid>` sentinel for a live H2CK/oidc access
+		// token on every IMAP / SMTP / Sieve connect — including connects
+		// fired *without* an active NC session (background dashboard widget
+		// refresh, cron jobs, engine-token-cookie reconnects, Sieve from
+		// CLI). The sentinel itself is the authoritative source of identity
+		// here because the engine persists it in the account record at first
+		// login (see Smail\Engine\Actions\UserAuth::accountFromNcSession()).
+		// We must NOT gate on isOIDCLogin() — that returns false when no NC
+		// user is currently logged in, the sentinel then leaks to Stalwart
+		// as a plaintext password and the mail server rejects the connect
+		// with AUTHENTICATIONFAILED.
+		if (!($oAccount instanceof \Smail\Engine\Model\MainAccount)) {
+			return;
 		}
+		if (!\str_starts_with($oSettings->passphrase, 'oidc_login|')) {
+			return;
+		}
+
+		$sUid = \substr($oSettings->passphrase, \strlen('oidc_login|'));
+		if ($sUid === '') {
+			// Malformed sentinel — leave passphrase untouched so the
+			// engine falls through to its normal error path instead of
+			// us silently masking the bad account record.
+			return;
+		}
+
+		$helper = \OCP\Server::get(\OCA\SouveraMail\Util\EngineHelper::class);
+		$sToken = $helper->getOidcAccessTokenForUid($sUid);
+		if (!$sToken) {
+			// H2CK refused or autologin-oidc disabled — leave the sentinel
+			// in place. The engine's normal IMAP error handling kicks in
+			// and the LoggerInterface call inside OidcProviderService
+			// already wrote a structured warning for the admin.
+			return;
+		}
+
+		$oSettings->passphrase = $sToken;
+		$oSettings->SASLMechanisms = \array_values(\array_unique(
+			\array_merge(array('OAUTHBEARER'), $oSettings->SASLMechanisms)
+		));
 	}
 
 	/*
