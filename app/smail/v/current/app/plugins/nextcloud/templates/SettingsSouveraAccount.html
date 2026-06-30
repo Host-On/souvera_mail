@@ -92,12 +92,31 @@
 
 				<!-- One-time secret card -->
 				<div data-bind="visible: justCreatedSecret() !== ''" class="sv-banner sv-banner-ok">
-					<div class="sv-secret-head">Neues App-Passwort für „<span data-bind="text: justCreatedDescription"></span>“</div>
-					<code class="sv-secret" data-bind="text: justCreatedSecret"></code>
+					<div class="sv-secret-head">Neues App-Passwort für „<span data-bind="text: justCreatedDescription"></span>"</div>
+
+					<!-- IMAP/SMTP username — the canonical Stalwart-side mail address.
+					     Shown alongside the password because Stalwart's PLAIN/LOGIN
+					     auth path matches by exact principal name, not by guessed-at
+					     email format. -->
+					<div class="sv-cred-row" data-bind="visible: justCreatedUsername() !== ''">
+						<div class="sv-cred-label">Benutzername</div>
+						<div class="sv-cred-value">
+							<code class="sv-secret sv-secret-user" data-bind="text: justCreatedUsername"></code>
+							<button class="sv-btn sv-btn-sm" data-bind="click: copyUsername" title="Benutzername kopieren">Kopieren</button>
+						</div>
+					</div>
+
+					<div class="sv-cred-row">
+						<div class="sv-cred-label">Passwort</div>
+						<div class="sv-cred-value">
+							<code class="sv-secret" data-bind="text: justCreatedSecret"></code>
+							<button class="sv-btn sv-btn-sm" data-bind="click: copySecret" title="Passwort kopieren">Kopieren</button>
+						</div>
+					</div>
+
 					<div class="sv-secret-foot">
-						<span>Bitte jetzt speichern — das Passwort wird nur <strong>einmal</strong> angezeigt.</span>
+						<span>Bitte <strong>beide Werte</strong> jetzt speichern — das Passwort wird nur <strong>einmal</strong> angezeigt. Im Mail-Client als Authentifizierung „Passwort / Login" wählen (nicht OAuth).</span>
 						<span>
-							<button class="sv-btn" data-bind="click: copySecret">Kopieren</button>
 							<button class="sv-btn" data-bind="click: dismissNewSecret">Fertig</button>
 						</span>
 					</div>
@@ -328,6 +347,26 @@
 .sv-banner-ok   { background: var(--sv-ok-soft);   border: 1px solid rgba(22,163,74,.2); color: #14532d; }
 
 .sv-secret-head { font-weight: 600; margin-bottom: 0.5em; }
+.sv-cred-row {
+	display: flex; align-items: center; gap: 0.75em;
+	margin: 0.4em 0;
+}
+.sv-cred-label {
+	flex: 0 0 7em;
+	font-weight: 500;
+	color: var(--sv-fg-muted);
+	font-size: 0.88em;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+.sv-cred-value {
+	flex: 1 1 auto;
+	display: flex; align-items: center; gap: 0.5em;
+	min-width: 0;
+}
+.sv-cred-value .sv-secret { flex: 1 1 auto; min-width: 0; }
+.sv-btn-sm { padding: 0.3em 0.7em; font-size: 0.82em; flex-shrink: 0; }
+.sv-secret-user { color: #1e3a8a; background: rgba(59,130,246,0.04); border-color: rgba(59,130,246,0.25); }
 .sv-secret {
 	display: block;
 	padding: 0.65em 0.8em;

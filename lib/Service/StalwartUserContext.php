@@ -40,9 +40,17 @@ class StalwartUserContext
     }
 
     /**
+     * Resolve the Stalwart-side mail address for a Nextcloud user — the
+     * same address the engine uses as the SASL identity. Returned to the
+     * App Password UI so the user knows exactly which username to enter
+     * in their legacy IMAP/SMTP client (Stalwart's Plain-Login does NOT
+     * fall back to alias lookup by default — that requires the
+     * `authenticateWithAlias` permission, which standard roles include
+     * but custom Stalwart deploys may omit).
+     *
      * @throws \RuntimeException on missing user / souvera_central / mailbox
      */
-    public function resolveAccountId(string $userId): string
+    public function resolveEmail(string $userId): string
     {
         $user = $this->userManager->get($userId);
         if (!$user instanceof IUser) {
@@ -54,7 +62,6 @@ class StalwartUserContext
                 'souvera_central is not installed — Souvera Mail cannot resolve the Stalwart principal mapping'
             );
         }
-
         $stalwartService = $this->container->get(self::STALWART_SERVICE_FQN);
 
         $email = $stalwartService->mailFor($user);
@@ -63,6 +70,17 @@ class StalwartUserContext
                 "souvera_central StalwartService returned no mail address for user '{$userId}'"
             );
         }
+        return $email;
+    }
+
+    /**
+     * @throws \RuntimeException on missing user / souvera_central / mailbox
+     */
+    public function resolveAccountId(string $userId): string
+    {
+        $email = $this->resolveEmail($userId);
+        $stalwartService = $this->container->get(self::STALWART_SERVICE_FQN);
+
         $accountId = $stalwartService->findAccountId($email, 'User');
         if (!\is_string($accountId) || $accountId === '') {
             throw new \RuntimeException(

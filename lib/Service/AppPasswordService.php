@@ -71,7 +71,16 @@ class AppPasswordService
      * Creates a new App Password. The plaintext `secret` is returned ONCE
      * and never recoverable afterwards (Stalwart stores only its hash).
      *
-     * @return array{id: string, secret: string, description: string}
+     * The `username` is the canonical Stalwart-side mail address — the
+     * exact SASL identity the user must enter in their legacy IMAP/SMTP
+     * client. Surfaced here (not just in the UI's "Identity" field)
+     * because Stalwart's PLAIN/LOGIN auth path matches the principal
+     * by its primary `name`/`emails[]` and does NOT fall back to alias
+     * lookup unless the principal carries the `authenticateWithAlias`
+     * permission. Returning the canonical username at create-time saves
+     * the user from guessing.
+     *
+     * @return array{id: string, secret: string, description: string, username: string}
      */
     public function createForUser(string $userId, string $description): array
     {
@@ -83,6 +92,7 @@ class AppPasswordService
             $description = \mb_substr($description, 0, 120);
         }
 
+        $email = $this->userContext->resolveEmail($userId);
         $accountId = $this->userContext->resolveAccountId($userId);
         $bearer = $this->userContext->resolveBearer($userId);
 
@@ -95,8 +105,13 @@ class AppPasswordService
                     'create' => [
                         $creationId => [
                             'description' => $description,
-                            // Frage 3a: inherit account's full permissions (IMAP+POP3+SMTP+JMAP).
+                            // Inherit ALL the account's permissions (IMAP+POP3+SMTP+JMAP) —
+                            // see Stalwart docs `/ref/object/app-password#credentialpermissions`.
+                            // The `@type` discriminator is mandatory; this exact payload is
+                            // what `stalwart-cli create AppPassword --field 'permissions={"@type":"Inherit"}'`
+                            // also sends. `allowedIps: {}` is the documented "no restriction" value.
                             'permissions' => ['@type' => 'Inherit'],
+                            'allowedIps' => (object) [],
                         ],
                     ],
                 ],
@@ -125,6 +140,7 @@ class AppPasswordService
             'id' => (string) $created['id'],
             'secret' => (string) $created['secret'],
             'description' => $description,
+            'username' => $email,
         ];
     }
 

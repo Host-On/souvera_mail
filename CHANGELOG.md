@@ -6,6 +6,37 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.9] — 2026-02-17
+
+### Fixed (P0 — generated App Passwords failed IMAP login with `AUTHENTICATIONFAILED`, reported 2026-07-01)
+- **Generated App Passwords now work on the first try with legacy IMAP/SMTP clients.** The plaintext secret returned by Stalwart's `x:AppPassword/set` JMAP call was correct, the documented `{'@type': 'Inherit'}` permissions payload was correct, but the UI only surfaced the *password* — never the *username*. The user had to guess which Stalwart-side mail address to enter and a guess like `<user>@<NC-domain>` would fail because Stalwart's PLAIN/LOGIN auth matches the principal by its canonical `name` and `emails[]` (and only falls back to alias lookup when the principal carries the `authenticateWithAlias` permission, which standard roles include but custom Stalwart deploys may omit). Stalwart's response was the bare `a NO [AUTHENTICATIONFAILED]` shown in the operator's reproduction.
+
+### Architecture
+- **`lib/Service/StalwartUserContext.php`**:
+  - New `resolveEmail(string $userId): string` exposes the canonical Stalwart mail address (resolved via souvera_central's `StalwartService::mailFor()`) without re-issuing the `findAccountId()` round-trip.
+  - `resolveAccountId()` now delegates the mail-address lookup to `resolveEmail()` — single source of truth, no duplicate `mailFor()` calls per request.
+- **`lib/Service/AppPasswordService.php`**:
+  - `createForUser()` return shape extended from `{id, secret, description}` to `{id, secret, description, username}`. The `username` is the canonical Stalwart mail address — exactly what the user must paste into the IMAP/SMTP client's "Username" field.
+  - JMAP create payload now also carries `allowedIps: {}` (the documented "no IP restriction" value, serialized as a JSON object via `(object) []` so json_encode emits `{}` not `[]` — Stalwart's deserializer rejects the array form).
+- **Snappymail "Sicherheit & Geräte" tab** (`SettingsSouveraAccount.html` + `settings-account.js`):
+  - New `justCreatedUsername` observable + `copyUsername` view-model action.
+  - The post-create banner now renders TWO labelled rows (`Benutzername` / `Passwort`) each with its own copy button, plus a hint to choose "Passwort / Login" (not OAuth) in the mail client.
+  - `dismissNewSecret()` also clears `justCreatedUsername` — no stale data after closing.
+  - New CSS classes `.sv-cred-row`, `.sv-cred-label`, `.sv-cred-value`, `.sv-secret-user`, `.sv-btn-sm` keep the new layout confined to the tab.
+
+### Verification
+- `php -l` clean on both modified PHP files.
+- **`tests/test_app_password_username_surface.php`: 32/32 PASS** (NEW). Static-source contract on all four touched files + a behavioural simulation that drives `createForUser()` end-to-end against stub `StalwartUserContext` + stub `StalwartAdminService`. Verifies:
+  - `resolveAccountId()` delegates to `resolveEmail()` (no duplicate lookups).
+  - Return array carries `username` = canonical Stalwart email.
+  - JMAP payload carries `permissions: {@type: Inherit}` and `allowedIps: {}` (serialized as JSON object, not array).
+  - UI template renders both labelled rows with copy buttons.
+  - ViewModel observable + `copyUsername` action + `dismissNewSecret` reset.
+- Full local suite **497/497 PASS** across 15 test files (was 465/465 across 14). Zero regressions.
+
+### Operator action
+If your Stalwart deploy uses a custom role that omits `authenticateWithAlias` AND the principal's `name` differs from its primary `email`, you may still see `AUTHENTICATIONFAILED` when entering the email shown by Souvera Mail — paste the principal's `name` instead, or grant `authenticateWithAlias` to the role (recommended: it is part of Stalwart's default user role).
+
 ## [0.13.8] — 2026-02-17
 
 ### Fixed (P0 — `Connected Devices` runtime TypeError on NC34, reported 2026-07-01)

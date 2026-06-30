@@ -79,6 +79,7 @@
 		// Plaintext secret shown ONCE after creation
 		this.justCreatedSecret = ko.observable('');
 		this.justCreatedDescription = ko.observable('');
+		this.justCreatedUsername = ko.observable('');
 
 		// Connected devices
 		this.devicesLoading = ko.observable(false);
@@ -175,10 +176,11 @@
 						self.appPasswordError(body.message || ('HTTP ' + (r.body ? '' : 'error')) || 'Creation failed');
 						return;
 					}
-					// Backend returns { status:'ok', created:{ id, secret, description } }
+					// Backend returns { status:'ok', created:{ id, secret, description, username } }
 					var created = body.created || {};
 					self.justCreatedSecret(String(created.secret || ''));
 					self.justCreatedDescription(String(created.description || desc));
+					self.justCreatedUsername(String(created.username || ''));
 					self.newAppPasswordDescription('');
 					self.loadAppPasswords();
 				})
@@ -191,6 +193,7 @@
 		dismissNewSecret: function () {
 			this.justCreatedSecret('');
 			this.justCreatedDescription('');
+			this.justCreatedUsername('');
 		},
 
 		copySecret: function () {
@@ -198,6 +201,14 @@
 			if (!s) { return; }
 			if (navigator.clipboard && navigator.clipboard.writeText) {
 				navigator.clipboard.writeText(s);
+			}
+		},
+
+		copyUsername: function () {
+			var u = this.justCreatedUsername();
+			if (!u) { return; }
+			if (navigator.clipboard && navigator.clipboard.writeText) {
+				navigator.clipboard.writeText(u);
 			}
 		},
 
