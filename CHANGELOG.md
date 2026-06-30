@@ -6,6 +6,30 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.10] — 2026-02-17
+
+### Fixed (P0 follow-up — email-as-username for App Passwords, requested 2026-07-01)
+- **Generated App Passwords now accept the user's e-mail address as the IMAP/SMTP username, on every Stalwart deploy.** 0.13.9 made the canonical username discoverable in the UI but Stalwart's PLAIN/LOGIN auth still refused the e-mail-form of the username unless the principal carried the `authenticateWithAlias` permission. The default Stalwart user role includes it, but custom-role deploys (such as the operator's) sometimes omit it — and there is no `Inherit + add` mode on Stalwart's `CredentialPermissions`, so the only way to guarantee the permission is present on the app password is to use `Replace` mode and list it explicitly.
+- **The `x:AppPassword/set` create payload now sends `{'@type': 'Replace', 'permissions': [...]}`** with an explicit, fully-comprehensive permission list covering `authenticate` + **`authenticateWithAlias`** (the email-as-username permission), `emailSend` / `emailReceive` (SMTP submission), the entire IMAP feature set (28 permissions — every operation Thunderbird / Outlook / iPhone Mail need), the POP3 feature set (6 permissions), and the ManageSieve feature set (9 permissions). The list is centralised as `AppPasswordService::APP_PASSWORD_PERMISSIONS` so future changes are auditable in one place.
+
+### Architecture
+- **`lib/Service/AppPasswordService.php`**:
+  - New private const `APP_PASSWORD_PERMISSIONS` — the explicit list of permissions assigned to every Souvera Mail-issued App Password.
+  - `createForUser()` swaps the `{'@type': 'Inherit'}` payload for `{'@type': 'Replace', 'permissions': self::APP_PASSWORD_PERMISSIONS}`. The credential's auth scope is now explicit and operator-config-independent.
+
+### Why `Replace` is the right call here (operator-facing rationale)
+- `Inherit` (previous) carried the operator's principal-role permissions verbatim. If the role omitted `authenticateWithAlias`, every legacy IMAP/SMTP client using the app password silently failed with `AUTHENTICATIONFAILED` — exactly the symptom the operator reported.
+- `Disable` lets you START FROM the role and remove perms — the wrong direction.
+- `Replace` lets us deliberately list the closed set of permissions a legacy mail client needs. The app password is intentionally NOT a full account credential; it cannot impersonate, manage the principal, or touch admin surfaces. That is the right security posture for a credential a user pastes into Thunderbird.
+
+### Verification
+- `php -l` clean on `lib/Service/AppPasswordService.php`.
+- **`tests/test_app_password_username_surface.php`: 51/51 PASS** (was 32; +19 assertions). New static-source coverage pins the `Replace` mode + the presence of every key permission (`authenticate`, `authenticateWithAlias`, all 14 spot-checked IMAP/POP3/Sieve/Email perms). Behavioural sim updated to send the `Replace` payload end-to-end and verify `authenticateWithAlias` reaches Stalwart.
+- Full local suite **516/516 PASS** across 15 test files (was 497/497). Zero regressions.
+
+### Operator action
+Deploy 0.13.10 to `/mnt/nc-shared/custom_apps/souvera_mail`. **Revoke any pre-0.13.10 app passwords** (they still carry the `Inherit` scope and will fail email-as-username on custom-role principals) and create new ones. The "Sicherheit & Geräte" tab now shows both username AND password — copy both into Thunderbird/Outlook with auth mode "Passwort / Login" (NOT OAuth).
+
 ## [0.13.9] — 2026-02-17
 
 ### Fixed (P0 — generated App Passwords failed IMAP login with `AUTHENTICATIONFAILED`, reported 2026-07-01)

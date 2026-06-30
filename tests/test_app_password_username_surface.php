@@ -85,10 +85,33 @@ assertTrue((bool) preg_match("#'username'\s*=>\s*\\\$email#", $svc),
     "createForUser() returns the `username` (= canonical Stalwart email)",
     $passes, $failures);
 
-// JMAP create payload carries the documented permissions shape + allowedIps
-assertTrue(str_contains($svc, "'permissions' => ['@type' => 'Inherit']"),
-    "JMAP AppPassword/set permissions payload uses {@type: Inherit} (documented shape)",
+// JMAP create payload uses Replace mode with explicit permissions list —
+// the only way to GUARANTEE `authenticateWithAlias` is present on the app
+// password (so email-as-username PLAIN/LOGIN succeeds), regardless of
+// what the operator's principal-level role looks like.
+assertTrue(str_contains($svc, "'@type' => 'Replace'"),
+    "JMAP AppPassword/set permissions uses Replace mode (NOT Inherit) — gives us full control over the scope",
     $passes, $failures);
+assertTrue(str_contains($svc, "self::APP_PASSWORD_PERMISSIONS"),
+    "createForUser() forwards the explicit permission list", $passes, $failures);
+assertTrue(str_contains($svc, "'authenticateWithAlias'"),
+    "Permission list includes `authenticateWithAlias` (the email-as-username permission)",
+    $passes, $failures);
+assertTrue(str_contains($svc, "'authenticate'"),
+    "Permission list includes `authenticate` (the base login gate)",
+    $passes, $failures);
+// Spot-check the IMAP / POP3 / Sieve coverage so a future refactor doesn't
+// quietly drop a permission and silently break legacy mail clients.
+foreach ([
+    'imapAuthenticate', 'imapFetch', 'imapAppend', 'imapStore', 'imapMove',
+    'imapSearch', 'imapIdle', 'imapExpunge',
+    'pop3Authenticate', 'pop3Retr',
+    'sieveAuthenticate', 'sievePutScript', 'sieveSetActive',
+    'emailSend', 'emailReceive',
+] as $perm) {
+    assertTrue(str_contains($svc, "'$perm'"),
+        "Permission list still includes `$perm`", $passes, $failures);
+}
 assertTrue((bool) preg_match("#'allowedIps'\s*=>\s*\(object\)\s*\[\]#", $svc),
     "JMAP AppPassword/set payload carries `allowedIps: {}` (documented no-restriction value, serialized as JSON object not array)",
     $passes, $failures);
@@ -198,7 +221,10 @@ function simCreate(string $userId, string $description, StubUserContext $ctx, St
             'accountId' => $accountId,
             'create' => ['k1' => [
                 'description' => $description,
-                'permissions' => ['@type' => 'Inherit'],
+                'permissions' => [
+                    '@type' => 'Replace',
+                    'permissions' => ['authenticate', 'authenticateWithAlias', 'imapAuthenticate', 'imapFetch', 'emailSend', 'emailReceive'],
+                ],
                 'allowedIps' => (object) [],
             ]],
         ], 'c0'],
@@ -230,8 +256,11 @@ assertTrue($ctx->emailCalls === ['scadmin'],
 
 // Verify the JMAP payload shape Stalwart actually receives
 $createPayload = $st->lastPayload[0][1]['create']['k1'];
-assertTrue($createPayload['permissions'] === ['@type' => 'Inherit'],
-    "5f: JMAP create payload sends {@type: Inherit} (documented shape)",
+assertTrue($createPayload['permissions']['@type'] === 'Replace',
+    "5f: JMAP create payload sends {@type: Replace} (gives us control over auth scope)",
+    $passes, $failures);
+assertTrue(in_array('authenticateWithAlias', $createPayload['permissions']['permissions'], true),
+    "5f2: Replace permissions list includes authenticateWithAlias (email-as-username)",
     $passes, $failures);
 assertTrue(is_object($createPayload['allowedIps']),
     "5g: JMAP create payload sends allowedIps as JSON object (not array — would serialize as []) ",

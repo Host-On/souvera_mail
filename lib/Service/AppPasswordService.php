@@ -20,6 +20,62 @@ use Psr\Log\LoggerInterface;
  */
 class AppPasswordService
 {
+    /**
+     * Permission list assigned to App Passwords created by Souvera Mail.
+     *
+     * We use Stalwart's `Replace` mode (instead of `Inherit`) so the app
+     * password's permissions are fully under our control — regardless of
+     * what the operator's principal-level role grants. The crucial
+     * permission is **`authenticateWithAlias`**: without it Stalwart's
+     * PLAIN/LOGIN auth refuses any username that isn't the principal's
+     * canonical `name`. The default Stalwart user role does include it,
+     * but custom deploys (and the operator that reported this bug)
+     * sometimes omit it — which made e-mail-as-username silently fail
+     * with `AUTHENTICATIONFAILED` even though the secret was correct.
+     *
+     * The remaining permissions cover the full IMAP/POP3/Sieve surface
+     * a legacy mail client needs (Thunderbird, Outlook, iPhone Mail …)
+     * plus `emailSend` / `emailReceive` for SMTP submission. Verified
+     * against Stalwart 0.16's `stalw.art/docs/ref/permissions` listing.
+     *
+     * @var list<string>
+     */
+    private const APP_PASSWORD_PERMISSIONS = [
+        // ── User authentication ──────────────────────────────────────
+        // `authenticate` is the gate; `authenticateWithAlias` is the
+        // one that lets the user log in with their e-mail address
+        // instead of the bare principal name.
+        'authenticate',
+        'authenticateWithAlias',
+
+        // ── Mail delivery ────────────────────────────────────────────
+        'emailSend',
+        'emailReceive',
+
+        // ── IMAP (full feature set so e.g. Thunderbird's APPEND
+        // sent-folder, IDLE, MOVE, SEARCH/SORT/THREAD all work) ──────
+        'imapAuthenticate',
+        'imapCapability', 'imapId', 'imapEnable', 'imapNamespace',
+        'imapList', 'imapLsub', 'imapSubscribe', 'imapUnsubscribe',
+        'imapSelect', 'imapExamine', 'imapStatus',
+        'imapAppend', 'imapFetch', 'imapStore',
+        'imapCopy', 'imapMove',
+        'imapSearch', 'imapSort', 'imapThread',
+        'imapCreate', 'imapDelete', 'imapRename', 'imapExpunge',
+        'imapIdle',
+        'imapAclGet', 'imapMyRights', 'imapListRights',
+
+        // ── POP3 (some legacy clients still default to it) ──────────
+        'pop3Authenticate',
+        'pop3List', 'pop3Uidl', 'pop3Stat', 'pop3Retr', 'pop3Dele',
+
+        // ── ManageSieve (server-side filtering) ─────────────────────
+        'sieveAuthenticate',
+        'sieveListScripts', 'sieveSetActive',
+        'sieveGetScript', 'sievePutScript', 'sieveDeleteScript',
+        'sieveRenameScript', 'sieveCheckScript', 'sieveHaveSpace',
+    ];
+
     public function __construct(
         private StalwartAdminService $stalwart,
         private StalwartUserContext $userContext,
@@ -105,12 +161,18 @@ class AppPasswordService
                     'create' => [
                         $creationId => [
                             'description' => $description,
-                            // Inherit ALL the account's permissions (IMAP+POP3+SMTP+JMAP) —
-                            // see Stalwart docs `/ref/object/app-password#credentialpermissions`.
-                            // The `@type` discriminator is mandatory; this exact payload is
-                            // what `stalwart-cli create AppPassword --field 'permissions={"@type":"Inherit"}'`
-                            // also sends. `allowedIps: {}` is the documented "no restriction" value.
-                            'permissions' => ['@type' => 'Inherit'],
+                            // Stalwart 0.16's CredentialPermissions: `Replace`
+                            // mode — the app password's permission scope is
+                            // explicitly the list we send, NOT inherited from
+                            // the account's role. Critical for ensuring
+                            // `authenticateWithAlias` is present (email-as-
+                            // username support) regardless of how the
+                            // operator's principal role is configured.
+                            // See APP_PASSWORD_PERMISSIONS comment above.
+                            'permissions' => [
+                                '@type' => 'Replace',
+                                'permissions' => self::APP_PASSWORD_PERMISSIONS,
+                            ],
                             'allowedIps' => (object) [],
                         ],
                     ],
