@@ -58,7 +58,7 @@ class Setup extends Command
             ->addOption('domain', null, InputOption::VALUE_REQUIRED, 'Mail domain (e.g. example.com)')
             ->addOption('oidc-audience', null, InputOption::VALUE_REQUIRED, 'Override OIDC audience hint (defaults to registered client identifier)')
             ->addOption('oidc-scopes',   null, InputOption::VALUE_REQUIRED, 'Optional: space-separated extra OIDC scopes')
-            ->addOption('sieve',       null, InputOption::VALUE_NONE, 'Enable ManageSieve filtering')
+            ->addOption('sieve',       null, InputOption::VALUE_NEGATABLE, 'Enable ManageSieve filtering (default: on — Stalwart 0.16 ships it natively on :4190 / OAUTHBEARER; pass --no-sieve to opt out)', true)
             ->addOption('sieve-host',  null, InputOption::VALUE_REQUIRED, 'Sieve server hostname (defaults to imap-host)')
             ->addOption('sieve-port',  null, InputOption::VALUE_REQUIRED, 'Sieve server port', '4190')
             ->addOption('sieve-ssl',   null, InputOption::VALUE_REQUIRED, 'Sieve SSL mode (none|ssl|starttls)', 'ssl')
@@ -100,7 +100,7 @@ class Setup extends Command
         $sieveHost = (string) ($input->getOption('sieve-host') ?: $imapHost);
         $sievePort = (int) $input->getOption('sieve-port');
         $sieveSsl = $this->normalizeSslMode((string) $input->getOption('sieve-ssl'));
-        $sieveEnabled = (bool) $input->getOption('sieve');
+        $sieveEnabled = (bool) ($input->getOption('sieve') ?? true);
         $oidcAudience = (string) ($input->getOption('oidc-audience') ?? '');
         $oidcScopes = (string) ($input->getOption('oidc-scopes') ?? '');
 

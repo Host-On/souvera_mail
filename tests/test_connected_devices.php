@@ -69,9 +69,28 @@ assertTrue((bool)preg_match(
 
 // guard must appear BEFORE invalidateTokenById
 $posGuard = strpos($svcSrc, 'InvalidArgumentException');
-$posInvalidate = strpos($svcSrc, 'invalidateTokenById($user, $tokenId)');
+$posInvalidate = strpos($svcSrc, 'invalidateTokenById($uid, $tokenId)');
 assertTrue($posGuard !== false && $posInvalidate !== false && $posGuard < $posInvalidate,
     "Self-revoke guard appears BEFORE invalidateTokenById in revoke()", $passes, $failures);
+
+// NC34 strict-type contract: token-provider calls pass string $uid, NOT IUser
+// (NC34's IProvider tightened both getTokenByUser and invalidateTokenById from
+// `IUser $user` to `string $uid` — passing the IUser instance crashes with
+// "must be of type string, OC\User\User given"). Pin all four call sites.
+foreach ([
+    'getTokenByUser($uid)',
+    'invalidateTokenById($uid, $tokenId)',
+    'invalidateTokenById($uid, $id)',
+] as $needle) {
+    assertTrue(str_contains($svcSrc, $needle),
+        "Service calls token-provider with string \$uid: $needle", $passes, $failures);
+}
+assertTrue(!preg_match('#getTokenByUser\(\$user\)#', $svcSrc),
+    "Service does NOT pass the IUser instance to getTokenByUser() (NC34 strict-type bug fix)",
+    $passes, $failures);
+assertTrue(!preg_match('#invalidateTokenById\(\$user,#', $svcSrc),
+    "Service does NOT pass the IUser instance to invalidateTokenById() (NC34 strict-type bug fix)",
+    $passes, $failures);
 
 // revokeAllOthers skips current
 assertTrue((bool)preg_match(
@@ -278,9 +297,9 @@ if (!interface_exists('OCP\\Authentication\\Token\\IToken')) {
 if (!interface_exists('OCP\\Authentication\\Token\\IProvider')) {
     eval('namespace OCP\\Authentication\\Token {
         interface IProvider {
-            public function getTokenByUser(\\OCP\\IUser $user): array;
+            public function getTokenByUser(string $uid): array;
             public function getToken(string $sessionId): IToken;
-            public function invalidateTokenById(\\OCP\\IUser $user, int $id): void;
+            public function invalidateTokenById(string $uid, int $id): void;
         }
     }');
 }
@@ -321,18 +340,23 @@ class StubTok implements \OCP\Authentication\Token\IToken {
 class StubTokenProvider implements \OCP\Authentication\Token\IProvider {
     /** @var StubTok[] */ public array $tokens = [];
     /** @var int[] */ public array $invalidated = [];
+    /** @var string[] */ public array $uidsSeen = [];
     public ?StubTok $sessionToken = null;
     public bool $sessionTokenThrows = false;
     public array $invalidateThrowsForIds = [];
 
-    public function getTokenByUser(\OCP\IUser $u): array { return $this->tokens; }
+    public function getTokenByUser(string $uid): array {
+        $this->uidsSeen[] = $uid;
+        return $this->tokens;
+    }
     public function getToken(string $sessionId): \OCP\Authentication\Token\IToken {
         if ($this->sessionTokenThrows || $this->sessionToken === null) {
             throw new \RuntimeException('no session token');
         }
         return $this->sessionToken;
     }
-    public function invalidateTokenById(\OCP\IUser $u, int $id): void {
+    public function invalidateTokenById(string $uid, int $id): void {
+        $this->uidsSeen[] = $uid;
         if (in_array($id, $this->invalidateThrowsForIds, true)) {
             throw new \RuntimeException("simulated failure on id=$id");
         }
@@ -384,13 +408,20 @@ assertTrue(count($tokProv->invalidated) === 0,
 
 // --- Case B: revoke() invalidates non-current token ----------------------
 $tokProv->invalidated = [];
+$tokProv->uidsSeen = [];
 $svc->revoke('alice', 99);
 assertTrue($tokProv->invalidated === [99],
     "revoke() invalidates non-current token exactly once (got: ["
     . implode(',', $tokProv->invalidated) . "])", $passes, $failures);
+// NC34 strict-type contract: the token-provider must be called with the
+// canonical UID string, never the IUser instance. uidsSeen records each call.
+assertTrue(in_array('alice', $tokProv->uidsSeen, true) && !in_array($user, $tokProv->uidsSeen, true),
+    "revoke() forwards string uid 'alice' to invalidateTokenById (NC34 strict-type bug fix)",
+    $passes, $failures);
 
 // --- Case C: revokeAllOthers() — 3 tokens, one current → 2 invalidations -
 $tokProv->invalidated = [];
+$tokProv->uidsSeen = [];
 $tokProv->tokens = [
     new StubTok(42, 'current'),  // current
     new StubTok(100, 'phone'),
@@ -401,6 +432,10 @@ assertTrue($n === 2, "revokeAllOthers() returns 2 (got: $n)", $passes, $failures
 sort($tokProv->invalidated);
 assertTrue($tokProv->invalidated === [100, 101],
     "revokeAllOthers() invalidated [100,101] (got: [" . implode(',', $tokProv->invalidated) . "])",
+    $passes, $failures);
+// NC34 strict-type contract on every call inside the iterator
+assertTrue($tokProv->uidsSeen !== [] && array_unique($tokProv->uidsSeen) === ['alice'],
+    "revokeAllOthers() forwards string uid 'alice' on every token-provider call (NC34 strict-type bug fix)",
     $passes, $failures);
 
 // --- Case D: revokeAllOthers() — graceful failure on one token -----------

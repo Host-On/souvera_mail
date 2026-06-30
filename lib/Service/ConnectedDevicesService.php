@@ -51,9 +51,10 @@ class ConnectedDevicesService
     public function listForUser(string $userId): array
     {
         $user = $this->requireUser($userId);
+        $uid = $user->getUID();
         $currentTokenId = $this->resolveCurrentTokenId();
         $items = [];
-        foreach ($this->tokenProvider->getTokenByUser($user) as $tok) {
+        foreach ($this->tokenProvider->getTokenByUser($uid) as $tok) {
             try {
                 $id = $tok->getId();
             } catch (\Throwable $e) {
@@ -135,6 +136,7 @@ class ConnectedDevicesService
     public function revoke(string $userId, int $tokenId): void
     {
         $user = $this->requireUser($userId);
+        $uid = $user->getUID();
         $currentTokenId = $this->resolveCurrentTokenId();
         if ($currentTokenId !== null && $tokenId === $currentTokenId) {
             // The personal-settings UI hides this button for the current
@@ -144,7 +146,7 @@ class ConnectedDevicesService
                 'Refusing to revoke the session the request itself is using; use Nextcloud logout instead.'
             );
         }
-        $this->tokenProvider->invalidateTokenById($user, $tokenId);
+        $this->tokenProvider->invalidateTokenById($uid, $tokenId);
     }
 
     /**
@@ -154,15 +156,16 @@ class ConnectedDevicesService
     public function revokeAllOthers(string $userId): int
     {
         $user = $this->requireUser($userId);
+        $uid = $user->getUID();
         $currentTokenId = $this->resolveCurrentTokenId();
         $revoked = 0;
-        foreach ($this->tokenProvider->getTokenByUser($user) as $tok) {
+        foreach ($this->tokenProvider->getTokenByUser($uid) as $tok) {
             $id = $tok->getId();
             if ($currentTokenId !== null && $id === $currentTokenId) {
                 continue;
             }
             try {
-                $this->tokenProvider->invalidateTokenById($user, $id);
+                $this->tokenProvider->invalidateTokenById($uid, $id);
                 $revoked++;
             } catch (\Throwable $e) {
                 $this->logger->warning(

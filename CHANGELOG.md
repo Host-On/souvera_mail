@@ -6,6 +6,32 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.8] — 2026-02-17
+
+### Fixed (P0 — `Connected Devices` runtime TypeError on NC34, reported 2026-07-01)
+- **The "Verbundene Geräte" tab no longer crashes with `OC\Authentication\Token\Manager::getTokenByUser(): Argument #1 ($uid) must be of type string, OC\User\User given`.** Nextcloud 34 tightened the `OCP\Authentication\Token\IProvider` contract: both `getTokenByUser()` and `invalidateTokenById()` now take `string $uid` (previously `IUser $user`). Our `ConnectedDevicesService` was still forwarding the `IUser` instance returned from `requireUser()` — strict typing rejected it at runtime, the Settings tab rendered empty after the head row.
+- **All four token-provider call sites in `lib/Service/ConnectedDevicesService.php` now pass `$user->getUID()` (the canonical UID string).** `requireUser()` is kept (it still validates that the user exists), but its return value is only used for `getUID()` — never forwarded to NC's token API.
+
+### Fixed (P1 — `Settings → Filters` showed generic `ERROR 1`, reported 2026-07-01)
+- **Opening the in-engine Filters tab no longer produces `ERROR 1`.** Root cause traced to `occ souvera_mail:setup`: the `--sieve` flag was declared as `VALUE_NONE` (opt-in, default false), so any operator who didn't pass `--sieve` shipped a domain config with `Sieve.enabled = false`. The engine's `Actions::Capa()` then resolved `Capa::SIEVE → false`, `DoFilters()` returned `FalseResponse()`, and the frontend rendered the catch-all `Notifications::RequestError = 1` ("ERROR 1").
+- **`--sieve` is now `VALUE_NEGATABLE` and defaults to `true`.** Stalwart 0.16 ships ManageSieve on port 4190 natively and accepts the exact same OAUTHBEARER + H2CK JWT as IMAP/SMTP — there is no scenario where shipping a Stalwart profile with IMAP+SMTP on but Sieve off is useful. Operators who want Sieve off pass `--no-sieve` explicitly. Existing deploys can pick the fix up with a no-arg re-run: `occ souvera_mail:setup --imap-host <…> --domain <…>` — every other previously-set option is preserved via the existing defaults.
+
+### Architecture
+- **`lib/Service/ConnectedDevicesService.php`**:
+  - `listForUser()`: `getTokenByUser($uid)` (was `$user`).
+  - `revoke()`: `invalidateTokenById($uid, $tokenId)` (was `$user`).
+  - `revokeAllOthers()`: `getTokenByUser($uid)` + `invalidateTokenById($uid, $id)` on every iteration (was `$user`).
+  - `requireUser()` unchanged — still validates existence; callers extract `$uid = $user->getUID()` once at the top and forward it to all token-provider calls.
+- **`lib/Command/Setup.php`**:
+  - `--sieve` flag: `InputOption::VALUE_NONE` → `InputOption::VALUE_NEGATABLE`, default `true`. Help text rewritten to mention Stalwart 0.16's native ManageSieve and the `--no-sieve` opt-out.
+  - `execute()`: `$sieveEnabled = (bool) $input->getOption('sieve');` → `$sieveEnabled = (bool) ($input->getOption('sieve') ?? true);` (honours the default when the operator passes neither `--sieve` nor `--no-sieve`).
+
+### Verification
+- `php -l` clean on both modified files.
+- **`tests/test_connected_devices.php`: 78/78 PASS** (was 71). Three new static-source assertions pin the four token-provider call sites + reject any regression that would re-introduce the `$user` instance pass. Stub `IProvider` interface + `StubTokenProvider::getTokenByUser/invalidateTokenById` updated to the NC34 string-typed signature; two new behavioural assertions record `uidsSeen` and verify the canonical UID string `'alice'` is forwarded on every call (and the `IUser` instance never is).
+- **`tests/test_sieve_default_on.php`: 13/13 PASS** (NEW). Static-source contract on the `--sieve` flag shape + the `?? true` default expression + help-text mentions + DomainConfigService wiring (`Sieve.enabled => $sieve` still flows through OAUTHBEARER), plus a 3-state behavioural simulation of Symfony Console's `VALUE_NEGATABLE` resolution: `--sieve`, `--no-sieve`, and neither-flag (the default-on regression).
+- Full local PHP test suite: **463/463 PASS** across 14 test files (was 445/445 across 13). Zero regressions.
+
 ## [0.13.7] — 2026-02-17
 
 ### Fixed (P0 — IMAP `AUTHENTICATIONFAILED` after 15 min, reported 2026-07-01)
