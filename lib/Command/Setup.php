@@ -62,6 +62,10 @@ class Setup extends Command
             ->addOption('sieve-host',  null, InputOption::VALUE_REQUIRED, 'Sieve server hostname (defaults to imap-host)')
             ->addOption('sieve-port',  null, InputOption::VALUE_REQUIRED, 'Sieve server port', '4190')
             ->addOption('sieve-ssl',   null, InputOption::VALUE_REQUIRED, 'Sieve SSL mode (none|ssl|starttls) — default starttls matches IANA RFC 5804 port 4190 and Stalwart out-of-the-box ManageSieve listener', 'starttls')
+            ->addOption('imap-allow-self-signed', null, InputOption::VALUE_NONE, 'Disable strict TLS cert verification for IMAP — required when imap-host is an internal IP (e.g. Stalwart cluster-internal IP) whose certificate CN does not match. Sets ssl.{verify_peer=false, verify_peer_name=false, allow_self_signed=true}.')
+            ->addOption('smtp-allow-self-signed', null, InputOption::VALUE_NONE, 'Same as --imap-allow-self-signed but for SMTP.')
+            ->addOption('sieve-allow-self-signed', null, InputOption::VALUE_NONE, 'Same as --imap-allow-self-signed but for Sieve.')
+            ->addOption('allow-self-signed', null, InputOption::VALUE_NONE, 'Shortcut for --imap-allow-self-signed --smtp-allow-self-signed --sieve-allow-self-signed.')
             ->addOption('check',        null, InputOption::VALUE_NONE, 'Run live IMAP/SMTP/Sieve connectivity preflight before writing')
             ->addOption('skip-checks',  null, InputOption::VALUE_NONE, 'Deprecated alias — connectivity is skipped by default; --check turns it on')
             ->addOption('dry-run',      null, InputOption::VALUE_NONE, 'Print what would be written without modifying any state')
@@ -101,6 +105,10 @@ class Setup extends Command
         $sievePort = (int) $input->getOption('sieve-port');
         $sieveSsl = $this->normalizeSslMode((string) $input->getOption('sieve-ssl'));
         $sieveEnabled = (bool) ($input->getOption('sieve') ?? true);
+        $globalSelfSigned = (bool) $input->getOption('allow-self-signed');
+        $imapAllowSelfSigned = $globalSelfSigned || (bool) $input->getOption('imap-allow-self-signed');
+        $smtpAllowSelfSigned = $globalSelfSigned || (bool) $input->getOption('smtp-allow-self-signed');
+        $sieveAllowSelfSigned = $globalSelfSigned || (bool) $input->getOption('sieve-allow-self-signed');
         $oidcAudience = (string) ($input->getOption('oidc-audience') ?? '');
         $oidcScopes = (string) ($input->getOption('oidc-scopes') ?? '');
 
@@ -177,6 +185,9 @@ class Setup extends Command
             $smtpHost, $smtpPort, $smtpSsl,
             $sieveHost, $sievePort, $sieveSsl,
             $sieveEnabled,
+            $imapAllowSelfSigned,
+            $smtpAllowSelfSigned,
+            $sieveAllowSelfSigned,
         );
         $this->domainService->writeDomainConfig($domain, $domainConfig);
         $report['actions'][] = ['wrote_domain_config' => $domain];

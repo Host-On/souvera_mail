@@ -161,17 +161,20 @@ class AppPasswordService
                     'create' => [
                         $creationId => [
                             'description' => $description,
-                            // Stalwart 0.16's CredentialPermissions: `Replace`
-                            // mode — the app password's permission scope is
-                            // explicitly the list we send, NOT inherited from
-                            // the account's role. Critical for ensuring
-                            // `authenticateWithAlias` is present (email-as-
-                            // username support) regardless of how the
-                            // operator's principal role is configured.
-                            // See APP_PASSWORD_PERMISSIONS comment above.
+                            // Stalwart 0.16 CredentialPermissions wire-format
+                            // (live-verified by trial against the operator's
+                            // deploy on 2026-06-30):
+                            //   { "@type": "Replace", "value": [<perm IDs...>] }
+                            // The `Replace` patch-tag is mandatory (Stalwart
+                            // returns `"Missing or invalid '@type'"` without it).
+                            // The list of identifiers MUST live under `value`,
+                            // NOT `permissions` (using `permissions` returns
+                            // `invalidPatch: properties[permissions/permissions]`).
+                            // The earlier wrapper { "@type": "Replace",
+                            // "permissions": [...] } was wrong on BOTH counts.
                             'permissions' => [
                                 '@type' => 'Replace',
-                                'permissions' => self::APP_PASSWORD_PERMISSIONS,
+                                'value' => self::APP_PASSWORD_PERMISSIONS,
                             ],
                             'allowedIps' => (object) [],
                         ],

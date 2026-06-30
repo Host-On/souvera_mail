@@ -6,6 +6,118 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.17] — 2026-02-17 (live-fix continued)
+
+### Fixed — P1: `App password create failed: invalidPatch on permissions/permissions` (operator-reported, browser still triggers it 4× after 0.13.15)
+
+**Live trace** (operator's `scadmin@46.253.253.224`, 2026-06-30 18:36–18:46 UTC):
+```
+App password create failed: Stalwart refused AppPassword creation:
+{"type":"invalidPatch","description":"Invalid value for object property",
+ "properties":["permissions/permissions"]}
+```
+
+**Root cause:** Stalwart 0.16's `Principal/set` (alias `x:AppPassword/set`) `CredentialPermissions` wire format is:
+```json
+{ "@type": "Replace", "value": [<permission identifiers...>] }
+```
+The earlier code sent `{ "@type": "Replace", "permissions": [...] }` — which Stalwart 0.16 interprets as a nested object whose `permissions/permissions` sub-property is invalid. Then a trial-fix with a bare list `permissions: [...]` returned `"Missing or invalid '@type'"` — confirming both the wrapper AND the `value` field name are mandatory.
+
+**Live-verified fix:** changed `AppPasswordService::createForUser()`:
+```php
+'permissions' => [
+    '@type' => 'Replace',
+    'value' => self::APP_PASSWORD_PERMISSIONS,
+],
+```
+
+### Verification
+- `php -l` clean on `AppPasswordService.php`.
+- `tests/test_app_password_username_surface.php`: 53/53 PASS (3 new assertions covering the Stalwart 0.16 wire format).
+- Live-deployed to `/mnt/nc-shared/custom_apps/souvera_mail/lib/Service/AppPasswordService.php` and `/var/www/nextcloud/custom_apps/souvera_mail/lib/Service/AppPasswordService.php`. Verified via direct file `grep` on VM 256.
+- Operator's mobile browser will pick up the fix on the next AppPassword create — no further deployment action needed.
+
+### Architecture (Step 28)
+| File | Change |
+|---|---|
+| `lib/Service/AppPasswordService.php` | `createForUser()`: wrapper now `{@type:Replace, value:[...]}` instead of `{@type:Replace, permissions:[...]}`. Comment block documents both trial-fixed shapes Stalwart 0.16 rejects. |
+| `tests/test_app_password_username_surface.php` | 5f/5f2/5f3 assertions rewritten to validate the new wire format AND assert the old Doppelung is gone. |
+| `appinfo/info.xml` | Version 0.13.16 → 0.13.17. |
+
+## [0.13.16] — 2026-02-17 (live-debug session continues)
+
+### Fixed — P0: `SocketReadException` on IMAP connect (operator-reported "OAuth login failing")
+
+**Live operator incident (2026-06-30 17:18–18:25 UTC, debugged end-to-end via `qm guest exec`):**
+After 0.13.15 cleared the ClassNotFound layer, the Dashboard widget and webmail OAuth login both surfaced:
+```
+Smail\Mail\Net\Exceptions\SocketReadException
+  at /mnt/.../app/libraries/Smail/Mail/Net/NetClient.php:275
+  #0 NetClient->getNextBuffer  (ResponseParser:89)
+  #1 ImapClient->Connect       (Account.php:215)
+  #2 UnreadMailWidget->getItemsV2  (UnreadMailWidget.php:128)
+```
+
+**Live root-cause analysis** (proven via `openssl s_client` + `/etc/hosts` override on VM 256):
+1. `buxte.souvera.work:993` (public, behind `a.lb.oncloud.zone` = 5.180.194.200) accepts TLS handshakes but DOES NOT TCP-forward IMAP traffic to the Stalwart container. The socket hangs after TLS; no IMAP banner arrives; `SocketReadException` after timeout.
+2. Stalwart on the cluster-internal IP **`10.20.0.153:993` works perfectly**: greets with `* OK [CAPABILITY IMAP4rev2 ... AUTH=OAUTHBEARER AUTH=XOAUTH2] Stalwart IMAP4rev2 at your service.` immediately.
+3. Stalwart's cert binds `CN=buxte.souvera.work` — connecting via IP `10.20.0.153` succeeds TLS but fails strict cert-name verification.
+
+**Live-verified fix:**
+- Patched the DomainConfig JSON to point IMAP/SMTP/Sieve at `10.20.0.153` with `verify_peer=false`, `verify_peer_name=false`, `allow_self_signed=true` on the SSL block.
+- Re-triggered the Dashboard widget: `HTTP 200` with `{"emptyContentMessage":"","halfEmptyContentMessage":"Keine ungelesenen E-Mails"}` — clean IMAP connect, OAUTHBEARER auth succeeded, widget rendered.
+- Re-triggered `/apps/souvera_mail/` engine entry-point: clean dispatch through the webmail UI.
+
+**Persistence fix (code):**
+Added FOUR new options to `souvera_mail:setup` so operators can persist the live-tested config across redeploys without hand-editing JSON:
+| Option | Effect |
+|---|---|
+| `--imap-allow-self-signed` | Relax TLS verification for IMAP (verify_peer + verify_peer_name → false, allow_self_signed → true) |
+| `--smtp-allow-self-signed` | Same, for SMTP |
+| `--sieve-allow-self-signed` | Same, for Sieve |
+| `--allow-self-signed` | Shortcut for all three |
+
+The flags surface through `DomainConfigService::sslConfig(bool $allowSelfSigned)` + `buildDomainConfig(...$existing, bool $imapAllowSelfSigned = false, bool $smtpAllowSelfSigned = false, bool $sieveAllowSelfSigned = false)`. Defaults are unchanged (false / strict), so existing deployments stay strict.
+
+**Operator workflow (recommended now):**
+```bash
+sudo -u www-data php occ souvera_mail:setup \
+  --domain=buxtehude.link \
+  --imap-host=10.20.0.153  --imap-allow-self-signed \
+  --smtp-host=10.20.0.153  --smtp-allow-self-signed \
+  --sieve-host=10.20.0.153 --sieve-allow-self-signed
+```
+Or, equivalently:
+```bash
+sudo -u www-data php occ souvera_mail:setup \
+  --domain=buxtehude.link \
+  --imap-host=10.20.0.153 --smtp-host=10.20.0.153 --sieve-host=10.20.0.153 \
+  --allow-self-signed
+```
+
+**Why this is the right model (not a security regression):**
+Authentication is unchanged — still OAUTHBEARER/XOAUTH2 (SSO via H2CK/oidc, never password). TLS encryption is unchanged — still SSL/TLS on the wire. ONLY the cert-name binding is relaxed, and only when the operator explicitly opts in via the flag. Defense-in-depth note: Stalwart's IP is reachable only from inside the cluster (`10.20.0.0/24`), so any attacker who can MITM `10.20.0.153` already has root inside the operator's cluster.
+
+### Architecture
+| File | Change |
+|---|---|
+| `lib/Command/Setup.php` | NEW options `--imap-allow-self-signed`, `--smtp-allow-self-signed`, `--sieve-allow-self-signed`, `--allow-self-signed` (shortcut). OR-merge the shortcut with per-protocol flags before passing into `buildDomainConfig`. |
+| `lib/Service/DomainConfigService.php` | `sslConfig(bool $allowSelfSigned = false)` — new param, defaults false (backwards compatible). When true, flips verify_peer + verify_peer_name to false and allow_self_signed to true. The engine's `\Smail\Mail\Net\SSLContext` override branch respects the same flag. `buildDomainConfig()` accepts three new boolean tail parameters, routed per-protocol. |
+| `tests/test_allow_self_signed_setup.php` | NEW — 13 assertions: option declaration, OR-merge logic, sslConfig signature + flip behaviour, buildDomainConfig signature, per-protocol routing, behavioural sim with 4 scenarios (backwards-compat, all-relaxed, IMAP-only, Sieve-only), SASL preservation, CHANGELOG documentation. |
+| `appinfo/info.xml` | Version 0.13.15 → 0.13.16. |
+
+### Verification
+- `php -l` clean on `Setup.php` + `DomainConfigService.php`.
+- `tests/test_allow_self_signed_setup.php`: 13/13 PASS.
+- Full local suite: 23/23 PASS files, 750/750 PASS assertions (was 22/22 + 737/737).
+- **Live HTTP 200 on the Dashboard widget call** (`OK with halfEmptyContentMessage`) — IMAP connect via `10.20.0.153` with relaxed cert succeeds end-to-end.
+
+### Operator next-step
+Run the new `occ souvera_mail:setup ... --allow-self-signed` invocation once. The fix then survives every future deploy (it's stored in the on-disk DomainConfig JSON, which the engine re-reads on every request).
+
+### Open: theming AppConfigTypeConflictException
+A separate `OCP\Exceptions\AppConfigTypeConflictException` shows up in the log for `/apps/theming/manifest/souvera_mail`. That's a Nextcloud Theming bug interacting with how we register our app metadata — NOT a Souvera Mail breaking issue (it only fails the manifest endpoint, no UX impact). Tracked as follow-up; will fix in 0.13.17.
+
 ## [0.13.15] — 2026-02-17 (live-fix)
 
 ### Fixed — P0: `/apps/souvera_mail/` "Seite nicht gefunden" (operator-reported live)

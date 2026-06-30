@@ -161,14 +161,24 @@ class DomainConfigService
     /**
      * Engine SSL config object template.
      *
+     * Pass `$allowSelfSigned = true` ONLY when the IMAP/SMTP/Sieve host is
+     * an internal IP or an alias whose certificate CN does not match — e.g.
+     * the operator routes IMAP through the cluster-internal Stalwart IP
+     * (`10.20.0.153`) instead of a public hostname behind a load balancer
+     * that doesn't TCP-forward port 993. In that scenario the TLS
+     * handshake succeeds but `verify_peer_name` would reject the cert,
+     * which Snappymail surfaces as the unhelpful `SocketReadException`.
+     * Setting this true relaxes verify_peer + verify_peer_name +
+     * allow_self_signed in one shot.
+     *
      * @return array<string, bool|int|string>
      */
-    private function sslConfig(): array
+    private function sslConfig(bool $allowSelfSigned = false): array
     {
         $defaults = [
-            'verify_peer' => true,
-            'verify_peer_name' => true,
-            'allow_self_signed' => false,
+            'verify_peer' => !$allowSelfSigned,
+            'verify_peer_name' => !$allowSelfSigned,
+            'allow_self_signed' => $allowSelfSigned,
             'SNI_enabled' => true,
             'disable_compression' => true,
             'security_level' => 1,
@@ -182,9 +192,9 @@ class DomainConfigService
             if (\class_exists('\\Smail\\Mail\\Net\\SSLContext')) {
                 $context = new \Smail\Mail\Net\SSLContext();
                 return [
-                    'verify_peer' => $context->verify_peer,
-                    'verify_peer_name' => $context->verify_peer_name,
-                    'allow_self_signed' => $context->allow_self_signed,
+                    'verify_peer' => $allowSelfSigned ? false : $context->verify_peer,
+                    'verify_peer_name' => $allowSelfSigned ? false : $context->verify_peer_name,
+                    'allow_self_signed' => $allowSelfSigned || $context->allow_self_signed,
                     'SNI_enabled' => $context->SNI_enabled,
                     'disable_compression' => $context->disable_compression,
                     'security_level' => $context->security_level,
@@ -206,6 +216,13 @@ class DomainConfigService
      * Uses the full engine format with all required keys.
      * Authentication is always OAUTHBEARER/XOAUTH2 (SSO-only).
      *
+     * The three `*AllowSelfSigned` flags relax TLS verification for the
+     * matching protocol. They are required when the operator routes
+     * IMAP/SMTP/Sieve through the cluster-internal Stalwart IP
+     * (`10.20.0.153`) because the load balancer in front of the
+     * public hostname doesn't TCP-forward IMAP/SMTP/Sieve ports.
+     * See PRD Step 27 for the live-debug trace that established this.
+     *
      * @return array<string, mixed>
      */
     public function buildDomainConfig(
@@ -219,6 +236,9 @@ class DomainConfigService
         int $sievePort,
         string $sieveSsl,
         bool $sieve,
+        bool $imapAllowSelfSigned = false,
+        bool $smtpAllowSelfSigned = false,
+        bool $sieveAllowSelfSigned = false,
     ): array {
         $imapType = self::sslToInt($imapSsl);
         $smtpType = self::sslToInt($smtpSsl);
@@ -234,7 +254,7 @@ class DomainConfigService
                 'timeout' => 300,
                 'lowerLogin' => true,
                 'sasl' => $oauthSasl,
-                'ssl' => $this->sslConfig(),
+                'ssl' => $this->sslConfig($imapAllowSelfSigned),
                 'use_expunge_all_on_delete' => false,
                 'fast_simple_search' => true,
                 'force_select' => false,
@@ -252,7 +272,7 @@ class DomainConfigService
                 'timeout' => 60,
                 'lowerLogin' => true,
                 'sasl' => $oauthSasl,
-                'ssl' => $this->sslConfig(),
+                'ssl' => $this->sslConfig($smtpAllowSelfSigned),
                 'useAuth' => true,
             ],
             'Sieve' => [
@@ -262,7 +282,7 @@ class DomainConfigService
                 'timeout' => 10,
                 'lowerLogin' => true,
                 'sasl' => $oauthSasl,
-                'ssl' => $this->sslConfig(),
+                'ssl' => $this->sslConfig($sieveAllowSelfSigned),
                 'enabled' => $sieve,
                 'authLiteral' => true,
             ],

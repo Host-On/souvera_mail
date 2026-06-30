@@ -85,15 +85,21 @@ assertTrue((bool) preg_match("#'username'\s*=>\s*\\\$email#", $svc),
     "createForUser() returns the `username` (= canonical Stalwart email)",
     $passes, $failures);
 
-// JMAP create payload uses Replace mode with explicit permissions list —
-// the only way to GUARANTEE `authenticateWithAlias` is present on the app
-// password (so email-as-username PLAIN/LOGIN succeeds), regardless of
-// what the operator's principal-level role looks like.
+// JMAP create payload uses Stalwart 0.16's `{@type:Replace, value:[...]}`
+// CredentialPermissions wire-format. Live-trial-verified against the
+// operator's deploy on 2026-06-30 (PRD Step 27 + 28):
+//   - bare list      → invalidPatch "Missing or invalid '@type'"
+//   - {@type, permissions:[]} → invalidPatch "permissions/permissions"
+//   - {@type, value:[]}       → ACCEPTED.
 assertTrue(str_contains($svc, "'@type' => 'Replace'"),
-    "JMAP AppPassword/set permissions uses Replace mode (NOT Inherit) — gives us full control over the scope",
+    "JMAP AppPassword/set CREATE uses Stalwart's @type:Replace patch-tag",
     $passes, $failures);
-assertTrue(str_contains($svc, "self::APP_PASSWORD_PERMISSIONS"),
-    "createForUser() forwards the explicit permission list", $passes, $failures);
+assertTrue(str_contains($svc, "'value' => self::APP_PASSWORD_PERMISSIONS"),
+    "JMAP AppPassword/set CREATE sends the permission list under `value` (Stalwart 0.16 format)",
+    $passes, $failures);
+assertTrue(!str_contains($svc, "'permissions' => self::APP_PASSWORD_PERMISSIONS"),
+    "Old Doppelung 'permissions/permissions' is gone",
+    $passes, $failures);
 assertTrue(str_contains($svc, "'authenticateWithAlias'"),
     "Permission list includes `authenticateWithAlias` (the email-as-username permission)",
     $passes, $failures);
@@ -221,9 +227,10 @@ function simCreate(string $userId, string $description, StubUserContext $ctx, St
             'accountId' => $accountId,
             'create' => ['k1' => [
                 'description' => $description,
+                // Stalwart 0.16 CredentialPermissions: {@type:Replace, value:[...]}
                 'permissions' => [
                     '@type' => 'Replace',
-                    'permissions' => ['authenticate', 'authenticateWithAlias', 'imapAuthenticate', 'imapFetch', 'emailSend', 'emailReceive'],
+                    'value' => ['authenticate', 'authenticateWithAlias', 'imapAuthenticate', 'imapFetch', 'emailSend', 'emailReceive'],
                 ],
                 'allowedIps' => (object) [],
             ]],
@@ -254,13 +261,18 @@ assertTrue($out['username'] === 'scadmin@buxtehude.email',
 assertTrue($ctx->emailCalls === ['scadmin'],
     "5e: resolveEmail() called exactly once with the NC user id", $passes, $failures);
 
-// Verify the JMAP payload shape Stalwart actually receives
+// Verify the JMAP payload shape Stalwart 0.16 actually expects on CREATE
 $createPayload = $st->lastPayload[0][1]['create']['k1'];
-assertTrue($createPayload['permissions']['@type'] === 'Replace',
-    "5f: JMAP create payload sends {@type: Replace} (gives us control over auth scope)",
+assertTrue(is_array($createPayload['permissions'])
+        && ($createPayload['permissions']['@type'] ?? null) === 'Replace',
+    "5f: JMAP create payload sends `permissions` with @type=Replace (Stalwart 0.16 patch-tag)",
     $passes, $failures);
-assertTrue(in_array('authenticateWithAlias', $createPayload['permissions']['permissions'], true),
-    "5f2: Replace permissions list includes authenticateWithAlias (email-as-username)",
+assertTrue(is_array($createPayload['permissions']['value'] ?? null)
+        && in_array('authenticateWithAlias', $createPayload['permissions']['value'], true),
+    "5f2: permission list lives under `value`, includes authenticateWithAlias",
+    $passes, $failures);
+assertTrue(!isset($createPayload['permissions']['permissions']),
+    "5f3: NO permissions/permissions Doppelung (that's what Stalwart 0.16 refused on 2026-06-30)",
     $passes, $failures);
 assertTrue(is_object($createPayload['allowedIps']),
     "5g: JMAP create payload sends allowedIps as JSON object (not array — would serialize as []) ",
