@@ -3,7 +3,7 @@
 	<id>souvera_mail</id>
 	<name>Souvera Mail</name>
 	<summary>Nextcloud-native webmail with Nextcloud as the OIDC Provider — CLI-configurable for automated deploys</summary>
-	<version>0.13.13</version>
+	<version>0.13.14</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author homepage="https://github.com/PhiGi87/souvera_mail">Souvera</author>
 	<website>https://github.com/PhiGi87/souvera_mail</website>

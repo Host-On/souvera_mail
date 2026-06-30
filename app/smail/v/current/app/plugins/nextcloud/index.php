@@ -398,6 +398,31 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			if ('address-book' === $sName) {
 				include_once __DIR__ . '/NextcloudAddressBook.php';
 				$mResult = new \NextcloudAddressBook();
+			} elseif ('filters' === $sName) {
+				// Swap the engine's ManageSieve-port-4190 SieveStorage for
+				// a JMAP-backed provider that reuses the H2CK/oidc JWT we
+				// already issue for AppPasswords / Quota / Identity sync.
+				// Bypasses the port-4190 dial-out chain that produced
+				// engine notification 352 (`CantGetFilters`) on the
+				// operator's Stalwart 0.16 deploy (PRD step 23 + 25).
+				// Best-effort: any failure to wire the provider leaves
+				// $mResult untouched so the engine falls back to its own
+				// default. We never throw out of a fabrica hook —
+				// crashes here take down the entire engine boot.
+				try {
+					if (\class_exists(\OCA\SouveraMail\Engine\Filters\JmapSieveStorage::class)
+						&& \class_exists(\OCA\SouveraMail\Service\SieveScriptService::class)) {
+						$svc = \OCP\Server::get(\OCA\SouveraMail\Service\SieveScriptService::class);
+						if ($svc->isAvailable()) {
+							$mResult = \OCP\Server::get(\OCA\SouveraMail\Engine\Filters\JmapSieveStorage::class);
+						}
+					}
+				} catch (\Throwable $e) {
+					\Smail\Engine\Log::warning(
+						'Nextcloud',
+						'JmapSieveStorage wiring skipped: ' . $e->getMessage()
+					);
+				}
 			}
 		}
 	}

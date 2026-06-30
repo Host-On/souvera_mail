@@ -5,3 +5,6 @@ credentials.json
 *.pem
 *.key
 .credentials
+
+# Operator live-debug access — never push to GitHub
+memory/operator_access.md
