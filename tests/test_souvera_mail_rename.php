@@ -46,7 +46,7 @@ assertTrue(($im[1] ?? '') === 'souvera_mail', "info.xml <id> == souvera_mail (go
 preg_match('#<namespace>([^<]+)</namespace>#', $infoXml, $nm);
 assertTrue(($nm[1] ?? '') === 'SouveraMail', "info.xml <namespace> == SouveraMail", $passes, $failures);
 preg_match('#<version>([^<]+)</version>#', $infoXml, $vm);
-assertTrue(($vm[1] ?? '') === '0.13.4', "info.xml <version> == 0.13.4 (got: '".($vm[1]??'')."')", $passes, $failures);
+assertTrue(($vm[1] ?? '') === '0.13.5', "info.xml <version> == 0.13.5 (got: '".($vm[1]??'')."')", $passes, $failures);
 assertTrue(str_contains($infoXml, '<admin>OCA\\SouveraMail\\Settings\\AdminSettings</admin>'), "info.xml <admin> uses new namespace", $passes, $failures);
 assertTrue(str_contains($infoXml, '<admin-section>'), "info.xml has <admin-section>", $passes, $failures);
 assertTrue(!str_contains($infoXml, '<personal>'), "info.xml has NO <personal>", $passes, $failures);
@@ -94,7 +94,7 @@ assertTrue(empty($syntaxErrors), "All /app/lib PHP files pass `php -l` (errors: 
 if (!empty($syntaxErrors)) { foreach ($syntaxErrors as $se) echo "  $se\n"; }
 
 // ============================================================
-// 5. templates/settings.php DELETED in 0.13.4 — the in-app settings
+// 5. templates/settings.php DELETED in 0.13.5 — the in-app settings
 //    page was replaced by an in-engine Snappymail Settings Tab
 //    (#/settings/souvera-account, registered by
 //     app/plugins/nextcloud/js/settings-account.js). See
@@ -142,7 +142,7 @@ $routesSrc = file_get_contents('/app/appinfo/routes.php');
 assertTrue(!preg_match("#'name'\s*=>\s*'smail#", $routesSrc), "routes.php has no route name starting with 'smail'", $passes, $failures);
 
 // ============================================================
-// 8. SettingsController — REDIRECT in 0.13.4 (was TemplateResponse)
+// 8. SettingsController — REDIRECT in 0.13.5 (was TemplateResponse)
 // ============================================================
 $scPath = '/app/lib/Controller/SettingsController.php';
 assertTrue(file_exists($scPath), "SettingsController.php exists", $passes, $failures);
@@ -194,7 +194,7 @@ assertTrue(str_contains($epSrc, "linkToRoute('souvera_mail.settings.index')"), "
 $quotaJs = file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/js/quota.js');
 assertTrue(str_contains($quotaJs, 'cfg.SmailSettingsUrl'), "quota.js reads cfg.SmailSettingsUrl from FilterAppData payload", $passes, $failures);
 assertTrue(preg_match("#createElement\(\s*settingsUrl\s*\?\s*'a'\s*:\s*'div'\s*\)#", $quotaJs) === 1, "quota.js creates <a> when settingsUrl present, else <div>", $passes, $failures);
-// 0.13.4: quota pill now navigates to the in-engine Settings tab (same tab)
+// 0.13.5: quota pill now navigates to the in-engine Settings tab (same tab)
 // instead of the NC-chrome page (new tab).
 assertTrue(str_contains($quotaJs, "el.target = '_self'") || str_contains($quotaJs, 'el.target="_self"'),
     "quota.js sets target='_self' (navigates to in-engine settings tab)", $passes, $failures);
@@ -202,7 +202,7 @@ assertTrue(str_contains($quotaJs, '#/settings/souvera-account'),
     "quota.js link target points at the in-engine #/settings/souvera-account route", $passes, $failures);
 
 // ============================================================
-// 13. js/personal-settings.js DELETED in 0.13.4 — its logic was ported
+// 13. js/personal-settings.js DELETED in 0.13.5 — its logic was ported
 //     into app/plugins/nextcloud/js/settings-account.js (Knockout VM).
 // ============================================================
 assertTrue(!file_exists('/app/js/personal-settings.js'),

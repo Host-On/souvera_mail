@@ -1,7 +1,7 @@
 <?php
 /**
  * Regression test for the IMAP/SMTP/Sieve subrequest token bug
- * fixed in Souvera Mail 0.13.4.
+ * fixed in Souvera Mail 0.13.5.
  *
  * Symptom
  * -------

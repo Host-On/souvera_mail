@@ -120,7 +120,7 @@ assertTrue(
 );
 
 // ============================================================
-// 5. Connected-Devices UI moved to the in-engine Settings tab in 0.13.4.
+// 5. Connected-Devices UI moved to the in-engine Settings tab in 0.13.5.
 //    The old NC-chrome templates/settings.php + js/personal-settings.js
 //    were deleted; the new owner is the engine plugin's Knockout VM.
 // ============================================================
@@ -134,7 +134,7 @@ assertTrue(!file_exists('/app/js/personal-settings.js'),
 $tmplSrc = file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/templates/SettingsSouveraAccount.html');
 foreach ([
     'Verbundene Geräte',                // section heading (de)
-    'Alle anderen abmelden',            // sign-out-others button label (shortened in 0.13.4)
+    'Alle anderen abmelden',            // sign-out-others button label (shortened in 0.13.5)
     'foreach: devices',                 // Knockout binding
     'dieses Gerät',                     // current-session badge
 ] as $needle) {
@@ -185,8 +185,8 @@ assertTrue((bool)preg_match("/signOutOthers[\s\S]{0,1000}confirm\(/", $jsSrc),
 // ============================================================
 $info = file_get_contents('/app/appinfo/info.xml');
 preg_match('#<version>([^<]+)</version>#', $info, $vm);
-assertTrue(($vm[1] ?? '') === '0.13.4',
-    "info.xml <version> == 0.13.4 (got: " . ($vm[1] ?? '') . ")", $passes, $failures);
+assertTrue(($vm[1] ?? '') === '0.13.5',
+    "info.xml <version> == 0.13.5 (got: " . ($vm[1] ?? '') . ")", $passes, $failures);
 
 $changelog = file_get_contents('/app/CHANGELOG.md');
 assertTrue(str_contains($changelog, '[0.12.0]'),
@@ -232,8 +232,8 @@ assertTrue(isset($classmap['OCA\\SouveraMail\\Service\\ConnectedDevicesService']
 assertTrue(isset($classmap['OCA\\SouveraMail\\Controller\\ConnectedDevicesController']),
     "Classmap contains OCA\\SouveraMail\\Controller\\ConnectedDevicesController", $passes, $failures);
 $classmapCount = count($classmap);
-assertTrue($classmapCount === 273,
-    "Classmap class count == 273 (was 270 + 2 connected-devices + 1 enforce-group-restriction) (got: $classmapCount)", $passes, $failures);
+assertTrue($classmapCount === 274,
+    "Classmap class count == 274 (270 + 2 connected-devices + 1 enforce-group-restriction + 1 namespace-bridge) (got: $classmapCount)", $passes, $failures);
 
 // ============================================================
 // 11. Existing regression suites still pass

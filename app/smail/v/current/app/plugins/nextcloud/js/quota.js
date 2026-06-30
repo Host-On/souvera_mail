@@ -117,15 +117,13 @@
 	};
 
 	const renderSettingsOnly = () => {
-		// Quota unavailable but we still want a settings entry-point.
-		if (!settingsUrl) {
-			removePill();
-			return;
-		}
-		const el = ensurePill();
-		el.style.cssText = pillStyle(0, false);
-		el.textContent = '\u2699 ' + 'Settings';
-		el.title = 'Open Souvera Mail settings';
+		// 0.13.5: there is no longer a separate "Settings" landing — the
+		// in-engine Snappymail tab "Sicherheit & Geräte" is reachable
+		// directly from the engine's own settings cog. When quota is
+		// unavailable we simply hide the pill instead of degrading to
+		// a redundant "⚙ Settings" entry-point that confused users
+		// after the consolidation.
+		removePill();
 	};
 
 	const refresh = () => {

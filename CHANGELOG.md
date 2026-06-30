@@ -6,6 +6,36 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.5] — 2026-02-17
+
+### Fixed (P0 — fatal QueryNotFoundException on every app load, reported 2026-06-30)
+- **`/index.php/apps/souvera_mail/` no longer crashes with `Could not resolve OCA\Souvera_mail\Controller\PageController!`** Nextcloud 34's `IAppManager::getAppNamespace()` derives the PHP namespace for an app from its id with `ucfirst($appId)` whenever the cached `<namespace>` tag from `info.xml` is stale in the `core.appinfo` memcache. For our id `souvera_mail` that yields `OCA\Souvera_mail\…` (lower-case `m`), which doesn't match our canonical `OCA\SouveraMail\…` PSR-4 path → every controller lookup throws `QueryNotFoundException`. Rather than depend on the operator's memcache state we now ship a **two-part namespace bridge** that accepts both shapes (see Architecture below). Once the operator's cache catches up, the bridge becomes a silent no-op (the spl_autoload hook short-circuits on every lookup that does not start with the underscore prefix).
+
+### Removed
+- **Redundant `⚙ Settings` fallback pill in the engine UI.** When the live quota endpoint was unreachable the engine plugin's `quota.js` degraded the quota pill into a standalone "⚙ Settings" pill linking to the legacy NC-chrome settings page. With settings now living as a tab inside the engine itself ("Sicherheit & Geräte"), the fallback pill was both redundant and confusing — clicking it took the user out of the inbox to a redirect-only URL. The quota pill now simply disappears when quota data is unavailable.
+
+### Architecture
+- **`lib-bridge/namespace-bridge.php`** (NEW). Registered under composer's `autoload.files`, so it loads eagerly on every `require vendor/autoload.php` (which Nextcloud's `OC_App::registerAutoloading()` does for every enabled app at bootstrap). Installs an `spl_autoload_register(..., prepend=true, throw=true)` hook that rewrites `OCA\Souvera_mail\<sub>` → `OCA\SouveraMail\<sub>` via `class_alias`. Handles classes, interfaces AND traits (NC's DI graph touches all three). Re-entrancy-guarded by a `SOUVERA_MAIL_NAMESPACE_BRIDGE_INSTALLED` define so multiple `require_once` calls don't re-register the hook.
+- **`lib-bridge/Souvera_mail/AppInfo/Application.php`** (NEW). Registered under composer's classmap. `final class Application extends \OCA\SouveraMail\AppInfo\Application` — empty body, inherits the entire boot/registration surface from the real Application. Gives NC's DI container something to `new` when it asks for `OCA\Souvera_mail\AppInfo\Application` directly.
+- **`composer.json`** autoload section extended:
+  - `"files": ["lib-bridge/namespace-bridge.php"]` — eager-load the spl hook before any class lookup.
+  - `"classmap": [..., "lib-bridge/"]` — register the bridge Application class.
+  - PSR-4 mapping for `OCA\SouveraMail\` is unchanged.
+- **`app/smail/v/current/app/plugins/nextcloud/js/quota.js`**: `renderSettingsOnly()` now simply calls `removePill()` instead of rendering a fallback "Settings" pill.
+
+### Verification
+- `php -l` clean on both bridge files.
+- `composer dump-autoload -o` regenerated; classmap holds 274 classes (was 273 — exactly +1 for `OCA\Souvera_mail\AppInfo\Application`).
+- **`tests/test_namespace_bridge.php`: 18/18 PASS** (NEW). Covers:
+  - Composer artefacts (`autoload_classmap.php`, `autoload_files.php`) contain both bridge entries.
+  - `composer.json` declares both bridge entries under the right sections.
+  - The bridge file's spl_autoload_register call is correctly parameterised (prepend=true, throw=true), targets exactly the underscore prefix, rewrites to the canonical CamelCase prefix, uses `class_alias` so the underscore name stays resolvable, handles classes/interfaces/traits, is re-entrancy-guarded.
+  - The bridge Application class declares the correct namespace, is `final`, and `extends \OCA\SouveraMail\AppInfo\Application`.
+  - **End-to-end PHP sub-process sim**: a stubbed `OCA\SouveraMail\Smoke\Target` class becomes reachable under `OCA\Souvera_mail\Smoke\Target` after loading only the bridge file. `new` works, reflection returns the canonical name (proving alias semantics), interface and trait variants work, and unrelated namespaces are NOT touched by the hook (no bleed-out).
+  - `quota.js` no longer renders the fallback "⚙ Settings" pill; the `renderSettingsOnly()` degrades to `removePill()` cleanly.
+  - `info.xml` still declares `<namespace>SouveraMail</namespace>` (the canonical CamelCase path for operators with a fresh cache).
+- Full regression — **397/397 PASS** across 11 test files.
+
 ## [0.13.4] — 2026-02-17
 
 ### Fixed (three live bugs reported by operator)

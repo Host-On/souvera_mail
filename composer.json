@@ -16,7 +16,11 @@
             "OCA\\SouveraMail\\": "lib/"
         },
         "classmap": [
-            "app/smail/v/current/app/libraries/Smail/"
+            "app/smail/v/current/app/libraries/Smail/",
+            "lib-bridge/"
+        ],
+        "files": [
+            "lib-bridge/namespace-bridge.php"
         ]
     },
     "scripts": {
