@@ -61,7 +61,7 @@ class Setup extends Command
             ->addOption('sieve',       null, InputOption::VALUE_NEGATABLE, 'Enable ManageSieve filtering (default: on — Stalwart 0.16 ships it natively on :4190 / OAUTHBEARER; pass --no-sieve to opt out)', true)
             ->addOption('sieve-host',  null, InputOption::VALUE_REQUIRED, 'Sieve server hostname (defaults to imap-host)')
             ->addOption('sieve-port',  null, InputOption::VALUE_REQUIRED, 'Sieve server port', '4190')
-            ->addOption('sieve-ssl',   null, InputOption::VALUE_REQUIRED, 'Sieve SSL mode (none|ssl|starttls)', 'ssl')
+            ->addOption('sieve-ssl',   null, InputOption::VALUE_REQUIRED, 'Sieve SSL mode (none|ssl|starttls) — default starttls matches IANA RFC 5804 port 4190 and Stalwart out-of-the-box ManageSieve listener', 'starttls')
             ->addOption('check',        null, InputOption::VALUE_NONE, 'Run live IMAP/SMTP/Sieve connectivity preflight before writing')
             ->addOption('skip-checks',  null, InputOption::VALUE_NONE, 'Deprecated alias — connectivity is skipped by default; --check turns it on')
             ->addOption('dry-run',      null, InputOption::VALUE_NONE, 'Print what would be written without modifying any state')

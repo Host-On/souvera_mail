@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Souvera Mail — Nextcloud nav icon.
+
+	Monochrome on transparent so Nextcloud's NavigationManager can
+	recolour it for the active theme (light → currentColor on dark
+	header, dark mode → currentColor on light header). Stroke-only
+	envelope shape with a folded paper-plane tab — distinctive but
+	calm at the 16×16 / 22×22 sizes the NC top-bar renders at, and
+	still readable at 64×64 on the Settings → Apps tile.
+
+	Geometry deliberately uses round joins / soft 1.7-unit stroke
+	so the icon doesn't look mechanical next to the other nav icons
+	(Files, Calendar, Talk) which all share a similar visual weight.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+	<!-- Envelope body -->
+	<rect x="2.5" y="5" width="19" height="14" rx="2.5"
+	      stroke="currentColor" stroke-width="1.7" />
+	<!-- Folded paper flap — the line that travels from the two top
+	     corners down to the middle, signalling "letter" without
+	     looking like a plain rectangle. -->
+	<path d="M3 7.2 L12 13.2 L21 7.2"
+	      stroke="currentColor" stroke-width="1.7"
+	      stroke-linecap="round" stroke-linejoin="round" />
+	<!-- Subtle "S" accent — a single sweeping mark in the envelope's
+	     lower-right quadrant. Half-opacity so it reads as a brand
+	     mark rather than a separate glyph; disappears entirely at
+	     ≤14 px which is exactly what we want for the 16 px nav icon. -->
+	<path d="M14.8 16.3
+	         c0.7 0 1.2 -0.45 1.2 -1
+	         c0 -0.55 -0.45 -0.9 -1.1 -1
+	         c-0.65 -0.1 -1.1 -0.45 -1.1 -1
+	         c0 -0.55 0.5 -1 1.2 -1"
+	      stroke="currentColor" stroke-width="1.4"
+	      stroke-linecap="round" fill="none" opacity="0.55" />
+</svg>

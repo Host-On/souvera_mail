@@ -159,7 +159,7 @@ class Application extends App implements IBootstrap
                 'id' => self::APP_ID,
                 'name' => NavigationTitle::resolve($appConfig),
                 'href' => $urlGenerator->linkToRoute('souvera_mail.page.index'),
-                'icon' => $urlGenerator->imagePath(self::APP_ID, 'logo-white-64x64.png'),
+                'icon' => $urlGenerator->imagePath(self::APP_ID, 'app.svg'),
                 'order' => 4,
             ];
         });

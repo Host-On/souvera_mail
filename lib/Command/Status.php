@@ -137,6 +137,7 @@ class Status extends Command
             }
             $imapType = $cfg['IMAP']['type'] ?? 0;
             $smtpType = $cfg['SMTP']['type'] ?? 0;
+            $sieveType = $cfg['Sieve']['type'] ?? 0;
             $entries[$domain] = [
                 'imap' => [
                     'host' => $cfg['IMAP']['host'] ?? '',
@@ -147,6 +148,18 @@ class Status extends Command
                     'host' => $cfg['SMTP']['host'] ?? '',
                     'port' => $cfg['SMTP']['port'] ?? 0,
                     'ssl' => \is_int($smtpType) ? DomainConfigService::sslToString($smtpType) : 'custom',
+                ],
+                // Surface the full Sieve config so operators can correlate
+                // engine-side "Error 352 / CantGetFilters" with the actual
+                // ManageSieve host/port/TLS triple the engine is dialling.
+                // Stalwart's ManageSieve listener defaults to port 4190
+                // STARTTLS — make sure the SSL mode here matches.
+                'sieve' => [
+                    'enabled' => (bool) ($cfg['Sieve']['enabled'] ?? false),
+                    'host' => $cfg['Sieve']['host'] ?? '',
+                    'port' => $cfg['Sieve']['port'] ?? 0,
+                    'ssl' => \is_int($sieveType) ? DomainConfigService::sslToString($sieveType) : 'custom',
+                    'sasl' => $cfg['Sieve']['sasl'] ?? [],
                 ],
                 'sieve_enabled' => (bool) ($cfg['Sieve']['enabled'] ?? false),
             ];

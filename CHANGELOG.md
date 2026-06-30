@@ -6,6 +6,33 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.12] — 2026-02-17
+
+### Changed — fresh Nextcloud nav icon
+- **`img/app.svg`** (NEW) — clean monochrome envelope mark with a folded-flap silhouette and a subtle "S" accent in the lower-right quadrant. Single-colour `currentColor`-only so Nextcloud's theme engine recolours it for light/dark mode automatically; well-formed XML with a 24×24 viewBox so NC's `IconService` serves it without rasterising. Looks calm next to Files / Calendar / Talk at the 16/22 px nav size and still readable at 64 px on the Settings → Apps tile. Replaces the rasterised `logo-white-64x64.png` which couldn't be themed.
+- **`lib/AppInfo/Application.php`** — nav-icon URL now resolves to `img/app.svg` (was `img/logo-white-64x64.png`). No other code changes; the SVG sits next to the existing PNG so deployments rolling back to 0.13.11 are unaffected.
+
+### Diagnostic — operator-facing context for `Error 352 / CantGetFilters`
+- **Symptom (post-0.13.8):** opening Settings → Filters now reaches Stalwart's ManageSieve listener but auth-or-list fails. The engine wraps the underlying exception as `Notifications::CantGetFilters = 352` ("Error 352"). The actual root cause is in Stalwart's ManageSieve config — the engine's domain config can only affect the dial-out shape (host / port / SSL mode / advertised SASL mechanisms).
+- **`occ souvera_mail:status`** now surfaces the full Sieve dial-out triple under `domains.<domain>.sieve` (host, port, ssl, sasl) alongside the legacy `sieve_enabled` boolean. Operators can pipe `--json | jq '.domains[].sieve'` against the live config and compare it against Stalwart's `server.listener.managesieve.*` settings.
+- **`occ souvera_mail:setup --sieve-ssl`** default flipped `ssl` → `starttls`. RFC 5804 §4 specifies port 4190 as the ManageSieve port using PLAIN or STARTTLS; Stalwart's `server.listener.managesieve` default config matches. Operators who run Stalwart with explicit-TLS on a custom port can still pass `--sieve-ssl ssl` explicitly.
+- **Common Error 352 root-cause checklist** (operator side, in priority order):
+  1. `ssl` mode mismatch — `occ souvera_mail:status --json | jq '.domains[].sieve.ssl'` should match Stalwart's `server.listener.managesieve.tls.implicit` (true → `ssl`, false → `starttls`).
+  2. ManageSieve listener missing OAUTHBEARER — Stalwart's default user role may include `sieveAuthenticate` but not advertise OAUTHBEARER on ManageSieve specifically. Add `auth.sasl.mechanisms` to the ManageSieve listener config and include `OAUTHBEARER`.
+  3. JWT audience mismatch on the Sieve port — Stalwart's `directory.ncoidc.requireAudience` is `smail`; verify the H2CK client config registers `smail` as the audience for the souvera_mail user.
+  4. ManageSieve port not actually open — `nc -zv <sieve-host> 4190` from inside the Nextcloud pod.
+
+### Verification
+- `php -l` clean on all four modified files (`img/app.svg` validates as XML).
+- **`tests/test_icon_and_sieve_diagnostic.php`: 20/20 PASS** (NEW). Pins: SVG well-formedness, `currentColor`-only fills/strokes, Application.php nav-icon wiring, `--sieve-ssl` default = `starttls`, Status command exposes the new `sieve` block.
+- Full local suite **573/573 PASS** across 17 test files (was 553/553 across 16). Zero regressions.
+
+### Operator action (Error 352)
+1. Deploy 0.13.12 to `/mnt/nc-shared/custom_apps/souvera_mail`.
+2. Re-run `occ souvera_mail:setup` (your previous flags + omit `--sieve-ssl` to pick up the new STARTTLS default; OR pass `--sieve-ssl ssl` explicitly if your Stalwart uses implicit TLS).
+3. Verify: `occ souvera_mail:status --json | jq '.domains[].sieve'` — compare with Stalwart's `server.listener.managesieve.*` config.
+4. If Error 352 persists, check the operator-side checklist above. The exact underlying exception is in the engine log: `data/_data_/_default_/logs/log-<date>.txt` (look for `Sieve` / `LoginException` entries near the failed compose-time-stamp).
+
 ## [0.13.11] — 2026-02-17
 
 ### Added — Stalwart shared-mailbox identity auto-sync (operator-requested 2026-07-01)
