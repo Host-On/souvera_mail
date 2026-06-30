@@ -247,6 +247,21 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			$oUrlGen = \OCP\Server::get(\OCP\IURLGenerator::class);
 			$sWebDAV = $oUrlGen->getAbsoluteURL($oUrlGen->linkTo('', 'remote.php') . '/dav');
 
+			// Disable the engine's inactivity-driven auto-logout in SSO
+			// mode. NC's session is the authoritative auth anchor (its
+			// own session_lifetime + sliding-window logic already enforce
+			// idle expiry centrally); the engine's 30-minute default just
+			// races with it and surfaces the chaotic "Logout Error →
+			// AuthError[102] on next Folders refresh" sequence the
+			// operator reported on 2026-07-01.
+			//
+			// Operators who want a stricter idle policy ON TOP of NC's
+			// session lifetime can override via:
+			//   occ config:app:set souvera_mail engine_autologout_minutes --value 60
+			// Default is 0 (engine inactivity timer disabled — NC owns auth).
+			$autoLogout = (int) \OCP\Server::get(\OCP\IConfig::class)
+				->getAppValue('souvera_mail', 'engine_autologout_minutes', '0');
+			$aResult['AutoLogout'] = $autoLogout;
 			// Seed a default mail identity using the NC display name on the
 			// very first request after first login — saves the user from the
 			// "please enter your name in Settings → Identities" gating dialog
