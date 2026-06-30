@@ -65,6 +65,12 @@ assertTrue(str_contains($src, "public const STALWART_ID_PREFIX = 'stalwart:';"),
 assertTrue(str_contains($src, "STALWART_LABEL_SUFFIX = ' [Stalwart]';"),
     "Stalwart-managed identities carry the ' [Stalwart]' label suffix (operator choice b — visible marker)",
     $passes, $failures);
+assertTrue(str_contains($src, 'public const SHARED_NAMESPACE_PREFIX = '),
+    "Service exposes SHARED_NAMESPACE_PREFIX constant (Stalwart default = 'Shared Folders/')",
+    $passes, $failures);
+assertTrue(str_contains($src, 'public const SHARED_SENT_LEAF = '),
+    "Service exposes SHARED_SENT_LEAF constant (Stalwart auto-creates a 'Sent' leaf per principal)",
+    $passes, $failures);
 assertTrue(preg_match('#public function syncIfStale\(string \$userId\)\s*:\s*\?array#', $src) === 1,
     "Service exposes syncIfStale(string \$userId): ?array (null = cache hit, skip)",
     $passes, $failures);
@@ -73,6 +79,17 @@ assertTrue(preg_match('#public function forceSync\(string \$userId\)\s*:\s*array
     $passes, $failures);
 assertTrue(preg_match('#public function reconcile\(array \$engineIdentities, array \$stalwart\)\s*:\s*array#', $src) === 1,
     "Service exposes pure reconcile() — drivable by tests with stubs",
+    $passes, $failures);
+
+// sentFolder routing — own identity vs shared mailbox
+assertTrue(str_contains($src, "self::SHARED_NAMESPACE_PREFIX . \$email . '/' . self::SHARED_SENT_LEAF"),
+    "fetchFromStalwart() builds sentFolder = 'Shared Folders/<email>/Sent' for shared mailboxes",
+    $passes, $failures);
+assertTrue(str_contains($src, "\$isShared = (\$ownEmail !== '' && \$email !== \$ownEmail)"),
+    "fetchFromStalwart() flags isShared = email differs from the user's own canonical email",
+    $passes, $failures);
+assertTrue(str_contains($src, "'sentFolder' => \$sentFolder"),
+    "Service entries carry the routed sentFolder through reconcile()",
     $passes, $failures);
 
 // JMAP shape: Identity/get with ids: null + submission capability
@@ -146,14 +163,15 @@ assertTrue(str_contains($plug, "\json_encode(\$reconciled) !== \json_encode(\$ex
 const PREFIX = 'stalwart:';
 const SUFFIX = ' [Stalwart]';
 
-function skeleton(string $sid, string $email, string $name): array {
+function skeleton(string $sid, string $email, string $name, string $sentFolder = ''): array {
     return [
         'Id' => PREFIX . $sid,
         'Label' => $name . SUFFIX,
         'Email' => $email,
         'Name' => $name,
         'ReplyTo' => '', 'Bcc' => '', 'Signature' => '',
-        'SignatureInsertBefore' => false, 'sentFolder' => '',
+        'SignatureInsertBefore' => false,
+        'sentFolder' => $sentFolder,
         'pgpEncrypt' => false, 'pgpSign' => false,
         'smimeKey' => '', 'smimeCertificate' => '',
     ];
@@ -178,15 +196,30 @@ function reconcile(array $engine, array $stalwart): array {
     foreach ($stalwart as $s) {
         if (isset($manualEmails[$s['email']])) continue;
         $sid = $s['stalwartId'];
+        $sentFolder = (string) ($s['sentFolder'] ?? '');
         if (isset($existing[$sid])) {
             $e = $existing[$sid];
             $e['Email'] = $s['email'];
             $e['Name'] = $s['name'];
             $e['Label'] = $s['name'] . SUFFIX;
+            $e['sentFolder'] = $sentFolder;
             $out[] = $e;
         } else {
-            $out[] = skeleton($sid, $s['email'], $s['name']);
+            $out[] = skeleton($sid, $s['email'], $s['name'], $sentFolder);
         }
+    }
+    return $out;
+}
+
+// Helper that mirrors fetchFromStalwart()'s routing logic — applies
+// the sentFolder per Stalwart entry depending on whether email == own.
+function withSentRouting(string $ownEmail, array $stalwart): array {
+    $out = [];
+    foreach ($stalwart as $s) {
+        $isShared = ($ownEmail !== '' && $s['email'] !== $ownEmail);
+        $s['isShared'] = $isShared;
+        $s['sentFolder'] = $isShared ? ('Shared Folders/' . $s['email'] . '/Sent') : '';
+        $out[] = $s;
     }
     return $out;
 }
@@ -278,6 +311,41 @@ $out = reconcile([], [
 ]);
 assertTrue($out[0]['Name'] === 'noreply',
     "4g: name fallback handles missing description gracefully",
+    $passes, $failures);
+
+// 4h. sentFolder routing — own identity gets EMPTY sentFolder so engine
+//     falls back to the user's account-level Sent. Shared mailbox gets
+//     `Shared Folders/<email>/Sent` so the IMAP APPEND lands in the
+//     SHARED inbox's Sent — not the user's own (the operator's bug).
+$stalwart = withSentRouting('scadmin@buxtehude.email', [
+    ['stalwartId' => 'i1', 'email' => 'scadmin@buxtehude.email', 'name' => 'Scadmin'],
+    ['stalwartId' => 'i2', 'email' => 'team@buxtehude.email',    'name' => 'Team Buxtehude'],
+]);
+$out = reconcile([], $stalwart);
+$ownIdent = null; $sharedIdent = null;
+foreach ($out as $i) {
+    if ($i['Email'] === 'scadmin@buxtehude.email') $ownIdent = $i;
+    if ($i['Email'] === 'team@buxtehude.email')    $sharedIdent = $i;
+}
+assertTrue($ownIdent !== null && $ownIdent['sentFolder'] === '',
+    "4h: own-identity sentFolder is '' → engine routes to account-level Sent (the user's own)",
+    $passes, $failures);
+assertTrue($sharedIdent !== null && $sharedIdent['sentFolder'] === 'Shared Folders/team@buxtehude.email/Sent',
+    "4h: shared-identity sentFolder = 'Shared Folders/<email>/Sent' (sends to SHARED inbox, not user's own — the bug fix)",
+    $passes, $failures);
+
+// 4i. Rename + revoke must NOT leak a stale sentFolder. After a shared
+//     mailbox is renamed Stalwart-side (different email), the existing
+//     identity record gets its sentFolder re-asserted to match.
+$engine = [
+    skeleton('i2', 'team@buxtehude.email', 'Team Buxtehude', 'Shared Folders/team@buxtehude.email/Sent'),
+];
+$stalwart = withSentRouting('scadmin@buxtehude.email', [
+    ['stalwartId' => 'i2', 'email' => 'team-neu@buxtehude.email', 'name' => 'Team Buxtehude (umbenannt)'],
+]);
+$out = reconcile($engine, $stalwart);
+assertTrue($out[0]['sentFolder'] === 'Shared Folders/team-neu@buxtehude.email/Sent',
+    "4i: shared-mailbox rename re-asserts sentFolder against the new email (no stale path)",
     $passes, $failures);
 
 // ---------------------------------------------------------------

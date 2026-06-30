@@ -35,6 +35,7 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 
 			$this->addJs('js/quota.js');
 			$this->addJs('js/settings-account.js');
+			$this->addJs('js/folder-names.js');
 
 			$this->addTemplate('templates/PopupsNextcloudFiles.html');
 			$this->addTemplate('templates/PopupsNextcloudCalendars.html');

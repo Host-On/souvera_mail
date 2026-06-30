@@ -6,6 +6,20 @@
 		"LABEL_TITLE": "Position:",
 		"ADD_MENU_NICKNAME": "Spitzname:"
 	},
+	"FOLDERS": {
+		"SHARED_NAMESPACE": "Geteilte Postfächer",
+		"OTHER_USERS_NAMESPACE": "Andere Postfächer",
+		"INBOX": "Posteingang",
+		"SENT": "Gesendet",
+		"SENT_ITEMS": "Gesendet",
+		"DRAFTS": "Entwürfe",
+		"TRASH": "Papierkorb",
+		"DELETED_ITEMS": "Gelöscht",
+		"JUNK": "Spam",
+		"SPAM": "Spam",
+		"ARCHIVE": "Archiv",
+		"OUTBOX": "Postausgang"
+	},
 	"NEXTCLOUD": {
 		"SAVE_ATTACHMENTS": "Speichern Sie in Nextcloud",
 		"SAVE_EML": "Als .eml in Nextcloud speichern",

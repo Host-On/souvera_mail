@@ -57,6 +57,22 @@ class SharedIdentitySyncService
     // "Stalwart-verwaltet" in the Settings → Identities list and in
     // the compose-window "From:" dropdown.
     public const STALWART_LABEL_SUFFIX = ' [Stalwart]';
+    // IMAP namespace prefix Stalwart's shared-mailbox folders live
+    // under. Matches Stalwart's `server.namespace.shared` default; if a
+    // deploy customises this (e.g. `Other Users/` or `#shared/`),
+    // operators can override the full sent-folder path per principal
+    // — but the out-of-the-box default works for every standard
+    // Stalwart 0.16 deploy and is what 99% of operators need. We
+    // prepend it to `<email>/Sent` for the engine identity's
+    // `sentFolder` so the IMAP APPEND that the engine does after a
+    // successful SMTP submission lands in the SHARED mailbox's Sent
+    // folder — not in the user's own. (Operator-reported 2026-07-01.)
+    public const SHARED_NAMESPACE_PREFIX = 'Shared Folders/';
+    // Leaf folder name for "Sent" in Stalwart's default IMAP layout
+    // for shared mailboxes. Stalwart auto-creates Inbox/Sent/Drafts/
+    // Trash/Junk for every principal; the Sent leaf is the unprefixed
+    // English name (Stalwart does NOT translate folder names per-user).
+    public const SHARED_SENT_LEAF = 'Sent';
 
     public function __construct(
         private StalwartUserContext $userContext,
@@ -186,6 +202,14 @@ class SharedIdentitySyncService
             return [];
         }
 
+        $ownEmail = '';
+        try {
+            $ownEmail = \strtolower(\trim($this->userContext->resolveEmail($userId)));
+        } catch (\Throwable) {
+            // Already failed above; just continue without it — we won't
+            // be able to flag the user's own identity but the rest works.
+        }
+
         $out = [];
         foreach ($list as $entry) {
             if (!\is_array($entry)) {
@@ -198,6 +222,19 @@ class SharedIdentitySyncService
                 // Stalwart should never emit these; defensive skip.
                 continue;
             }
+            // Stalwart-side `Identity/get` returns BOTH the user's own
+            // primary identity AND every shared mailbox where they have
+            // send-as. Distinguish so we can route the IMAP APPEND of
+            // the sent copy correctly: shared mailboxes need a
+            // `sentFolder` that points at the shared inbox's Sent
+            // (`Shared Folders/<email>/Sent` under Stalwart's default
+            // namespace); the user's own identity must keep
+            // `sentFolder = ''` so the engine falls back to its
+            // account-level Sent.
+            $isShared = ($ownEmail !== '' && $email !== $ownEmail);
+            $sentFolder = $isShared
+                ? (self::SHARED_NAMESPACE_PREFIX . $email . '/' . self::SHARED_SENT_LEAF)
+                : '';
             $out[] = [
                 'stalwartId' => $sid,
                 'email' => $email,
@@ -205,6 +242,8 @@ class SharedIdentitySyncService
                 // Stalwart hasn't set a description — better than an
                 // empty `From: <team@example.com>` field.
                 'name' => $name !== '' ? $name : \explode('@', $email)[0],
+                'isShared' => $isShared,
+                'sentFolder' => $sentFolder,
             ];
         }
         return $out;
@@ -230,7 +269,7 @@ class SharedIdentitySyncService
      *     signature for their own primary mailbox.
      *
      * @param list<array<string, mixed>> $engineIdentities Current engine state (raw JSON-decoded array)
-     * @param list<array{stalwartId: string, email: string, name: string}> $stalwart
+     * @param list<array{stalwartId: string, email: string, name: string, isShared?: bool, sentFolder?: string}> $stalwart
      * @return list<array<string, mixed>> New `identities` array, ready to JSON-encode + Put()
      */
     public function reconcile(array $engineIdentities, array $stalwart): array
@@ -258,14 +297,21 @@ class SharedIdentitySyncService
                 continue;
             }
             $sid = $s['stalwartId'];
+            $sentFolder = (string) ($s['sentFolder'] ?? '');
             $existing = $existingByStalwartId[$sid] ?? null;
             if ($existing !== null) {
                 $existing['Email'] = $s['email'];
                 $existing['Name'] = $s['name'];
                 $existing['Label'] = $s['name'] . self::STALWART_LABEL_SUFFIX;
+                // Always re-assert the canonical sentFolder — Stalwart
+                // is the authoritative source. If the operator revokes
+                // send-as on a shared mailbox and re-grants on a
+                // different one, the existing record's stale path
+                // would otherwise outlive the change.
+                $existing['sentFolder'] = $sentFolder;
                 $merged[] = $existing;
             } else {
-                $merged[] = $this->skeleton($sid, $s['email'], $s['name']);
+                $merged[] = $this->skeleton($sid, $s['email'], $s['name'], $sentFolder);
             }
         }
         return $merged;
@@ -278,7 +324,7 @@ class SharedIdentitySyncService
      *
      * @return array<string, mixed>
      */
-    private function skeleton(string $stalwartId, string $email, string $name): array
+    private function skeleton(string $stalwartId, string $email, string $name, string $sentFolder = ''): array
     {
         return [
             'Id' => self::STALWART_ID_PREFIX . $stalwartId,
@@ -289,7 +335,12 @@ class SharedIdentitySyncService
             'Bcc' => '',
             'Signature' => '',
             'SignatureInsertBefore' => false,
-            'sentFolder' => '',
+            // Routes the IMAP APPEND of the sent copy AFTER SMTP
+            // submission. Empty = engine falls back to the account's
+            // default Sent (= the user's own); non-empty = explicit
+            // path the engine APPENDs to. For shared mailboxes we
+            // point at `Shared Folders/<email>/Sent` (Stalwart default).
+            'sentFolder' => $sentFolder,
             'pgpEncrypt' => false,
             'pgpSign' => false,
             'smimeKey' => '',

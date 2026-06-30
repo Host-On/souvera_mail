@@ -6,6 +6,47 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.13] — 2026-02-17
+
+### Fixed (P0 — sent copy of shared-mailbox messages landed in user's own Sent, reported 2026-07-01)
+- **Sending via a shared mailbox now lands the sent copy in the SHARED mailbox's Sent folder, not the user's own.** The 0.13.11 shared-identity sync seeded every Stalwart-managed identity with `sentFolder = ''`, which the engine treats as "use the account default Sent" — that default is the user's own. The result: every reply or new message composed under a shared identity vanished from the shared inbox's audit trail.
+- **`SharedIdentitySyncService::fetchFromStalwart()`** now flags each Stalwart-side `Identity/get` entry with `isShared = (email !== ownEmail)` and sets `sentFolder = 'Shared Folders/<email>/Sent'` for shared entries. The user's own identity keeps `sentFolder = ''` so the engine still routes their personal sent copies to their personal Sent. Routing happens at sync time, written into the engine's per-identity record, picked up by the engine's existing send-time logic at `static/js/app.js:11795` (`currentIdentity()?.sentFolder?.() || FolderUserStore.sentFolder()`).
+- **`reconcile()`** now also re-asserts the routed `sentFolder` on EVERY sync run — when the operator renames a shared mailbox Stalwart-side, the existing engine record's stale Sent path is overwritten on the next sync window. Idempotent and pure: drift-tested via the behavioural sim.
+
+### Added — German + English folder-name localisation for shared mailboxes
+- **`langs/de.json` + `langs/en.json`** ship a new `FOLDERS` namespace covering the 12 IMAP leaf names + namespace prefixes Stalwart commonly surfaces ("Shared Folders" → "Geteilte Postfächer", "INBOX" → "Posteingang", "Sent" / "Sent Items" → "Gesendet", "Drafts" → "Entwürfe", "Deleted Items" → "Gelöscht", "Junk" / "Spam" → "Spam", "Archive" → "Archiv", "Outbox" → "Postausgang", "Trash" → "Papierkorb", "Other Users" → "Andere Postfächer"). Operator-requested: localisation lives in the JSON, never hard-coded into JS.
+- **`app/plugins/nextcloud/js/folder-names.js` (NEW)** walks both the engine's folder collection AND the rendered DOM, looking up each IMAP leaf against `rl.i18n('FOLDERS/<key>')`, replacing the display name only. Full IMAP paths stay unchanged so the engine's IMAP commands (FETCH, APPEND, MOVE) keep operating on the real names. A `MutationObserver` re-runs on every render so lazy-loaded folder rows are caught too.
+
+### Added — global Spam/Junk auto-hide
+- **`folder-names.js`** injects a CSS rule `li[data-folder-junk="1"] { display: none !important; }` and marks every folder row whose IMAP leaf matches `Junk` / `Junk E-mail` / `Junk Email` / `Spam` with that data-attribute. Hidden across the board — applies to the user's own mailbox AND every shared mailbox. The folder still exists IMAP-side (so server-side filters keep working); only the UI hides it.
+
+### Architecture
+| File | Change |
+|---|---|
+| `lib/Service/SharedIdentitySyncService.php` | New constants `SHARED_NAMESPACE_PREFIX`, `SHARED_SENT_LEAF`. `fetchFromStalwart()` flags `isShared` + routes `sentFolder`. `reconcile()` re-asserts sentFolder on every sync run. `skeleton()` carries a `sentFolder` parameter. |
+| `app/plugins/nextcloud/langs/de.json` | New `FOLDERS` namespace, 12 keys. Cleaned up tab-indentation. |
+| `app/plugins/nextcloud/langs/en.json` | New `FOLDERS` namespace (mirror keys, English strings). |
+| `app/plugins/nextcloud/js/folder-names.js` | NEW — leaf-name localiser + Junk/Spam DOM hider + MutationObserver. |
+| `app/plugins/nextcloud/index.php` | `addJs('js/folder-names.js')` registration. |
+| `tests/test_shared_identity_sync.php` | +5 assertions for the sentFolder routing constants, fetchFromStalwart logic, and reconcile re-assert. New 4h + 4i behavioural cases. |
+| `tests/test_folder_localisation_and_spam_hide.php` | NEW — JSON validity + FOLDERS namespace presence + simulated leaf-translation behaviour. |
+
+### Verification
+- `php -l` clean on every modified PHP file. Both lang JSON files parse cleanly.
+- **`tests/test_shared_identity_sync.php`: 45/45 PASS** (was 37; +8 assertions, including the two new sentFolder-routing scenarios).
+- **`tests/test_folder_localisation_and_spam_hide.php`: NEW** — see test run for final count.
+- Full local suite (run after this commit) — see runner log.
+
+### Operator action
+1. Deploy 0.13.13 to `/mnt/nc-shared/custom_apps/souvera_mail`.
+2. Open Souvera Mail → wait up to 15 min for the next shared-identity sync window OR force a sync by triggering an engine reload (sign out + sign in). Every shared mailbox identity will now carry the routed `sentFolder`.
+3. Send a test message via a shared identity → verify the copy lands in the SHARED inbox's "Gesendet" folder, NOT the user's own.
+4. Verify folder names render in German ("Posteingang", "Gesendet", "Gelöscht", "Entwürfe") for shared mailboxes.
+5. Verify Spam/Junk folders no longer appear in the folder tree.
+
+### Note on Sieve Error 352 (still open)
+0.13.12's `--sieve-ssl starttls` default + `occ souvera_mail:status` Sieve probe are NOT enough on this deploy. Next step (operator-confirmed): build a JMAP-based Sieve provider that bypasses Stalwart's ManageSieve listener entirely, using `SieveScript/get` + `SieveScript/set` via the same JWT path that AppPasswords + Identities already use. Planned for 0.13.14.
+
 ## [0.13.12] — 2026-02-17
 
 ### Changed — fresh Nextcloud nav icon

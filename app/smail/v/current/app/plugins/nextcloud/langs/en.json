@@ -6,6 +6,20 @@
 		"LABEL_TITLE": "Title:",
 		"ADD_MENU_NICKNAME": "Nickname:"
 	},
+	"FOLDERS": {
+		"SHARED_NAMESPACE": "Shared mailboxes",
+		"OTHER_USERS_NAMESPACE": "Other mailboxes",
+		"INBOX": "Inbox",
+		"SENT": "Sent",
+		"SENT_ITEMS": "Sent",
+		"DRAFTS": "Drafts",
+		"TRASH": "Trash",
+		"DELETED_ITEMS": "Trash",
+		"JUNK": "Spam",
+		"SPAM": "Spam",
+		"ARCHIVE": "Archive",
+		"OUTBOX": "Outbox"
+	},
 	"NEXTCLOUD": {
 		"SAVE_ATTACHMENTS": "Save in Nextcloud",
 		"SAVE_EML": "Save as .eml in Nextcloud",
