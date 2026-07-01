@@ -85,26 +85,36 @@ assertTrue((bool) preg_match("#'username'\s*=>\s*\\\$email#", $svc),
     "createForUser() returns the `username` (= canonical Stalwart email)",
     $passes, $failures);
 
-// JMAP create payload uses Stalwart 0.16's `{@type:Replace, value:[...]}`
-// CredentialPermissions wire-format. Live-trial-verified against the
-// operator's deploy on 2026-06-30 (PRD Step 27 + 28):
-//   - bare list      → invalidPatch "Missing or invalid '@type'"
-//   - {@type, permissions:[]} → invalidPatch "permissions/permissions"
-//   - {@type, value:[]}       → ACCEPTED.
+// JMAP create payload uses Stalwart 0.16's real CredentialPermissions
+// wire-format. Live-verified 2026-07-01 on the operator's `fccec267`
+// cluster via exhaustive schema-fuzz of every plausible shape:
+//   - {@type,value:[...]}         → invalidPatch "permissions/value"       ❌
+//   - {@type,permissions:[...]}   → invalidPatch "permissions/permissions" ❌
+//   - {@type,permissions:{p:true}} → ACCEPTED, permission granted          ✅
+// The final shape is a MAP `<perm-id> => bool`, NOT an array.
 assertTrue(str_contains($svc, "'@type' => 'Replace'"),
     "JMAP AppPassword/set CREATE uses Stalwart's @type:Replace patch-tag",
     $passes, $failures);
-assertTrue(str_contains($svc, "'value' => self::APP_PASSWORD_PERMISSIONS"),
-    "JMAP AppPassword/set CREATE sends the permission list under `value` (Stalwart 0.16 format)",
+assertTrue(str_contains($svc, "'permissions' => \\array_fill_keys("),
+    "JMAP AppPassword/set CREATE sends perms as MAP `<perm-id> => true` (Stalwart 0.16 format)",
     $passes, $failures);
-assertTrue(!str_contains($svc, "'permissions' => self::APP_PASSWORD_PERMISSIONS"),
-    "Old Doppelung 'permissions/permissions' is gone",
+assertTrue(!str_contains($svc, "'value' => self::APP_PASSWORD_PERMISSIONS"),
+    "Old array-under-`value` shape from 0.13.18 is gone",
+    $passes, $failures);
+assertTrue(!preg_match("#'permissions'\s*=>\s*self::APP_PASSWORD_PERMISSIONS#", $svc),
+    "Old array-under-`permissions` doppelung is gone",
     $passes, $failures);
 assertTrue(str_contains($svc, "'authenticateWithAlias'"),
     "Permission list includes `authenticateWithAlias` (the email-as-username permission)",
     $passes, $failures);
 assertTrue(str_contains($svc, "'authenticate'"),
     "Permission list includes `authenticate` (the base login gate)",
+    $passes, $failures);
+// Regression guard: `imapUnsubscribe` was removed from the Stalwart 0.16
+// Permission enum — including it in the map returns "Invalid key for
+// object property" and blocks App-Password creation entirely.
+assertTrue(!str_contains($svc, "'imapUnsubscribe'"),
+    "Permission list does NOT include `imapUnsubscribe` (removed in Stalwart 0.16 — subscribe/unsub folded into a single `imapSubscribe`)",
     $passes, $failures);
 // Spot-check the IMAP / POP3 / Sieve coverage so a future refactor doesn't
 // quietly drop a permission and silently break legacy mail clients.
@@ -227,10 +237,18 @@ function simCreate(string $userId, string $description, StubUserContext $ctx, St
             'accountId' => $accountId,
             'create' => ['k1' => [
                 'description' => $description,
-                // Stalwart 0.16 CredentialPermissions: {@type:Replace, value:[...]}
+                // Stalwart 0.16 CredentialPermissions:
+                //   {@type:"Replace", permissions:{<perm>: true, …}}
                 'permissions' => [
                     '@type' => 'Replace',
-                    'value' => ['authenticate', 'authenticateWithAlias', 'imapAuthenticate', 'imapFetch', 'emailSend', 'emailReceive'],
+                    'permissions' => [
+                        'authenticate' => true,
+                        'authenticateWithAlias' => true,
+                        'imapAuthenticate' => true,
+                        'imapFetch' => true,
+                        'emailSend' => true,
+                        'emailReceive' => true,
+                    ],
                 ],
                 'allowedIps' => (object) [],
             ]],
@@ -267,12 +285,21 @@ assertTrue(is_array($createPayload['permissions'])
         && ($createPayload['permissions']['@type'] ?? null) === 'Replace',
     "5f: JMAP create payload sends `permissions` with @type=Replace (Stalwart 0.16 patch-tag)",
     $passes, $failures);
-assertTrue(is_array($createPayload['permissions']['value'] ?? null)
-        && in_array('authenticateWithAlias', $createPayload['permissions']['value'], true),
-    "5f2: permission list lives under `value`, includes authenticateWithAlias",
+assertTrue(is_array($createPayload['permissions']['permissions'] ?? null)
+        && ($createPayload['permissions']['permissions']['authenticateWithAlias'] ?? null) === true,
+    "5f2: permission MAP lives under `permissions.permissions`, `authenticateWithAlias => true`",
     $passes, $failures);
-assertTrue(!isset($createPayload['permissions']['permissions']),
-    "5f3: NO permissions/permissions Doppelung (that's what Stalwart 0.16 refused on 2026-06-30)",
+assertTrue(!isset($createPayload['permissions']['value']),
+    "5f3: NO `permissions/value` array (that's what Stalwart 0.16 refused on 2026-07-01)",
+    $passes, $failures);
+// The map's values must all be booleans (Stalwart returns "Invalid value for
+// object property" if they're objects, nulls, or strings).
+$allBool = true;
+foreach (($createPayload['permissions']['permissions'] ?? []) as $v) {
+    if (!is_bool($v)) { $allBool = false; break; }
+}
+assertTrue($allBool,
+    "5f4: every permission-map value is a strict bool (Stalwart 0.16 rejects any other type)",
     $passes, $failures);
 assertTrue(is_object($createPayload['allowedIps']),
     "5g: JMAP create payload sends allowedIps as JSON object (not array — would serialize as []) ",

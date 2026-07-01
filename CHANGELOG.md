@@ -6,6 +6,112 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.20] — 2026-02-17 (AppPassword wire-format + Settings-tab dark mode)
+
+### Fixed — P0: AppPassword creation refused with `invalidPatch: permissions/value`
+
+**Live symptom (operator's `fccec267` cluster, 2026-07-01):** clicking
+Erzeugen on the Settings tab returned a red banner:
+
+```
+Stalwart refused AppPassword creation:
+{"type":"invalidPatch","description":"Invalid property","properties":["permissions/value"]}
+```
+
+**Root cause:** 0.13.18 sent
+
+```json
+"permissions": {"@type":"Replace", "value": ["authenticate", …]}
+```
+
+Stalwart 0.16 doesn't accept a `value` sub-property, and doesn't accept
+an *array* under any sub-property. Via exhaustive schema fuzz on the
+live cluster we established the actual accepted shape:
+
+```json
+"permissions": {
+  "@type": "Replace",
+  "permissions": {"authenticate": true, "authenticateWithAlias": true, …}
+}
+```
+
+Key facts pinned by the new test:
+- Top-level `@type` must be `Replace` (or `Inherit`, which ignores the
+  payload). Anything else → `Missing or invalid '@type'`.
+- The KEY under `Replace` is `permissions` (NOT `value` / `perms` /
+  `list` / `items` / `set` — all rejected as `Invalid key for object`).
+- The VALUE at `permissions` is a MAP `<perm-id> => bool`, NOT an
+  array (array → `Invalid value for object property`).
+- Perm IDs are the ones enumerated by
+  `stalwart-cli describe Permission`. Inventing new ones (or keeping
+  the pre-0.16 `imapUnsubscribe`) → `Invalid key for object property`.
+
+**Fix:** `AppPasswordService::createForUser()` now sends
+`array_fill_keys(APP_PASSWORD_PERMISSIONS, true)` as the value under
+`permissions.permissions`. Removed `imapUnsubscribe` from the list —
+Stalwart 0.16 folded subscribe/unsubscribe into a single `imapSubscribe`.
+
+### Fixed — P1: Settings-tab titles / session table invisible in dark mode
+
+**Live symptom (same operator report):** the section headers
+"App-Passwörter für IMAP, POP3 und SMTP" and "Verbundene Geräte" were
+unreadable in Nextcloud 34's dark theme; the "dieses Gerät" pill in the
+session table showed blue text on a blue background.
+
+**Root cause:** the Settings-tab CSS only had a
+`@media (prefers-color-scheme: dark)` block. Nextcloud 34 switches
+themes via `body[data-theme-dark]` regardless of what the OS reports,
+so users who picked Dark from NC personal settings while their OS is
+Light got the light-mode fallback palette (`--sv-fg: #1f2733`,
+`--sv-fg-muted: #6c7886`) bled through onto a dark background. Multiple
+banners and the `.sv-secret-user` pill also had hardcoded dark hex
+colors that don't survive a light-on-dark inversion.
+
+**Fix:** added an explicit
+`body[data-theme-dark] .souvera-settings, body[data-theme-dark-highcontrast] .souvera-settings, .theme--dark .souvera-settings`
+selector block that overrides `--sv-fg`, `--sv-fg-muted`, `--sv-bg`,
+`--sv-border`, plus per-banner and per-pill dark-mode palettes for
+`.sv-secret`, `.sv-secret-user`, `.sv-banner-warn`, `.sv-banner-ok`,
+`.sv-banner-err`, `.sv-btn:hover`, `.sv-list-empty`, `.sv-row-current`,
+`.sv-pill-muted`.
+
+The OS-level `@media (prefers-color-scheme: dark)` block still exists
+(covers Snappymail's standalone webmail context) and now also flips
+`--sv-fg` and `--sv-fg-muted` to their light-mode-safe complements.
+
+### Live-verified 2026-07-01 (VM 117, `fccec267-nc34-web`, prod-fra7-wk04)
+
+```
+$ sudo -u www-data php occ souvera_mail:status | grep version
+  version: 0.13.20
+
+$ … createForUser('scadmin', 'live-test-…')
+CREATED id=b secret_prefix=app_aaaaaai2gak… username=scadmin@buxtehude.link
+
+$ … listForUser('scadmin')
+AppPasswords count: 1
+
+$ … revokeForUser('scadmin', 'b')
+revoked id=b desc=live-test-…
+Final list: []
+```
+
+### Test coverage
+
+New `tests/test_darkmode_and_apppassword_shape.php` — 21 assertions
+covering:
+- OS + NC-explicit dark-mode selectors both flip `--sv-fg` to a light
+  hex (regression guard for the 0.13.18–0.13.19 invisible-text bug).
+- Per-banner dark-mode palettes are all present.
+- `AppPasswordService` uses `array_fill_keys(perms, true)` (map shape).
+- Neither of the two rejected shapes (`'value' => APP_PASSWORD_PERMISSIONS`
+  or `'permissions' => APP_PASSWORD_PERMISSIONS`) can leak back in.
+- `imapUnsubscribe` is not sent.
+
+`tests/test_app_password_username_surface.php` updated for the new
+map shape (previously pinned the wrong `value: [...]` array). All 25
+local test files pass.
+
 ## [0.13.19] — 2026-02-17 (WarmupOidc flip-flop — the description-only touch didn't work)
 
 ### Fixed — P0: `souvera_mail:warmup-oidc` returned final_probe 401 on fresh clusters

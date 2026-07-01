@@ -397,14 +397,119 @@
 .sv-row-current td { background: var(--sv-accent-soft); }
 .sv-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.95em; }
 
-/* Dark theme tweaks via prefers-color-scheme — only when Snappymail
-   variables aren't already overriding us. */
+/* ==========================================================
+ * Dark-mode overrides
+ * ----------------------------------------------------------
+ * Trigger under either (a) OS-level `prefers-color-scheme: dark`
+ * OR (b) Nextcloud 34's explicit dark-mode markers, since NC
+ * switches theme via `body[data-theme-dark]` regardless of what
+ * the OS reports. Operator report 2026-07-01: section titles
+ * and session-row text were invisible in dark mode because the
+ * CSS fallback `--sv-fg: #1f2733` bled through onto a dark
+ * background.
+ * ========================================================== */
 @media (prefers-color-scheme: dark) {
 	.souvera-settings {
+		--sv-fg: #e4e6eb;
+		--sv-fg-muted: #9aa4b1;
 		--sv-bg: rgba(255,255,255,0.04);
-		--sv-border: rgba(255,255,255,0.10);
+		--sv-border: rgba(255,255,255,0.14);
 	}
-	.sv-card-h { background: rgba(255,255,255,0.02); }
-	.sv-secret { background: rgba(255,255,255,0.06); color: #86efac; border-color: rgba(34,197,94,.35); }
+	.souvera-settings .sv-card-h { background: rgba(255,255,255,0.03); }
+	.souvera-settings .sv-secret {
+		background: rgba(255,255,255,0.06);
+		color: #86efac;
+		border-color: rgba(34,197,94,.35);
+	}
+	.souvera-settings .sv-secret-user {
+		color: #93c5fd;
+		background: rgba(59,130,246,0.10);
+		border-color: rgba(59,130,246,0.35);
+	}
+	.souvera-settings .sv-banner-warn {
+		background: rgba(217,119,6,0.14);
+		color: #fbbf24;
+		border-color: rgba(217,119,6,0.35);
+	}
+	.souvera-settings .sv-banner-ok {
+		background: rgba(22,163,74,0.14);
+		color: #86efac;
+		border-color: rgba(22,163,74,0.35);
+	}
+	.souvera-settings .sv-banner-err {
+		background: rgba(220,38,38,0.14);
+		color: #fca5a5;
+		border-color: rgba(220,38,38,0.35);
+	}
+	.souvera-settings .sv-btn:hover { background: rgba(255,255,255,0.06); }
+	.souvera-settings .sv-list-empty { background: rgba(255,255,255,0.03); }
+	.souvera-settings .sv-row-current td { background: rgba(59,130,246,0.10); }
+	.souvera-settings .sv-pill-muted {
+		background: rgba(255,255,255,0.08);
+		color: var(--sv-fg-muted);
+	}
+}
+
+/* Nextcloud 34 explicit dark theme (independent of OS setting) */
+body[data-theme-dark] .souvera-settings,
+body[data-theme-dark-highcontrast] .souvera-settings,
+.theme--dark .souvera-settings {
+	--sv-fg: #e4e6eb;
+	--sv-fg-muted: #9aa4b1;
+	--sv-bg: rgba(255,255,255,0.04);
+	--sv-border: rgba(255,255,255,0.14);
+}
+body[data-theme-dark] .souvera-settings .sv-card-h,
+body[data-theme-dark-highcontrast] .souvera-settings .sv-card-h,
+.theme--dark .souvera-settings .sv-card-h { background: rgba(255,255,255,0.03); }
+body[data-theme-dark] .souvera-settings .sv-secret,
+body[data-theme-dark-highcontrast] .souvera-settings .sv-secret,
+.theme--dark .souvera-settings .sv-secret {
+	background: rgba(255,255,255,0.06);
+	color: #86efac;
+	border-color: rgba(34,197,94,.35);
+}
+body[data-theme-dark] .souvera-settings .sv-secret-user,
+body[data-theme-dark-highcontrast] .souvera-settings .sv-secret-user,
+.theme--dark .souvera-settings .sv-secret-user {
+	color: #93c5fd;
+	background: rgba(59,130,246,0.10);
+	border-color: rgba(59,130,246,0.35);
+}
+body[data-theme-dark] .souvera-settings .sv-banner-warn,
+body[data-theme-dark-highcontrast] .souvera-settings .sv-banner-warn,
+.theme--dark .souvera-settings .sv-banner-warn {
+	background: rgba(217,119,6,0.14);
+	color: #fbbf24;
+	border-color: rgba(217,119,6,0.35);
+}
+body[data-theme-dark] .souvera-settings .sv-banner-ok,
+body[data-theme-dark-highcontrast] .souvera-settings .sv-banner-ok,
+.theme--dark .souvera-settings .sv-banner-ok {
+	background: rgba(22,163,74,0.14);
+	color: #86efac;
+	border-color: rgba(22,163,74,0.35);
+}
+body[data-theme-dark] .souvera-settings .sv-banner-err,
+body[data-theme-dark-highcontrast] .souvera-settings .sv-banner-err,
+.theme--dark .souvera-settings .sv-banner-err {
+	background: rgba(220,38,38,0.14);
+	color: #fca5a5;
+	border-color: rgba(220,38,38,0.35);
+}
+body[data-theme-dark] .souvera-settings .sv-btn:hover,
+body[data-theme-dark-highcontrast] .souvera-settings .sv-btn:hover,
+.theme--dark .souvera-settings .sv-btn:hover { background: rgba(255,255,255,0.06); }
+body[data-theme-dark] .souvera-settings .sv-list-empty,
+body[data-theme-dark-highcontrast] .souvera-settings .sv-list-empty,
+.theme--dark .souvera-settings .sv-list-empty { background: rgba(255,255,255,0.03); }
+body[data-theme-dark] .souvera-settings .sv-row-current td,
+body[data-theme-dark-highcontrast] .souvera-settings .sv-row-current td,
+.theme--dark .souvera-settings .sv-row-current td { background: rgba(59,130,246,0.10); }
+body[data-theme-dark] .souvera-settings .sv-pill-muted,
+body[data-theme-dark-highcontrast] .souvera-settings .sv-pill-muted,
+.theme--dark .souvera-settings .sv-pill-muted {
+	background: rgba(255,255,255,0.08);
+	color: var(--sv-fg-muted);
 }
 </style>

@@ -56,7 +56,7 @@ class AppPasswordService
         // sent-folder, IDLE, MOVE, SEARCH/SORT/THREAD all work) ──────
         'imapAuthenticate',
         'imapCapability', 'imapId', 'imapEnable', 'imapNamespace',
-        'imapList', 'imapLsub', 'imapSubscribe', 'imapUnsubscribe',
+        'imapList', 'imapLsub', 'imapSubscribe',
         'imapSelect', 'imapExamine', 'imapStatus',
         'imapAppend', 'imapFetch', 'imapStore',
         'imapCopy', 'imapMove',
@@ -162,19 +162,44 @@ class AppPasswordService
                         $creationId => [
                             'description' => $description,
                             // Stalwart 0.16 CredentialPermissions wire-format
-                            // (live-verified by trial against the operator's
-                            // deploy on 2026-06-30):
-                            //   { "@type": "Replace", "value": [<perm IDs...>] }
-                            // The `Replace` patch-tag is mandatory (Stalwart
-                            // returns `"Missing or invalid '@type'"` without it).
-                            // The list of identifiers MUST live under `value`,
-                            // NOT `permissions` (using `permissions` returns
-                            // `invalidPatch: properties[permissions/permissions]`).
-                            // The earlier wrapper { "@type": "Replace",
-                            // "permissions": [...] } was wrong on BOTH counts.
+                            // (live-verified 2026-07-01 against Stalwart
+                            // 0.16.10 on the operator's `fccec267` cluster
+                            // by exhaustively fuzzing every plausible shape):
+                            //   { "@type": "Replace",
+                            //     "permissions": { "authenticate": true,
+                            //                      "emailSend": true, … } }
+                            // Key observations:
+                            //   - `@type` must be "Replace" (or "Inherit" —
+                            //     but that ignores the payload) — anything
+                            //     else fails with `Missing or invalid '@type'`.
+                            //   - The KEY under "Replace" is `permissions`,
+                            //     NOT `value` / `perms` / `list` / `items` /
+                            //     `set` (all rejected as "Invalid key for
+                            //     object").
+                            //   - The VALUE at `permissions` is a MAP of
+                            //     `<perm-id> => bool`, NOT an array of
+                            //     perm-id strings (array rejected as
+                            //     "Invalid value for object property").
+                            //     Setting a perm to `false` explicitly
+                            //     revokes it; omission is treated as
+                            //     implicit revoke by the Replace semantics.
+                            //   - Perm IDs are the ones listed by
+                            //     `stalwart-cli describe Permission` (see
+                            //     the enum definition in the schema store
+                            //     — DO NOT invent new ones, `Invalid key`
+                            //     will be returned).
+                            //
+                            // The 0.13.18 attempt used
+                            //   { "@type": "Replace", "value": [...] }
+                            // and the earlier 0.13.17 attempt used
+                            //   { "@type": "Replace", "permissions": [...] }
+                            // Both were wrong on the SHAPE (array vs map).
                             'permissions' => [
                                 '@type' => 'Replace',
-                                'value' => self::APP_PASSWORD_PERMISSIONS,
+                                'permissions' => \array_fill_keys(
+                                    self::APP_PASSWORD_PERMISSIONS,
+                                    true,
+                                ),
                             ],
                             'allowedIps' => (object) [],
                         ],
