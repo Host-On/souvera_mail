@@ -116,9 +116,39 @@ window entirely.
 ### Regression
 
 - 23 pre-existing local tests continue to pass (752 assertions total).
-- 1 new local test file (`tests/test_warmup_oidc_command.php`) adds 32
+- 1 new local test file (`tests/test_warmup_oidc_command.php`) adds 33
   assertions covering the command's contract + StalwartAdminService's
   admin surface.
+
+### Also fixed live during 0.13.18 debug session
+
+Two additional non-code deploy-agent issues were surfaced and fixed on the
+live cluster; both are documented in `DEPLOY_AGENT_INSTRUCTIONS.md` for
+carry-over into the CloudManager templates so they don't recur on future
+redeploys:
+
+1. **Nginx `.well-known` catch-all `return 301` blocks OIDC-Discovery**
+   — Stalwart's HTTP client doesn't follow redirects on discovery. Fix:
+   replace `return 301 /index.php$request_uri;` with
+   `try_files $uri $uri/ /index.php$request_uri;` inside the
+   `location ^~ /.well-known` block.
+
+2. **Missing `overwritehost` + `overwriteprotocol` in NC config** —
+   H2CK/oidc uses `trusted_domains[0]` (= `localhost`) as fallback URL
+   when there's no request context (CLI, Cron, subrequest middleware).
+   Every JWT minted from those paths ends up with `iss=https://localhost`,
+   which Stalwart rejects. Fix: set both keys to the canonical mail
+   hostname at bootstrap time.
+
+### Icon refresh
+
+- `img/app.svg` reworked from a stroke-only outline to a filled envelope
+  silhouette (single path with evenodd knockout for the flap). Operator
+  report 2026-07-01: outline-only rendered as an inverted-looking white
+  envelope in Nextcloud 34's dark-mode app-grid tile because that tile
+  applies `filter: brightness(0)`-style theming to icons; filled shapes
+  now paint as a proper black silhouette on the light-blue chip, matching
+  Files / Talk / Calendar / Contacts on the same grid.
 
 ## [0.13.17] — 2026-02-17 (live-fix continued)
 
