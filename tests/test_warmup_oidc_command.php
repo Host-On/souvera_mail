@@ -147,15 +147,27 @@ ok(str_contains($src, "'x:Directory/get'"),
     $passes, $failures);
 
 ok(str_contains($src, "'x:Directory/set'"),
-    "WarmupOidc calls x:Directory/set to trigger the OIDC re-fetch (semantic no-op update)",
+    "WarmupOidc calls x:Directory/set to trigger the OIDC re-fetch (flip-flop of issuerUrl — description-only touches don't reset Stalwart's OIDC provider cache)",
     $passes, $failures);
 
 ok(str_contains($src, "'@type'") && str_contains($src, "'Oidc'"),
     "WarmupOidc filters retrieved Directory records by @type == 'Oidc' client-side",
     $passes, $failures);
 
-ok(str_contains($src, "'@type' => 'ReloadSettings'"),
-    "After touching directories WarmupOidc creates a ReloadSettings Action to invalidate any stale cache singletons",
+ok(str_contains($src, "str_ends_with(\$orig, '/')"),
+    "WarmupOidc flip-flops issuerUrl by toggling the trailing slash (the smallest change Stalwart still treats as a real update)",
+    $passes, $failures);
+
+ok(str_contains($src, "'issuerUrl' => \$flipped") && str_contains($src, "'issuerUrl' => \$orig"),
+    "WarmupOidc issues TWO Directory/set updates per OIDC directory: one to flip, one to restore",
+    $passes, $failures);
+
+ok(\substr_count($src, "'@type' => 'ReloadSettings'") >= 2,
+    "WarmupOidc creates ReloadSettings AFTER each half of the flip-flop (≥2 ReloadSettings calls in the refresh path)",
+    $passes, $failures);
+
+ok(str_contains($src, "'@type' => 'InvalidateCaches'"),
+    "WarmupOidc also issues an InvalidateCaches action (per-account token cache is separate from OIDC provider cache)",
     $passes, $failures);
 
 // The 401→refresh→retry loop needs a probe-status check equal to 200.

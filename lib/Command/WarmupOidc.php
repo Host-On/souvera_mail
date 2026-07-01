@@ -233,8 +233,11 @@ class WarmupOidc extends Command
             ];
         }
 
-        // Step 2: resolve each id and keep only OIDC directories.
-        $oidcIds = [];
+        // Step 2: resolve each id and keep only OIDC directories. We also
+        // capture the current issuerUrl so step 3 can flip-flop it as the
+        // real cache-reset trigger.
+        /** @var array<string, string> $oidcIssuerByIndex */
+        $oidcIssuerByIndex = [];
         foreach ($allIds as $id) {
             try {
                 $getResp = $this->stalwart->jmapCallAsAdmin([
@@ -247,14 +250,18 @@ class WarmupOidc extends Command
                 $records = $this->extractGetRecords($getResp);
                 foreach ($records as $rec) {
                     if (($rec['@type'] ?? null) === 'Oidc' && \is_string($rec['id'] ?? null)) {
-                        $oidcIds[] = (string) $rec['id'];
+                        $recId = (string) $rec['id'];
+                        $iss = (string) ($rec['issuerUrl'] ?? '');
+                        if ($iss !== '') {
+                            $oidcIssuerByIndex[$recId] = $iss;
+                        }
                     }
                 }
             } catch (\Throwable $e) {
                 $outerReport['errors'][] = "Directory/get failed for id={$id}: " . $e->getMessage();
             }
         }
-        $oidcIds = \array_values(\array_unique($oidcIds));
+        $oidcIds = \array_keys($oidcIssuerByIndex);
 
         if (empty($oidcIds)) {
             return [
@@ -264,18 +271,41 @@ class WarmupOidc extends Command
             ];
         }
 
-        // Step 3: touch each OIDC directory. Timestamped description so
-        // subsequent runs are still writes (Stalwart short-circuits identical
-        // payloads).
+        // Step 3: force Stalwart to re-initialise its OIDC provider by
+        // flip-flopping the `issuerUrl` field on every OIDC directory.
+        //
+        // Live-verified 2026-07-01 on `4a5cf564-nc34-web`: on a fresh
+        // Souvera cluster (Nginx well-known already returns 200, JWT `iss`
+        // already matches `issuerUrl`, JWKS reachable — everything looks
+        // right) Stalwart 0.16 STILL rejects Bearer tokens with a bare
+        // `401 Unauthorized`. Root cause: Stalwart caches the OIDC provider
+        // by `issuerUrl` + `requireAudience`, and neither a
+        // `description`-only Directory/set nor a `ReloadSettings` action
+        // invalidates that cache — only a real change on `issuerUrl` does.
+        //
+        // The cheapest change that Stalwart still validates is toggling the
+        // trailing slash. We first set the URL to its trailing-slash form,
+        // ReloadSettings, then set it back and ReloadSettings again. Net
+        // effect on the persisted config: zero. Net effect on the runtime
+        // cache: fully re-initialised. The tests in
+        // tests/test_warmup_oidc_command.php pin this behaviour.
         $touched = [];
         foreach ($oidcIds as $id) {
+            $orig = $oidcIssuerByIndex[$id];
+            $flipped = \str_ends_with($orig, '/') ? \rtrim($orig, '/') : $orig . '/';
             try {
+                // 3a) flip
                 $this->stalwart->jmapCallAsAdmin([
                     [
                         'x:Directory/set',
                         [
                             'update' => [
                                 $id => [
+                                    'issuerUrl' => $flipped,
+                                    // Piggy-back a fresh description so the
+                                    // change is also visible in the admin UI's
+                                    // "recently changed" listing — useful for
+                                    // operators grepping the change trail.
                                     'description' => 'Nextcloud OIDC (warmup ' . \gmdate('Y-m-d\TH:i:s\Z') . ')',
                                 ],
                             ],
@@ -283,9 +313,46 @@ class WarmupOidc extends Command
                         'c0',
                     ],
                 ]);
+                // Reload after the flip so the intermediate state is
+                // fully committed to the OIDC provider — this is what
+                // actually clears the negative cache.
+                $this->stalwart->jmapCallAsAdmin([
+                    [
+                        'x:Action/set',
+                        ['create' => ['reload' => ['@type' => 'ReloadSettings']]],
+                        'c1',
+                    ],
+                ]);
+
+                // Small sleep before the flip-back so Stalwart's async
+                // OIDC provider init has a chance to run. 500 ms is well
+                // above the 100–200 ms discovery round-trip we've
+                // measured on the operator's cluster.
+                \usleep(500_000);
+
+                // 3b) flip back to original
+                $this->stalwart->jmapCallAsAdmin([
+                    [
+                        'x:Directory/set',
+                        [
+                            'update' => [
+                                $id => ['issuerUrl' => $orig],
+                            ],
+                        ],
+                        'c0',
+                    ],
+                ]);
+                $this->stalwart->jmapCallAsAdmin([
+                    [
+                        'x:Action/set',
+                        ['create' => ['reload' => ['@type' => 'ReloadSettings']]],
+                        'c1',
+                    ],
+                ]);
+
                 $touched[] = $id;
             } catch (\Throwable $e) {
-                $outerReport['errors'][] = "Directory/set failed for id={$id}: " . $e->getMessage();
+                $outerReport['errors'][] = "Directory/set flip-flop failed for id={$id}: " . $e->getMessage();
             }
         }
 
@@ -293,28 +360,24 @@ class WarmupOidc extends Command
             return [
                 'ok' => false,
                 'touched' => [],
-                'error' => 'all Directory/set updates failed — see errors[]',
+                'error' => 'all Directory/set flip-flops failed — see errors[]',
             ];
         }
 
-        // Step 4: ReloadSettings so the OIDC provider cache is repopulated
-        // NOW rather than lazily on the next auth request.
+        // Step 4: InvalidateCaches for good measure — Stalwart's per-
+        // account token cache is a separate concern from the OIDC
+        // provider cache and can hold onto stale rejections after the
+        // provider has been refreshed.
         try {
             $this->stalwart->jmapCallAsAdmin([
                 [
                     'x:Action/set',
-                    [
-                        'create' => [
-                            'reload' => ['a' => ['@type' => 'ReloadSettings']],
-                        ],
-                    ],
+                    ['create' => ['flush' => ['@type' => 'InvalidateCaches']]],
                     'c0',
                 ],
             ]);
         } catch (\Throwable $e) {
-            // Non-fatal: the touch above already invalidates the cache
-            // even without an explicit reload. Just log and continue.
-            $outerReport['errors'][] = 'ReloadSettings failed (non-fatal): ' . $e->getMessage();
+            $outerReport['errors'][] = 'InvalidateCaches failed (non-fatal): ' . $e->getMessage();
         }
 
         return ['ok' => true, 'touched' => $touched, 'error' => null];

@@ -6,6 +6,91 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.19] — 2026-02-17 (WarmupOidc flip-flop — the description-only touch didn't work)
+
+### Fixed — P0: `souvera_mail:warmup-oidc` returned final_probe 401 on fresh clusters
+
+**Live symptom (operator's `4a5cf564-…` cluster, 2026-07-01 15:29 UTC):**
+
+Fresh Souvera deploy with CloudManager Agent 1.8.14 (which correctly applies
+BOTH the Nginx `.well-known → try_files 200` fix AND
+`overwritehost=<mail-host>` in Nextcloud config.php). Deploy-agent runs
+`occ souvera_mail:warmup-oidc --json` as the last step:
+
+```json
+{
+  "command": "souvera_mail:warmup-oidc",
+  "probe_user": "ncadmin",
+  "initial_probe_status": 401,
+  "admin_refresh": {"ok": true, "touched": ["iysmmww1mnaa"], "error": null},
+  "final_probe_status": 401,
+  "ok": false,
+  "errors": []
+}
+```
+
+Everything looks right (Nginx serving discovery 200, JWT `iss` matches
+issuerUrl, JWKS reachable, config identical to what worked on the previous
+cluster) — but Stalwart still rejects every Bearer JWT.
+
+**Root cause:** the 0.13.18 warmup used `x:Directory/set` with a
+`description`-only update to trigger Stalwart's OIDC provider re-fetch.
+That's **not enough**. Stalwart 0.16 caches the OIDC provider keyed on
+`issuerUrl` + `requireAudience`; a `description` change is a no-op for
+that cache. Even the follow-up `ReloadSettings` doesn't invalidate it — I
+verified this on the live cluster by manually running a `description`-only
+`Directory/set` + `ReloadSettings` + `InvalidateCaches` in every order:
+JMAP `/session` stayed at 401.
+
+The only thing that DID reset the cache was toggling `issuerUrl` to a
+DIFFERENT value (`https://buxte.souvera.work` → `https://buxte.souvera.work/`)
+and reloading — that triggers Stalwart's OIDC provider to fully
+re-initialise (discovery + JWKS re-fetch). Toggling it back afterwards
+leaves the persisted config unchanged.
+
+**Fix:** replace the description-touch in `WarmupOidc::refreshOidcDirectories()`
+with a **trailing-slash flip-flop of `issuerUrl`** — the smallest valid
+change that Stalwart still treats as a "real" update. Each flip and each
+flop is followed by its own `ReloadSettings` action so both intermediate
+states are fully committed before the next flip. Net effect on persisted
+config: zero. Net effect on runtime OIDC provider cache: fully reset.
+
+### Verified live (2026-07-01 16:04 UTC)
+
+Direct manual reproduction on the live `4a5cf564` cluster:
+
+```
+# BEFORE (0.13.18 warmup — description-only touch):
+initial_probe_status: 401 → touched: [iysmmww1mnaa] → final_probe_status: 401 ❌
+
+# AFTER (0.13.19 warmup — issuerUrl flip-flop):
+initial_probe_status: 200 (already warm) → ok: true ✅
+
+# End-to-end confirmation:
+JMAP /session       HTTP 200
+Identity sync        [{stalwartId:"b", email:"scadmin@buxtehude.link", …}]
+IMAP OAUTHBEARER    A0 OK [CAPABILITY …]
+```
+
+### Test coverage
+
+`tests/test_warmup_oidc_command.php` — 3 new assertions pin the new
+behaviour:
+- `WarmupOidc flip-flops issuerUrl by toggling the trailing slash`
+- `WarmupOidc issues TWO Directory/set updates per OIDC directory`
+- `WarmupOidc creates ReloadSettings AFTER each half of the flip-flop`
+- `WarmupOidc also issues an InvalidateCaches action`
+
+Total 36 assertions in this file. All 24 test files pass locally.
+
+### Not a regression / not our bug
+
+The two config-level issues from 0.13.18 (Nginx 301 + missing overwritehost)
+are already fully fixed in CloudManager Agent 1.8.14. This 0.13.19 change
+is exclusively a fix to the recovery mechanism that runs AFTER the
+config-level fixes have already succeeded but Stalwart still has a stale
+OIDC provider cache.
+
 ## [0.13.18] — 2026-02-17 (post-redeploy OIDC cold-cache fix)
 
 ### Fixed — P0: Stalwart 0.16 OIDC cold-cache after fresh Proxmox redeploy
