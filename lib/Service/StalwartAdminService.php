@@ -34,6 +34,8 @@ use Psr\Log\LoggerInterface;
 class StalwartAdminService
 {
     public const SYSTEM_CONFIG_API_URL = 'souvera_central.stalwart_api_url';
+    public const SYSTEM_CONFIG_ADMIN_USER = 'souvera_central.stalwart_admin_user';
+    public const SYSTEM_CONFIG_ADMIN_PASSWORD = 'souvera_central.stalwart_admin_password';
     public const JMAP_PATH = '/jmap';
     public const SESSION_PATH = '/jmap/session';
     public const CAPABILITY = 'urn:stalwart:jmap';
@@ -60,6 +62,24 @@ class StalwartAdminService
     public function isConfigured(): bool
     {
         return $this->getApiUrl() !== null;
+    }
+
+    /**
+     * Basic-auth credentials for the Stalwart admin API. Populated by the
+     * `souvera_central` app when it provisions the mail server. Returns null
+     * when either half is missing — callers must treat that as "admin ops
+     * are unavailable" and NOT fall back to guessing defaults.
+     *
+     * @return array{0: non-empty-string, 1: non-empty-string}|null
+     */
+    public function getAdminCredentials(): ?array
+    {
+        $user = \trim((string) $this->config->getSystemValue(self::SYSTEM_CONFIG_ADMIN_USER, ''));
+        $pw = (string) $this->config->getSystemValue(self::SYSTEM_CONFIG_ADMIN_PASSWORD, '');
+        if ($user === '' || $pw === '') {
+            return null;
+        }
+        return [$user, $pw];
     }
 
     /**
@@ -119,6 +139,116 @@ class StalwartAdminService
             throw new \RuntimeException('Stalwart JMAP response is not JSON: ' . \substr($body, 0, 200));
         }
         return $decoded;
+    }
+
+    /**
+     * Performs a JMAP request using Basic-auth admin credentials from
+     * `souvera_central.stalwart_admin_user` + `…_password`. Used ONLY by
+     * privileged flows that user JWTs cannot cover — currently the
+     * `souvera_mail:warmup-oidc` command which forces Stalwart to re-fetch
+     * its cached OIDC discovery + JWKS after a fresh deploy.
+     *
+     * @param list<array{0: string, 1: array<string, mixed>, 2: string}> $methodCalls
+     * @param list<string> $extraCapabilities
+     * @return array<string, mixed> Decoded JMAP response
+     * @throws \RuntimeException on missing admin creds / HTTP / JMAP failure
+     */
+    public function jmapCallAsAdmin(array $methodCalls, array $extraCapabilities = []): array
+    {
+        $url = $this->getApiUrl();
+        if ($url === null) {
+            throw new \RuntimeException('Stalwart API URL not configured (souvera_central.stalwart_api_url)');
+        }
+        $creds = $this->getAdminCredentials();
+        if ($creds === null) {
+            throw new \RuntimeException(
+                'Stalwart admin credentials not configured — set the system-config keys '
+                . self::SYSTEM_CONFIG_ADMIN_USER . ' + ' . self::SYSTEM_CONFIG_ADMIN_PASSWORD
+                . ' (normally provisioned by the souvera_central app).'
+            );
+        }
+
+        $using = ['urn:ietf:params:jmap:core', self::CAPABILITY];
+        foreach ($extraCapabilities as $cap) {
+            if (\is_string($cap) && $cap !== '' && !\in_array($cap, $using, true)) {
+                $using[] = $cap;
+            }
+        }
+
+        $envelope = [
+            'using' => $using,
+            'methodCalls' => $methodCalls,
+        ];
+
+        try {
+            $client = $this->clientService->newClient();
+            $response = $client->post($url . self::JMAP_PATH, [
+                'headers' => [
+                    'Authorization' => 'Basic ' . \base64_encode($creds[0] . ':' . $creds[1]),
+                    'Content-Type' => 'application/json',
+                    'Accept' => 'application/json',
+                ],
+                'body' => (string) \json_encode($envelope, JSON_UNESCAPED_SLASHES),
+                'timeout' => self::HTTP_TIMEOUT_SECONDS,
+                'connect_timeout' => self::HTTP_TIMEOUT_SECONDS,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail: Stalwart admin JMAP call failed: ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
+            throw new \RuntimeException('Stalwart admin JMAP request failed: ' . $e->getMessage(), 0, $e);
+        }
+
+        $body = (string) $response->getBody();
+        $decoded = \json_decode($body, true);
+        if (!\is_array($decoded)) {
+            throw new \RuntimeException('Stalwart admin JMAP response is not JSON: ' . \substr($body, 0, 200));
+        }
+        return $decoded;
+    }
+
+    /**
+     * Probes `GET /jmap/session` with a Bearer OIDC JWT and returns the HTTP
+     * status code. Used by the warmup command to detect whether Stalwart is
+     * currently able to validate H2CK/oidc-issued JWTs. Does NOT parse the
+     * body — a 200 means auth worked, anything else (401 typically) means it
+     * did not.
+     *
+     * @param non-empty-string $bearerToken
+     */
+    public function probeSessionAsUser(string $bearerToken): int
+    {
+        $url = $this->getApiUrl();
+        if ($url === null) {
+            throw new \RuntimeException('Stalwart API URL not configured (souvera_central.stalwart_api_url)');
+        }
+
+        try {
+            $client = $this->clientService->newClient();
+            $response = $client->get($url . self::SESSION_PATH, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $bearerToken,
+                    'Accept' => 'application/json',
+                ],
+                'timeout' => self::HTTP_TIMEOUT_SECONDS,
+                'connect_timeout' => self::HTTP_TIMEOUT_SECONDS,
+                // Do NOT throw on 4xx/5xx — we WANT the status code.
+                'http_errors' => false,
+                'nextcloud' => ['allow_local_address' => true],
+            ]);
+        } catch (\OCP\Http\Client\LocalServerException $e) {
+            throw new \RuntimeException(
+                'Stalwart API URL is a local/private address blocked by Nextcloud outbound policy — '
+                . 'set `allow_local_remote_servers = true` in config.php or use a routable hostname: '
+                . $e->getMessage(),
+                0,
+                $e
+            );
+        } catch (\Throwable $e) {
+            throw new \RuntimeException('Stalwart /jmap/session probe failed: ' . $e->getMessage(), 0, $e);
+        }
+        return $response->getStatusCode();
     }
 
     /**

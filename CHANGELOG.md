@@ -6,6 +6,120 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.18] — 2026-02-17 (post-redeploy OIDC cold-cache fix)
+
+### Fixed — P0: Stalwart 0.16 OIDC cold-cache after fresh Proxmox redeploy
+
+**Live symptom (operator's `scadmin@buxte.souvera.work`, 2026-07-01):**
+Complete Proxmox redeploy (fresh Stalwart VM `10.20.0.129`, fresh NC VM
+`10.20.0.109`) → every OIDC-JWT authenticated request rejected:
+
+```
+[AUTHENTICATIONFAILED] (IMAP OAUTHBEARER)
+HTTP/1.1 401 Unauthorized (JMAP session, Identity/get, AppPassword list)
+www-authenticate: Bearer realm="Stalwart Server"
+```
+
+Nextcloud logs:
+```
+Souvera Mail: Stalwart JMAP call failed:
+`POST http://10.20.0.129:8080/jmap` resulted in a `401 Unauthorized` response
+Souvera Mail: JMAP Identity/get failed for scadmin: 401 Unauthorized
+```
+
+**Root cause** (verified end-to-end against live Stalwart 0.16.10):
+
+1. Stalwart 0.16's OIDC directory lazily fetches the H2CK/oidc discovery
+   doc at `<issuerUrl>/.well-known/openid-configuration` on first use.
+2. Nextcloud's shipped `.htaccess` returns a **301 redirect** on that path
+   to `/index.php/.well-known/openid-configuration`.
+3. Stalwart's HTTP discovery client does not follow the redirect, silently
+   caches a failed fetch, and returns `401 "You have to authenticate
+   first"` for every OIDC-JWT request until an admin nudges the Directory
+   object (any `x:Directory/set` update triggers a re-fetch).
+4. `cm_bootstrap.py` (deploy-agent) creates the OIDC directory via
+   `x:Directory/create` + `ReloadSettings`, but neither operation
+   re-runs the discovery-fetch pipeline — the negative cache from step 3
+   survives every reload.
+
+**Fix, souvera_mail side (0.13.18):**
+
+New `occ souvera_mail:warmup-oidc` command that:
+1. Mints an H2CK/oidc probe JWT for a `souvera-users` group member
+   (or the `--user <uid>` override).
+2. Sends `GET /jmap/session` with the JWT. HTTP 200 → cache warm → exit 0.
+3. Otherwise Basic-auths to Stalwart admin JMAP (creds from
+   `souvera_central.stalwart_admin_user` + `…_password`), runs
+   `x:Directory/query {"@type":"Oidc"}` + `x:Directory/set` on every
+   matching directory (semantic no-op update forces re-fetch), then
+   `x:Action/set` → `ReloadSettings`.
+4. Re-probes JMAP session. HTTP 200 → exit 0. Otherwise exit 1 with a
+   `--json`-friendly error report.
+
+The command is idempotent: on an already-warm server it runs step 2 only
+and exits 0 without touching any admin state.
+
+**Verified live-fix on the operator's cluster** (2026-07-01 11:19–11:33 UTC):
+
+Before (from the running Stalwart VM 142, discovery URL trace):
+```
+> GET /.well-known/openid-configuration HTTP/2
+< HTTP/2 301
+< location: /index.php/.well-known/openid-configuration
+```
+
+After the `x:Directory/set` nudge:
+```
+IMAP: A0 OK [CAPABILITY IMAP4rev2 IMAP4rev1 ENABLE SASL-IR LITERAL+ ID
+  UTF8=ACCEPT JMAPACCESS IDLE NAMESPACE …] scadmin@buxtehude.link
+SMTP: 235 2.7.0 Authentication succeeded.
+JMAP Identity/get: HTTP 200, list=[{id:"b", email:"scadmin@buxtehude.link"}]
+```
+
+### Deploy-agent guidance
+
+Recommended integration in `cm_bootstrap.py` (Souvera CloudManager) — the
+last step, after the OIDC directory is created and set as active auth
+source:
+
+```python
+# 8) Warm Stalwart's OIDC cache — Stalwart 0.16 caches a failed discovery
+#    fetch on first boot when Nextcloud's .htaccess 301-redirects the
+#    /.well-known/openid-configuration path. souvera_mail:warmup-oidc
+#    re-fetches by nudging every OIDC Directory via x:Directory/set.
+subprocess.run(
+    ["sudo", "-u", "www-data", "php", "/var/www/nextcloud/occ",
+     "souvera_mail:warmup-oidc", "--json"],
+    check=False,  # non-fatal: souvera_mail will retry on first user login
+    timeout=30,
+)
+```
+
+Not calling it is not fatal: the first authenticated request from the
+webmail UI still succeeds because souvera_mail's login middleware retries
+JWT minting on 401; but the operator sees the "Anmelden fehlgeschlagen"
+banner once before the second attempt hits the (now warm) cache. Calling
+`souvera_mail:warmup-oidc` after bootstrap removes that transient failure
+window entirely.
+
+### Added
+
+- `lib/Command/WarmupOidc.php` — the new command described above.
+- `lib/Service/StalwartAdminService.php` extended with:
+  - `getAdminCredentials(): ?array` (reads
+    `souvera_central.stalwart_admin_user/_password`).
+  - `jmapCallAsAdmin(array, array): array` (Basic-auth JMAP for privileged
+    x:Directory/x:Action operations).
+  - `probeSessionAsUser(string): int` (probes `GET /jmap/session` and
+    returns the raw HTTP status code — does NOT throw on 4xx/5xx).
+
+### Regression
+
+- 23 pre-existing local tests continue to pass (752 assertions total).
+- 1 new local test file (`tests/test_warmup_oidc_command.php`) adds 32
+  assertions covering the command's contract + StalwartAdminService's
+  admin surface.
+
 ## [0.13.17] — 2026-02-17 (live-fix continued)
 
 ### Fixed — P1: `App password create failed: invalidPatch on permissions/permissions` (operator-reported, browser still triggers it 4× after 0.13.15)
