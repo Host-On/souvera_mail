@@ -653,13 +653,6 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			\Smail\Engine\Log::warning('Nextcloud', 'help data read skipped: ' . $e->getMessage());
 		}
 
-		// Stalwart 0.16 ships POP3 on port 995 (implicit SSL) alongside
-		// IMAP on 993. The host is the IMAP host — Stalwart's single
-		// listener binds all four ports (POP3/IMAP/SMTP/Sieve).
-		$pop3Host = $imapHost;
-		$pop3Port = $imapHost !== '' ? '995' : '';
-		$pop3Ssl = $imapHost !== '' ? 'SSL' : '';
-
 		// Souvera Shield URL — auto-resolves to the Nextcloud
 		// `souvera_shield` app when it is installed AND enabled for
 		// the current user. Falls back to an explicit operator
@@ -699,6 +692,37 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 		$calDavUrl = $webdavBase . '/calendars/' . $sUID . '/';
 		$cardDavUrl = $webdavBase . '/addressbooks/users/' . $sUID . '/';
 
+		// Public FQDN — extracted from the Nextcloud WebDAV base URL
+		// (which uses the same overwrite.cli.url / trusted_domain the
+		// user reaches Nextcloud on). This is what external mail
+		// clients MUST connect to. The engine domain-config JSON
+		// contains an INTERNAL address (e.g. `10.20.0.129`) that only
+		// works inside the cluster; showing that to a customer would
+		// break every external Thunderbird / K-9 setup.
+		//
+		// Every mail-server host (IMAP / POP3 / SMTP / Sieve) is
+		// overridden with this public hostname — Souvera clusters
+		// front all four Stalwart ports through the same reverse
+		// proxy the WebDAV URL points at.
+		$publicHost = '';
+		$parsedHost = \parse_url($sWebDAV, PHP_URL_HOST);
+		if (\is_string($parsedHost) && $parsedHost !== '') {
+			$publicHost = $parsedHost;
+		}
+		if ($publicHost !== '') {
+			if ($imapHost !== '') { $imapHost = $publicHost; }
+			if ($smtpHost !== '') { $smtpHost = $publicHost; }
+			if ($sieveHost !== '') { $sieveHost = $publicHost; }
+		}
+		// Stalwart 0.16 ships POP3 on port 995 (implicit SSL) alongside
+		// IMAP on 993. The host is the IMAP host — Stalwart's single
+		// listener binds all four ports (POP3/IMAP/SMTP/Sieve). We
+		// derive POP3 AFTER the public-host override so both surface
+		// the public FQDN.
+		$pop3Host = $imapHost;
+		$pop3Port = $imapHost !== '' ? '995' : '';
+		$pop3Ssl = $imapHost !== '' ? 'SSL' : '';
+
 		// User's canonical mail address — best-effort. Fall back to the NC
 		// profile email, then to the raw UID + domain, then to an empty
 		// string (JS renders "—").
@@ -713,7 +737,11 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 		}
 
 		return [
-			'SmailHelpDomain' => $domain,
+			// `SmailHelpDomain` now surfaces the PUBLIC FQDN (was the
+			// mail domain in earlier revisions). The Kalender-&-Kontakte
+			// footer + iOS/Android walk-throughs need the actual host
+			// the user reaches Nextcloud on, not the mail address suffix.
+			'SmailHelpDomain' => $publicHost !== '' ? $publicHost : $domain,
 			'SmailHelpEmail' => $userEmail,
 			'SmailHelpImapHost' => $imapHost,
 			'SmailHelpImapPort' => $imapPort,

@@ -73,26 +73,68 @@
  *   1st col (Label)   — natural width for "Server"/"Port"/…
  *   2nd col (Value)   — takes ALL remaining space so IP:port + code
  *                       chips look chunky instead of squeezed left.
- *   3rd col (Button)  — hugs the copy-button width.
+ *   3rd col (Button)  — hugs the copy-button width. `rowspan="3"`
+ *                       buttons must render vertically centred across
+ *                       the 3 rows (Server / Port / Verschlüsselung).
  */
 #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table td:nth-child(1) {
 	width: 1%;
 	white-space: nowrap;
 	font-weight: 500;
 	color: var(--text-muted, #6b7280);
+	vertical-align: middle;
 }
 #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table td:nth-child(2) {
 	width: auto;
+	vertical-align: middle;
 }
 #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table td:nth-child(3) {
 	width: 1%;
 	white-space: nowrap;
 	text-align: right;
+	vertical-align: middle;    /* CRITICAL: rowspan="3" buttons centred */
 }
 
 /* Introductory paragraph on each Souvera tab */
 #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-lead {
 	margin: 0 0 1em;
+	color: var(--text-muted, #6b7280);
+}
+
+/* Callout box — used on the Mail-Client tab for the App-Passwort
+ * step-by-step explainer. Sky-blue accent, ordered list is the
+ * visual centerpiece so users' eyes track the numbered steps. */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-callout {
+	margin: 0 0 1.2em;
+	padding: 0.9em 1.1em 1em;
+	border: 1px solid rgba(59, 130, 246, 0.35);
+	border-left-width: 3px;
+	border-radius: 6px;
+	background: rgba(59, 130, 246, 0.05);
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-callout h4 {
+	margin: 0 0 0.5em;
+	font-size: 0.95em;
+	font-weight: 600;
+	color: var(--accent, #3b82f6);
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-callout > p {
+	margin: 0 0 0.6em;
+	color: inherit;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-steps {
+	margin: 0.4em 0 0.6em 1.4em;
+	padding: 0;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-steps li {
+	margin: 0.25em 0;
+	line-height: 1.55;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-callout-hint {
+	margin: 0.7em 0 0;
+	padding-top: 0.6em;
+	border-top: 1px dashed rgba(59, 130, 246, 0.30);
+	font-size: 0.88em;
 	color: var(--text-muted, #6b7280);
 }
 

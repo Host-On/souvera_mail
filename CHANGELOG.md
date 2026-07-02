@@ -6,7 +6,55 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.13.25] — 2026-02-17 (Help modal: full-width tab content + shortcuts consolidated)
+## [0.13.26] — 2026-02-17 (Public FQDN · vertical align · App-Passwort explainer)
+
+### Fixed — internal cluster IP leaked into customer-facing help
+The Mail-Client tab was showing `10.20.0.129` (the engine's INTERNAL
+Stalwart address baked into the domain-config JSON) instead of the
+public hostname external clients need to reach. External Thunderbird
+/ K-9 setups following the help would fail every connect.
+
+`buildHelpData()` now:
+1. Extracts the public FQDN via `parse_url($sWebDAV, PHP_URL_HOST)` —
+   this is the exact host the user reaches Nextcloud on
+   (`overwrite.cli.url` / active trusted-domain).
+2. Overrides every mail-server host (IMAP / POP3 / SMTP / Sieve)
+   with that public FQDN — Souvera clusters front all four Stalwart
+   ports through the same reverse proxy.
+3. `SmailHelpDomain` (used by the CalDAV/CardDAV footer hint
+   „Server-Adresse ist der Host-Teil der URL, z. B. …") now surfaces
+   the public FQDN as well, not the mail-address suffix.
+
+### Fixed — rowspan copy buttons vertically misaligned
+`Server:Port kopieren` buttons live in `td[rowspan="3"]` cells (they
+span the Server / Port / Verschlüsselung rows). Without an explicit
+`vertical-align` the buttons snapped to the top of the cell instead
+of the visual centre. Fix: `vertical-align: middle` on all three
+columns of `.sv-help-table`. Now the copy buttons sit centred across
+their 3 rows, matching the vertical rhythm of the labels/values.
+
+### Added — proper App-Passwort walk-through on the Mail-Client tab
+Previous text just said "unter „Sicherheit & Geräte" erstellen" —
+incomplete. Customers didn't know that the entry point is the profile
+menu → **Einstellungen** → **Sicherheit & Geräte**. New callout box
+lists the 5-step creation flow with the „einmalig angezeigt" warning
+and the „pro Gerät ein App-Passwort" revocability hint. A new
+`Passwort` row in the config table reinforces: use the App-Passwort,
+not the Login one.
+
+### Architecture
+| File | Change |
+|---|---|
+| `plugins/nextcloud/index.php` | `buildHelpData()`: `parse_url()` extracts the public FQDN, overrides every mail-server host, updates `SmailHelpDomain` to surface the same FQDN. POP3 host derivation moved AFTER the override. |
+| `templates/…/PopupsKeyboardShortcutsHelp.html` | New `.sv-help-callout` on the Mail-Client tab with 5-step ordered list + revocability hint + STARTTLS tip re-worded. New `Passwort` config-row that points back to the callout. |
+| `plugins/nextcloud/css/help-modal.css` | New `.sv-help-callout` / `.sv-help-steps` / `.sv-help-callout-hint` rules. `.sv-help-table td:nth-child(1..3)` now `vertical-align: middle`. |
+| `tests/test_help_modal_integration.php` | +9 assertions (App-Passwort explainer, vertical-align, public-FQDN override, POP3 re-derivation order). |
+| `appinfo/info.xml` | 0.13.25 → **0.13.26**. |
+
+### Verification
+- `php -l` clean. All 27 test files PASS.
+
+
 
 ### Fixed — tab content only ~50% wide (2nd customer report)
 Snappymail's `.tabs` uses a CSS-grid layout where the content column

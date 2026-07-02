@@ -12,7 +12,20 @@
 		<input type="radio" name="helptabs" id="tab-help-mailclient" checked>
 		<label for="tab-help-mailclient" role="tab" aria-selected="true" aria-controls="panel-mailclient" tabindex="0">Mail-Client</label>
 		<div class="tab-content sv-help-tab" role="tabpanel" aria-hidden="false">
-			<p class="sv-help-lead">Für Thunderbird, Apple Mail, Outlook, K-9 &amp; Co. Zur Anmeldung ein <strong>App-Passwort</strong> benutzen (unter „Sicherheit &amp; Geräte" erstellen).</p>
+			<p class="sv-help-lead">Souvera Mail spricht mit jedem gängigen Mail-Programm — Thunderbird, Apple Mail, Outlook, K-9 Mail, FairEmail und andere. Trage die untenstehenden Server-Daten dort ein.</p>
+
+			<div class="sv-help-callout">
+				<h4>Wichtig: Du brauchst ein <em>App-Passwort</em>, kein Login-Passwort</h4>
+				<p>Externe Programme können sich <strong>nicht</strong> mit deinem normalen Souvera-Login-Passwort anmelden — sie brauchen ein eigenes App-Passwort pro Gerät.</p>
+				<ol class="sv-help-steps">
+					<li>Oben rechts auf dein Profilbild klicken → <strong>Einstellungen</strong></li>
+					<li>Links im Menü <strong>Sicherheit &amp; Geräte</strong> wählen</li>
+					<li>Bei „Neues App-Passwort erzeugen" einen Namen vergeben (z.&nbsp;B. „Thunderbird Laptop", „iPhone")</li>
+					<li>Auf <strong>Erzeugen</strong> klicken → das Passwort wird <em>einmalig</em> angezeigt</li>
+					<li>Direkt kopieren und in deinem Mail-Programm als <strong>Passwort</strong> eintragen — Benutzername ist deine E-Mail-Adresse</li>
+				</ol>
+				<p class="sv-help-callout-hint">Pro Gerät ein eigenes App-Passwort. Wird ein Handy verloren, kannst du gezielt <em>nur</em> dessen App-Passwort im gleichen Menü widerrufen — alle anderen Geräte bleiben verbunden.</p>
+			</div>
 
 			<table class="table table-striped table-bordered sv-help-table">
 				<tbody>
@@ -21,6 +34,11 @@
 						<td>E-Mail / Benutzername</td>
 						<td><code data-smail-help="SmailHelpEmail">—</code></td>
 						<td><button type="button" class="sv-help-copy" data-smail-help-copy="SmailHelpEmail">Kopieren</button></td>
+					</tr>
+					<tr>
+						<td>Passwort</td>
+						<td>Dein persönliches <strong>App-Passwort</strong> (siehe Anleitung oben) — nicht dein Login-Passwort.</td>
+						<td></td>
 					</tr>
 
 					<tr class="sv-help-section-row"><td colspan="3"><strong>IMAP</strong> · empfohlen für alle Geräte</td></tr>
@@ -61,7 +79,7 @@
 				</tbody>
 			</table>
 
-			<p class="sv-help-tip"><strong>Tipp:</strong> Wenn dein Programm nach „STARTTLS" fragt → Port 143 (IMAP), 587 (SMTP). Für „SSL/TLS" die Standardports 993/465/995. Souvera liefert oben die exakten Werte.</p>
+			<p class="sv-help-tip"><strong>Tipp:</strong> Wenn dein Mail-Programm nach „STARTTLS" fragt → Port 143 (IMAP) bzw. 587 (SMTP). Für „SSL/TLS" die Standardports 993/465/995. Souvera Mail zeigt oben die exakten Werte für deinen Zugang.</p>
 		</div>
 
 		<!-- ============================================================ -->

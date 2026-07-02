@@ -167,6 +167,15 @@ assertTrue((bool) preg_match('#\.sv-help-table\s+td:nth-child\(3\)\s*\{[^}]*widt
     "help-modal.css: config-table button column hugs the copy-button width",
     $passes, $failures);
 
+// CRITICAL vertical-alignment: rowspan="3" copy buttons must render mid-cell
+foreach ([1, 2, 3] as $col) {
+    assertTrue((bool) preg_match(
+        '#\.sv-help-table\s+td:nth-child\(' . $col . '\)\s*\{[^}]*vertical-align\s*:\s*middle#s',
+        $css
+    ), "help-modal.css: .sv-help-table td:nth-child($col) is vertical-align: middle (rowspan=3 copy buttons centred)",
+        $passes, $failures);
+}
+
 // Inline code (IP:port etc.) must NOT be word-break: break-all
 assertTrue((bool) preg_match('#\.sv-help-table\s+code\s*\{[^}]*word-break\s*:\s*normal#s', $css),
     "help-modal.css: short values (IP/port) are word-break:normal — no more '10.2/0.0.1/29' mid-digit breaks",
@@ -313,6 +322,41 @@ foreach (['K-9 Mail', 'Thunderbird', 'Apple Mail', 'DAVx⁵', 'FairEmail', 'Outl
 }
 
 // ---------------------------------------------------------------
+// 4b. App-Passwort explainer on the Mail-Client tab
+// ---------------------------------------------------------------
+// Correct navigation path — customers must be told the actual UI route
+// ("Einstellungen → Sicherheit & Geräte"), not just the sub-tab name.
+assertTrue(str_contains($tpl, 'sv-help-callout'),
+    "template has a .sv-help-callout box on the Mail-Client tab for the App-Passwort explainer",
+    $passes, $failures);
+assertTrue(str_contains($tpl, 'sv-help-steps'),
+    "template numbers the App-Passwort creation steps in a <ol class='sv-help-steps'>",
+    $passes, $failures);
+assertTrue(str_contains($tpl, '<strong>Einstellungen</strong>'),
+    "template hints the user to click their profile → 'Einstellungen'",
+    $passes, $failures);
+assertTrue(str_contains($tpl, '<strong>Sicherheit &amp; Geräte</strong>'),
+    "template names the target settings tab 'Sicherheit & Geräte' in bold",
+    $passes, $failures);
+assertTrue((bool) preg_match('#pro\s+Gerät#i', $tpl),
+    "template stresses one App-Passwort PER device for revocability",
+    $passes, $failures);
+assertTrue(str_contains($tpl, 'einmalig'),
+    "template warns the App-Passwort is only shown ONCE ('einmalig')",
+    $passes, $failures);
+assertTrue(!str_contains($tpl, 'unter „Sicherheit & Geräte"')
+    && !str_contains($tpl, 'unter „Sicherheit &amp; Geräte"'),
+    "template no longer uses the misleading 'unter „Sicherheit & Geräte\"' phrasing",
+    $passes, $failures);
+
+// Passwort row in the config table cross-references the explainer
+assertTrue((bool) preg_match(
+    '#<td>Passwort</td>\s*<td>[^<]*<strong>App-Passwort</strong>#s',
+    $tpl
+), "config table has a 'Passwort' row that reinforces: use the App-Passwort, not the login one",
+    $passes, $failures);
+
+// ---------------------------------------------------------------
 // 5. Plugin wiring (Init())
 // ---------------------------------------------------------------
 $plugin = (string) file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/index.php');
@@ -365,6 +409,36 @@ assertTrue(str_contains($plugin, "getAbsoluteURL"),
 // The app-config override still works as an optional escape hatch
 assertTrue(str_contains($plugin, "getValueString('souvera_mail', 'shield_url'"),
     "buildHelpData() keeps the app-config `souvera_mail.shield_url` override as a fallback",
+    $passes, $failures);
+
+// CRITICAL — internal cluster IPs (e.g. 10.20.0.129) must NEVER surface to
+// end users. Overwrite IMAP/POP3/SMTP/Sieve host with the public FQDN
+// extracted from the WebDAV base URL (same host the user reaches NC on).
+assertTrue(str_contains($plugin, "\$parsedHost = \\parse_url(\$sWebDAV, PHP_URL_HOST)"),
+    "buildHelpData() extracts the public FQDN via parse_url(webdav, PHP_URL_HOST)",
+    $passes, $failures);
+assertTrue((bool) preg_match('#if\s*\(\s*\$imapHost\s*!==\s*\'\'\s*\)\s*\{\s*\$imapHost\s*=\s*\$publicHost;\s*\}#', $plugin),
+    "buildHelpData() overrides IMAP host with the public FQDN (hides internal IP)",
+    $passes, $failures);
+assertTrue((bool) preg_match('#if\s*\(\s*\$smtpHost\s*!==\s*\'\'\s*\)\s*\{\s*\$smtpHost\s*=\s*\$publicHost;\s*\}#', $plugin),
+    "buildHelpData() overrides SMTP host with the public FQDN",
+    $passes, $failures);
+assertTrue((bool) preg_match('#if\s*\(\s*\$sieveHost\s*!==\s*\'\'\s*\)\s*\{\s*\$sieveHost\s*=\s*\$publicHost;\s*\}#', $plugin),
+    "buildHelpData() overrides Sieve host with the public FQDN",
+    $passes, $failures);
+// POP3 host is derived from imapHost AFTER the public-host override —
+// pin that the derivation appears BELOW the override block.
+assertTrue((bool) preg_match(
+    '#\$sieveHost\s*=\s*\$publicHost;\s*\}\s*\}\s*//[^\n]*\n(?:\s*//[^\n]*\n)*\s*\$pop3Host\s*=\s*\$imapHost;#',
+    $plugin
+), "buildHelpData() re-derives POP3 host AFTER the public-host override",
+    $passes, $failures);
+
+// SmailHelpDomain: now surfaces the public FQDN (was mail-domain earlier)
+assertTrue((bool) preg_match(
+    "#'SmailHelpDomain'\s*=>\s*\\\$publicHost\s*!==\s*''\s*\?\s*\\\$publicHost\s*:\s*\\\$domain#",
+    $plugin
+), "buildHelpData() prefers the public FQDN for SmailHelpDomain, falls back to the mail domain",
     $passes, $failures);
 
 foreach ($keys as $k) {
