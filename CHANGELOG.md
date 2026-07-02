@@ -6,7 +6,48 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.13.28] — 2026-02-17 (Message-sort fallback — newest-first when SORT is missing)
+## [0.13.29] — 2026-02-17 (Hotfix: sort patch used undefined \$sSearch)
+
+### Fixed — v0.13.28 regression: Snappymail 500 → NC 404 for every user
+My v0.13.28 sort-fallback patch referenced the local variable
+`$sSearch` inside `GetUids()` — but `GetUids()` doesn't have that
+local; the value lives on `$oParams->sSearch`. Under PHP 8.2+
+strictness (or Snappymail's error-to-exception handler) this
+raised an "Undefined variable" fatal, breaking the entire
+`FilterAppData` → `DoMessageList` flow → users saw NC's generic
+"Die Seite konnte auf dem Server nicht gefunden werden oder du
+bist nicht berechtigt sie anzusehen." 404 page.
+
+Fix: replace `$sSearch` with `$oParams->sSearch` in the fallback
+reverse guard. Behaviour is unchanged from the intended 0.13.28
+semantics.
+
+### Anti-regression
+`tests/test_message_sort_fallback.php` gains two new assertions:
+1. The patch block MUST NOT reference the undefined local
+   `$sSearch` (regex negative match).
+2. The patch block MUST reference `$oParams->sSearch`.
+
+Any future edit that reintroduces the bad reference fails the
+suite before it can ship.
+
+### Files
+| File | Change |
+|---|---|
+| `app/smail/v/current/app/libraries/Smail/Mail/Client/MailClient.php` | 1-line fix: `$sSearch` → `$oParams->sSearch` inside the sort-fallback guard. |
+| `tests/test_message_sort_fallback.php` | +2 anti-regression assertions pinning the correct variable form. |
+| `appinfo/info.xml` | 0.13.28 → **0.13.29**. |
+
+### Verification
+- `php -l` clean.
+- All 28 test files PASS.
+
+### Deploy
+1. Rsync `/app/*` → `/mnt/nc-shared/custom_apps/souvera_mail`
+2. `sudo -u www-data php occ upgrade`
+3. Hard-refresh browser (Strg+F5) → Souvera Mail loads for every user.
+
+
 
 ### Fixed — "Sortieren nach Datum funktioniert gar nicht"
 Snappymail's `MailClient::GetUids()` falls back to plain `SEARCH`

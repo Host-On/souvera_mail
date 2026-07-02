@@ -55,9 +55,9 @@ assertTrue((bool) preg_match(
 
 // Search-active guard — don't touch explicit search results
 assertTrue((bool) preg_match(
-    '#!\\\\strlen\(\$sSearch\)#',
+    '#!\\\\strlen\(\$oParams->sSearch\)#',
     $src
-), "patch skips the reverse when a search is active (!strlen(sSearch) guard)",
+), "patch skips the reverse when a search is active (!strlen(oParams->sSearch) guard)",
     $passes, $failures);
 
 // Sequence-set guard — don't touch caller-provided ranges
@@ -72,6 +72,23 @@ assertTrue((bool) preg_match(
     '#\\\\count\(\$aResultUids\)\s*>\s*1#',
     $src
 ), "patch only reverses when there is more than 1 UID (>1 guard)",
+    $passes, $failures);
+
+// CRITICAL bug-recurrence guard (0.13.28 → 0.13.29):
+// v0.13.28 referenced the undefined variable `$sSearch` inside GetUids()
+// which triggered "undefined variable" errors → Snappymail 500 → NC 404.
+// GetUids() DOES have `$oParams->sSearch` but NOT a local `$sSearch`.
+// Anti-regression: the patched fallback branch must reference the
+// object-property form only.
+$startFallback = strpos($src, 'Souvera Mail patch');
+assertTrue($startFallback !== false, "patch marker still present", $passes, $failures);
+$endFallback = strpos($src, 'array_reverse($aResultUids)', $startFallback);
+$patchBlock = substr($src, $startFallback, $endFallback - $startFallback + 100);
+assertTrue(!(bool) preg_match('#[^>a-zA-Z_]\$sSearch\b#', $patchBlock),
+    "patch block does NOT reference the undefined local \$sSearch (regression from 0.13.28)",
+    $passes, $failures);
+assertTrue(str_contains($patchBlock, '$oParams->sSearch'),
+    "patch block uses the correct \$oParams->sSearch (v0.13.29 fix)",
     $passes, $failures);
 
 // The IF-branch (SORT worked) MUST NOT contain array_reverse
@@ -132,8 +149,8 @@ assertTrue(version_compare($vm[1] ?? '0', '0.13.28', '>='),
     $passes, $failures);
 
 $cl = (string) file_get_contents('/app/CHANGELOG.md');
-assertTrue(str_contains($cl, '[0.13.28]'),
-    "CHANGELOG has a [0.13.28] section", $passes, $failures);
+assertTrue(str_contains($cl, '[0.13.28]') || str_contains($cl, '[0.13.29]'),
+    "CHANGELOG has a [0.13.28] or [0.13.29] section", $passes, $failures);
 assertTrue(str_contains($cl, 'sort') || str_contains($cl, 'Sort'),
     "CHANGELOG mentions the sort fix",
     $passes, $failures);
