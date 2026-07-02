@@ -1,19 +1,160 @@
 <header>
 	<a href="#" class="close" data-bind="click: close">×</a>
-	<h3 data-i18n="SHORTCUTS_HELP/LEGEND_SHORTCUTS_HELP"></h3>
+	<h3>Hilfe</h3>
 </header>
 <div class="modal-body">
 
 	<div class="tabs">
 
-		<input type="radio" name="helptabs" id="tab-help1" checked>
+		<!-- ============================================================ -->
+		<!-- Souvera Mail — Mail-Client einrichten (IMAP / POP3 / SMTP / Sieve) -->
+		<!-- ============================================================ -->
+		<input type="radio" name="helptabs" id="tab-help-mailclient" checked>
+		<label for="tab-help-mailclient" role="tab" aria-selected="true" aria-controls="panel-mailclient" tabindex="0">Mail-Client</label>
+		<div class="tab-content sv-help-tab" role="tabpanel" aria-hidden="false">
+			<p class="sv-help-lead">Für Thunderbird, Apple Mail, Outlook, K-9 &amp; Co. Zur Anmeldung ein <strong>App-Passwort</strong> benutzen (unter „Sicherheit &amp; Geräte" erstellen).</p>
+
+			<table class="table table-striped table-bordered sv-help-table">
+				<tbody>
+					<tr class="sv-help-section-row"><td colspan="3"><strong>Deine Adresse</strong></td></tr>
+					<tr>
+						<td>E-Mail / Benutzername</td>
+						<td><code data-smail-help="SmailHelpEmail">—</code></td>
+						<td><button type="button" class="sv-help-copy" data-smail-help-copy="SmailHelpEmail">Kopieren</button></td>
+					</tr>
+
+					<tr class="sv-help-section-row"><td colspan="3"><strong>IMAP</strong> · empfohlen für alle Geräte</td></tr>
+					<tr>
+						<td>Server</td>
+						<td><code data-smail-help="SmailHelpImapHost">—</code></td>
+						<td rowspan="3"><button type="button" class="sv-help-copy" data-smail-help-copy-pair="SmailHelpImapHost,SmailHelpImapPort">Server:Port kopieren</button></td>
+					</tr>
+					<tr><td>Port</td><td><code data-smail-help="SmailHelpImapPort">—</code></td></tr>
+					<tr><td>Verschlüsselung</td><td><code data-smail-help="SmailHelpImapSsl">—</code></td></tr>
+
+					<tr class="sv-help-section-row"><td colspan="3"><strong>SMTP</strong> · Ausgang</td></tr>
+					<tr>
+						<td>Server</td>
+						<td><code data-smail-help="SmailHelpSmtpHost">—</code></td>
+						<td rowspan="3"><button type="button" class="sv-help-copy" data-smail-help-copy-pair="SmailHelpSmtpHost,SmailHelpSmtpPort">Server:Port kopieren</button></td>
+					</tr>
+					<tr><td>Port</td><td><code data-smail-help="SmailHelpSmtpPort">—</code></td></tr>
+					<tr><td>Verschlüsselung</td><td><code data-smail-help="SmailHelpSmtpSsl">—</code></td></tr>
+
+					<tr class="sv-help-section-row"><td colspan="3"><strong>POP3</strong> · nur wenn nötig</td></tr>
+					<tr>
+						<td>Server</td>
+						<td><code data-smail-help="SmailHelpPop3Host">—</code></td>
+						<td rowspan="3"><button type="button" class="sv-help-copy" data-smail-help-copy-pair="SmailHelpPop3Host,SmailHelpPop3Port">Server:Port kopieren</button></td>
+					</tr>
+					<tr><td>Port</td><td><code data-smail-help="SmailHelpPop3Port">—</code></td></tr>
+					<tr><td>Verschlüsselung</td><td><code data-smail-help="SmailHelpPop3Ssl">—</code></td></tr>
+
+					<tr class="sv-help-section-row"><td colspan="3"><strong>ManageSieve</strong> · Serverseitige Filter</td></tr>
+					<tr>
+						<td>Server</td>
+						<td><code data-smail-help="SmailHelpSieveHost">—</code></td>
+						<td rowspan="3"><button type="button" class="sv-help-copy" data-smail-help-copy-pair="SmailHelpSieveHost,SmailHelpSievePort">Server:Port kopieren</button></td>
+					</tr>
+					<tr><td>Port</td><td><code data-smail-help="SmailHelpSievePort">—</code></td></tr>
+					<tr><td>Verschlüsselung</td><td><code data-smail-help="SmailHelpSieveSsl">—</code></td></tr>
+				</tbody>
+			</table>
+
+			<p class="sv-help-tip"><strong>Tipp:</strong> Wenn dein Programm nach „STARTTLS" fragt → Port 143 (IMAP), 587 (SMTP). Für „SSL/TLS" die Standardports 993/465/995. Souvera liefert oben die exakten Werte.</p>
+		</div>
+
+		<!-- ============================================================ -->
+		<!-- Souvera Mail — Kalender & Kontakte (CalDAV / CardDAV) -->
+		<!-- ============================================================ -->
+		<input type="radio" name="helptabs" id="tab-help-caldav">
+		<label for="tab-help-caldav" role="tab" aria-selected="false" aria-controls="panel-caldav" tabindex="0">Kalender &amp; Kontakte</label>
+		<div class="tab-content sv-help-tab" role="tabpanel" aria-hidden="true">
+			<p class="sv-help-lead">Synchronisiere Kalender und Adressbücher mit Apple Mail, Thunderbird, DAVx⁵ (Android) oder anderen CalDAV-/CardDAV-Clients. Anmeldung mit App-Passwort.</p>
+
+			<table class="table table-striped table-bordered sv-help-table">
+				<tbody>
+					<tr class="sv-help-section-row"><td colspan="3"><strong>CalDAV</strong> · Kalender</td></tr>
+					<tr>
+						<td>URL</td>
+						<td><code class="sv-help-url" data-smail-help="SmailHelpCalDavUrl">—</code></td>
+						<td><button type="button" class="sv-help-copy" data-smail-help-copy="SmailHelpCalDavUrl">Kopieren</button></td>
+					</tr>
+
+					<tr class="sv-help-section-row"><td colspan="3"><strong>CardDAV</strong> · Kontakte</td></tr>
+					<tr>
+						<td>URL</td>
+						<td><code class="sv-help-url" data-smail-help="SmailHelpCardDavUrl">—</code></td>
+						<td><button type="button" class="sv-help-copy" data-smail-help-copy="SmailHelpCardDavUrl">Kopieren</button></td>
+					</tr>
+				</tbody>
+			</table>
+
+			<div class="sv-help-tip">
+				<strong>iOS / macOS:</strong> Einstellungen → Kalender → Account hinzufügen → <em>Andere</em> → <em>CalDAV-Account hinzufügen</em>. Server-Adresse ist der Host-Teil der URL (z.&nbsp;B. <code data-smail-help="SmailHelpDomain">—</code>).<br>
+				<strong>Android:</strong> DAVx⁵ (F-Droid / Play Store) — komplette URL einfügen, App-Passwort verwenden.<br>
+				<strong>Thunderbird:</strong> Kalender → Neuer Kalender → Im Netzwerk → CalDAV. URL oben, App-Passwort.
+			</div>
+		</div>
+
+		<!-- ============================================================ -->
+		<!-- Souvera Mail — Shield & Mobile-Apps -->
+		<!-- ============================================================ -->
+		<input type="radio" name="helptabs" id="tab-help-shieldapps">
+		<label for="tab-help-shieldapps" role="tab" aria-selected="false" aria-controls="panel-shieldapps" tabindex="0">Shield &amp; Apps</label>
+		<div class="tab-content sv-help-tab" role="tabpanel" aria-hidden="true">
+
+			<div class="sv-help-shield sv-help-shield-available" data-smail-help-shield-block>
+				<h4>Souvera Shield · Spam-Quarantäne</h4>
+				<p>Prüfe zurückgehaltene Nachrichten, hebe Absender-Sperren auf oder gib Mails frei. Öffnet in einem neuen Tab.</p>
+				<a class="sv-help-shield-link" target="_blank" rel="noopener" data-smail-help-shield-link href="#">Souvera Shield öffnen ↗</a>
+			</div>
+			<div class="sv-help-shield sv-help-shield-missing" data-smail-help-shield-missing hidden>
+				<h4>Souvera Shield · nicht konfiguriert</h4>
+				<p>Der Administrator kann die Quarantäne-URL setzen mit:<br>
+				<code>occ config:app:set souvera_mail shield_url --value "https://…"</code></p>
+			</div>
+
+			<h4 class="sv-help-apps-title">Empfohlene Mobile- und Desktop-Apps</h4>
+			<div class="sv-help-apps">
+				<div class="sv-help-app">
+					<div class="sv-help-app-name">K-9 Mail <span class="sv-help-tag">Android</span></div>
+					<p>Open-Source, unterstützt IMAP + SMTP + STARTTLS/SSL. Setup mit E-Mail und App-Passwort.</p>
+				</div>
+				<div class="sv-help-app">
+					<div class="sv-help-app-name">Thunderbird <span class="sv-help-tag">Desktop &amp; Mobile</span></div>
+					<p>Klassiker. Auf Android als „Thunderbird for Android" (K-9-Nachfolger). Auto-Konfiguration.</p>
+				</div>
+				<div class="sv-help-app">
+					<div class="sv-help-app-name">Apple Mail <span class="sv-help-tag">iOS &amp; macOS</span></div>
+					<p>Manuell: Einstellungen → Mail → Accounts → Andere → Mail-Account hinzufügen. IMAP-Werte oben.</p>
+				</div>
+				<div class="sv-help-app">
+					<div class="sv-help-app-name">DAVx⁵ <span class="sv-help-tag">Android · CalDAV</span></div>
+					<p>Für Kalender + Kontakte. Kombination mit K-9 + OpenTasks ergibt die volle Suite auf Android.</p>
+				</div>
+				<div class="sv-help-app">
+					<div class="sv-help-app-name">FairEmail <span class="sv-help-tag">Android</span></div>
+					<p>Alternative zu K-9. Datenschutzfokus, PGP-Support, alle Auth-Modi.</p>
+				</div>
+				<div class="sv-help-app">
+					<div class="sv-help-app-name">Outlook / Windows Mail <span class="sv-help-tag">Windows</span></div>
+					<p>Beim Hinzufügen: <em>Erweitertes Setup → Internet-E-Mail</em>. IMAP/SMTP-Werte oben.</p>
+				</div>
+			</div>
+		</div>
+
+		<!-- ============================================================ -->
+		<!-- Existing Snappymail keyboard-shortcut tabs (unchanged) -->
+		<!-- ============================================================ -->
+		<input type="radio" name="helptabs" id="tab-help1">
 		<label for="tab-help1"
 			role="tab"
-			aria-selected="true"
+			aria-selected="false"
 			aria-controls="panel1"
 			tabindex="0"
 			data-i18n="SHORTCUTS_HELP/TAB_MAILBOX"></label>
-		<div class="tab-content" role="tabpanel" aria-hidden="false">
+		<div class="tab-content" role="tabpanel" aria-hidden="true">
 			<table class="table table-striped table-bordered" style="border-radius: 0 4px 4px 4px">
 			<tbody>
 				<tr><td></td><td data-i18n="SHORTCUTS_HELP/LABEL_OPEN_USER_DROPDOWN"></td><td>M</td></tr>

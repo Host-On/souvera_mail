@@ -1,0 +1,200 @@
+/*
+ * Souvera Mail — styling for the extended help modal
+ * ------------------------------------------------------------
+ * Applied only within the vendored Snappymail
+ * `#V-PopupsKeyboardShortcutsHelp` popup. The extra Souvera tabs
+ * (Mail-Client / Kalender & Kontakte / Shield & Apps) reuse the
+ * upstream `.tab-content` scaffolding but wrap their content in
+ * `.sv-help-tab` for scoped styling that WILL NOT bleed into the
+ * existing keyboard-shortcut tabs.
+ *
+ * Palette follows the shared `.souvera-settings` scope where
+ * possible; local fallbacks match Snappymail's smail theme.
+ * ------------------------------------------------------------ */
+
+#x2m-app #V-PopupsKeyboardShortcutsHelp .modal-body {
+	max-height: 78vh;
+	overflow-y: auto;
+}
+
+/* Souvera-tab content wrapper */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-tab {
+	padding: 1em 1.2em 1.4em;
+	font-size: 0.92em;
+	line-height: 1.5;
+}
+
+/* Introductory paragraph on each Souvera tab */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-lead {
+	margin: 0 0 1em;
+	color: var(--text-muted, #6b7280);
+}
+
+/* Section separator rows inside the config table */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table .sv-help-section-row td {
+	background: rgba(59, 130, 246, 0.06);
+	color: var(--accent, #3b82f6);
+	font-weight: 500;
+	padding-top: 0.5em;
+	padding-bottom: 0.5em;
+	letter-spacing: 0.02em;
+}
+
+/* Inline code with the config value */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table code {
+	padding: 0.1em 0.4em;
+	border-radius: 4px;
+	background: rgba(0, 0, 0, 0.05);
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 0.94em;
+	word-break: break-all;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp code.sv-help-url {
+	display: inline-block;
+	max-width: 100%;
+	padding: 0.35em 0.55em;
+	line-height: 1.4;
+}
+
+/* Copy-to-clipboard button */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-copy {
+	padding: 0.25em 0.7em;
+	font-size: 0.85em;
+	border: 1px solid var(--border, #d1d5db);
+	border-radius: 5px;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+	transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+	white-space: nowrap;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-copy:hover {
+	background: rgba(59, 130, 246, 0.08);
+	border-color: var(--accent, #3b82f6);
+	color: var(--accent, #3b82f6);
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-copy.sv-help-copy-done {
+	background: rgba(34, 197, 94, 0.12);
+	border-color: #22c55e;
+	color: #16a34a;
+}
+
+/* Tip / hint box */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-tip {
+	margin-top: 1em;
+	padding: 0.7em 0.9em;
+	border-left: 3px solid var(--accent, #3b82f6);
+	background: rgba(59, 130, 246, 0.06);
+	border-radius: 4px;
+	font-size: 0.9em;
+}
+
+/* Shield block */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield {
+	padding: 1em 1.2em;
+	border: 1px solid var(--border, #d1d5db);
+	border-radius: 8px;
+	margin-bottom: 1.3em;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield h4 {
+	margin: 0 0 0.4em;
+	font-size: 1em;
+	font-weight: 600;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield p {
+	margin: 0 0 0.7em;
+	color: var(--text-muted, #6b7280);
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield-link {
+	display: inline-block;
+	padding: 0.45em 0.9em;
+	background: var(--accent, #3b82f6);
+	color: #fff !important;
+	border-radius: 6px;
+	text-decoration: none;
+	font-weight: 500;
+	transition: background-color .15s ease, transform .15s ease;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield-link:hover {
+	background: #2563eb;
+	transform: translateY(-1px);
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield-missing {
+	background: rgba(234, 179, 8, 0.08);
+	border-color: rgba(234, 179, 8, 0.4);
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield-missing code {
+	display: block;
+	margin-top: 0.3em;
+	padding: 0.4em 0.6em;
+	background: rgba(0, 0, 0, 0.06);
+	border-radius: 4px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 0.88em;
+	word-break: break-all;
+}
+
+/* Mobile app cards */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-apps-title {
+	margin: 0.4em 0 0.7em;
+	font-size: 1em;
+	font-weight: 600;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-apps {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	gap: 0.7em;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-app {
+	padding: 0.75em 0.95em;
+	border: 1px solid var(--border, #d1d5db);
+	border-radius: 8px;
+	background: rgba(0, 0, 0, 0.015);
+	transition: border-color .15s ease, box-shadow .15s ease;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-app:hover {
+	border-color: var(--accent, #3b82f6);
+	box-shadow: 0 4px 12px rgba(59, 130, 246, 0.10);
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-app-name {
+	font-weight: 600;
+	margin-bottom: 0.3em;
+	display: flex;
+	align-items: center;
+	gap: 0.4em;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-app p {
+	margin: 0;
+	color: var(--text-muted, #6b7280);
+	font-size: 0.88em;
+	line-height: 1.45;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-tag {
+	padding: 0.1em 0.5em;
+	border-radius: 3px;
+	background: rgba(59, 130, 246, 0.12);
+	color: var(--accent, #3b82f6);
+	font-size: 0.7em;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+/* Dark-mode adjustments — match the "Sicherheit & Geräte" palette */
+body[data-theme-dark] #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table code,
+body[data-theme-dark-highcontrast] #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table code,
+.theme--dark #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table code {
+	background: rgba(255, 255, 255, 0.08);
+	color: inherit;
+}
+body[data-theme-dark] #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield-missing code,
+body[data-theme-dark-highcontrast] #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield-missing code,
+.theme--dark #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield-missing code {
+	background: rgba(255, 255, 255, 0.10);
+	color: inherit;
+}
+body[data-theme-dark] #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-app,
+body[data-theme-dark-highcontrast] #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-app,
+.theme--dark #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-app {
+	background: rgba(255, 255, 255, 0.03);
+}

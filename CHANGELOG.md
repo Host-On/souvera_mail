@@ -6,7 +6,58 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.13.21] — 2026-02-17 (Help tab + auto-activated dashboard widget)
+## [0.13.22] — 2026-02-17 (F1 Help modal — rebuilt from Snappymail shortcut popup)
+
+### Rework — general help modal replaces the (broken) Settings tab
+
+The `#/settings/souvera-help` tab shipped in 0.13.21 never activated
+properly in Snappymail's ViewModel registry (root cause pending
+investigation — likely a timing issue with `rl.addSettingsViewModel`
+before the settings-screen is mounted). Per operator request the
+help content now lives INSIDE the existing F1 "Tastaturkürzel-Hilfe"
+popup, which becomes the general Souvera Mail help modal.
+
+Three new tabs are inserted BEFORE the four upstream shortcut tabs
+(Mail-Client is default-selected on open):
+
+1. **Mail-Client** — IMAP / POP3 / SMTP / ManageSieve config with
+   host, port, encryption + copy-Host:Port button per protocol.
+   POP3 defaults to Stalwart's 995/SSL alongside the IMAP host.
+2. **Kalender & Kontakte** — CalDAV + CardDAV URLs derived from the
+   NC WebDAV base with iOS/Android/Thunderbird walk-through hints.
+3. **Shield & Apps** — Souvera Shield quarantine link (with dual
+   branch: link block when configured / operator-hint banner with
+   the `occ config:app:set` command when not) + six mobile/desktop
+   app recommendations (K-9, Thunderbird, Apple Mail, DAVx⁵,
+   FairEmail, Outlook).
+
+The upstream 4 shortcut tabs (Postfach, Nachrichtenliste, Ansicht,
+Verfassen) are preserved untouched — the built-in Tab-navigation
+JS (`dom.querySelectorAll('.tabs input')`) picks up all 7 radios
+via the shared `name="helptabs"` and cycles through them with
+Tab/←/→ as before.
+
+### Architecture
+| File | Change |
+|---|---|
+| `app/smail/v/current/app/templates/Views/User/PopupsKeyboardShortcutsHelp.html` | Header title → `<h3>Hilfe</h3>` (was i18n-bound to `SHORTCUTS_HELP/LEGEND_SHORTCUTS_HELP`). 3 new tabs inserted BEFORE the shortcut tabs, using `<code data-smail-help="KEY">—</code>` placeholders + dual-branch Shield block + mobile-app grid. |
+| `app/smail/v/current/app/plugins/nextcloud/js/help-modal.js` (NEW) | MutationObserver-based enricher: waits for the lazy `#V-PopupsKeyboardShortcutsHelp` popup, then fills every `[data-smail-help]` placeholder from `rl.settings.get('Nextcloud')`. Re-enriches on every `open` toggle (fresh values across setting changes). Wires copy-to-clipboard buttons (single + host:port pair) with "✓ Kopiert" flash feedback and idempotent event attachment via a `dataset.smailHelpWired` marker. Clipboard API with `execCommand('copy')` legacy fallback. |
+| `app/smail/v/current/app/plugins/nextcloud/css/help-modal.css` (NEW) | Fully scoped under `#V-PopupsKeyboardShortcutsHelp` — the upstream shortcut tabs are visually untouched. Full dark-mode selectors (`body[data-theme-dark]`, `body[data-theme-dark-highcontrast]`, `.theme--dark`). |
+| `app/smail/v/current/app/plugins/nextcloud/index.php` | Init(): `addJs('js/help-modal.js')` + new `addCss('css/help-modal.css')`. Removed old registrations for `settings-help.js` / `SettingsSouveraHelp.html`. `buildHelpData()` unchanged. |
+| **Removed** | `app/smail/v/current/app/plugins/nextcloud/js/settings-help.js` · `app/smail/v/current/app/plugins/nextcloud/templates/SettingsSouveraHelp.html` · `tests/test_help_tab_integration.php` — all obsolete. |
+| `appinfo/info.xml` | Version 0.13.21 → **0.13.22**. |
+
+### Verification
+- `php -l` + `node -c` clean on every modified/new file.
+- `tests/test_help_modal_integration.php` (NEW) pins: obsolete files
+  removed, JS enricher targets the correct popup DOM id, uses
+  MutationObserver + re-enrichment on `open`, wires clipboard + shield
+  toggle + all 16 `data-smail-help` keys, CSS scoped + dark-mode-safe,
+  template has 7 `name="helptabs"` radios with exactly one default-
+  checked (Mail-Client tab), version bumped, changelog updated.
+- 26/26 test files PASS (927+ assertions).
+
+
 
 ### Added — "Hilfe & Anleitung" Settings tab
 

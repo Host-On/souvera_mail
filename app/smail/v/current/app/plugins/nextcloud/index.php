@@ -35,13 +35,14 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 
 			$this->addJs('js/quota.js');
 			$this->addJs('js/settings-account.js');
-			$this->addJs('js/settings-help.js');
+			$this->addJs('js/help-modal.js');
 			$this->addJs('js/folder-names.js');
+
+			$this->addCss('css/help-modal.css');
 
 			$this->addTemplate('templates/PopupsNextcloudFiles.html');
 			$this->addTemplate('templates/PopupsNextcloudCalendars.html');
 			$this->addTemplate('templates/SettingsSouveraAccount.html');
-			$this->addTemplate('templates/SettingsSouveraHelp.html');
 
 			$this->addHook('imap.before-login', 'beforeLogin');
 			$this->addHook('smtp.before-login', 'beforeLogin');
@@ -594,8 +595,9 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 	}
 
 	/**
-	 * Build the read-only "Hilfe & Anleitung" payload consumed by the
-	 * Snappymail Settings tab at `#/settings/souvera-help`.
+	 * Build the read-only "Hilfe" payload consumed by the extended
+	 * F1 help modal `PopupsKeyboardShortcutsHelp` (see
+	 * `plugins/nextcloud/js/help-modal.js`).
 	 *
 	 * Every value is a string (never null / missing), so the JS side
 	 * can render a friendly placeholder ("—") without null-checks. The
