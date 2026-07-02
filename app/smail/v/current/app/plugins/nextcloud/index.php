@@ -306,7 +306,7 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 				// /apps/souvera_mail/settings — the controller now redirects to
 				// the engine-internal hash route #/settings/souvera-account.
 				'SmailSettingsUrl' => $oUrlGen->getAbsoluteURL($oUrlGen->linkToRoute('souvera_mail.settings.index'))
-			] + $this->buildHelpData($sUID, $sWebDAV, $ocUser, $oUrlGen)
+			] + $this->safeBuildHelpData($sUID, $sWebDAV, $ocUser, $oUrlGen)
 //				'WebDAV_files' => $sWebDAV . '/files/' . $sUID
 			;
 			if (empty($aResult['Auth'])) {
@@ -591,6 +591,40 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			}
 		} catch (\Throwable $e) {
 			\Smail\Engine\Log::warning('Nextcloud', 'Stalwart identity sync skipped: ' . $e->getMessage());
+		}
+	}
+
+	/**
+	 * Defensive wrapper around {@see buildHelpData()} that guarantees
+	 * the FilterAppData hook is NEVER broken by a Help-data glitch.
+	 *
+	 * Rationale: if `buildHelpData()` throws (missing route, malformed
+	 * WebDAV URL, downstream service unavailable, etc.) Snappymail's
+	 * entire boot payload would break — a customer would see NC's
+	 * generic "Die Seite konnte auf dem Server nicht gefunden werden
+	 * oder du bist nicht berechtigt sie anzusehen." error page
+	 * instead of their inbox. We catch every Throwable and emit an
+	 * all-empty-string payload with the same keys so the JS side just
+	 * renders "—" placeholders and the help modal degrades gracefully.
+	 *
+	 * @return array<string, string>
+	 */
+	protected function safeBuildHelpData(string $sUID, string $sWebDAV, \OCP\IUser $ocUser, \OCP\IURLGenerator $oUrlGen) : array
+	{
+		try {
+			return $this->buildHelpData($sUID, $sWebDAV, $ocUser, $oUrlGen);
+		} catch (\Throwable $e) {
+			\Smail\Engine\Log::warning('Nextcloud', 'buildHelpData crashed, degrading gracefully: ' . $e->getMessage());
+			return [
+				'SmailHelpDomain' => '',
+				'SmailHelpEmail' => '',
+				'SmailHelpImapHost' => '', 'SmailHelpImapPort' => '', 'SmailHelpImapSsl' => '',
+				'SmailHelpPop3Host' => '', 'SmailHelpPop3Port' => '', 'SmailHelpPop3Ssl' => '',
+				'SmailHelpSmtpHost' => '', 'SmailHelpSmtpPort' => '', 'SmailHelpSmtpSsl' => '',
+				'SmailHelpSieveHost' => '', 'SmailHelpSievePort' => '', 'SmailHelpSieveSsl' => '',
+				'SmailHelpCalDavUrl' => '', 'SmailHelpCardDavUrl' => '',
+				'SmailHelpShieldUrl' => '',
+			];
 		}
 	}
 

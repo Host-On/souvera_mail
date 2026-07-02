@@ -6,7 +6,47 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.13.26] — 2026-02-17 (Public FQDN · vertical align · App-Passwort explainer)
+## [0.13.27] — 2026-02-17 (Emergency: defensive Help-data wrapper)
+
+### Fixed — operator reported "Die Seite konnte auf dem Server nicht gefunden werden" 404
+Root cause hypothesis: any exception thrown by `buildHelpData()`
+(missing `souvera_shield.page.index` route, malformed WebDAV URL,
+downstream Service DI glitch on NC 34) bubbles up through
+`FilterAppData` and breaks the ENTIRE Snappymail boot payload —
+the user hits a generic NC 404 instead of their inbox.
+
+Fix: new `safeBuildHelpData()` wrapper that:
+- Calls `buildHelpData()` inside `try { … } catch (\Throwable $e)`.
+- On any failure, logs a warning and returns an all-empty-string
+  payload containing every `SmailHelp*` key so the JS side just
+  renders "—" placeholders (no null-crash).
+- `FilterAppData` now routes through this wrapper — every other
+  key in the Snappymail boot payload is unaffected by Help issues.
+
+### Architecture
+| File | Change |
+|---|---|
+| `plugins/nextcloud/index.php` | New `safeBuildHelpData()` wrapper; `FilterAppData` uses it. `buildHelpData()` itself is unchanged (still the source of truth). |
+| `tests/test_help_modal_integration.php` | +6 assertions pinning the safe wrapper and its per-key fallback payload. |
+| `appinfo/info.xml` | 0.13.26 → **0.13.27**. |
+
+### Verification
+- `php -l` clean.
+- All 27 test files PASS (941 assertions).
+
+### Debugging tips for the operator
+If Snappymail still 404s after this patch, the cause is NOT the Help
+code. Check in order:
+1. `sudo -u www-data php occ app:list | grep souvera_mail` — is the
+   app still enabled? An `occ upgrade` repair-step failure will
+   auto-disable it. Re-enable: `occ app:enable souvera_mail`.
+2. `tail -n 200 /var/www/nextcloud/data/nextcloud.log | grep -i souvera`
+   — look for fatals from other services (SetupService, LogService).
+3. Verify the version was actually deployed: `cat
+   /var/www/nextcloud/apps/souvera_mail/appinfo/info.xml | grep version`
+   should show `0.13.27`.
+
+
 
 ### Fixed — internal cluster IP leaked into customer-facing help
 The Mail-Client tab was showing `10.20.0.129` (the engine's INTERNAL

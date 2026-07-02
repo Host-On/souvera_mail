@@ -381,6 +381,28 @@ assertTrue(str_contains($plugin, 'protected function buildHelpData('),
     "buildHelpData() PHP helper still exists (data source unchanged)",
     $passes, $failures);
 
+// Defensive wrapper: FilterAppData routes through safeBuildHelpData()
+// so a Help-data glitch NEVER breaks the entire Snappymail boot.
+assertTrue(str_contains($plugin, 'protected function safeBuildHelpData('),
+    "plugin has a defensive safeBuildHelpData() wrapper",
+    $passes, $failures);
+assertTrue(str_contains($plugin, '$this->safeBuildHelpData($sUID, $sWebDAV, $ocUser, $oUrlGen)'),
+    "FilterAppData routes through safeBuildHelpData (NOT direct buildHelpData)",
+    $passes, $failures);
+assertTrue((bool) preg_match(
+    '#safeBuildHelpData[\s\S]{0,300}try\s*\{[\s\S]{0,200}return \$this->buildHelpData\([\s\S]{0,50}catch\s*\(\\\\?Throwable#',
+    $plugin
+), "safeBuildHelpData() wraps buildHelpData() in try/catch(Throwable) — graceful degradation",
+    $passes, $failures);
+// Fallback payload includes every Help key so the JS side never null-crashes
+foreach (['SmailHelpImapHost', 'SmailHelpShieldUrl', 'SmailHelpCalDavUrl', 'SmailHelpDomain'] as $k) {
+    assertTrue((bool) preg_match(
+        '#safeBuildHelpData[\s\S]{0,1500}\'' . $k . '\'\s*=>\s*\'\'#s',
+        $plugin
+    ), "safeBuildHelpData() fallback emits '$k' => '' on failure",
+        $passes, $failures);
+}
+
 // Signature now includes IURLGenerator (needed for Shield auto-link)
 assertTrue((bool) preg_match(
     '#buildHelpData\(\s*string \$sUID,\s*string \$sWebDAV,\s*\\\\OCP\\\\IUser \$ocUser,\s*\\\\OCP\\\\IURLGenerator \$oUrlGen\s*\)#',
