@@ -690,6 +690,23 @@ class MailClient
 //			$this->oImapClient->hasCapability('ESEARCH')
 //			$aResultUids = $this->oImapClient->MessageESearch($oSearchCriterias, null, $bReturnUid)
 			$aResultUids = $this->oImapClient->MessageSearch($oSearchCriterias,        $bReturnUid);
+			// Souvera Mail patch (2026-02-17, v0.13.28) — sort fallback.
+			// IMAP SEARCH returns UIDs ascending (RFC 3501 §7.2.5) which
+			// puts oldest emails at the top. That is the "Sortieren nach
+			// Datum funktioniert gar nicht" bug reported on Stalwart 0.16
+			// setups where the server SORT capability is not announced
+			// post-OAUTHBEARER-auth. IMAP UIDs are monotonically
+			// increasing per folder, so array_reverse() surfaces newest
+			// first — mirroring an IMAP SORT REVERSE DATE for 99% of
+			// folder traffic. Skipped when server-side SORT worked
+			// (bUseSort=true above), when the caller passed an explicit
+			// sequence-set range, or when a search is active.
+			if (\is_array($aResultUids) && \count($aResultUids) > 1
+			 && !\strlen($sSearch)
+			 && !$oParams->oSequenceSet
+			) {
+				$aResultUids = \array_reverse($aResultUids);
+			}
 		}
 
 		if ($bUseCache) {

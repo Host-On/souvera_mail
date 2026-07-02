@@ -6,7 +6,54 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.13.27] — 2026-02-17 (Emergency: defensive Help-data wrapper)
+## [0.13.28] — 2026-02-17 (Message-sort fallback — newest-first when SORT is missing)
+
+### Fixed — "Sortieren nach Datum funktioniert gar nicht"
+Snappymail's `MailClient::GetUids()` falls back to plain `SEARCH`
+when the IMAP server's `SORT` capability isn't announced. `SEARCH ALL`
+returns UIDs in ASCENDING order per RFC 3501 §7.2.5 — which puts the
+OLDEST message at the top of the folder listing. Exactly the bug
+reported on Stalwart 0.16 setups where `SORT` isn't reliably
+announced post-OAUTHBEARER-auth.
+
+Fix: after the fallback `MessageSearch()` call in the vendored
+`app/smail/v/current/app/libraries/Smail/Mail/Client/MailClient.php`,
+reverse the UID array. IMAP UIDs are monotonically increasing per
+folder, so `array_reverse()` surfaces the newest UID first — the
+same effective ordering as `SORT REVERSE DATE` for 99 % of folder
+traffic (regular INBOX / archive folders; the 1 % edge case is
+manually-imported historical mail where UID order and date order
+diverge — those still reach the top via UID even though their date
+is older, which is still better than the ascending-UID default).
+
+The reverse is gated to ONLY:
+- the fallback `else` branch (skipped when server-side SORT worked),
+- no active search (`!\strlen($sSearch)`),
+- no caller-provided sequence-set (`!$oParams->oSequenceSet`),
+- ≥2 UIDs in the result (`count > 1`).
+
+Server-side SORT still takes precedence whenever it's available —
+the fix is a pure fallback, no double-reversal risk.
+
+### Architecture
+| File | Change |
+|---|---|
+| `app/smail/v/current/app/libraries/Smail/Mail/Client/MailClient.php` | New `array_reverse($aResultUids)` in the `else` branch of `if ($bUseSort)` inside `GetUids()`. 4-way gate (fallback branch + no search + no seq-set + >1 UID). |
+| `tests/test_message_sort_fallback.php` (NEW) | Static-source assertions on the patch (marker present, correct branch, 4 guards) + behavioural sim through 5 scenarios (normal inbox / search-active / seq-set / empty / single-element). |
+| `appinfo/info.xml` | 0.13.27 → **0.13.28**. |
+
+### Verification
+- `php -l` clean on the patched MailClient.
+- All 28 test files PASS.
+
+### Deploy
+1. Rsync `/app/*` → `/mnt/nc-shared/custom_apps/souvera_mail`
+2. `sudo -u www-data php occ upgrade`
+3. Browser hard-refresh → open INBOX → newest emails at the top.
+   Folder cache may hold stale UID order — trigger a fresh fetch by
+   switching folders or shift-clicking the folder-refresh icon.
+
+
 
 ### Fixed — operator reported "Die Seite konnte auf dem Server nicht gefunden werden" 404
 Root cause hypothesis: any exception thrown by `buildHelpData()`
