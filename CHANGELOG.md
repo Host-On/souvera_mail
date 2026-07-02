@@ -6,7 +6,52 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.13.24] — 2026-02-17 (Help modal layout + Shield auto-link)
+## [0.13.25] — 2026-02-17 (Help modal: full-width tab content + shortcuts consolidated)
+
+### Fixed — tab content only ~50% wide (2nd customer report)
+Snappymail's `.tabs` uses a CSS-grid layout where the content column
+is `1fr` **without** an explicit `min-width: 0`. Inside a browser
+that computes the intrinsic table width, the `1fr` column collapses
+around the table's natural width instead of filling the row → the
+~50 % artefact the operator screenshotted. Fix pins:
+
+```css
+.tabs                          { width: 100%; }
+.tabs > .tab-content           { width: 100%; min-width: 0; max-width: 100%; }
+.sv-help-tab                   { width: 100%; box-sizing: border-box; }
+.sv-help-tab table             { width: 100%; table-layout: auto; }
+.sv-help-table td:nth-child(1) { width: 1%; white-space: nowrap; }
+.sv-help-table td:nth-child(3) { width: 1%; text-align: right; }
+```
+
+Result: label column hugs "Server / Port / Verschlüsselung", value
+column expands with the modal, button column hugs "Server:Port
+kopieren" — every tab now uses the FULL popup width.
+
+### Changed — 4 shortcut tabs consolidated into 1 "Tastenkürzel" tab
+Postfach / Nachrichtenliste / Nachrichtenansicht / Nachricht
+schreiben are now section headings inside a single **Tastenkürzel**
+tab, arranged in a responsive 2-column CSS grid
+(`repeat(auto-fill, minmax(360px, 1fr))`). All upstream i18n keys
+preserved (`SHORTCUTS_HELP/TAB_MAILBOX`, `…/TAB_MESSAGE_LIST`,
+`…/TAB_MESSAGE_VIEW`, `…/TAB_COMPOSE`) — now bound to `<h4>` section
+headings instead of `<label>` tab handles.
+
+Popup now has exactly **4 tabs** (down from 7):
+Mail-Client · Kalender & Kontakte · Shield & Apps · Tastenkürzel.
+
+### Architecture
+| File | Change |
+|---|---|
+| `app/smail/…/PopupsKeyboardShortcutsHelp.html` | 4× shortcut radios → single `#tab-help-shortcuts` radio; content rewrapped in `.sv-help-shortcut-grid` with 4 `.sv-help-shortcut-block` sections (each = 1 upstream tab's table + i18n `<h4>` heading). |
+| `plugins/nextcloud/css/help-modal.css` | Full-width fix (`.tabs > .tab-content { width: 100%; min-width: 0 }`, `.sv-help-tab table { width: 100% }`, column-width rules). New shortcut-grid layout with per-column styling (icon hug / label auto / key-combo mono + accent color). |
+| `tests/test_help_modal_integration.php` | Assertion refresh: tab count 4 (was ≥7), obsolete `tab-help1..4` gone, i18n keys still present as section headings, +7 CSS regression pins for the full-width fixes and the shortcut grid. |
+| `appinfo/info.xml` | 0.13.24 → **0.13.25**. |
+
+### Verification
+- `php -l` clean. All 27 test files PASS.
+
+
 
 ### Fixed — layout regressions reported by the operator
 1. **Modal too narrow (~50 % viewport):** 7 tab labels wrapped

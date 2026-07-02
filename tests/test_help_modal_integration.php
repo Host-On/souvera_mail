@@ -128,21 +128,46 @@ assertTrue(str_contains($css, 'sv-help-copy-done'),
 
 // ---------------------------------------------------------------
 // 3b. CSS layout regressions (2026-02-17 — customer feedback:
-//     50% modal width + IP addresses broken mid-digit)
+//     tab-content only 50% wide + IP addresses broken mid-digit)
 // ---------------------------------------------------------------
-// Modal must be wide enough for 7 tab labels on a single row
+// Modal must be wide enough for 4 tab labels on a single row
 assertTrue((bool) preg_match('#\#V-PopupsKeyboardShortcutsHelp\s*\{[^}]*max-width\s*:\s*min\(\s*1100px#s', $css)
     || (bool) preg_match('#\#V-PopupsKeyboardShortcutsHelp\s*\{[^}]*width\s*:\s*min\(\s*1100px#s', $css),
-    "help-modal.css bumps the popup width to accommodate 7 tab labels",
+    "help-modal.css bumps the popup width to accommodate all tabs",
     $passes, $failures);
 
-// Tab labels: no mid-word breaks ("Nachrichte\nnliste")
+// CRITICAL: `.tabs > .tab-content` must span full width (fix for 50% artefact)
+assertTrue((bool) preg_match('#\.tabs\s*>\s*\.tab-content\s*\{[^}]*width\s*:\s*100%#s', $css),
+    "help-modal.css: .tabs > .tab-content { width: 100% } — no more 50% artefact",
+    $passes, $failures);
+assertTrue((bool) preg_match('#\.tabs\s*>\s*\.tab-content\s*\{[^}]*min-width\s*:\s*0#s', $css),
+    "help-modal.css: .tabs > .tab-content { min-width: 0 } — allows CSS-grid shrinkage",
+    $passes, $failures);
+
+// .sv-help-tab wrapper: full width, box-sizing set
+assertTrue((bool) preg_match('#\.sv-help-tab\s*\{[^}]*width\s*:\s*100%#s', $css),
+    "help-modal.css: .sv-help-tab { width: 100% } — Souvera tabs fill the popup",
+    $passes, $failures);
+
+// Every table inside a Souvera tab spans full width
+assertTrue((bool) preg_match('#\.sv-help-tab\s+table\s*\{[^}]*width\s*:\s*100%#s', $css),
+    "help-modal.css: .sv-help-tab table { width: 100% } — tables stop shrinking to intrinsic width",
+    $passes, $failures);
+
+// Tab labels: no mid-word breaks
 assertTrue((bool) preg_match('#\.tabs\s*>\s*label\s*\{\s*white-space:\s*nowrap#', $css),
     "help-modal.css sets .tabs > label { white-space: nowrap } so labels don't break mid-word",
     $passes, $failures);
 
-// Inline code (IP:port etc.) must NOT be word-break: break-all — only the
-// dedicated .sv-help-url class breaks long DAV URLs.
+// Config-table column widths — 1st (label) & 3rd (button) hug, 2nd (value) grows
+assertTrue((bool) preg_match('#\.sv-help-table\s+td:nth-child\(1\)\s*\{[^}]*width\s*:\s*1%#s', $css),
+    "help-modal.css: config-table label column hugs its natural width",
+    $passes, $failures);
+assertTrue((bool) preg_match('#\.sv-help-table\s+td:nth-child\(3\)\s*\{[^}]*width\s*:\s*1%#s', $css),
+    "help-modal.css: config-table button column hugs the copy-button width",
+    $passes, $failures);
+
+// Inline code (IP:port etc.) must NOT be word-break: break-all
 assertTrue((bool) preg_match('#\.sv-help-table\s+code\s*\{[^}]*word-break\s*:\s*normal#s', $css),
     "help-modal.css: short values (IP/port) are word-break:normal — no more '10.2/0.0.1/29' mid-digit breaks",
     $passes, $failures);
@@ -151,6 +176,14 @@ assertTrue((bool) preg_match('#\.sv-help-table\s+code\s*\{[^}]*white-space\s*:\s
     $passes, $failures);
 assertTrue((bool) preg_match('#code\.sv-help-url\s*\{[^}]*word-break\s*:\s*break-all#s', $css),
     "help-modal.css: only .sv-help-url (CalDAV/CardDAV URLs) uses word-break: break-all",
+    $passes, $failures);
+
+// Shortcut-grid styling (2-column responsive layout for the unified tab)
+assertTrue((bool) preg_match('#\.sv-help-shortcut-grid\s*\{[^}]*display\s*:\s*grid#s', $css),
+    "help-modal.css: .sv-help-shortcut-grid uses CSS grid",
+    $passes, $failures);
+assertTrue((bool) preg_match('#\.sv-help-shortcut-grid\s*\{[^}]*grid-template-columns\s*:\s*repeat\(auto-fill#s', $css),
+    "help-modal.css: shortcut grid uses auto-fill for responsive columns",
     $passes, $failures);
 
 // Dead CSS gone (no more shield-missing rules)
@@ -184,22 +217,42 @@ foreach ([
         "template has label text '$label'", $passes, $failures);
 }
 
-// Existing shortcut tabs still there
-foreach (['tab-help1', 'tab-help2', 'tab-help3', 'tab-help4'] as $id) {
-    assertTrue(str_contains($tpl, 'id="' . $id . '"'),
-        "existing shortcut tab '$id' preserved", $passes, $failures);
-}
-assertTrue(str_contains($tpl, 'SHORTCUTS_HELP/TAB_MAILBOX'),
-    "existing i18n key SHORTCUTS_HELP/TAB_MAILBOX preserved",
+// Existing shortcut tabs are now CONSOLIDATED into a single "Tastenkürzel" tab
+assertTrue(str_contains($tpl, 'id="tab-help-shortcuts"'),
+    "template has consolidated 'Tastenkürzel' tab (id=tab-help-shortcuts)",
     $passes, $failures);
-assertTrue(str_contains($tpl, 'SHORTCUTS_HELP/TAB_COMPOSE'),
-    "existing i18n key SHORTCUTS_HELP/TAB_COMPOSE preserved",
+foreach (['tab-help1', 'tab-help2', 'tab-help3', 'tab-help4'] as $obsolete) {
+    assertTrue(!str_contains($tpl, 'id="' . $obsolete . '"'),
+        "obsolete radio '$obsolete' is REMOVED (4 shortcut tabs → 1)",
+        $passes, $failures);
+}
+
+// All four shortcut categories are now section headings inside the unified tab
+foreach ([
+    'SHORTCUTS_HELP/TAB_MAILBOX',
+    'SHORTCUTS_HELP/TAB_MESSAGE_LIST',
+    'SHORTCUTS_HELP/TAB_MESSAGE_VIEW',
+    'SHORTCUTS_HELP/TAB_COMPOSE',
+] as $i18nKey) {
+    assertTrue(str_contains($tpl, 'data-i18n="' . $i18nKey . '"'),
+        "shortcut category i18n key '$i18nKey' preserved (now as section heading)",
+        $passes, $failures);
+}
+assertTrue(str_contains($tpl, 'SHORTCUTS_HELP/LABEL_OPEN_COMPOSE_POPUP'),
+    "compose shortcut rows preserved inside the unified tab",
+    $passes, $failures);
+assertTrue(str_contains($tpl, 'sv-help-shortcut-grid'),
+    "template uses .sv-help-shortcut-grid wrapper (2-column responsive layout)",
+    $passes, $failures);
+$shortcutBlocks = preg_match_all('#class="sv-help-shortcut-block"#', $tpl);
+assertTrue($shortcutBlocks === 4,
+    "template has exactly 4 shortcut blocks (Postfach + Liste + Ansicht + Verfassen). got: $shortcutBlocks",
     $passes, $failures);
 
 // Tab-navigation JS relies on all radios sharing the same name
 $radios = substr_count($tpl, 'name="helptabs"');
-assertTrue($radios >= 7,
-    "template has ≥7 radios with name='helptabs' (3 Souvera + 4 shortcut). got: $radios",
+assertTrue($radios === 4,
+    "template has exactly 4 radios with name='helptabs' (3 Souvera + 1 unified Tastenkürzel). got: $radios",
     $passes, $failures);
 
 // Exactly ONE default-checked tab (the very first Souvera tab)

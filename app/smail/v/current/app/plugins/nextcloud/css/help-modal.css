@@ -12,10 +12,9 @@
  * possible; local fallbacks match Snappymail's smail theme.
  * ------------------------------------------------------------ */
 
-/* Modal itself — bump the width so 7 tab labels (3 Souvera + 4 upstream
- * shortcuts) can sit on a single row without breaking mid-word
- * ("Nachrichte\nnliste"). Snappymail's default dialog max-width was
- * tuned for 4 tabs. */
+/* Modal itself — bump the width so 4 tab labels (3 Souvera + 1 unified
+ * shortcuts) can sit on a single row and every tab's content extends
+ * to the full popup width (not only 50 % as before). */
 #x2m-app #V-PopupsKeyboardShortcutsHelp {
 	max-width: min(1100px, 96vw);
 	width: min(1100px, 96vw);
@@ -24,6 +23,26 @@
 #x2m-app #V-PopupsKeyboardShortcutsHelp .modal-body {
 	max-height: 78vh;
 	overflow-y: auto;
+	/* Modal body must span the popup width so tab-content can too */
+	width: 100%;
+	box-sizing: border-box;
+}
+
+/* CRITICAL: the vendored Snappymail `.tabs` uses a CSS-grid with an
+ * `auto`-sized first column and `1fr` for the content column. Without
+ * a min-width the content column collapses to its intrinsic width —
+ * which is exactly the ~50 %-of-modal look reported by the operator.
+ * Force the tabs container AND every `.tab-content` panel to fill
+ * the available width. */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .tabs {
+	width: 100%;
+	box-sizing: border-box;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .tabs > .tab-content {
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
+	min-width: 0;   /* allow shrinkage inside CSS-grid `1fr` cells */
 }
 
 /* Tab labels: never break inside a word. Modal is wide enough now. */
@@ -31,11 +50,44 @@
 	white-space: nowrap;
 }
 
-/* Souvera-tab content wrapper */
+/* Souvera-tab content wrapper — spans the FULL popup width */
 #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-tab {
 	padding: 1em 1.2em 1.4em;
 	font-size: 0.92em;
 	line-height: 1.5;
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+/* Every table inside a Souvera tab MUST fill the tab-content width.
+ * Without this the tables default to `width: auto` (intrinsic
+ * shrink-to-fit) — which is exactly the ~50 % artefact the operator
+ * screenshotted. */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-tab table {
+	width: 100%;
+	table-layout: auto;
+}
+
+/* Configuration table columns:
+ *   1st col (Label)   — natural width for "Server"/"Port"/…
+ *   2nd col (Value)   — takes ALL remaining space so IP:port + code
+ *                       chips look chunky instead of squeezed left.
+ *   3rd col (Button)  — hugs the copy-button width.
+ */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table td:nth-child(1) {
+	width: 1%;
+	white-space: nowrap;
+	font-weight: 500;
+	color: var(--text-muted, #6b7280);
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table td:nth-child(2) {
+	width: auto;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table td:nth-child(3) {
+	width: 1%;
+	white-space: nowrap;
+	text-align: right;
 }
 
 /* Introductory paragraph on each Souvera tab */
@@ -185,6 +237,53 @@
 	font-weight: 500;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
+}
+
+/* ============================================================
+ * Tastenkürzel tab — 4 categories in a 2-column responsive grid
+ * so all shortcuts are visible at once without cramming.
+ * ============================================================ */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shortcut-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+	gap: 0.9em 1.1em;
+	width: 100%;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shortcut-block {
+	min-width: 0; /* allow shrinkage inside 1fr grid cells */
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shortcut-heading {
+	margin: 0 0 0.4em;
+	padding: 0.35em 0.55em;
+	font-size: 0.92em;
+	font-weight: 600;
+	color: var(--accent, #3b82f6);
+	background: rgba(59, 130, 246, 0.06);
+	border-radius: 4px;
+}
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shortcut-table {
+	width: 100%;
+	table-layout: auto;
+	font-size: 0.88em;
+}
+/* Compact spacing so the four categories fit comfortably */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shortcut-table td {
+	padding: 0.28em 0.55em;
+}
+/* Icon glyph column (arrows, checkboxes, star) is narrow */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shortcut-table td:first-child {
+	width: 1%;
+	text-align: center;
+	color: var(--text-muted, #6b7280);
+}
+/* Key-combo column hugs the right */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shortcut-table td:last-child {
+	width: 1%;
+	white-space: nowrap;
+	text-align: right;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 0.9em;
+	color: var(--accent, #3b82f6);
 }
 
 /* Dark-mode adjustments — match the "Sicherheit & Geräte" palette */
