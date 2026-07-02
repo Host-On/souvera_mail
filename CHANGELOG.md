@@ -6,7 +6,47 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.13.23] — 2026-02-17 (Branded app.svg from host-on.dev · img/ cleanup)
+## [0.13.24] — 2026-02-17 (Help modal layout + Shield auto-link)
+
+### Fixed — layout regressions reported by the operator
+1. **Modal too narrow (~50 % viewport):** 7 tab labels wrapped
+   mid-word ("Nachrichte\nnliste"). Bumped popup to
+   `min(1100 px, 96 vw)` and pinned `.tabs > label { white-space:
+   nowrap }`.
+2. **IP addresses broken mid-digit:** `10.20.0.129` rendered as
+   `10.2 / 0.0.1 / 29` because inline `<code>` inherited
+   `word-break: break-all`. Removed the global break-all,
+   scoped it to `.sv-help-url` only (the long CalDAV/CardDAV
+   URLs that genuinely need to wrap). Short values now use
+   `white-space: nowrap`.
+
+### Fixed — Souvera Shield UX for end-users
+1. **`occ` fallback removed** — customers on managed Souvera clusters
+   have no shell access and must never see raw operator commands.
+2. **Auto-link to the `souvera_shield` NC app:** `buildHelpData()`
+   now probes `IAppManager::isEnabledForUser('souvera_shield',
+   $ocUser)` and, when enabled, resolves the Shield URL via
+   `linkToRoute('souvera_shield.page.index')` → absolute URL. The
+   app-config override `souvera_mail.shield_url` is preserved as an
+   optional escape hatch for split-domain deployments.
+3. **Shield block hides entirely** when neither the NC app nor the
+   override are configured — no misleading "not configured" banner.
+
+### Architecture
+| File | Change |
+|---|---|
+| `app/smail/v/current/app/plugins/nextcloud/index.php` | `buildHelpData()` signature gains `IURLGenerator $oUrlGen`; Shield resolver now probes `IAppManager::isEnabledForUser('souvera_shield', …)` first and only falls back to the app-config override if the app is absent. |
+| `app/smail/v/current/app/templates/Views/User/PopupsKeyboardShortcutsHelp.html` | Removed the `[data-smail-help-shield-missing]` branch (occ-command hint) — the `[data-smail-help-shield-block]` starts `hidden` and is unhidden by JS only when `SmailHelpShieldUrl` is present. |
+| `app/smail/v/current/app/plugins/nextcloud/js/help-modal.js` | Single-branch Shield logic — no more missing-shield DOM handle. |
+| `app/smail/v/current/app/plugins/nextcloud/css/help-modal.css` | Popup width `min(1100px, 96vw)`; `.tabs > label { white-space: nowrap }`; `.sv-help-table code { word-break: normal; white-space: nowrap }`; long-URL `word-break: break-all` scoped to `.sv-help-url` only. Removed dead `.sv-help-shield-missing` rules. |
+| `tests/test_help_modal_integration.php` | +14 assertions covering the layout fixes + the auto-Shield resolver (`IAppManager::isEnabledForUser`, `linkToRoute('souvera_shield.page.index')`, `getAbsoluteURL`), + the customer-safety pin (zero `occ` commands in the template). |
+| `appinfo/info.xml` | Version 0.13.23 → **0.13.24**. |
+
+### Verification
+- `php -l` clean on the plugin.
+- All 27 test files PASS.
+
+
 
 ### Changed
 - `img/app.svg` replaced with the branded logo hosted at

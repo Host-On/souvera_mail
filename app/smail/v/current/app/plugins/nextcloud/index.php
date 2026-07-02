@@ -306,7 +306,7 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 				// /apps/souvera_mail/settings — the controller now redirects to
 				// the engine-internal hash route #/settings/souvera-account.
 				'SmailSettingsUrl' => $oUrlGen->getAbsoluteURL($oUrlGen->linkToRoute('souvera_mail.settings.index'))
-			] + $this->buildHelpData($sUID, $sWebDAV, $ocUser)
+			] + $this->buildHelpData($sUID, $sWebDAV, $ocUser, $oUrlGen)
 //				'WebDAV_files' => $sWebDAV . '/files/' . $sUID
 			;
 			if (empty($aResult['Auth'])) {
@@ -618,7 +618,7 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 	 *
 	 * @return array<string, string>
 	 */
-	protected function buildHelpData(string $sUID, string $sWebDAV, \OCP\IUser $ocUser) : array
+	protected function buildHelpData(string $sUID, string $sWebDAV, \OCP\IUser $ocUser, \OCP\IURLGenerator $oUrlGen) : array
 	{
 		$domain = '';
 		$imapHost = '';  $imapPort = '';  $imapSsl = '';
@@ -660,18 +660,38 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 		$pop3Port = $imapHost !== '' ? '995' : '';
 		$pop3Ssl = $imapHost !== '' ? 'SSL' : '';
 
-		// Shield URL — optional operator config
+		// Souvera Shield URL — auto-resolves to the Nextcloud
+		// `souvera_shield` app when it is installed AND enabled for
+		// the current user. Falls back to an explicit operator
+		// override in app-config `souvera_mail.shield_url` for
+		// deployments where Shield lives on a different host.
+		//
+		// Empty string means "hide the entire Shield block" — end
+		// users must never see raw `occ` commands (they don't have
+		// shell access on managed Souvera clusters).
 		$shieldUrl = '';
 		try {
-			$appConfig = \OCP\Server::get(\OCP\IAppConfig::class);
-			$shieldUrl = (string) $appConfig->getValueString('souvera_mail', 'shield_url', '');
+			$appManager = \OCP\Server::get(\OCP\App\IAppManager::class);
+			if ($appManager->isEnabledForUser('souvera_shield', $ocUser)) {
+				$shieldUrl = $oUrlGen->getAbsoluteURL(
+					$oUrlGen->linkToRoute('souvera_shield.page.index')
+				);
+			}
 		} catch (\Throwable $e) {
-			// Older NC / missing IAppConfig — fall back silently
+			// souvera_shield not installed or has no `page.index`
+			// route — fall through to app-config override.
+		}
+		if ($shieldUrl === '') {
 			try {
-				$config = \OCP\Server::get(\OCP\IConfig::class);
-				$shieldUrl = (string) $config->getAppValue('souvera_mail', 'shield_url', '');
-			} catch (\Throwable $e2) {
-				$shieldUrl = '';
+				$appConfig = \OCP\Server::get(\OCP\IAppConfig::class);
+				$shieldUrl = (string) $appConfig->getValueString('souvera_mail', 'shield_url', '');
+			} catch (\Throwable $e) {
+				try {
+					$config = \OCP\Server::get(\OCP\IConfig::class);
+					$shieldUrl = (string) $config->getAppValue('souvera_mail', 'shield_url', '');
+				} catch (\Throwable $e2) {
+					$shieldUrl = '';
+				}
 			}
 		}
 

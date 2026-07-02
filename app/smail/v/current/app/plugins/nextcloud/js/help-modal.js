@@ -80,19 +80,18 @@
 			el.textContent = valueOrDash(c[key]);
 		});
 
-		// 2. Shield block toggle + link href
+		// 2. Shield block: show if URL present, hide entirely otherwise.
+		// End users must never see the missing-Shield fallback (no
+		// occ commands in a customer-facing UI).
 		var shieldUrl = String(c.SmailHelpShieldUrl || '');
 		var shieldBlock = popupEl.querySelector('[data-smail-help-shield-block]');
-		var shieldMissing = popupEl.querySelector('[data-smail-help-shield-missing]');
 		var shieldLink = popupEl.querySelector('[data-smail-help-shield-link]');
-		if (shieldBlock && shieldMissing) {
+		if (shieldBlock) {
 			if (shieldUrl) {
 				shieldBlock.hidden = false;
-				shieldMissing.hidden = true;
 				if (shieldLink) { shieldLink.setAttribute('href', shieldUrl); }
 			} else {
 				shieldBlock.hidden = true;
-				shieldMissing.hidden = false;
 			}
 		}
 

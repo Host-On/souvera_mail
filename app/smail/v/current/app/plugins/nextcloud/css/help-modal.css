@@ -12,9 +12,23 @@
  * possible; local fallbacks match Snappymail's smail theme.
  * ------------------------------------------------------------ */
 
+/* Modal itself — bump the width so 7 tab labels (3 Souvera + 4 upstream
+ * shortcuts) can sit on a single row without breaking mid-word
+ * ("Nachrichte\nnliste"). Snappymail's default dialog max-width was
+ * tuned for 4 tabs. */
+#x2m-app #V-PopupsKeyboardShortcutsHelp {
+	max-width: min(1100px, 96vw);
+	width: min(1100px, 96vw);
+}
+
 #x2m-app #V-PopupsKeyboardShortcutsHelp .modal-body {
 	max-height: 78vh;
 	overflow-y: auto;
+}
+
+/* Tab labels: never break inside a word. Modal is wide enough now. */
+#x2m-app #V-PopupsKeyboardShortcutsHelp .tabs > label {
+	white-space: nowrap;
 }
 
 /* Souvera-tab content wrapper */
@@ -40,20 +54,27 @@
 	letter-spacing: 0.02em;
 }
 
-/* Inline code with the config value */
+/* Inline code with the config value — DO NOT break-all. Short values
+ * like "10.20.0.129" or "993" must render on a single line. Overflow
+ * wraps between whitespace only. Long URLs get the wider .sv-help-url
+ * treatment further down. */
 #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table code {
 	padding: 0.1em 0.4em;
 	border-radius: 4px;
 	background: rgba(0, 0, 0, 0.05);
 	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	font-size: 0.94em;
-	word-break: break-all;
+	white-space: nowrap;
+	word-break: normal;
 }
+/* Only long URLs (CalDAV/CardDAV) get the wrap behaviour. */
 #x2m-app #V-PopupsKeyboardShortcutsHelp code.sv-help-url {
 	display: inline-block;
 	max-width: 100%;
 	padding: 0.35em 0.55em;
 	line-height: 1.4;
+	white-space: normal;
+	word-break: break-all;
 }
 
 /* Copy-to-clipboard button */
@@ -119,20 +140,6 @@
 	background: #2563eb;
 	transform: translateY(-1px);
 }
-#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield-missing {
-	background: rgba(234, 179, 8, 0.08);
-	border-color: rgba(234, 179, 8, 0.4);
-}
-#x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield-missing code {
-	display: block;
-	margin-top: 0.3em;
-	padding: 0.4em 0.6em;
-	background: rgba(0, 0, 0, 0.06);
-	border-radius: 4px;
-	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-	font-size: 0.88em;
-	word-break: break-all;
-}
 
 /* Mobile app cards */
 #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-apps-title {
@@ -185,12 +192,6 @@ body[data-theme-dark] #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table cod
 body[data-theme-dark-highcontrast] #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table code,
 .theme--dark #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-table code {
 	background: rgba(255, 255, 255, 0.08);
-	color: inherit;
-}
-body[data-theme-dark] #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield-missing code,
-body[data-theme-dark-highcontrast] #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield-missing code,
-.theme--dark #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-shield-missing code {
-	background: rgba(255, 255, 255, 0.10);
 	color: inherit;
 }
 body[data-theme-dark] #x2m-app #V-PopupsKeyboardShortcutsHelp .sv-help-app,
