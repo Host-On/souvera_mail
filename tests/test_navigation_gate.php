@@ -96,7 +96,7 @@ $makeNav = function ($serverContainer): array {
         'id'    => APP_ID,
         'name'  => \OCA\SouveraMail\Util\NavigationTitle::resolve($appConfig),
         'href'  => $urlGenerator->linkToRoute('souvera_mail.page.index'),
-        'icon'  => $urlGenerator->imagePath(APP_ID, 'logo-white-64x64.png'),
+        'icon'  => $urlGenerator->imagePath(APP_ID, 'app.svg'),
         'order' => 4,
     ];
 };

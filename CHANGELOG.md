@@ -6,6 +6,36 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.13.23] — 2026-02-17 (Branded app.svg from host-on.dev · img/ cleanup)
+
+### Changed
+- `img/app.svg` replaced with the branded logo hosted at
+  `https://www.host-on.dev/app.svg` (4430 bytes, 512×512 viewBox,
+  Inkscape export). This supersedes the previous theme-friendly
+  monochrome 24×24 `currentColor` SVG.
+- `img/` folder cleaned — **only** `app.svg` remains. Deleted:
+  `favicon.png`, `favicon-mask.svg`, `favicon-touch.png`,
+  `logo-64x64.png`, `logo-white-64x64.png`, `screenshot-inbox.png`,
+  `screenshot-calendar.png`, `screenshot-wizard.png`.
+
+### Fixed — dangling references to deleted image files
+| File | Change |
+|---|---|
+| `templates/admin-local.php` | `logo-64x64.png` → `app.svg` |
+| `lib/Settings/AdminSection.php::getIcon()` | `logo-64x64.png` → `app.svg` |
+| `lib/Dashboard/UnreadMailWidget.php` (2 sites) | `logo-64x64.png` → `app.svg` |
+| `tests/test_navigation_gate.php` (stub) | `logo-white-64x64.png` → `app.svg` |
+| `appinfo/info.xml` | `<screenshot>` entries removed (targets no longer exist in the repo) |
+| `appinfo/info.xml` | Version 0.13.22 → **0.13.23** |
+
+### Tests
+- `tests/test_icon_and_sieve_diagnostic.php` relaxed for the branded
+  SVG: file exists + valid XML + `<svg viewBox="…">` + Application.php
+  still references `app.svg` + **NEW** assertion that the `img/`
+  folder contains exactly one file (`app.svg`).
+- 27/27 test files PASS (890 assertions).
+
+
 ## [0.13.22] — 2026-02-17 (F1 Help modal — rebuilt from Snappymail shortcut popup)
 
 ### Rework — general help modal replaces the (broken) Settings tab
@@ -58,6 +88,7 @@ Tab/←/→ as before.
 - 26/26 test files PASS (927+ assertions).
 
 
+## [0.13.21] — 2026-02-17 (Help tab + auto-activated dashboard widget · superseded by 0.13.22)
 
 ### Added — "Hilfe & Anleitung" Settings tab
 
@@ -129,6 +160,7 @@ level and never breaks the login flow.
   user (marker already set, widget missing → no re-add).
 
 
+## [0.13.20] — 2026-02-17 (AppPassword wire-format + Settings-tab dark mode)
 
 ### Fixed — P0: AppPassword creation refused with `invalidPatch: permissions/value`
 

@@ -31,6 +31,6 @@ class AdminSection implements IIconSection
 
     public function getIcon(): string
     {
-        return $this->urlGenerator->imagePath('souvera_mail', 'logo-64x64.png');
+        return $this->urlGenerator->imagePath('souvera_mail', 'app.svg');
     }
 }

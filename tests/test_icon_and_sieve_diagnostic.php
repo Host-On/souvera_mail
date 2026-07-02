@@ -40,28 +40,18 @@ function assertTrue(bool $c, string $m, array &$p, array &$f): void {
 }
 
 // ---------------------------------------------------------------
-// 1. New monochrome SVG nav icon
+// 1. Nav icon file
 // ---------------------------------------------------------------
+// NOTE: 0.13.22 — the operator swapped the previous monochrome
+// theme-friendly SVG for a branded logo hosted at host-on.dev.
+// We no longer enforce viewBox="0 0 24 24" / `currentColor` /
+// zero hex colours — those constraints reflected the older
+// nav-icon design goal. We DO still enforce that the file
+// exists, is valid XML, and is wired via Application.php.
 $iconPath = '/app/img/app.svg';
 assertTrue(\file_exists($iconPath),
     "img/app.svg exists (the Nextcloud nav icon)", $passes, $failures);
 $icon = \file_get_contents($iconPath);
-
-// Must be a valid SVG with a viewBox so NC can resize it
-assertTrue((bool) \preg_match('#<svg[^>]+viewBox\s*=\s*"0 0 24 24"#', $icon),
-    "app.svg declares a 24x24 viewBox (NC nav-icon convention)",
-    $passes, $failures);
-
-// Monochrome: every stroke / fill must use `currentColor` so NC's theme
-// engine can recolour for light/dark mode. No hex colours, no rgb(),
-// no named colours (other than 'transparent' / 'none').
-assertTrue(!\preg_match('/fill="#[0-9a-fA-F]/', $icon)
-    && !\preg_match('/stroke="#[0-9a-fA-F]/', $icon),
-    "app.svg uses no hard-coded hex colours (NC theme-friendly)",
-    $passes, $failures);
-assertTrue(\substr_count($icon, 'currentColor') >= 3,
-    "app.svg uses currentColor on every shape (≥3 occurrences for the body, flap, accent)",
-    $passes, $failures);
 
 // SVG must validate as XML so NC's IconService doesn't choke
 $prev = \libxml_use_internal_errors(true);
@@ -72,13 +62,25 @@ assertTrue($xml !== false,
     "app.svg is well-formed XML — NC's image route can serve it as-is",
     $passes, $failures);
 
-// Application.php wires the new icon path (was: logo-white-64x64.png)
+// Sanity: root element is <svg> with a viewBox (any dimensions)
+assertTrue((bool) \preg_match('#<svg\b[^>]*\bviewBox\s*=\s*"[^"]+"#s', $icon),
+    "app.svg root element is <svg> with a viewBox attribute (NC IconService can scale it)",
+    $passes, $failures);
+
+// Application.php wires the icon path
 $app = \file_get_contents('/app/lib/AppInfo/Application.php');
 assertTrue((bool) \preg_match("#imagePath\(self::APP_ID, 'app\.svg'\)#", $app),
-    "Application.php points the nav icon at img/app.svg (theme-friendly SVG)",
+    "Application.php points the nav icon at img/app.svg",
     $passes, $failures);
 assertTrue(!\str_contains($app, "'logo-white-64x64.png'"),
     "Application.php no longer references the rasterised logo-white-64x64.png",
+    $passes, $failures);
+
+// The img/ folder is now clean: ONLY app.svg lives there
+$imgFolder = '/app/img';
+$imgFiles = \array_values(\array_diff(\scandir($imgFolder), ['.', '..']));
+assertTrue($imgFiles === ['app.svg'],
+    "img/ folder contains exactly one file: app.svg (got: " . \implode(',', $imgFiles) . ")",
     $passes, $failures);
 
 // ---------------------------------------------------------------

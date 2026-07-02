@@ -1,52 +1,51 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!--
-	Souvera Mail — Nextcloud nav icon.
-
-	FILLED silhouette (fill="currentColor"), matching Nextcloud's other
-	first-party app-grid tiles (Files, Talk, Contacts, Calendar …). The
-	prior stroke-only outline rendered as an inverted-looking "empty"
-	envelope in the dark-mode app grid — operator report 2026-07-01 —
-	because Nextcloud's dashboard tile paints the icon black on a light-
-	blue chip, and outline-only icons read as a hole punched into the
-	chip whereas filled ones read as a proper silhouette.
-
-	Design: RFC 6764-friendly envelope silhouette at the 24×24 viewBox
-	Nextcloud expects. Two paths:
-	  1. The envelope body — a rounded rectangle with the flap V CARVED
-	     OUT as evenodd fill-rule, so we still get "letter"-recognizable
-	     geometry with only a single filled shape.
-	  2. A subtle upper-right accent dot representing the S in "Souvera",
-	     invisible at ≤14 px (nav-bar) but recognisable at 64 px (Apps
-	     settings tile).
-
-	Both paths use fill="currentColor" so Nextcloud's NavigationManager +
-	theming layer recolour correctly for light/dark mode.
--->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-	<!--
-		Envelope silhouette. Outer rounded-rect is the letter body; the
-		inner "flap V" path is a knockout (evenodd) so the fold is
-		visible as a negative space rather than an extra stroke on top.
-	-->
-	<path fill-rule="evenodd" clip-rule="evenodd" d="
-		M4 5.5
-		C2.9 5.5 2 6.4 2 7.5
-		V16.5
-		C2 17.6 2.9 18.5 4 18.5
-		H20
-		C21.1 18.5 22 17.6 22 16.5
-		V7.5
-		C22 6.4 21.1 5.5 20 5.5
-		H4
-		Z
-		M4 7.5
-		L12 12.6
-		L20 7.5
-		V8.9
-		L12.53 13.68
-		C12.21 13.88 11.79 13.88 11.47 13.68
-		L4 8.9
-		V7.5
-		Z
-	" />
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   version="1.0"
+   width="512.000000pt"
+   height="512.000000pt"
+   viewBox="0 0 512.000000 512.000000"
+   preserveAspectRatio="xMidYMid meet"
+   id="svg4"
+   sodipodi:docname="app.svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs4" />
+  <sodipodi:namedview
+     id="namedview4"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="pt"
+     inkscape:zoom="1.0927734"
+     inkscape:cx="341.33333"
+     inkscape:cy="341.33333"
+     inkscape:window-width="1920"
+     inkscape:window-height="991"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="g4" />
+  <g
+     transform="translate(0.000000,512.000000) scale(0.100000,-0.100000)"
+     fill="#000000"
+     stroke="none"
+     id="g4">
+    <path
+       d="M287 4319 c-108 -25 -200 -103 -251 -209 l-31 -65 -3 -277 -3 -278 25 -25 c30 -30 65 -32 97 -6 24 19 24 20 29 290 3 163 9 274 15 280 7 7 259 -192 786 -621 l776 -632 -11 -35 c-14 -47 -13 -306 1 -353 l11 -37 -341 -277 c-473 -384 -467 -379 -467 -419 0 -38 37 -75 76 -75 15 0 148 102 401 309 295 241 380 306 388 295 6 -7 26 -42 45 -76 22 -39 73 -101 135 -163 115 -115 197 -166 345 -216 84 -28 112 -33 232 -37 118 -4 151 -1 234 18 227 52 446 212 556 406 16 30 33 54 37 54 7 0 1420 -1146 1455 -1180 19 -19 19 -19 -8 -30 -41 -15 -4511 -9 -4526 6 -9 9 43 56 202 185 331 268 338 275 338 315 0 21 -8 42 -20 54 -44 44 -61 34 -355 -205 -152 -124 -280 -225 -284 -225 -5 0 -11 14 -15 31 -3 17 -6 501 -6 1076 l0 1044 -25 24 c-13 14 -36 25 -50 25 -14 0 -37 -11 -50 -25 l-25 -24 0 -1059 c0 -1029 1 -1062 20 -1123 35 -115 132 -211 243 -244 75 -22 4518 -23 4592 -1 114 35 208 129 245 245 19 59 20 91 20 470 l0 408 -23 21 c-31 29 -80 29 -107 0 -19 -21 -20 -33 -20 -414 0 -407 -3 -459 -26 -450 -15 6 -1451 1171 -1493 1211 -23 22 -23 24 -11 96 16 94 15 267 -3 341 l-14 58 261 213 c634 517 1219 993 1242 1010 24 18 24 18 34 -8 6 -17 10 -347 10 -925 0 -494 3 -906 6 -915 18 -47 109 -48 133 -2 9 16 11 254 9 947 l-3 925 -28 61 c-36 77 -113 154 -192 191 l-60 28 -2255 2 c-1289 0 -2271 -3 -2293 -8z m4522 -150 c17 -6 31 -14 31 -17 -1 -4 -332 -276 -737 -605 l-735 -598 -36 61 c-115 194 -313 344 -528 401 -387 101 -796 -73 -994 -424 l-32 -57 -53 42 c-278 222 -1444 1175 -1445 1180 0 3 12 11 28 16 40 15 4458 16 4501 1z m-2089 -893 c252 -54 454 -228 541 -466 173 -474 -178 -971 -685 -970 -127 0 -207 19 -321 74 -440 214 -541 808 -196 1155 108 109 227 176 366 206 80 18 215 18 295 1z"
+       id="path1"
+       style="fill:#ffffff" />
+    <path
+       style="fill:#ffffff;stroke-width:13.2542;stroke-linecap:square;stroke-miterlimit:1;paint-order:fill markers stroke"
+       d="m 2258.337,1995.1901 c -94.9991,68.2047 -190.905,222.2684 -182.3041,300.5199 h 259.0885 c 16.7107,-66.3282 53.093,-119.566 119.6927,-144.0122 19.4415,-6.4375 37.141,-11.1271 57.6137,-15.1399 172.0132,-33.718 362.2046,31.9623 300.3127,181.3221 -39.9956,96.5196 -345.3642,151.4971 -447.4116,191.5058 -23.8687,9.1591 -96.0547,45.5879 -102.5314,51.7437 -1.7841,1.6942 -4.7242,3.0768 -6.5372,3.0768 -1.8142,0 -3.6655,0.825 -4.1163,1.8483 -0.4527,1.0152 -9.0908,7.3904 -19.205,14.164 -21.8169,14.6148 -27.6366,19.4734 -48.8698,40.8085 -83.5913,83.9865 -99.2885,194.161 -78.8251,308.9778 47.1334,232.7106 227.7513,289.3785 417.7234,301.7163 15.5797,1.0122 76.7391,3.2217 95.9068,0 224.29,-7.1863 470.595,-117.8194 458.8096,-390.8576 -0.131,-2.7509 -28.4305,-3.1985 -139.7317,-3.1985 h -138.5103 c -13.1034,131.8102 -154.4965,184.1132 -278.0801,162.6826 -50.324,-10.2379 -99.043,-19.1958 -128.0712,-68.9462 -24.7984,-43.7516 -18.9967,-97.5439 11.0195,-135.18 54.1345,-55.1433 137.8593,-73.7436 208.6358,-97.6001 123.5958,-44.7296 265.3641,-64.4114 370.2007,-146.7166 88.6985,-69.8197 115.6882,-159.3824 112.6688,-227.548 4.1816,-142.0177 -41.2424,-270.2791 -169.1083,-355.8586 -82.9894,-55.545 -419.4056,-152.0192 -668.3701,26.7261 z"
+       id="path10-9"
+       sodipodi:nodetypes="sccssscssscssscsscssssssss" />
+  </g>
 </svg>

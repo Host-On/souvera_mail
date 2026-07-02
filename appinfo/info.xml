@@ -3,7 +3,7 @@
 	<id>souvera_mail</id>
 	<name>Souvera Mail</name>
 	<summary>Nextcloud-native webmail with Nextcloud as the OIDC Provider — CLI-configurable for automated deploys</summary>
-	<version>0.13.22</version>
+	<version>0.13.23</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author homepage="https://github.com/PhiGi87/souvera_mail">Souvera</author>
 	<website>https://github.com/PhiGi87/souvera_mail</website>
@@ -13,8 +13,6 @@
 		<admin>https://github.com/PhiGi87/souvera_mail#quick-start-automated-deploy</admin>
 		<developer>https://github.com/PhiGi87/souvera_mail</developer>
 	</documentation>
-	<screenshot>https://raw.githubusercontent.com/PhiGi87/souvera_mail/main/img/screenshot-inbox.png</screenshot>
-	<screenshot>https://raw.githubusercontent.com/PhiGi87/souvera_mail/main/img/screenshot-calendar.png</screenshot>
 	<description><![CDATA[**Souvera Mail** — Nextcloud-native webmail with Nextcloud as the OIDC Provider.
 
 Built for automated, declarative deployments (Ansible, Helm, OCI containers, Nextcloud-AIO addons). Every configuration step is reachable through `occ` — there is no browser-based setup wizard. A read-only status panel exists for diagnostics only.

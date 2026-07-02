@@ -23,7 +23,7 @@ $engine = $status['engine'] ?? [];
 ?>
 <div id="souvera_mail-admin-status" class="section">
     <h2 style="display:flex;align-items:center;gap:0.5em;">
-        <img src="<?php p(image_path('souvera_mail', 'logo-64x64.png')); ?>"
+        <img src="<?php p(image_path('souvera_mail', 'app.svg')); ?>"
              alt="Souvera Mail" style="height:32px;width:32px;">
         <?php p($l->t('Souvera Mail — Status')); ?>
     </h2>

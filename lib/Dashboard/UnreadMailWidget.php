@@ -141,7 +141,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
                     $Message->From()->ToString(),
                     $Message->Subject(),
                     $baseURL . '/mailbox/INBOX/m' . $Message->Uid(),
-                    $this->urlGenerator->imagePath('souvera_mail', 'logo-64x64.png'),
+                    $this->urlGenerator->imagePath('souvera_mail', 'app.svg'),
                     $Message->ETag('')
                 );
             }
@@ -170,6 +170,6 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function getIconUrl(): string
     {
-        return $this->urlGenerator->imagePath('souvera_mail', 'logo-64x64.png');
+        return $this->urlGenerator->imagePath('souvera_mail', 'app.svg');
     }
 }
