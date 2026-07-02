@@ -30,6 +30,7 @@ use Psr\Log\LoggerInterface;
  */
 class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 {
+    public const WIDGET_ID = 'souvera_mail-unread';
     public const MODE_UNREAD = 'unread';
     public const MODE_ALL = 'all';
     public const MODE_DEFAULT = self::MODE_UNREAD;
@@ -46,7 +47,7 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function getId(): string
     {
-        return 'souvera_mail-unread';
+        return self::WIDGET_ID;
     }
 
     public function getTitle(): string

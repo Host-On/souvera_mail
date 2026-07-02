@@ -6,7 +6,78 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.13.20] — 2026-02-17 (AppPassword wire-format + Settings-tab dark mode)
+## [0.13.21] — 2026-02-17 (Help tab + auto-activated dashboard widget)
+
+### Added — "Hilfe & Anleitung" Settings tab
+
+A new read-only Snappymail Settings tab at `#/settings/souvera-help`,
+registered alongside "Sicherheit & Geräte". Consolidates every piece
+of configuration a user needs to hook a third-party client into their
+Souvera Mail account — no more support tickets from users guessing
+IMAP/SMTP hostnames or CalDAV paths.
+
+The tab surfaces (all live-derived from the active engine domain
+config, no hard-coded values):
+- **IMAP / POP3 / SMTP / ManageSieve** — host, port, encryption
+  string (SSL / STARTTLS / None). Each row has a "Host:Port kopieren"
+  button. POP3 defaults to Stalwart's 995/SSL alongside the IMAP host
+  (single-listener design). Explicit reminder that legacy clients
+  need an **App-Passwort** (link to the sister tab).
+- **CalDAV / CardDAV** — user-specific WebDAV URLs
+  (`…/dav/calendars/<uid>/`, `…/dav/addressbooks/users/<uid>/`) with
+  copy buttons and short iOS / macOS / Android DAVx⁵ walk-through.
+- **Souvera Shield** — link to the operator-configured spam quarantine.
+  Empty operator config renders a friendly "not configured" banner
+  with the `occ config:app:set souvera_mail shield_url …` command.
+- **Mobile-App-Empfehlungen** — cards for K-9 Mail, Thunderbird,
+  Apple Mail, DAVx⁵, FairEmail, Outlook / Windows Mail with
+  platform-specific setup hints.
+- **Tastenkürzel** — three-column reference of the compose /
+  list / view shortcut keys (full list still available via F1).
+
+Every value is emitted as a string via a new `buildHelpData()` helper
+on the engine plugin — the JS side never null-checks, missing values
+render as "—". No new HTTP endpoints; no new PHP dependencies.
+
+### Added — auto-activated "Unread Mail" dashboard widget
+
+On the very first Nextcloud login of each user, `LoginBridgeListener`
+now appends the Souvera Mail unread-mail widget id
+(`souvera_mail-unread`) to their per-user `dashboard.layout`
+config and stamps a `souvera_mail/dashboard-widget-autoactivated`
+marker. Subsequent logins skip the seed — if the user removes the
+widget later, we do NOT re-add it. Empty pre-existing layout is
+seeded with `recommendations,spreed,souvera_mail-unread` so the
+first-run dashboard is immediately useful.
+
+Best-effort: any failure in the seed path is swallowed at debug
+level and never breaks the login flow.
+
+### Architecture
+| File | Change |
+|---|---|
+| `app/smail/v/current/app/plugins/nextcloud/js/settings-help.js` | NEW — Knockout ViewModel `SouveraHelpSettings`, read-only bindings + clipboard-copy actions. |
+| `app/smail/v/current/app/plugins/nextcloud/templates/SettingsSouveraHelp.html` | NEW — 5-card layout (IMAP-POP3-SMTP-Sieve · CalDAV/CardDAV · Shield · Mobile Apps · Shortcuts) with scoped CSS reusing the shared `.souvera-settings` palette. |
+| `app/smail/v/current/app/plugins/nextcloud/index.php` | Registers the new JS + template via `addJs` / `addTemplate`. New `buildHelpData(uid, webdav, IUser)` helper merged into the `Nextcloud` FilterAppData payload. Reads the active domain config via `DomainConfigService::listDomains()` + `readDomainConfig()`; degrades gracefully when no domain is configured yet. |
+| `lib/Listeners/LoginBridgeListener.php` | Constructor takes `IConfig`. New `autoActivateDashboardWidget(uid)` seeds the widget id into `dashboard.layout` on first login, tracked via a marker. Public constants for the marker + dashboard keys keep the test surface pinned. |
+| `lib/Dashboard/UnreadMailWidget.php` | Widget id promoted to `public const WIDGET_ID = 'souvera_mail-unread'` — single source of truth referenced by the listener + tests. |
+| `appinfo/info.xml` | Version 0.13.20 → 0.13.21. |
+
+### Verification
+- `php -l` clean on every modified PHP file.
+- `tests/test_help_tab_integration.php` (NEW) pins: JS + template
+  existence, ViewModel registration + hash route, FilterAppData
+  emits every `SmailHelp*` key, POP3 defaults to 995/SSL derived
+  from IMAP host, Shield URL resolves via app-config, template
+  binds every observable, plugin `Init()` registers both new
+  assets.
+- `tests/test_dashboard_widget_autoactivate.php` (NEW) pins: the
+  marker + dashboard config keys, `WIDGET_ID` constant, seed logic
+  in `autoActivateDashboardWidget()` — cold user (empty layout),
+  warm user (existing layout without our widget), respected-choice
+  user (marker already set, widget missing → no re-add).
+
+
 
 ### Fixed — P0: AppPassword creation refused with `invalidPatch: permissions/value`
 

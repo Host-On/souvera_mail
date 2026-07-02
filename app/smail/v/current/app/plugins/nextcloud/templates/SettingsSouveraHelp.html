@@ -1,0 +1,451 @@
+<div class="souvera-settings souvera-help">
+
+        <!-- Header strip -->
+        <div class="sv-header">
+                <div class="sv-header-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                </div>
+                <div>
+                        <div class="sv-header-title">Hilfe &amp; Anleitung</div>
+                        <div class="sv-header-sub">Externe Mail-Clients, Kalender, Kontakte und Souvera Shield einrichten</div>
+                </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- IMAP / POP3 / SMTP configuration -->
+        <!-- ============================================================ -->
+        <section class="sv-card">
+                <header class="sv-card-h">
+                        <span class="sv-card-h-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                        <polyline points="22,6 12,13 2,6"></polyline>
+                                </svg>
+                        </span>
+                        <span>Mail-Client einrichten (IMAP / POP3 / SMTP)</span>
+                </header>
+                <div class="sv-card-b">
+                        <p class="sv-card-desc">
+                                Verwende diese Zugangsdaten in Thunderbird, Apple Mail, Outlook oder anderen Mail-Programmen. Für den Login brauchst du ein <strong>App-Passwort</strong> — dein normales Nextcloud-Passwort funktioniert hier nicht. Erstelle eines im Reiter <em>„Sicherheit &amp; Geräte"</em>.
+                        </p>
+
+                        <div class="sv-help-grid">
+
+                                <!-- Identity -->
+                                <div class="sv-help-block">
+                                        <div class="sv-help-block-title">Deine Adresse</div>
+                                        <dl class="sv-kv">
+                                                <dt>E-Mail / Benutzername</dt>
+                                                <dd>
+                                                        <code data-bind="text: userEmail"></code>
+                                                        <button class="sv-btn sv-btn-sm" data-bind="click: copyEmail" title="Kopieren">Kopieren</button>
+                                                </dd>
+                                                <dt>Authentifizierung</dt>
+                                                <dd><strong>Passwort / Login</strong> — <em>nicht</em> OAuth</dd>
+                                        </dl>
+                                </div>
+
+                                <!-- IMAP -->
+                                <div class="sv-help-block">
+                                        <div class="sv-help-block-title">IMAP <span class="sv-tag sv-tag-alt">Empfohlen</span></div>
+                                        <dl class="sv-kv">
+                                                <dt>Server</dt><dd><code data-bind="text: imapHost"></code></dd>
+                                                <dt>Port</dt><dd><code data-bind="text: imapPort"></code></dd>
+                                                <dt>Verschlüsselung</dt><dd><code data-bind="text: imapSsl"></code></dd>
+                                        </dl>
+                                        <button class="sv-btn sv-btn-sm sv-help-block-copy" data-bind="click: copyImap" title="Server:Port kopieren">Host:Port kopieren</button>
+                                </div>
+
+                                <!-- POP3 -->
+                                <div class="sv-help-block">
+                                        <div class="sv-help-block-title">POP3</div>
+                                        <dl class="sv-kv">
+                                                <dt>Server</dt><dd><code data-bind="text: pop3Host"></code></dd>
+                                                <dt>Port</dt><dd><code data-bind="text: pop3Port"></code></dd>
+                                                <dt>Verschlüsselung</dt><dd><code data-bind="text: pop3Ssl"></code></dd>
+                                        </dl>
+                                        <button class="sv-btn sv-btn-sm sv-help-block-copy" data-bind="click: copyPop3" title="Server:Port kopieren">Host:Port kopieren</button>
+                                </div>
+
+                                <!-- SMTP -->
+                                <div class="sv-help-block">
+                                        <div class="sv-help-block-title">SMTP <span class="sv-tag sv-tag-alt">Ausgang</span></div>
+                                        <dl class="sv-kv">
+                                                <dt>Server</dt><dd><code data-bind="text: smtpHost"></code></dd>
+                                                <dt>Port</dt><dd><code data-bind="text: smtpPort"></code></dd>
+                                                <dt>Verschlüsselung</dt><dd><code data-bind="text: smtpSsl"></code></dd>
+                                        </dl>
+                                        <button class="sv-btn sv-btn-sm sv-help-block-copy" data-bind="click: copySmtp" title="Server:Port kopieren">Host:Port kopieren</button>
+                                </div>
+
+                                <!-- Sieve -->
+                                <div class="sv-help-block">
+                                        <div class="sv-help-block-title">ManageSieve <span class="sv-tag">Filter</span></div>
+                                        <dl class="sv-kv">
+                                                <dt>Server</dt><dd><code data-bind="text: sieveHost"></code></dd>
+                                                <dt>Port</dt><dd><code data-bind="text: sievePort"></code></dd>
+                                                <dt>Verschlüsselung</dt><dd><code data-bind="text: sieveSsl"></code></dd>
+                                        </dl>
+                                        <button class="sv-btn sv-btn-sm sv-help-block-copy" data-bind="click: copySieve" title="Server:Port kopieren">Host:Port kopieren</button>
+                                </div>
+                        </div>
+
+                        <div class="sv-help-tips">
+                                <strong>Tipp:</strong> Wenn dein Mail-Programm nach „STARTTLS" fragt, verwende Port 143 (IMAP) bzw. 587 (SMTP). Für SSL/TLS („implizit") die Standardports 993/465/995. Souvera Mail liefert die exakten Werte oben.
+                        </div>
+                </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- CalDAV / CardDAV -->
+        <!-- ============================================================ -->
+        <section class="sv-card">
+                <header class="sv-card-h">
+                        <span class="sv-card-h-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+                                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                                </svg>
+                        </span>
+                        <span>Kalender &amp; Kontakte (CalDAV / CardDAV)</span>
+                </header>
+                <div class="sv-card-b">
+                        <p class="sv-card-desc">
+                                Diese Zugänge synchronisieren Kalender und Adressbücher mit Apple, Thunderbird, DAVx⁵ (Android) und ähnlichen Clients. Zur Authentifizierung ebenfalls ein <strong>App-Passwort</strong> verwenden.
+                        </p>
+                        <div class="sv-help-grid">
+                                <div class="sv-help-block sv-help-block-wide">
+                                        <div class="sv-help-block-title">CalDAV (Kalender)</div>
+                                        <dl class="sv-kv">
+                                                <dt>URL</dt>
+                                                <dd>
+                                                        <code class="sv-code-wrap" data-bind="text: calDavUrl"></code>
+                                                        <button class="sv-btn sv-btn-sm" data-bind="click: copyCalDav" title="Kopieren">Kopieren</button>
+                                                </dd>
+                                        </dl>
+                                </div>
+                                <div class="sv-help-block sv-help-block-wide">
+                                        <div class="sv-help-block-title">CardDAV (Kontakte)</div>
+                                        <dl class="sv-kv">
+                                                <dt>URL</dt>
+                                                <dd>
+                                                        <code class="sv-code-wrap" data-bind="text: cardDavUrl"></code>
+                                                        <button class="sv-btn sv-btn-sm" data-bind="click: copyCardDav" title="Kopieren">Kopieren</button>
+                                                </dd>
+                                        </dl>
+                                </div>
+                        </div>
+                        <div class="sv-help-tips">
+                                <strong>iOS / macOS:</strong> Einstellungen → Kalender → Account hinzufügen → <em>Andere</em> → <em>CalDAV-Account hinzufügen</em>. Server-Adresse ist der Host-Teil der URL (z.&nbsp;B. <code data-bind="text: userDomain"></code>).<br>
+                                <strong>Android:</strong> App „DAVx⁵" aus F-Droid oder Play Store, komplette URL einfügen.
+                        </div>
+                </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- Souvera Shield -->
+        <!-- ============================================================ -->
+        <section class="sv-card">
+                <header class="sv-card-h">
+                        <span class="sv-card-h-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                </svg>
+                        </span>
+                        <span>Souvera Shield <span class="sv-card-h-note">Spam-Quarantäne</span></span>
+                </header>
+                <div class="sv-card-b">
+                        <!-- ko if: shieldAvailable -->
+                        <p class="sv-card-desc">
+                                In deiner Spam-Quarantäne kannst du zurückgehaltene Nachrichten prüfen, wiederherstellen oder Absender freigeben. Der Zugang öffnet sich in einem neuen Tab.
+                        </p>
+                        <a class="sv-btn sv-btn-primary sv-help-shield-link"
+                                target="_blank" rel="noopener"
+                                data-bind="attr: { href: shieldUrl }">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                Souvera Shield öffnen
+                        </a>
+                        <div class="sv-help-tips">
+                                Häufige Absender kannst du dort dauerhaft freischalten oder blockieren. Die persönlichen Sieve-Filter im Tab <em>Filter</em> laufen zusätzlich auf dem Server.
+                        </div>
+                        <!-- /ko -->
+                        <!-- ko ifnot: shieldAvailable -->
+                        <div class="sv-banner sv-banner-warn">
+                                <strong>Kein Shield konfiguriert.</strong>
+                                Der Administrator kann die Quarantäne-URL setzen mit
+                                <code>occ config:app:set souvera_mail shield_url --value &quot;https://…&quot;</code>.
+                        </div>
+                        <!-- /ko -->
+                </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- Mobile-App-Empfehlungen -->
+        <!-- ============================================================ -->
+        <section class="sv-card">
+                <header class="sv-card-h">
+                        <span class="sv-card-h-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                                        <line x1="12" y1="18" x2="12.01" y2="18"></line>
+                                </svg>
+                        </span>
+                        <span>Mobile-App-Empfehlungen</span>
+                </header>
+                <div class="sv-card-b">
+                        <p class="sv-card-desc">Getestete Apps, die problemlos mit deinem Souvera-Postfach zusammenarbeiten:</p>
+                        <div class="sv-help-apps">
+                                <div class="sv-help-app">
+                                        <div class="sv-help-app-title">K-9 Mail <span class="sv-tag">Android</span></div>
+                                        <p>Open-Source, unterstützt IMAP + SMTP + STARTTLS/SSL. Import via QR-Code oder manuell mit den Werten oben.</p>
+                                </div>
+                                <div class="sv-help-app">
+                                        <div class="sv-help-app-title">Thunderbird <span class="sv-tag">Desktop &amp; Mobile</span></div>
+                                        <p>Klassiker. Auf Android als „Thunderbird for Android" (Nachfolger von K-9). Auto-Konfiguration mit E-Mail + App-Passwort.</p>
+                                </div>
+                                <div class="sv-help-app">
+                                        <div class="sv-help-app-title">Apple Mail <span class="sv-tag">iOS &amp; macOS</span></div>
+                                        <p>Manuell hinzufügen: <em>Einstellungen → Mail → Accounts → Andere → Mail-Account hinzufügen</em>. IMAP-Werte oben.</p>
+                                </div>
+                                <div class="sv-help-app">
+                                        <div class="sv-help-app-title">DAVx⁵ <span class="sv-tag">Android · CalDAV</span></div>
+                                        <p>Für Kalender + Kontakte. Kombiniert mit K-9 Mail und OpenTasks ergibt das die vollständige Souvera-Suite auf Android.</p>
+                                </div>
+                                <div class="sv-help-app">
+                                        <div class="sv-help-app-title">FairEmail <span class="sv-tag">Android</span></div>
+                                        <p>Alternative zu K-9. Fokus auf Datenschutz, unterstützt PGP und alle Auth-Modi.</p>
+                                </div>
+                                <div class="sv-help-app">
+                                        <div class="sv-help-app-title">Outlook &amp; Windows Mail <span class="sv-tag">Windows</span></div>
+                                        <p>Wählt beim Hinzufügen des Accounts <em>Erweitertes Setup → Internet-E-Mail</em>. IMAP/SMTP mit den Werten oben.</p>
+                                </div>
+                        </div>
+                </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- Keyboard shortcuts -->
+        <!-- ============================================================ -->
+        <section class="sv-card">
+                <header class="sv-card-h">
+                        <span class="sv-card-h-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+                                        <path d="M6 10h.01"></path><path d="M10 10h.01"></path><path d="M14 10h.01"></path><path d="M18 10h.01"></path>
+                                        <path d="M6 14h12"></path>
+                                </svg>
+                        </span>
+                        <span>Tastenkürzel</span>
+                </header>
+                <div class="sv-card-b">
+                        <p class="sv-card-desc">Die wichtigsten Kürzel im Überblick — die vollständige Liste erscheint jederzeit mit <kbd>F1</kbd>.</p>
+                        <div class="sv-help-shortcuts">
+                                <div class="sv-help-shortcut-group">
+                                        <div class="sv-help-shortcut-title">Nachrichten</div>
+                                        <dl class="sv-kv">
+                                                <dt>Neue Nachricht</dt><dd><kbd>W</kbd> / <kbd>C</kbd></dd>
+                                                <dt>Antworten</dt><dd><kbd>R</kbd></dd>
+                                                <dt>Allen antworten</dt><dd><kbd>A</kbd> oder <kbd>Shift</kbd>+<kbd>R</kbd></dd>
+                                                <dt>Weiterleiten</dt><dd><kbd>F</kbd></dd>
+                                                <dt>Senden</dt><dd><kbd>Strg</kbd>+<kbd>Enter</kbd></dd>
+                                                <dt>Speichern (Entwurf)</dt><dd><kbd>Strg</kbd>+<kbd>S</kbd></dd>
+                                        </dl>
+                                </div>
+                                <div class="sv-help-shortcut-group">
+                                        <div class="sv-help-shortcut-title">Liste &amp; Ordner</div>
+                                        <dl class="sv-kv">
+                                                <dt>Alle markieren</dt><dd><kbd>Strg</kbd>+<kbd>A</kbd></dd>
+                                                <dt>Archivieren</dt><dd><kbd>Z</kbd></dd>
+                                                <dt>Löschen</dt><dd><kbd>Entf</kbd></dd>
+                                                <dt>Verschieben</dt><dd><kbd>Einfg</kbd></dd>
+                                                <dt>Gelesen / Ungelesen</dt><dd><kbd>Q</kbd> / <kbd>U</kbd></dd>
+                                                <dt>Wichtig markieren</dt><dd><kbd>I</kbd></dd>
+                                                <dt>Suchen</dt><dd><kbd>/</kbd></dd>
+                                        </dl>
+                                </div>
+                                <div class="sv-help-shortcut-group">
+                                        <div class="sv-help-shortcut-title">Ansicht</div>
+                                        <dl class="sv-kv">
+                                                <dt>Nachricht öffnen</dt><dd><kbd>Enter</kbd></dd>
+                                                <dt>Vollbild</dt><dd><kbd>Enter</kbd> in der Ansicht</dd>
+                                                <dt>Schließen</dt><dd><kbd>Esc</kbd></dd>
+                                                <dt>Wechsel Ordner ↔ Liste</dt><dd><kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd></dd>
+                                                <dt>Hilfe</dt><dd><kbd>F1</kbd></dd>
+                                        </dl>
+                                </div>
+                        </div>
+                </div>
+        </section>
+
+</div>
+
+<style>
+/* ==========================================================
+ * Souvera Mail — Help tab styling
+ * Reuses the .souvera-settings palette + card system, adds
+ * a few help-specific layouts (grid of config cards + shortcut
+ * columns + mobile-app cards).
+ * ========================================================== */
+.souvera-help .sv-help-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 0.75em;
+        margin: 0.4em 0 0.6em;
+}
+.souvera-help .sv-help-block {
+        position: relative;
+        padding: 0.85em 1em 0.9em;
+        border: 1px solid var(--sv-border);
+        border-radius: 10px;
+        background: rgba(0,0,0,0.015);
+}
+.souvera-help .sv-help-block-wide { grid-column: 1 / -1; }
+.souvera-help .sv-help-block-title {
+        font-weight: 600;
+        margin-bottom: 0.4em;
+        display: flex; align-items: center; gap: 0.4em;
+}
+.souvera-help .sv-help-block-copy {
+        margin-top: 0.5em;
+}
+
+.souvera-help .sv-kv {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.35em 0.75em;
+        margin: 0;
+        font-size: 0.92em;
+}
+.souvera-help .sv-kv dt {
+        color: var(--sv-fg-muted);
+        font-weight: 500;
+        white-space: nowrap;
+}
+.souvera-help .sv-kv dd {
+        margin: 0;
+        display: flex; align-items: center; gap: 0.4em;
+        flex-wrap: wrap;
+        min-width: 0;
+}
+.souvera-help .sv-kv dd code {
+        padding: 0.15em 0.45em;
+        border-radius: 5px;
+        background: rgba(0,0,0,0.05);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.92em;
+        word-break: break-all;
+}
+.souvera-help .sv-code-wrap {
+        flex: 1 1 100%;
+        display: block;
+        padding: 0.4em 0.6em !important;
+}
+
+.souvera-help .sv-tag-alt {
+        background: var(--sv-accent); color: #fff;
+}
+
+.souvera-help .sv-help-tips {
+        margin-top: 0.9em;
+        padding: 0.65em 0.85em;
+        border-left: 3px solid var(--sv-accent);
+        background: var(--sv-accent-soft);
+        border-radius: 4px;
+        font-size: 0.9em;
+        line-height: 1.5;
+}
+
+.souvera-help .sv-help-shield-link {
+        display: inline-flex; align-items: center; gap: 0.4em;
+        text-decoration: none;
+}
+
+.souvera-help .sv-help-apps {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 0.75em;
+}
+.souvera-help .sv-help-app {
+        padding: 0.85em 1em;
+        border: 1px solid var(--sv-border);
+        border-radius: 10px;
+        background: rgba(0,0,0,0.015);
+        transition: border-color .15s ease, box-shadow .15s ease;
+}
+.souvera-help .sv-help-app:hover {
+        border-color: var(--sv-accent);
+        box-shadow: 0 4px 12px rgba(59,130,246,0.10);
+}
+.souvera-help .sv-help-app-title {
+        font-weight: 600;
+        margin-bottom: 0.35em;
+        display: flex; align-items: center; gap: 0.4em;
+}
+.souvera-help .sv-help-app p {
+        margin: 0;
+        color: var(--sv-fg-muted);
+        font-size: 0.9em;
+        line-height: 1.45;
+}
+
+.souvera-help .sv-help-shortcuts {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 0.85em;
+}
+.souvera-help .sv-help-shortcut-group {
+        padding: 0.85em 1em;
+        border: 1px solid var(--sv-border);
+        border-radius: 10px;
+        background: rgba(0,0,0,0.015);
+}
+.souvera-help .sv-help-shortcut-title {
+        font-weight: 600;
+        margin-bottom: 0.5em;
+        color: var(--sv-accent);
+}
+.souvera-help kbd {
+        display: inline-block;
+        padding: 0.1em 0.5em;
+        min-width: 1.4em;
+        text-align: center;
+        border: 1px solid var(--sv-border);
+        border-bottom-width: 2px;
+        border-radius: 4px;
+        background: var(--sv-bg);
+        color: var(--sv-fg);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.82em;
+        line-height: 1.3;
+}
+
+/* Dark mode adjustments piggy-back on the shared .souvera-settings
+ * variable overrides — no extra dark-mode block needed here since
+ * every color reference above resolves through CSS custom
+ * properties defined by the parent .souvera-settings scope. Only
+ * the raw rgba() backgrounds get a light re-tint for contrast. */
+@media (prefers-color-scheme: dark) {
+        .souvera-help .sv-help-block,
+        .souvera-help .sv-help-app,
+        .souvera-help .sv-help-shortcut-group { background: rgba(255,255,255,0.03); }
+        .souvera-help .sv-kv dd code { background: rgba(255,255,255,0.08); color: var(--sv-fg); }
+}
+body[data-theme-dark] .souvera-help .sv-help-block,
+body[data-theme-dark-highcontrast] .souvera-help .sv-help-block,
+.theme--dark .souvera-help .sv-help-block,
+body[data-theme-dark] .souvera-help .sv-help-app,
+body[data-theme-dark-highcontrast] .souvera-help .sv-help-app,
+.theme--dark .souvera-help .sv-help-app,
+body[data-theme-dark] .souvera-help .sv-help-shortcut-group,
+body[data-theme-dark-highcontrast] .souvera-help .sv-help-shortcut-group,
+.theme--dark .souvera-help .sv-help-shortcut-group { background: rgba(255,255,255,0.03); }
+body[data-theme-dark] .souvera-help .sv-kv dd code,
+body[data-theme-dark-highcontrast] .souvera-help .sv-kv dd code,
+.theme--dark .souvera-help .sv-kv dd code { background: rgba(255,255,255,0.08); color: var(--sv-fg); }
+</style>

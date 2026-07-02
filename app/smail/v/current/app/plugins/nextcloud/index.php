@@ -35,11 +35,13 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 
 			$this->addJs('js/quota.js');
 			$this->addJs('js/settings-account.js');
+			$this->addJs('js/settings-help.js');
 			$this->addJs('js/folder-names.js');
 
 			$this->addTemplate('templates/PopupsNextcloudFiles.html');
 			$this->addTemplate('templates/PopupsNextcloudCalendars.html');
 			$this->addTemplate('templates/SettingsSouveraAccount.html');
+			$this->addTemplate('templates/SettingsSouveraHelp.html');
 
 			$this->addHook('imap.before-login', 'beforeLogin');
 			$this->addHook('smtp.before-login', 'beforeLogin');
@@ -303,8 +305,9 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 				// /apps/souvera_mail/settings — the controller now redirects to
 				// the engine-internal hash route #/settings/souvera-account.
 				'SmailSettingsUrl' => $oUrlGen->getAbsoluteURL($oUrlGen->linkToRoute('souvera_mail.settings.index'))
+			] + $this->buildHelpData($sUID, $sWebDAV, $ocUser)
 //				'WebDAV_files' => $sWebDAV . '/files/' . $sUID
-			];
+			;
 			if (empty($aResult['Auth'])) {
 				$config = \OCP\Server::get(\OCP\IConfig::class);
 				$sEmail = '';
@@ -588,6 +591,124 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 		} catch (\Throwable $e) {
 			\Smail\Engine\Log::warning('Nextcloud', 'Stalwart identity sync skipped: ' . $e->getMessage());
 		}
+	}
+
+	/**
+	 * Build the read-only "Hilfe & Anleitung" payload consumed by the
+	 * Snappymail Settings tab at `#/settings/souvera-help`.
+	 *
+	 * Every value is a string (never null / missing), so the JS side
+	 * can render a friendly placeholder ("—") without null-checks. The
+	 * IMAP/POP3/SMTP/Sieve rows are sourced from the active engine
+	 * domain-config JSON via {@see DomainConfigService::readDomainConfig()}.
+	 * POP3 is derived from the IMAP host with the well-known 995 / SSL
+	 * default (Stalwart 0.16 ships POP3 on 995 alongside IMAP on 993 —
+	 * see stalw.art/docs/server/listener#pop3).
+	 *
+	 * The Souvera Shield quarantine URL is optional and comes from the
+	 * app-config key `souvera_mail.shield_url`; when empty the JS tab
+	 * shows a friendly "not configured" banner with the operator
+	 * override command.
+	 *
+	 * Any failure to read the domain config (e.g. fresh install with
+	 * no domain profile yet) returns friendly placeholder strings —
+	 * the tab NEVER crashes the settings screen.
+	 *
+	 * @return array<string, string>
+	 */
+	protected function buildHelpData(string $sUID, string $sWebDAV, \OCP\IUser $ocUser) : array
+	{
+		$domain = '';
+		$imapHost = '';  $imapPort = '';  $imapSsl = '';
+		$smtpHost = '';  $smtpPort = '';  $smtpSsl = '';
+		$sieveHost = ''; $sievePort = ''; $sieveSsl = '';
+
+		try {
+			$domainService = \OCP\Server::get(\OCA\SouveraMail\Service\DomainConfigService::class);
+			$domains = $domainService->listDomains();
+			if (!empty($domains)) {
+				$domain = (string) $domains[0];
+				$cfg = $domainService->readDomainConfig($domain) ?: [];
+				$imap = \is_array($cfg['IMAP'] ?? null) ? $cfg['IMAP'] : [];
+				$smtp = \is_array($cfg['SMTP'] ?? null) ? $cfg['SMTP'] : [];
+				$sieve = \is_array($cfg['Sieve'] ?? null) ? $cfg['Sieve'] : [];
+
+				$imapHost = (string) ($imap['host'] ?? '');
+				$imapPort = isset($imap['port']) ? (string) $imap['port'] : '';
+				$imapSsl = \OCA\SouveraMail\Service\DomainConfigService::sslToString((int) ($imap['type'] ?? 0));
+
+				$smtpHost = (string) ($smtp['host'] ?? '');
+				$smtpPort = isset($smtp['port']) ? (string) $smtp['port'] : '';
+				$smtpSsl = \OCA\SouveraMail\Service\DomainConfigService::sslToString((int) ($smtp['type'] ?? 0));
+
+				if (!empty($sieve['enabled'])) {
+					$sieveHost = (string) ($sieve['host'] ?? '');
+					$sievePort = isset($sieve['port']) ? (string) $sieve['port'] : '';
+					$sieveSsl = \OCA\SouveraMail\Service\DomainConfigService::sslToString((int) ($sieve['type'] ?? 0));
+				}
+			}
+		} catch (\Throwable $e) {
+			\Smail\Engine\Log::warning('Nextcloud', 'help data read skipped: ' . $e->getMessage());
+		}
+
+		// Stalwart 0.16 ships POP3 on port 995 (implicit SSL) alongside
+		// IMAP on 993. The host is the IMAP host — Stalwart's single
+		// listener binds all four ports (POP3/IMAP/SMTP/Sieve).
+		$pop3Host = $imapHost;
+		$pop3Port = $imapHost !== '' ? '995' : '';
+		$pop3Ssl = $imapHost !== '' ? 'SSL' : '';
+
+		// Shield URL — optional operator config
+		$shieldUrl = '';
+		try {
+			$appConfig = \OCP\Server::get(\OCP\IAppConfig::class);
+			$shieldUrl = (string) $appConfig->getValueString('souvera_mail', 'shield_url', '');
+		} catch (\Throwable $e) {
+			// Older NC / missing IAppConfig — fall back silently
+			try {
+				$config = \OCP\Server::get(\OCP\IConfig::class);
+				$shieldUrl = (string) $config->getAppValue('souvera_mail', 'shield_url', '');
+			} catch (\Throwable $e2) {
+				$shieldUrl = '';
+			}
+		}
+
+		$webdavBase = \rtrim($sWebDAV, '/');
+		$calDavUrl = $webdavBase . '/calendars/' . $sUID . '/';
+		$cardDavUrl = $webdavBase . '/addressbooks/users/' . $sUID . '/';
+
+		// User's canonical mail address — best-effort. Fall back to the NC
+		// profile email, then to the raw UID + domain, then to an empty
+		// string (JS renders "—").
+		$userEmail = '';
+		try {
+			$userEmail = (string) ($ocUser->getEMailAddress() ?? '');
+		} catch (\Throwable $e) {
+			// getEMailAddress may throw on some auth backends — swallow
+		}
+		if ($userEmail === '' && $domain !== '') {
+			$userEmail = $sUID . '@' . $domain;
+		}
+
+		return [
+			'SmailHelpDomain' => $domain,
+			'SmailHelpEmail' => $userEmail,
+			'SmailHelpImapHost' => $imapHost,
+			'SmailHelpImapPort' => $imapPort,
+			'SmailHelpImapSsl' => $imapSsl,
+			'SmailHelpPop3Host' => $pop3Host,
+			'SmailHelpPop3Port' => $pop3Port,
+			'SmailHelpPop3Ssl' => $pop3Ssl,
+			'SmailHelpSmtpHost' => $smtpHost,
+			'SmailHelpSmtpPort' => $smtpPort,
+			'SmailHelpSmtpSsl' => $smtpSsl,
+			'SmailHelpSieveHost' => $sieveHost,
+			'SmailHelpSievePort' => $sievePort,
+			'SmailHelpSieveSsl' => $sieveSsl,
+			'SmailHelpCalDavUrl' => $calDavUrl,
+			'SmailHelpCardDavUrl' => $cardDavUrl,
+			'SmailHelpShieldUrl' => $shieldUrl,
+		];
 	}
 
 }
