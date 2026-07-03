@@ -6,6 +6,47 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.2] — 2026-02-18 (Diagnostic: `whoami` + email/uid mismatch guard)
+
+### Added
+
+- **`occ souvera_mail:whoami <uid>`** — diagnostic command that dumps
+  the exact resolution cascade Snappymail would use for a given
+  Nextcloud user, so mismatched provisioning ("uid=joerg but Souvera
+  Mail opens hello@…'s inbox") can be pinpointed in one call. Reports
+  all four cascade sources in precedence order:
+  1. `userconfig[souvera_mail/email]` (per-user override)
+  2. `userconfig[settings/email]` (Nextcloud profile email)
+  3. `IUser::getEMailAddress()`
+  4. Fallback to uid.
+  Also reports OIDC provider availability and access-token status.
+  Supports `--json` for pipelines. Exit codes: `0` clean / `1` user
+  missing / `2` warnings triggered.
+
+### Security
+
+- **Early-warning log for email/uid mismatches.** Whenever
+  `EngineHelper::getSsoEmail()` resolves an email whose localpart does
+  not correspond to the uid (or whose full form differs when the uid
+  itself contains `@`), the app now emits a WARNING/INFO log line
+  identifying the uid, the resolved email, and the cascade source. The
+  operator can `grep 'Souvera Mail: email/uid mismatch' nextcloud.log`
+  to catch a Central provisioning bug before a customer reports data
+  leakage. Login is deliberately NOT blocked (legitimate aliases like
+  `info@` would false-positive) — the log signal is enough for
+  detection.
+
+### Notes
+
+- New test file `tests/test_whoami_and_email_guard.php` — 24 assertions
+  pinning the guard logic and command surface. Total:
+  **31 suites / 1071 assertions passing** (was 30/1047).
+- The user's original scenario ("joerg logs in, sees hello's mailbox")
+  is almost always a Central provisioning bug — Central wrote the
+  wrong `settings/email` for the new user. `occ souvera_mail:whoami
+  <uid>` now proves this instantly. See the command's own remediation
+  hints (`occ user:setting <uid> settings email …`).
+
 ## [0.14.1] — 2026-02-18 (Hotfix: mUTF-7 folder names, missing search results, revoke recursion)
 
 ### Fixed

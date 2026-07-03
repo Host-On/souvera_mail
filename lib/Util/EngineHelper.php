@@ -186,25 +186,69 @@ class EngineHelper
             return null;
         }
 
+        // Cascade — first non-empty wins. Diagnostics:
+        // `occ souvera_mail:whoami <uid>` dumps this same cascade so an
+        // operator can eyeball which source Snappymail actually consumed.
         $custom = $this->userConfig->getValueString($uid, 'souvera_mail', 'email', '');
         if ($custom !== '') {
-            return $custom;
+            return $this->guardEmailAgainstUid($uid, $custom, 'userconfig[souvera_mail/email]');
         }
 
         $email = $this->userConfig->getValueString($uid, 'settings', 'email', '');
         if ($email !== '') {
-            return $email;
+            return $this->guardEmailAgainstUid($uid, $email, 'userconfig[settings/email]');
         }
 
         $user = $this->userSession->getUser();
         if ($user !== null && $user->getUID() === $uid) {
             $email = $user->getEMailAddress();
             if ($email !== '' && $email !== null) {
-                return $email;
+                return $this->guardEmailAgainstUid($uid, $email, 'IUser::getEMailAddress()');
             }
         }
 
         return $uid;
+    }
+
+    /**
+     * Warn (loud) if the resolved email looks like it might belong to a
+     * DIFFERENT user than the current uid — early warning for the
+     * "joerg logs in and sees hello's mailbox" class of provisioning
+     * bugs where an upstream tool (e.g. Souvera Central) writes the
+     * wrong `settings/email` value.
+     *
+     * We are deliberately conservative: only log, never rewrite or
+     * block. A false positive (e.g. shared alias like `info@`) is far
+     * cheaper than a silent data leak.
+     */
+    private function guardEmailAgainstUid(string $uid, string $email, string $source): string
+    {
+        // Uid contains '@' AND the resolved email differs from the uid
+        // → straight-up mismatch. `uid=joerg@x` but `email=hello@x`
+        // fires here.
+        if (\str_contains($uid, '@') && \strcasecmp($uid, $email) !== 0) {
+            $this->logger->warning(
+                'Souvera Mail: email/uid mismatch for uid="' . $uid . '" — Snappymail will use "' . $email
+                . '" (from ' . $source . '). Verify Central provisioning; use '
+                . '`occ souvera_mail:whoami ' . $uid . '` for a full trace.',
+                ['app' => 'souvera_mail']
+            );
+        }
+
+        // uid is a short identifier AND email localpart differs → still
+        // suspicious. `uid=joerg` but `email=hello@x` fires here.
+        if (\str_contains($uid, '@') === false
+                && \str_contains($email, '@')
+                && \strcasecmp(\explode('@', $email, 2)[0], $uid) !== 0) {
+            $this->logger->info(
+                'Souvera Mail: uid="' . $uid . '" resolves to email="' . $email
+                . '" (from ' . $source . '). Localparts differ; verify this is intentional. '
+                . 'Run `occ souvera_mail:whoami ' . $uid . '` if unexpected.',
+                ['app' => 'souvera_mail']
+            );
+        }
+
+        return $email;
     }
 
     /**
