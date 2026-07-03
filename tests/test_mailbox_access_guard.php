@@ -147,6 +147,26 @@ ok($guardCallPos !== false && $loginCallPos !== false && $guardCallPos < $loginC
     "EngineHelper calls the guard BEFORE LoginProcess (block-and-return pattern)",
     $passes, $failures);
 
+// v0.14.6: the guard MUST also run before the `getMainAccountFromToken(false)`
+// call that decides whether $doLogin should be true. In v0.14.5 the guard was
+// nested inside `if ($doLogin && ...)`, which meant it never ran on any
+// request where Snappymail's engine had already rebuilt a MainAccount from
+// the NC session — i.e. every request after the first. See SEG Marburg
+// live-incident follow-up (2026-02-19).
+$mainAccountCheckPos = \strpos($helper, '$oActions->getMainAccountFromToken(false)');
+ok($mainAccountCheckPos !== false,
+    "EngineHelper still consults getMainAccountFromToken(false) for doLogin", $passes, $failures);
+ok($mainAccountCheckPos !== false && $guardCallPos !== false && $guardCallPos < $mainAccountCheckPos,
+    "Guard runs BEFORE getMainAccountFromToken() — i.e. on every request, "
+    . "not only when \$doLogin=true (v0.14.6 SEG Marburg follow-up fix)",
+    $passes, $failures);
+
+// On a deny, the engine's auth cookies MUST be purged so a hard reload
+// can't just re-populate a MainAccount from stale state.
+ok((bool) \preg_match('#catch\s*\(\s*MailboxAccessDenied\s+\$e\s*\)[^{}]*\{.*?\$oActions->Logout\(\s*true\s*\)#s', $helper),
+    "MailboxAccessDenied handler purges Snappymail auth cookies via Logout(true)",
+    $passes, $failures);
+
 // The catch handler around assertMailboxOwnership catches the narrow type
 ok(\str_contains($helper, 'catch (MailboxAccessDenied $e)'),
     "EngineHelper catches MailboxAccessDenied specifically (not Throwable — programmer errors still surface)",

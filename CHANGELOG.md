@@ -6,6 +6,43 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.6] — 2026-02-19 (Security follow-up: guard also runs on cached-account requests)
+
+### Security — P0 (live-fix follow-up on the SEG Marburg incident)
+
+- **v0.14.5 wasn't enough** — the guard was still only called from
+  the `if ($doLogin && ...)` branch in `EngineHelper::startApp()`.
+  In real-world traffic the engine's `getMainAccountFromToken(false)`
+  rebuilds a `MainAccount` from the current NC session on EVERY
+  request (`Actions/UserAuth::accountFromNcSession`), so `$doLogin`
+  quickly becomes `false` and the guard is bypassed on every request
+  after the first. A fresh Nextcloud user without a Stalwart mailbox
+  could still land inside the mailbox Stalwart mapped their JWT to
+  (typically the previous tenant's account via alias / catch-all
+  resolution). Reported on the SEG Marburg instance a second time,
+  with a screenshot showing joerg@gratify.it logged in but reading
+  hello@gratify.it's inbox.
+- **Fix**: `EngineHelper::startApp()` now calls
+  `MailboxAccessGuard::assertMailboxOwnership()` **before** it
+  touches `getMainAccountFromToken()` — every request, every user,
+  every time — as long as the current NC user has an SSO email.
+  Guard failure ALSO clears Snappymail's own auth cookies via
+  `oActions->Logout(true)` so a subsequent hard reload cannot
+  re-populate a `MainAccount` from stale state.
+- The guard's Stalwart `/jmap/session` probe is still cheap
+  (single HTTP round-trip, best-effort) and cached upstream in
+  Stalwart. Fail-closed on network errors is preserved.
+
+### Notes
+
+- The new pinning assertion in `tests/test_mailbox_access_guard.php`
+  verifies the guard call site is now OUTSIDE the `$doLogin`-gated
+  block: we `grep` for
+  `\$this->mailboxGuard->assertMailboxOwnership(` before any
+  `if ($doLogin` line in `EngineHelper.php`.
+- Total local suite: **34 suites / 1151 assertions passing**
+  (was 34 / 1148).
+
 ## [0.14.5] — 2026-02-18 (Security: mailbox ownership guard against session bleeding)
 
 ### Security — P0

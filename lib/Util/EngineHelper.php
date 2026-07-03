@@ -100,44 +100,47 @@ class EngineHelper
 
         try {
             $oActions = \Smail\Engine\Api::Actions();
-            $doLogin = !$oActions->getMainAccountFromToken(false);
             $aCredentials = $this->getLoginCredentials();
-            if ($doLogin && $aCredentials[1] && $aCredentials[2]) {
-                // ────────────────────────────────────────────────
-                // SECURITY GUARD (v0.14.5): before we hand a mailbox
-                // to Snappymail, verify that Stalwart actually owns
-                // this mailbox for this NC user. Otherwise a fresh
-                // NC user whose Stalwart account was not yet
-                // provisioned would silently be served the mailbox
-                // Stalwart happens to map their OIDC token to
-                // (typically the first tenant account with a matching
-                // sub prefix) — cross-tenant data leak. See the
-                // SEG Marburg incident 2026-02-18.
-                //
-                // Guard is best-effort: throws MailboxAccessDenied on
-                // ANY failure (Stalwart unreachable, mismatched
-                // username, 401, ambiguous session body). Login
-                // aborts and Snappymail shows an error state instead
-                // of someone else's inbox.
-                // ────────────────────────────────────────────────
+            $ncUid = $aCredentials[0];
+            $expectedEmail = $aCredentials[1];
+
+            // ────────────────────────────────────────────────
+            // SECURITY GUARD (v0.14.5 / hardened in v0.14.6):
+            // Runs on EVERY request that has an NC user + expected
+            // email, regardless of whether Snappymail already has a
+            // cached MainAccount. Previously the guard was gated
+            // behind `$doLogin=true`, so once Snappymail's engine had
+            // built a MainAccount (from NC session in
+            // Actions/UserAuth::accountFromNcSession) it would be
+            // served without any Stalwart-side ownership check —
+            // leading to the SEG Marburg live incident where Jörg's
+            // JWT was successfully OAUTHBEARER'd against Stalwart but
+            // Stalwart's principal lookup returned hello@'s mailbox
+            // (alias/auth-with-alias path). Now we ALWAYS ask Stalwart
+            // "does this JWT map to the same mailbox we expect?" and
+            // hard-deny on any mismatch.
+            //
+            // Guard is best-effort but fail-closed: throws
+            // MailboxAccessDenied on Stalwart-unreachable, 401, 403,
+            // ambiguous session body, or username mismatch.
+            // ────────────────────────────────────────────────
+            if ($ncUid !== '' && $expectedEmail !== '') {
                 try {
-                    $uid = $this->getSsoUid();
-                    if ($uid !== null && $uid !== '') {
-                        $this->mailboxGuard->assertMailboxOwnership($uid);
-                    }
+                    $this->mailboxGuard->assertMailboxOwnership($ncUid);
                 } catch (MailboxAccessDenied $e) {
-                    // Loud log so operators see this in nextcloud.log
-                    // even without users reporting. Do NOT proceed to
-                    // LoginProcess — that would be the exact bug we
-                    // are protecting against.
                     $this->logger->critical(
                         'Souvera Mail: mailbox access denied — ' . $e->getMessage(),
                         ['app' => 'souvera_mail']
                     );
-                    // Bail cleanly — Snappymail's Actions has no
-                    // MainAccount so its UI renders the "not logged
-                    // in" state; the user sees no mailbox at all,
-                    // which is the correct outcome.
+                    // Purge Snappymail's own auth cookies so a hard
+                    // reload can't just replay the (still-valid) NC
+                    // session into a stale MainAccount. Best-effort —
+                    // we already have a deny path below regardless.
+                    try {
+                        $oActions->Logout(true);
+                    } catch (\Throwable $ignored) {
+                    }
+
                     if ($handle) {
                         \header_remove('Content-Security-Policy');
                         \header('Content-Type: text/plain; charset=utf-8', true, 403);
@@ -146,7 +149,10 @@ class EngineHelper
                     }
                     return;
                 }
+            }
 
+            $doLogin = !$oActions->getMainAccountFromToken(false);
+            if ($doLogin && $aCredentials[1] && $aCredentials[2]) {
                 try {
                     $oActions->LoginProcess(
                         $aCredentials[1],
