@@ -219,6 +219,25 @@ class StalwartAdminService
      */
     public function probeSessionAsUser(string $bearerToken): int
     {
+        return $this->fetchSessionAsUser($bearerToken)['status'];
+    }
+
+    /**
+     * Full version of {@see probeSessionAsUser} that ALSO returns the decoded
+     * JMAP session body. Used by the mailbox-access guard to compare the
+     * account Stalwart maps the JWT to against the email Souvera Mail
+     * *thinks* it should be opening.
+     *
+     * The session response (JMAP RFC 8620 §2) carries:
+     *   - `username`: the authenticated principal name
+     *   - `primaryAccounts`: map of capability URI → default accountId
+     *   - `accounts`: map of accountId → account descriptor (with `name`)
+     *
+     * @param non-empty-string $bearerToken
+     * @return array{status: int, body: array<string, mixed>}
+     */
+    public function fetchSessionAsUser(string $bearerToken): array
+    {
         $url = $this->getApiUrl();
         if ($url === null) {
             throw new \RuntimeException('Stalwart API URL not configured (souvera_central.stalwart_api_url)');
@@ -233,7 +252,6 @@ class StalwartAdminService
                 ],
                 'timeout' => self::HTTP_TIMEOUT_SECONDS,
                 'connect_timeout' => self::HTTP_TIMEOUT_SECONDS,
-                // Do NOT throw on 4xx/5xx — we WANT the status code.
                 'http_errors' => false,
                 'nextcloud' => ['allow_local_address' => true],
             ]);
@@ -246,9 +264,18 @@ class StalwartAdminService
                 $e
             );
         } catch (\Throwable $e) {
-            throw new \RuntimeException('Stalwart /jmap/session probe failed: ' . $e->getMessage(), 0, $e);
+            throw new \RuntimeException('Stalwart /jmap/session fetch failed: ' . $e->getMessage(), 0, $e);
         }
-        return $response->getStatusCode();
+
+        $status = $response->getStatusCode();
+        $body = [];
+        if ($status === 200) {
+            $decoded = \json_decode((string) $response->getBody(), true);
+            if (\is_array($decoded)) {
+                $body = $decoded;
+            }
+        }
+        return ['status' => $status, 'body' => $body];
     }
 
     /**

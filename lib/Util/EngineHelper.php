@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace OCA\SouveraMail\Util;
 
+use OCA\SouveraMail\Service\MailboxAccessDenied;
+use OCA\SouveraMail\Service\MailboxAccessGuard;
 use OCA\SouveraMail\Service\OidcProviderService;
 use OCP\App\IAppManager;
 use OCP\Config\IUserConfig;
@@ -30,6 +32,7 @@ class EngineHelper
         private IAppManager $appManager,
         private LoggerInterface $logger,
         private OidcProviderService $oidcProvider,
+        private MailboxAccessGuard $mailboxGuard,
     ) {
     }
 
@@ -100,6 +103,50 @@ class EngineHelper
             $doLogin = !$oActions->getMainAccountFromToken(false);
             $aCredentials = $this->getLoginCredentials();
             if ($doLogin && $aCredentials[1] && $aCredentials[2]) {
+                // ────────────────────────────────────────────────
+                // SECURITY GUARD (v0.14.5): before we hand a mailbox
+                // to Snappymail, verify that Stalwart actually owns
+                // this mailbox for this NC user. Otherwise a fresh
+                // NC user whose Stalwart account was not yet
+                // provisioned would silently be served the mailbox
+                // Stalwart happens to map their OIDC token to
+                // (typically the first tenant account with a matching
+                // sub prefix) — cross-tenant data leak. See the
+                // SEG Marburg incident 2026-02-18.
+                //
+                // Guard is best-effort: throws MailboxAccessDenied on
+                // ANY failure (Stalwart unreachable, mismatched
+                // username, 401, ambiguous session body). Login
+                // aborts and Snappymail shows an error state instead
+                // of someone else's inbox.
+                // ────────────────────────────────────────────────
+                try {
+                    $uid = $this->getSsoUid();
+                    if ($uid !== null && $uid !== '') {
+                        $this->mailboxGuard->assertMailboxOwnership($uid);
+                    }
+                } catch (MailboxAccessDenied $e) {
+                    // Loud log so operators see this in nextcloud.log
+                    // even without users reporting. Do NOT proceed to
+                    // LoginProcess — that would be the exact bug we
+                    // are protecting against.
+                    $this->logger->critical(
+                        'Souvera Mail: mailbox access denied — ' . $e->getMessage(),
+                        ['app' => 'souvera_mail']
+                    );
+                    // Bail cleanly — Snappymail's Actions has no
+                    // MainAccount so its UI renders the "not logged
+                    // in" state; the user sees no mailbox at all,
+                    // which is the correct outcome.
+                    if ($handle) {
+                        \header_remove('Content-Security-Policy');
+                        \header('Content-Type: text/plain; charset=utf-8', true, 403);
+                        echo "Souvera Mail: " . $e->getMessage() . "\n";
+                        exit;
+                    }
+                    return;
+                }
+
                 try {
                     $oActions->LoginProcess(
                         $aCredentials[1],
