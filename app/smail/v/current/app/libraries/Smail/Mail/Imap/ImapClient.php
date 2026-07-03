@@ -165,11 +165,43 @@ class ImapClient extends \Smail\Mail\Net\NetClient
 			// RFC 9051: native rev2 path — UNSEEN via STATUS/ESEARCH, not ENABLE IMAP4rev1
 			// (ENABLE IMAP4rev1 is for clients that want deprecated rev1 SELECT semantics)
 
-			// RFC 6855 || RFC 5738
-			$this->UTF8 = $this->hasCapability('UTF8=ONLY') || $this->hasCapability('UTF8=ACCEPT');
-			if ($this->UTF8) {
-				$this->Enable('UTF8=ACCEPT');
-			}
+			// RFC 6855 / RFC 5738 — UTF8=ACCEPT.
+			//
+			// v0.14.1 (2026-02-18): Stalwart 0.16 advertises `UTF8=ACCEPT`
+			// in CAPABILITY but does NOT round-trip mailbox names as
+			// UTF-8 after `ENABLE UTF8=ACCEPT` (RFC 5738 §3 REQUIRES
+			// the server to switch mailbox names to UTF-8 quoted syntax
+			// once the extension is enabled; Stalwart still emits some
+			// mailbox names in mUTF-7 literal form — e.g. imported
+			// folders come back as `1_Gr&APw-ndung`).
+			//
+			// The result is a client-server split-brain: Snappymail
+			// believes names are UTF-8 (so it does not re-encode when
+			// selecting/searching), but Stalwart still expects the
+			// literal mUTF-7 wire form for those specific mailboxes.
+			// SELECT/EXAMINE/SEARCH then return "mailbox does not exist"
+			// or empty result sets.
+			//
+			// Fix: DO NOT enable UTF8=ACCEPT. The universally-supported
+			// IMAP4rev1 mUTF-7 wire format is our source of truth. All
+			// mailbox names are decoded on receive (`toUTF8`) and
+			// re-encoded on send (`EscapeFolderName`) so Stalwart sees
+			// exactly what it stored regardless of any internal
+			// encoding it may have chosen. Search criteria with
+			// non-ASCII bytes get an explicit `CHARSET UTF-8` header
+			// via the `!$this->UTF8` branch in Messages.php (RFC 3501
+			// §6.4.4) — Stalwart supports that natively.
+			//
+			// If Stalwart later ships a full RFC-6855 fix, this
+			// override can be lifted by simply restoring the original
+			// two-line hasCapability probe.
+			$this->UTF8 = false;
+			// (original probe kept commented for the day Stalwart's
+			//  RFC-6855 support becomes trustworthy again:)
+			// $this->UTF8 = $this->hasCapability('UTF8=ONLY') || $this->hasCapability('UTF8=ACCEPT');
+			// if ($this->UTF8) {
+			// 	$this->Enable('UTF8=ACCEPT');
+			// }
 		}
 		catch (Exceptions\NegativeResponseException $oException)
 		{

@@ -6,6 +6,57 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.1] — 2026-02-18 (Hotfix: mUTF-7 folder names, missing search results, revoke recursion)
+
+### Fixed
+
+- **Folders with umlauts now display correctly again** (e.g. `1_Gründung`
+  instead of `1_Gr&APw-ndung`). Root cause: Stalwart 0.16 advertises
+  `UTF8=ACCEPT` in its IMAP capabilities but violates RFC 5738 §3 by
+  still returning some mailbox names in literal mUTF-7 form
+  (`ENABLE UTF8=ACCEPT` should switch names to UTF-8 quoted syntax).
+  Snappymail assumed the response was already UTF-8 and skipped its
+  own mUTF-7 decoder — leaving the raw `&...-` sequences visible in
+  the sidebar. Fix: force `$this->UTF8 = false` inside
+  `ImapClient::__doLogin()`, falling back to the universally-supported
+  IMAP4rev1 mUTF-7 wire protocol which is unambiguous on Stalwart.
+- **"Nachrichtenliste ist nicht verfügbar" when opening folders with
+  umlauts.** Consequence of the same encoding split-brain — Snappymail
+  tried `SELECT` with the still-mUTF-7 string, Stalwart could not
+  match it. Auto-fixed by the same UTF8=ACCEPT disable.
+- **Search returned "no matches" for non-empty queries.** Third symptom
+  of the same encoding bug. In mUTF-7 mode, Snappymail's already-present
+  `!$this->UTF8 && !IsAscii($sSearchCriterias)` branch now correctly
+  emits `CHARSET UTF-8` for non-ASCII search terms (RFC 3501 §6.4.4).
+- **App-password revoke failing with a generic "Revocation failed".**
+  Root cause: classic event-listener recursion. Our `revokeForUser`
+  calls `IProvider::invalidateTokenById()`, which internally dispatches
+  `TokenInvalidatedEvent`. Our own `NcTokenInvalidatedListener` catches
+  the event and destroys the Stalwart side + mapping row. Then
+  `revokeForUser` continues and tries to destroy Stalwart AGAIN →
+  `notDestroyed: id not in destroyed list` → the frontend showed its
+  generic "Revocation failed" fallback because it discarded the response
+  body on non-2xx status. Two fixes:
+  - Instance-level `$this->inRevoke` re-entrancy guard in
+    `AppPasswordService` — the listener now no-ops when called from
+    inside `revokeForUser`.
+  - Frontend `revokeAppPassword`/`revokeDevice` now parse the JSON
+    body **regardless of** HTTP status, so users see the actual
+    backend error message going forward.
+  - Broader exception catches around `invalidateTokenById()`
+    (`DoesNotExistException`, generic `Throwable` — log-and-continue)
+    so a stale NC-token row does not block the Stalwart cleanup.
+
+### Notes
+
+- If Stalwart ships full RFC 6855 compliance later, the two-line
+  override in `ImapClient::__doLogin()` can be reverted; see the
+  detailed comment block there. The pinned regression test
+  `tests/test_stalwart_utf8_accept_override.php` fails intentionally
+  if the mitigation is removed without conscious intent.
+- New tests: **`test_stalwart_utf8_accept_override.php`** (13
+  assertions). Total: **30 suites / 1047 assertions passing** (was 1034).
+
 ## [0.14.0] — 2026-02-18 (Feature: combined Mail + Nextcloud/DAV app passwords)
 
 ### Added
