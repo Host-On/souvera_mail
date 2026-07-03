@@ -6,6 +6,54 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.5] — 2026-02-18 (Security: mailbox ownership guard against session bleeding)
+
+### Security — P0
+
+- **Refuse login when Stalwart maps the OIDC JWT to a mailbox the
+  Nextcloud user does not own.** Reported at SEG Marburg
+  (2026-02-18, second follow-up): a fresh NC user `joerg@gratify.it`
+  logs into Souvera Mail and lands inside the mailbox of
+  `hello@gratify.it` — the previously seen tenant. Root cause is
+  ALWAYS upstream (Central had not provisioned the Stalwart account
+  for joerg yet), but v0.14.5 hardens Souvera Mail so a Central
+  provisioning bug can never again result in cross-tenant data
+  exposure.
+- **New `lib/Service/MailboxAccessGuard.php` + `MailboxAccessDenied`
+  exception.** Before `EngineHelper::startApp()` hands credentials
+  to Snappymail's `LoginProcess`, the guard now:
+  1. Ensures Stalwart is configured (`souvera_central.stalwart_api_url`)
+     — otherwise refuses login (fail-closed).
+  2. Resolves the mailbox email for the current uid using the same
+     `StalwartUserContext` cascade Snappymail would use.
+  3. Mints the user's OIDC bearer JWT and issues
+     `GET /jmap/session` against Stalwart. HTTP 401 / 403 →
+     "no mailbox has been provisioned yet" deny with an operator hint.
+  4. Extracts the reported principal name (top-level `username`,
+     falling back to `accounts.<primaryAccountId>.name`) and
+     compares case-insensitively against the resolved email. Any
+     mismatch → `logger->critical()` + hard deny with a message
+     pointing at `occ souvera_mail:whoami <uid>` for the operator.
+- **The engine-handled branch aborts with `HTTP 403` + a plain-text
+  body** so the browser sees a clear denial screen instead of
+  silently defaulting to the previous session's mailbox.
+
+### Notes
+
+- The guard is best-effort: if `StalwartAdminService::fetchSessionAsUser`
+  cannot reach Stalwart at all (transient network, DNS, TLS), we
+  FAIL CLOSED — a `MailboxAccessDenied` is thrown, the login is
+  aborted, and the operator sees a warning log entry. Availability
+  loses to safety here on purpose.
+- New pinning test `tests/test_mailbox_access_guard.php` — 34
+  assertions covering every deny branch, the guard's position in
+  the login flow (BEFORE `LoginProcess`), the pure
+  `extractAuthenticatedIdentity()` helper across both JMAP session
+  wire-format shapes (top-level `username` vs. `accounts.<id>.name`
+  fallback), and the critical-log emission on mismatch.
+- Total local suite: **34 suites / 1148 assertions passing**
+  (was 33 / 1100).
+
 ## [0.14.4] — 2026-02-18 (Hotfix: stray CSS visible under "Verbundene Geräte")
 
 ### Fixed
