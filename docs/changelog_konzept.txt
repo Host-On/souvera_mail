@@ -1,0 +1,101 @@
+========================================================================
+ CHANGELOG-KONZEPT – Souvera Apps (Central · Shield · Mail)
+ Einheitliche Konvention für ALLE Agents. Stand: 2026-07-03
+========================================================================
+
+ZIEL
+----
+Jede Souvera-App führt ein eigenes, einheitlich aufgebautes Changelog in
+BookStack (doku.souvera.eu). Alle Agents gehen exakt gleich vor, damit die
+Changelogs aller Apps identisch aussehen und gepflegt werden.
+
+1) ABLAGEORT (BookStack)
+------------------------
+- Regal (Shelf): "Changelogs" (id 3)
+- Ein BUCH pro App, exakter App-Name:
+  * "Souvera Central" (Buch id 10)
+  * "Souvera Shield"  (Buch id 9)
+  * "Souvera Mail"    (Buch id 11)
+- Jedes Buch enthaelt GENAU EINE Seite mit dem Namen "Changelog".
+- WICHTIG: Das Konzept/Regelwerk (dieses Dokument) wird NICHT in BookStack
+  abgelegt. Es liegt als TXT im jeweiligen App-Projekt und wird den Agents
+  direkt mitgegeben.
+
+2) VERSIONSNUMMERN – Semantic Versioning (MAJOR.MINOR.PATCH)
+------------------------------------------------------------
+- MAJOR: grundlegende, ggf. inkompatible Aenderung
+- MINOR: neue Funktion, abwaertskompatibel
+- PATCH: Fehlerbehebung / kleine Verbesserung
+Beispiel: 1.4.2
+
+3) AUFBAU DER "Changelog"-SEITE
+-------------------------------
+- Neueste Version IMMER ZUOBERST.
+- Kurze Einleitungszeile (Legende), danach die Versionsbloecke.
+- Pro Version ein Block:
+    Ueberschrift (h2): vX.Y.Z – JJJJ-MM-TT
+    darunter nur die ZUTREFFENDEN Kategorien (als h3), feste Reihenfolge:
+      1. Neu          (neue Funktionen)
+      2. Geaendert    (Aenderungen an bestehendem Verhalten/Design)
+      3. Behoben      (Fehlerbehebungen)
+      4. Entfernt     (entfernte Funktionen)
+      5. Sicherheit   (sicherheitsrelevante Aenderungen)
+    je Kategorie eine Aufzaehlung (ul/li) mit kurzen Stichpunkten.
+
+4) STIL DER EINTRAEGE
+---------------------
+- Sprache: Deutsch.
+- Kurze, verstaendliche Stichpunkte aus ANWENDERSICHT (was aendert sich fuer
+  den Nutzer/Administrator), keine internen Code-Details.
+- Wo sinnvoll: Verweis auf die passende Handbuch-Seite.
+
+5) VERBINDLICHE REGEL (fuer jede App)
+-------------------------------------
+Bei JEDER neuen Funktion oder Aenderung MUESSEN gepflegt werden:
+  (1) das App-HANDBUCH (Bedienung) – NUR Bedienung, keine Installation/
+      Konfiguration/OCC (das uebernimmt der Hoster),
+  (2) das CHANGELOG (neuer Versionsblock ZUOBERST),
+  (3) die APP-VERSION bumpen (in der App-Definition UND in der sichtbaren
+      Versionsanzeige der Oberflaeche),
+danach die Oberflaeche neu bauen.
+
+6) TECHNIK (BookStack API)
+--------------------------
+- Auth-Header: Authorization: Token <ID>:<SECRET>
+- Neue Version anhaengen (empfohlen, haelt "neueste oben" stabil):
+    GET  /api/pages/<id>  -> aktuelles html lesen
+    neuen Versionsblock OBEN einfuegen (nach der Einleitungszeile)
+    PUT  /api/pages/<id>  -> html zurueckschreiben
+- Seiten nutzen HTML (kein Markdown).
+- Screenshot-Platzhalter in Handbuechern (nicht im Changelog):
+    <p class="callout info"><strong>[SCREENSHOT]</strong> Beschreibung ...</p>
+
+7) HTML-VORLAGE FUER EINEN VERSIONSBLOCK
+----------------------------------------
+<h2>v1.2.0 – 2026-07-03</h2>
+<h3>Neu</h3>
+<ul>
+  <li>Kurzbeschreibung der neuen Funktion.</li>
+</ul>
+<h3>Behoben</h3>
+<ul>
+  <li>Kurzbeschreibung des behobenen Fehlers.</li>
+</ul>
+(Nur die Kategorien verwenden, die tatsaechlich zutreffen.)
+
+8) ERSTSTAND / INITIALER EINTRAG
+--------------------------------
+Beim ERSTMALIGEN Anlegen des Changelogs einer App wird der bisherige
+Entwicklungsstand zu EINEM EINZIGEN Versionsblock zusammengefasst (die
+aktuelle App-Version, datiert auf den Starttag). Der Block erhaelt den
+Hinweis:
+   "Erststand des Changelogs – fasst den bisherigen Entwicklungsstand
+    zusammen. Kuenftige Aenderungen werden als einzelne Versionen gefuehrt."
+Grund: viele historische Einzelversionen sind unuebersichtlich.
+
+AB DANN gilt: jede weitere Aenderung bekommt eine EIGENE Version (ein
+eigener Block), nicht mehr sammeln.
+
+========================================================================
+ Ende des Konzepts. Bitte identisch fuer Central, Shield und Mail anwenden.
+========================================================================
