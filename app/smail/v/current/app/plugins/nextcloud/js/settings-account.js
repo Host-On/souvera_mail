@@ -226,15 +226,29 @@
 				credentials: 'same-origin',
 				headers: csrfHeaders()
 			})
-				.then(function (resp) { return resp.ok ? resp.json() : null; })
-				.then(function (body) {
-					if (!body || body.status !== 'ok') {
-						self.appPasswordError((body && body.message) || 'Revocation failed');
+				.then(function (resp) {
+					// Read body regardless of HTTP status so users see
+					// the ACTUAL backend error, not just a generic
+					// "Revocation failed" fallback (the backend always
+					// returns JSON — even on 4xx / 5xx).
+					return resp.json()
+						.then(function (b) { return { ok: resp.ok, status: resp.status, body: b }; })
+						.catch(function () { return { ok: resp.ok, status: resp.status, body: {} }; });
+				})
+				.then(function (r) {
+					var body = r.body || {};
+					if (!r.ok || body.status !== 'ok') {
+						var msg = body.message
+							|| ('HTTP ' + r.status + ' — no error detail')
+							|| 'Revocation failed';
+						self.appPasswordError(msg);
 						return;
 					}
 					self.loadAppPasswords();
 				})
-				.catch(function () { self.appPasswordError('Network error'); });
+				.catch(function (err) {
+					self.appPasswordError('Network error: ' + (err && err.message ? err.message : 'unknown'));
+				});
 		},
 
 		// ---------------- Connected devices ----------------
@@ -284,15 +298,27 @@
 				credentials: 'same-origin',
 				headers: csrfHeaders()
 			})
-				.then(function (resp) { return resp.ok ? resp.json() : null; })
-				.then(function (body) {
-					if (!body || body.status !== 'ok') {
-						self.devicesError((body && body.message) || 'Revocation failed');
+				.then(function (resp) {
+					// Read body regardless of HTTP status so we surface
+					// the ACTUAL backend error (matches revokeAppPassword).
+					return resp.json()
+						.then(function (b) { return { ok: resp.ok, status: resp.status, body: b }; })
+						.catch(function () { return { ok: resp.ok, status: resp.status, body: {} }; });
+				})
+				.then(function (r) {
+					var body = r.body || {};
+					if (!r.ok || body.status !== 'ok') {
+						var msg = body.message
+							|| ('HTTP ' + r.status + ' — no error detail')
+							|| 'Revocation failed';
+						self.devicesError(msg);
 						return;
 					}
 					self.loadDevices();
 				})
-				.catch(function () { self.devicesError('Network error'); });
+				.catch(function (err) {
+					self.devicesError('Network error: ' + (err && err.message ? err.message : 'unknown'));
+				});
 		},
 
 		signOutOthers: function () {

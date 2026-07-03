@@ -327,6 +327,10 @@ class AppPasswordService
 
         // ── NC token first (see rationale above) ─────────────────────
         if ($mapping !== null) {
+            // Guard against re-entering via TokenInvalidatedEvent →
+            // NcTokenInvalidatedListener → revokeByNcTokenId → Stalwart
+            // destroy. The listener MUST no-op while this flag is set.
+            $this->inRevoke = true;
             try {
                 $this->ncTokenProvider->invalidateTokenById(
                     $userId,
@@ -341,6 +345,28 @@ class AppPasswordService
                     . $e->getMessage(),
                     ['app' => 'souvera_mail']
                 );
+            } catch (\OCP\AppFramework\Db\DoesNotExistException $e) {
+                // NC 33+: PublicKeyTokenProvider::invalidateTokenById()
+                // internally calls getTokenById() which throws
+                // DoesNotExistException (not InvalidTokenException) if
+                // the token row is already gone. Same recovery.
+                $this->logger->info(
+                    'Souvera Mail: NC token row already deleted during revoke: '
+                    . $e->getMessage(),
+                    ['app' => 'souvera_mail']
+                );
+            } catch (\Throwable $e) {
+                // Any other NC internal — log full context but DO NOT
+                // abort. If we bail here, the user's Stalwart password
+                // stays, the mapping row stays, and there's no path
+                // through the UI to fix it. Better: log + press on.
+                $this->logger->warning(
+                    'Souvera Mail: unexpected NC invalidateTokenById error during revoke: '
+                    . $e->getMessage(),
+                    ['app' => 'souvera_mail', 'exception' => $e]
+                );
+            } finally {
+                $this->inRevoke = false;
             }
         }
 
@@ -371,10 +397,21 @@ class AppPasswordService
      * when a user clicks "Revoke" on a combined token from within the
      * standard NC UI (i.e. WITHOUT going through Souvera Mail). We
      * mirror the deletion to Stalwart so mail auth stops working too.
+     *
+     * Re-entrancy: while {@see revokeForUser} is running the invalidate
+     * call it will ALSO fire this listener via TokenInvalidatedEvent.
+     * That case is handled by the `$this->inRevoke` guard — the outer
+     * revokeForUser already destroys Stalwart + mapping, so this method
+     * must no-op instead of double-destroying (which would fail with
+     * `notDestroyed: id not in destroyed list`).
      */
     public function revokeByNcTokenId(string $userId, int $ncTokenId): void
     {
-        $qb = null;
+        if ($this->inRevoke) {
+            // Nested call from TokenInvalidatedEvent inside our own
+            // revokeForUser flow — the outer caller cleans up.
+            return;
+        }
         $rows = $this->mappingMapper->findAllForUser($userId);
         foreach ($rows as $row) {
             if ($row->getNcTokenId() !== $ncTokenId) {
