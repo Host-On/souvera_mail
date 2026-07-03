@@ -6,6 +6,77 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-02-18 (Feature: combined Mail + Nextcloud/DAV app passwords)
+
+### Added
+
+- **One app password for Mail AND Nextcloud/DAV.** Since v0.14.0 every
+  app password created in Souvera Mail is a *combined* credential —
+  the same plaintext works for IMAP/SMTP/Sieve (Thunderbird, K-9,
+  Apple Mail) AND for Nextcloud/DAV (WebDAV, CalDAV, CardDAV in
+  DAVx⁵, Apple Calendar, Nextcloud Desktop client).
+  - Two-phase commit in `AppPasswordService::createForUser()`:
+    Stalwart first, then `\OCP\Authentication\Token\IProvider::generateToken()`
+    with the SAME plaintext, then mapping row in
+    `oc_souvera_mail_apppwd`. Full rollback on either failure — a
+    "half-created" credential can never leak to the user.
+  - NC token created with `type = PERMANENT_TOKEN`, `scope =
+    ['filesystem' => true]` (full DAV), `password = null` (OIDC
+    users have no locally-stored password), and human-friendly
+    name `<desc> (Souvera Mail + DAV)` so the user recognises our
+    tokens in `/settings/user/security`.
+- **New table `oc_souvera_mail_apppwd`** — persistent mapping
+  `user_id ↔ nc_token_id ↔ stalwart_app_id` created via
+  `Version001400Date20260218000000.php` (SimpleMigrationStep,
+  auto-discovered). Unique index on `(user_id, stalwart_app_id)`,
+  reverse index on `nc_token_id`.
+- **Legacy badge** in the app-password list — Stalwart-only
+  passwords created before v0.14.0 (or via `stalwart-cli`) show a
+  `nur Mail (legacy)` badge. Tooltip explains: works for mail but
+  not for DAV — revoke and re-create for combined behaviour.
+
+### Changed
+
+- **`/settings/user/security` app-password form** is now HIDDEN for
+  members of `souvera-users`. Injected notice card redirects to
+  Souvera Mail's Security & Devices tab so nobody accidentally
+  creates a DAV-only token that later fails for IMAP.
+  - `SecurityPageHijackListener` hooks `BeforeTemplateRenderedEvent`,
+    injects `css/security-page-hijack.css` + `js/security-page-hijack.js`.
+  - Existing tokens remain visible so users can still revoke.
+  - **Known limitation**: hide-via-CSS. A future release will use
+    an HTTP middleware to fully block the NC-only create endpoint —
+    tracked as P2 in PRD Step 23.
+- **Revoke is now bidirectional.**
+  - Revoking a combined password in Souvera Mail also destroys the
+    NC token (order: NC invalidate → Stalwart destroy → mapping
+    delete — orphan NC token would linger as a "zombie" in
+    `/settings/user/security`, orphan Stalwart is harmless).
+  - Revoking a combined token in Nextcloud (`/settings/user/security`
+    → "Alle anderen abmelden" or per-device revoke) now dispatches
+    `TokenInvalidatedEvent`, which our `NcTokenInvalidatedListener`
+    mirrors to Stalwart — so a compromised device really loses
+    mail access, not just DAV.
+- **App-password create/list surface (Snappymail template + JS)**:
+  card header, description text and one-time-secret banner all
+  now say "Mail + DAV / Nextcloud" instead of "IMAP, POP3, SMTP".
+
+### Security
+
+- Combined app passwords are created exclusively via the official
+  NC public token API (`OCP\Authentication\Token\IProvider`) — no
+  direct INSERT into `oc_authtoken`. Nextcloud's encryption,
+  rotation, password-reset invalidation and wipe-marker paths all
+  keep working as designed.
+
+### Tests
+
+- New `tests/test_combined_app_password.php` — 76 assertions
+  covering: DI wiring, PHPDoc contracts, rollback paths (both
+  directions), revoke order, legacy fallback path, listener
+  registration, and CSS/JS asset content.
+- Total: **29 suites / 1034 assertions passing** (was 958).
+
 ## [0.13.29] — 2026-02-17 (Hotfix: sort patch used undefined \$sSearch)
 
 ### Fixed — v0.13.28 regression: Snappymail 500 → NC 404 for every user

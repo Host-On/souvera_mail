@@ -23,6 +23,8 @@ use OCA\SouveraMail\Dashboard\UnreadMailWidget;
 use OCA\SouveraMail\Listeners\ImpersonateListener;
 use OCA\SouveraMail\Listeners\LoginBridgeListener;
 use OCA\SouveraMail\Listeners\LogoutListener;
+use OCA\SouveraMail\Listeners\NcTokenInvalidatedListener;
+use OCA\SouveraMail\Listeners\SecurityPageHijackListener;
 use OCA\SouveraMail\Search\Provider;
 use OCA\SouveraMail\Util\NavigationTitle;
 use OCP\App\IAppManager;
@@ -30,6 +32,8 @@ use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
+use OCP\AppFramework\Http\Events\BeforeTemplateRenderedEvent;
+use OCP\Authentication\Events\TokenInvalidatedEvent;
 use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\INavigationManager;
@@ -102,6 +106,25 @@ class Application extends App implements IBootstrap
         );
 
         $context->registerDashboardWidget(UnreadMailWidget::class);
+
+        // v0.14.0 — combined Mail + Nextcloud/DAV app passwords.
+        //
+        // (a) Rewrite `/settings/user/security` for souvera-users: hide
+        //     the native "Create app password" form and inject a notice
+        //     pointing at Souvera Mail's own combined-flow.
+        $context->registerEventListener(
+            BeforeTemplateRenderedEvent::class,
+            SecurityPageHijackListener::class
+        );
+
+        // (b) Mirror NC-side token invalidations to Stalwart — if a user
+        //     revokes a combined token from `/settings/user/security`
+        //     (still visible for existing tokens), the mail auth side must
+        //     die too. Otherwise the credential lives on for IMAP/SMTP.
+        $context->registerEventListener(
+            TokenInvalidatedEvent::class,
+            NcTokenInvalidatedListener::class
+        );
     }
 
     public function boot(IBootContext $context): void

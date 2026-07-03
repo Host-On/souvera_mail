@@ -59,7 +59,7 @@
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
 			</span>
 			<span>App-Passwörter</span>
-			<small class="sv-card-h-note">für IMAP, POP3 und SMTP</small>
+			<small class="sv-card-h-note">für Mail (IMAP/SMTP/Sieve) &amp; Nextcloud/DAV (Kalender · Kontakte · Dateien)</small>
 		</header>
 		<div class="sv-card-b">
 
@@ -70,7 +70,7 @@
 
 			<!-- Create form -->
 			<div data-bind="visible: appPasswordsAvailable">
-				<p class="sv-card-desc">Erzeuge ein eigenes Passwort für jede Mail-App. Du kannst es jederzeit widerrufen, ohne dein Hauptpasswort zu ändern.</p>
+				<p class="sv-card-desc">Erzeuge ein eigenes Passwort für jedes Gerät oder Programm. <strong>Dasselbe Passwort</strong> funktioniert sowohl für Mail (Thunderbird, K-9, Apple Mail) als auch für Nextcloud/DAV (Kalender, Kontakte, WebDAV). Du kannst es jederzeit widerrufen &mdash; dein Hauptpasswort bleibt unverändert.</p>
 				<div class="sv-form-row">
 					<input type="text"
 						placeholder="z. B. iPhone Mail, Thunderbird, Outlook"
@@ -93,6 +93,7 @@
 				<!-- One-time secret card -->
 				<div data-bind="visible: justCreatedSecret() !== ''" class="sv-banner sv-banner-ok">
 					<div class="sv-secret-head">Neues App-Passwort für „<span data-bind="text: justCreatedDescription"></span>"</div>
+					<div class="sv-secret-hint">Dieses <strong>eine Passwort</strong> gilt sowohl für Mail (IMAP/SMTP/Sieve) als auch für Nextcloud &amp; DAV (Kalender, Kontakte, WebDAV).</div>
 
 					<!-- IMAP/SMTP username — the canonical Stalwart-side mail address.
 					     Shown alongside the password because Stalwart's PLAIN/LOGIN
@@ -347,6 +348,30 @@
 .sv-banner-ok   { background: var(--sv-ok-soft);   border: 1px solid rgba(22,163,74,.2); color: #14532d; }
 
 .sv-secret-head { font-weight: 600; margin-bottom: 0.5em; }
+.sv-secret-hint {
+	font-size: 0.9em;
+	color: #14532d;
+	margin-bottom: 0.8em;
+	line-height: 1.45;
+	opacity: 0.9;
+}
+.sv-badge {
+	display: inline-block;
+	margin-left: 0.55em;
+	padding: 0.15em 0.55em;
+	font-size: 0.72em;
+	font-weight: 600;
+	line-height: 1.3;
+	border-radius: 999px;
+	vertical-align: middle;
+	letter-spacing: 0.02em;
+	cursor: help;
+}
+.sv-badge-warn {
+	background: var(--sv-warn-soft, #fef3c7);
+	color: #92400e;
+	border: 1px solid rgba(217,119,6,.35);
+}
 .sv-cred-row {
 	display: flex; align-items: center; gap: 0.75em;
 	margin: 0.4em 0;
@@ -506,6 +531,14 @@ body[data-theme-dark-highcontrast] .souvera-settings .sv-list-empty,
 body[data-theme-dark] .souvera-settings .sv-row-current td,
 body[data-theme-dark-highcontrast] .souvera-settings .sv-row-current td,
 .theme--dark .souvera-settings .sv-row-current td { background: rgba(59,130,246,0.10); }
+body[data-theme-dark] .souvera-settings .sv-pill-muted,
+body[data-theme-dark-highcontrast] .souvera-settings .sv-pill-muted,
+.theme--dark .souvera-settings .sv-pill-muted {
+	background: rgba(255,255,255,0.08);
+	color: var(--sv-fg-muted);
+}
+</style>
+}
 body[data-theme-dark] .souvera-settings .sv-pill-muted,
 body[data-theme-dark-highcontrast] .souvera-settings .sv-pill-muted,
 .theme--dark .souvera-settings .sv-pill-muted {

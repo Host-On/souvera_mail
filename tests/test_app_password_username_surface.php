@@ -72,9 +72,10 @@ assertTrue(!str_contains($rid, '$stalwartService->mailFor('),
 // ---------------------------------------------------------------
 $svc = file_get_contents('/app/lib/Service/AppPasswordService.php');
 
-// PHPDoc return-type contract
-assertTrue(str_contains($svc, "array{id: string, secret: string, description: string, username: string}"),
-    "createForUser() PHPDoc return shape includes `username`", $passes, $failures);
+// PHPDoc return-type contract (extended in v0.14.0 with `ncTokenId` for
+// the combined Mail + Nextcloud/DAV credential).
+assertTrue(str_contains($svc, "array{id: string, secret: string, description: string, username: string, ncTokenId: int}"),
+    "createForUser() PHPDoc return shape includes `username` and `ncTokenId` (v0.14.0)", $passes, $failures);
 
 // Body resolves the email
 assertTrue(str_contains($svc, '$this->userContext->resolveEmail($userId)'),

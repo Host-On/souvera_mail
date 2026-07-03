@@ -142,7 +142,9 @@
 							return {
 								id: String(it.id || ''),
 								description: String(it.description || ''),
-								createdAt: fmtDate(it.createdAt || '')
+								createdAt: fmtDate(it.createdAt || ''),
+								kind: String(it.kind || 'combined'),
+								isLegacy: String(it.kind || 'combined') === 'legacy'
 							};
 						}));
 					}

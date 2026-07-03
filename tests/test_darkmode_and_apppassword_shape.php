@@ -142,8 +142,8 @@ ok(str_contains($svc, 'MAP of'),
 // ==============================================================
 
 $info = (string) file_get_contents('/app/appinfo/info.xml');
-ok(preg_match('#<version>0\.13\.2[0-9]</version>#', $info) === 1,
-    "appinfo/info.xml version is at ≥0.13.20 (this release)",
+ok((bool) preg_match('#<version>0\.(?:13\.2[0-9]|14\.[0-9]+)</version>#', $info),
+    "appinfo/info.xml version is at ≥0.13.20 (this release or later, e.g. 0.14.0)",
     $passes, $failures);
 
 // ==============================================================
