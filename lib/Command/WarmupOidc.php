@@ -166,10 +166,23 @@ class WarmupOidc extends Command
      */
     private function mintProbeToken(string $userId, array &$report): ?string
     {
+        // Explicit availability check FIRST so we surface the exact
+        // reason (e.g. "app-config oidc-client-id is empty") instead of
+        // the vague inner exception from resolveBearer(). Massively
+        // shortens debugging time when the CI pipeline breaks after a
+        // deploy that recreated the app without preserving app-config.
+        $reason = $this->oidc->diagnoseAvailability();
+        if ($reason !== null) {
+            $report['errors'][] = "OIDC provider unavailable: {$reason}";
+            $report['remediation'] = $reason;
+            return null;
+        }
+
         try {
             $token = $this->userContext->resolveBearer($userId);
             if ($token === '') {
                 $report['errors'][] = "H2CK/oidc returned an empty token for user '{$userId}'";
+                $report['remediation'] = "Client is registered but H2CK refused to mint. Check `occ souvera_mail:status`; the user must be OIDC-eligible in H2CK's client config.";
                 return null;
             }
             return $token;

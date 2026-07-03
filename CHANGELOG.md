@@ -6,6 +6,71 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.4] — 2026-02-18 (Hotfix: stray CSS visible under "Verbundene Geräte")
+
+### Fixed
+
+- **Raw CSS text visible below "Verbundene Geräte" on the Souvera Mail
+  account settings page.** A copy-paste accident during the v0.14.0
+  app-password UI rewrite left a duplicated `sv-pill-muted` dark-theme
+  block after the closing `</style>` tag, so the browser rendered the
+  rest of the CSS as plain text. Removed the duplicate; the `</style>`
+  now sits at the true end of the styles block.
+- New guard test `tests/test_settings_template_style_balance.php`
+  fails immediately if a future refactor introduces a second
+  `<style>`/`</style>` pair in the template.
+
+### Notes
+
+- Total: **33 suites / 1100 assertions passing** (was 32/1094).
+
+## [0.14.3] — 2026-02-18 (Diagnostic: precise OIDC availability reasons)
+
+### Added
+
+- **`OidcProviderService::diagnoseAvailability(): ?string`** — public
+  richer variant of `isProviderAvailable()`. Returns a human-readable
+  reason WHY OIDC token issuance would fail, or `null` when everything
+  is in place. The four distinct failure modes are now named
+  individually:
+  1. `H2CK/oidc app is NOT installed — run \`occ app:install oidc\``
+  2. `H2CK/oidc app is installed but DISABLED — run \`occ app:enable oidc\``
+  3. `H2CK/oidc app is enabled but its TokenGenerationRequestEvent
+     class is missing (ABI mismatch — need H2CK/oidc 1.17+)`
+  4. `Souvera Mail OIDC client identifier is NOT persisted in
+     app-config (souvera_mail/oidc-client-id is empty). … Run
+     \`occ souvera_mail:oidc:register-client --force\``.
+- **`souvera_mail:warmup-oidc` now prefaces token minting with the
+  diagnostic** and adds a `remediation` key to the JSON report — CI /
+  deploy pipelines can react without parsing free-text errors.
+- **INFO-level log line on every login** when the diagnostic is
+  non-null. Operators can grep `Souvera Mail: OIDC diagnostic` in
+  `nextcloud.log` to catch a broken OIDC deployment BEFORE the first
+  user report.
+
+### Fixed
+
+- **Confusing single-message error masked three different failure modes.**
+  The previous message `"H2CK/oidc missing or souvera_mail client not
+  registered?"` blurred: app not installed / app disabled / client-id
+  not persisted. Real-world alarm at SEG Marburg (2026-02-18) turned
+  out to be the very first branch — H2CK/oidc had been auto-disabled
+  by a Nextcloud upgrade whose `<max-version>` constraint the H2CK
+  release didn't cover yet. Now the exact reason is on the operator's
+  screen in one line.
+
+### Notes
+
+- `isProviderAvailable()` stays LOOSE (checks installed+enabled+class
+  only) on purpose — pre-v0.14.3 installs that never explicitly ran
+  `souvera_mail:oidc:register-client` and rely on H2CK accepting the
+  default client name must keep working. The strict client-id check
+  is diagnostic-only, never a hard gate.
+- New test file `tests/test_oidc_diagnostic_v0_14_3.php` — 23
+  assertions covering all four diagnostic branches, warmup wiring,
+  and info.xml version bump. Total: **32 suites / 1094 assertions
+  passing** (was 31/1071).
+
 ## [0.14.2] — 2026-02-18 (Diagnostic: `whoami` + email/uid mismatch guard)
 
 ### Added
