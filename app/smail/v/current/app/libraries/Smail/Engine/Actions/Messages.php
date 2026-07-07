@@ -250,34 +250,117 @@ trait Messages
 							$this->logException($oException, \LOG_ERR);
 						}
 
-						try
-						{
-							$this->ImapClient()->MessageAppendStream(
-								$sSaveFolder, $rAppendMessageStream, $iAppendMessageStreamSize,
-								array(MessageFlag::SEEN->value)
-							);
+						// ────────────────────────────────────────────────
+						// Souvera Mail v0.14.7: intelligent Sent-folder
+						// routing for "Send-As" identities.
+						//
+						// Reported at SEG (2026-02-19): sending as a shared
+						// mailbox identity (e.g. reseller@souvera.eu) whose
+						// per-identity Sent folder is left on "(Standard)"
+						// used to append the sent copy to the primary
+						// account's own Sent folder — or fail with
+						// "TRYCREATE Mailbox does not exist" when that
+						// folder is missing. Outlook/Exchange convention
+						// routes such sent copies into the shared mailbox's
+						// own Sent Items folder, and users expect the same
+						// behaviour here.
+						//
+						// Strategy: if the identity's From: email differs
+						// from the authenticated account email, prepend
+						// well-known shared-namespace candidates ahead of
+						// the client-provided saveFolder. `Sent Items` (the
+						// Exchange/Outlook default that Souvera Central's
+						// Stalwart provisioning uses) is tried first, then
+						// the generic `Sent`, then German localised names.
+						//
+						// Each candidate is a single IMAP APPEND. Stalwart
+						// rejects unknown mailboxes with `NO [TRYCREATE]`
+						// BEFORE any literal transmission, so the message
+						// stream stays untouched across failed candidates.
+						// ────────────────────────────────────────────────
+						$aSaveCandidates = [];
+						$sSendAsIdentityEmail = '';
+						try {
+							$oFromRaw = \Smail\Mail\Mime\Email::Parse((string) $this->GetActionParam('from', ''));
+							$sSendAsIdentityEmail = ($oFromRaw && $oFromRaw->GetEmail())
+								? \Smail\Engine\IDN::emailToAscii((string) $oFromRaw->GetEmail())
+								: '';
+							$sAccountEmail = \Smail\Engine\IDN::emailToAscii((string) $oAccount->Email());
+							if ($sSendAsIdentityEmail !== ''
+								&& \strcasecmp($sSendAsIdentityEmail, $sAccountEmail) !== 0
+							) {
+								$aSaveCandidates = [
+									'Shared Folders/' . $sSendAsIdentityEmail . '/Sent Items',
+									'Shared Folders/' . $sSendAsIdentityEmail . '/Sent',
+									'Shared Folders/' . $sSendAsIdentityEmail . '/Gesendete Elemente',
+									'Shared Folders/' . $sSendAsIdentityEmail . '/Gesendet',
+								];
+							}
+						} catch (\Throwable $eIdent) {
+							$this->logException($eIdent, \LOG_INFO);
 						}
-						catch (\Throwable $oException)
-						{
-							// Save folder not the same as default Sent folder, so try again
+						// Client-provided saveFolder is always attempted
+						// last as the safe fallback (respects users who
+						// explicitly set the identity's Sent folder to
+						// something custom via the UI).
+						$aSaveCandidates[] = $sSaveFolder;
+
+						$oException = null;
+						$bAppended = false;
+						$aTried = [];
+						foreach ($aSaveCandidates as $sCandidate) {
+							if ($sCandidate === '' || \in_array($sCandidate, $aTried, true)) {
+								continue;
+							}
+							$aTried[] = $sCandidate;
+							try
+							{
+								$this->ImapClient()->MessageAppendStream(
+									$sCandidate, $rAppendMessageStream, $iAppendMessageStreamSize,
+									array(MessageFlag::SEEN->value)
+								);
+								$bAppended = true;
+								$oException = null;
+								if ($sSendAsIdentityEmail !== '' && $sCandidate !== $sSaveFolder) {
+									$this->logWrite(
+										'Send-As: saved sent copy for identity "' . $sSendAsIdentityEmail
+										. '" in shared folder "' . $sCandidate . '"',
+										\LOG_INFO,
+										'SOUVERA'
+									);
+								}
+								break;
+							}
+							catch (\Throwable $eAppend)
+							{
+								$oException = $eAppend;
+							}
+						}
+
+						if (!$bAppended) {
+							// Last-ditch attempt against the account-wide
+							// SentFolder configured in Snappymail's
+							// system-folders settings (upstream behaviour).
 							$oSettingsLocal = $this->SettingsProvider(true)->Load($oAccount);
 							if ($oSettingsLocal instanceof \Smail\Engine\Settings) {
 								$sSentFolder = (string) $oSettingsLocal->GetConf('SentFolder', '');
-								if (\strlen($sSentFolder) && $sSentFolder !== $sSaveFolder) {
-									$oException = null;
+								if (\strlen($sSentFolder) && !\in_array($sSentFolder, $aTried, true)) {
 									try
 									{
 										$this->ImapClient()->MessageAppendStream(
 											$sSentFolder, $rAppendMessageStream, $iAppendMessageStreamSize,
 											array(MessageFlag::SEEN->value)
 										);
+										$bAppended = true;
+										$oException = null;
 									}
-									catch (\Throwable $oException)
+									catch (\Throwable $eSettings)
 									{
+										$oException = $eSettings;
 									}
 								}
 							}
-							if ($oException) {
+							if (!$bAppended && $oException) {
 								$this->logException($oException, \LOG_ERR);
 								throw new ClientException(Notifications::CantSaveMessage->value, $oException);
 							}

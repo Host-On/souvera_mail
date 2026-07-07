@@ -6,6 +6,65 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.7] — 2026-02-19 (Send-As Sent-Ordner-Routing für geteilte Postfächer)
+
+### Neu — Anwender-sichtbar
+
+- **Sent-Kopien für „Im Namen von"-Identitäten landen automatisch im
+  Sent-Ordner des geteilten Postfachs.** Reported at SEG
+  (2026-02-19): Anwender komponiert als `reseller@souvera.eu`
+  (geteiltes Postfach, Sent-Ordner in der Identität auf
+  „(Standard)"), Nachricht geht raus, aber Snappymail meldet:
+  > „Die Nachricht wurde gesendet, konnte aber nicht im
+  > Gesendet-Ordner gespeichert werden. TRYCREATE Mailbox does not
+  > exist."
+  Ursache: mit „(Standard)" schickte das Frontend den Sent-Ordner
+  des eingeloggten Haupt-Accounts als `saveFolder`. Der existierte
+  entweder gar nicht (TRYCREATE), oder — schlimmer — er nahm die
+  Kopie schweigend an, obwohl der Absender das geteilte Postfach
+  war.  Outlook/Exchange-Konvention (und die Erwartung aller
+  Anwender) ist: die Sent-Kopie MUSS im Sent-Ordner des geteilten
+  Postfachs landen.
+- **Neue Auto-Erkennung in `DoSendMessage()`** (Snappymail-Fork-Patch,
+  `app/libraries/Smail/Engine/Actions/Messages.php`, klar mit
+  `Souvera Mail v0.14.7`-Banner markiert):
+  - Wenn die From:-Identität eine andere E-Mail hat als der
+    authentifizierte Account, werden folgende Kandidaten
+    (in dieser Reihenfolge) probiert **bevor** der vom Client
+    gelieferte `saveFolder` genutzt wird:
+    1. `Shared Folders/<identityEmail>/Sent Items`
+       (Stalwart-Default aus Souvera Central)
+    2. `Shared Folders/<identityEmail>/Sent`
+    3. `Shared Folders/<identityEmail>/Gesendete Elemente`
+    4. `Shared Folders/<identityEmail>/Gesendet`
+  - Der vom Client gelieferte `saveFolder` wird als sicheres
+    letztes Fallback drangehängt — Anwender, die im UI explizit
+    einen custom Sent-Ordner pro Identität gesetzt haben, behalten
+    dieses Verhalten.
+  - IMAP APPEND gegen einen unbekannten Ordner erhält von Stalwart
+    ein `NO [TRYCREATE]` **vor** der Literal-Übertragung, d.h. der
+    Message-Stream bleibt zwischen Kandidaten unangetastet — kein
+    Doppel-Save-Risiko und keine spürbare Verzögerung.
+
+### Für Administratoren
+
+- Erfolgreiche Umleitung schreibt eine grep-bare Info-Zeile:
+  `SOUVERA Send-As: saved sent copy for identity "<email>" in shared folder "<path>"`
+- Wenn ALLE Kandidaten fehlschlagen (weder shared noch client-`saveFolder`
+  noch account-weite `Settings.SentFolder`), bleibt das ursprüngliche
+  Verhalten erhalten: `Notifications::CantSaveMessage` mit der Original-
+  IMAP-Fehlermeldung im nextcloud.log.
+
+### Notes
+
+- Neuer Regression-Test `tests/test_shared_sent_folder_routing.php`
+  (33 Assertions) — pinnt Reihenfolge der Kandidaten, Dedup-Verhalten,
+  Success-Log, Non-fatal-Behandlung bei kaputtem `from`-Header,
+  Erhaltung des `SentFolder`-Fallbacks aus den Settings und
+  `CantSaveMessage`-Verhalten wenn wirklich alles fehlschlägt.
+- Total local suite: **35 suites / 1185 assertions passing**
+  (was 34 / 1151).
+
 ## [0.14.6] — 2026-02-19 (Security follow-up: guard also runs on cached-account requests)
 
 ### Security — P0 (live-fix follow-up on the SEG Marburg incident)
