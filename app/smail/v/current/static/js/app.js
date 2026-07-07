@@ -12204,6 +12204,20 @@ body > * {
 	//				case ComposeType.Empty:
 				}
 			}
+			// Souvera Mail v0.14.8: prefer Send-As identity when replying/forwarding
+			// from a message that lives inside a "Shared Folders/<email>/..." path.
+			// This mirrors the server-side v0.14.7 Send-As Sent-folder routing and
+			// matches Outlook/Exchange convention: read from shared inbox → reply
+			// AS the shared mailbox by default. Only kicks in when the classic
+			// To/Cc/Bcc address-based heuristic above returned no match, so we
+			// never override an explicit hit against a user's own aliases.
+			if (!identity && oLastMessage && oLastMessage.folder) {
+				const sharedFolderMatch = /^Shared Folders\/([^\/]+)\//.exec(oLastMessage.folder);
+				if (sharedFolderMatch) {
+					const sharedEmail = sharedFolderMatch[1].toLowerCase();
+					identity = IdentityUserStore.find(i => (i.email() || '').toLowerCase() === sharedEmail);
+				}
+			}
 			identity = identity || IdentityUserStore()[0];
 			if (identity) {
 	//			excludeEmail.add(identity.email());

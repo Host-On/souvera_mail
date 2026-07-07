@@ -6,6 +6,48 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.8] — 2026-02-19 (Send-As Identität wird automatisch vorausgewählt)
+
+### Neu — Anwender-sichtbar
+
+- **Auto-Auswahl der Send-As Identität beim Antworten aus einem
+  geteilten Postfach.** UX-Ergänzung zu v0.14.7: wenn du eine
+  Nachricht im Ordner `Shared Folders/reseller@souvera.eu/INBOX`
+  (oder generell `Shared Folders/<email>/…`) öffnest und auf
+  „Antworten" / „Antworten an alle" / „Weiterleiten" klickst, wählt
+  Souvera Mail jetzt automatisch die Identität mit passender
+  E-Mail (`reseller@souvera.eu`) als Absender vor. Kein manuelles
+  Umstellen im Absender-Dropdown mehr. Matches Outlook/Exchange
+  convention: „read from shared inbox → reply AS the shared inbox".
+- **Bestehende Heuristik bleibt Vorrang.** Falls du in der
+  eingehenden Mail bereits eine deiner Alias-Adressen in
+  To/Cc/Bcc stehen hast, greift Snappymails alte Auto-Erkennung
+  weiterhin zuerst — die Shared-Folder-Auto-Auswahl kickt nur ein,
+  wenn diese Heuristik keinen Treffer hatte. Explizite Adress-Hits
+  werden nie überschrieben.
+
+### Implementation
+
+- Patch in `app/smail/v/current/static/js/app.js::initOnShow()` der
+  ComposePopupView, klar mit `Souvera Mail v0.14.8`-Kommentar-Banner
+  markiert. Regex `/^Shared Folders\/([^\/]+)\//` gegen
+  `oLastMessage.folder`, case-insensitiver Vergleich mit
+  `IdentityUserStore.find(…)`. Sitzt exakt zwischen der klassischen
+  To/Cc/Bcc-Heuristik und dem `IdentityUserStore()[0]`-Fallback.
+
+### Notes
+
+- Server-Seite (v0.14.7) und Client-Seite (v0.14.8) greifen jetzt
+  Hand in Hand: Auto-Absender-Auswahl beim Antworten + Auto-Sent-Ordner
+  beim Senden = vollständiges Outlook-Verhalten für geteilte Postfächer.
+- Neuer Regression-Test `tests/test_shared_identity_autoselect.php`
+  (19 Assertions) — pinnt Regex, Lookup-Aufruf, Reihenfolge zwischen
+  Heuristik und Fallback, unveränderten `findIdentity`-Helper und eine
+  behavioural sim per `node` gegen 8 Test-Cases (4 positive, 4 negative
+  inkl. `Other Users/`-Namespace der bewusst NICHT matcht).
+- Total local suite: **36 suites / 1205 assertions passing**
+  (was 35 / 1185).
+
 ## [0.14.7] — 2026-02-19 (Send-As Sent-Ordner-Routing für geteilte Postfächer)
 
 ### Neu — Anwender-sichtbar
