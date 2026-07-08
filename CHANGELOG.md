@@ -6,6 +6,92 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.10] — 2026-02-19 (Migration-Wizard Phase 2 — Frontend/UI)
+
+### Neu — Anwender-sichtbar
+
+- **Welcome-Popup „Alte Mails importieren"** beim allerersten Öffnen von
+  Souvera Mail (und bei jedem folgenden Login, bis der Anwender
+  „Nicht mehr zeigen" klickt). 5-Screen-Wizard:
+  1. **Welcome-Splash** — „Willkommen bei Souvera Mail. Wir können deine
+     Mails vom alten Anbieter automatisch übertragen."
+  2. **IMAP-Eingabemaske** — Custom-Freitext-Formular (Host, Port,
+     Benutzername, Passwort, TLS-Toggle). Kein Preset-Dropdown per
+     Anwender-Direktive „nur Custom".
+  3. **Bestätigungsschirm** — grüner Verbindungs-Check ✓ + optionale
+     Vorschau „12 Ordner · 8 432 Nachrichten". Klare Warnung dass ein
+     gestarteter Import nicht abgebrochen werden kann (provider.tools
+     hat keinen Cancel-Endpoint).
+  4. **Progress-Screen** — Fortschrittsbalken, Nachrichten-/Ordner-Zähler,
+     Queue-Position falls noch in der Warteschlange, alle 5 Sekunden
+     Poll gegen `GET /migration/status`.
+  5. **Erfolgs-Splash** — großes ✓, „Import erfolgreich!", schließt
+     nach 8 Sekunden automatisch. Bei Fehler statt dessen roter
+     ✗-Splash mit Fehler-Detail zur Weitergabe an Support.
+- **Persistenter Floating-Button** unten rechts („Alte Mails
+  importieren") — immer sichtbar wenn Souvera Mail geladen ist. Klick
+  öffnet den Wizard direkt auf dem Form-Screen. Bei laufendem Import
+  wechselt der Button auf grün+pulsierend und Text „Import läuft…"; bei
+  Abschluss zeigt er kurz „Import fertig" / „Import fehlgeschlagen".
+- **Auto-Resume** — Wenn beim Öffnen von Souvera Mail bereits eine
+  Migration läuft (Cache-Refresh, Login von anderem Gerät), springt der
+  Wizard automatisch auf den Progress-Screen (kein Doppel-Start
+  möglich, Rate-Limit-geschützt vom Backend).
+
+### Sicherheit
+
+- **Old-Provider-Passwort wird direkt nach dem `/start`-Call aus dem
+  Browser-Speicher gelöscht** (`form.password = ''`). Danach gibt es
+  keinen Weg mehr im DOM oder in JS-Memory an das Passwort zu kommen.
+- **NC requesttoken-Header** auf allen POST-Calls (CSRF-Schutz per
+  Nextcloud-Standard).
+- **`credentials: 'same-origin'`** — nur wenn die Session gültig ist,
+  passieren API-Calls.
+
+### Technische Details
+
+- Pure-vanilla-JS-Overlay in `/app/js/migration-wizard.js` (516 LOC) +
+  Styling in `/app/css/migration-wizard.css` (294 LOC). **Kein**
+  Snappymail-KO-Popup-Hook — die Overlay lebt oberhalb von
+  Snappymails DOM (z-index 2.1e9+, oberhalb Snappymails Popup-Range
+  von 210), überlebt Snappymail-Bundle-Refreshes und macht keine
+  Änderungen am `static/js/app.js`.
+- Assets werden von `PageController::index()` via
+  `\OCP\Util::addStyle('souvera_mail', 'migration-wizard')` +
+  `\OCP\Util::addScript('souvera_mail', 'migration-wizard')` geladen.
+  Reihenfolge: Style vor Script → kein FOUC beim Pill-Mount.
+- Poll-Intervall Frontend: 5 Sekunden. Backend-Poller refresht alle
+  60 Sekunden gegen provider.tools; Frontend liest gecachten
+  `progress_json`. → deutlich unter jedem provider.tools-Rate-Limit,
+  auch mit vielen parallelen Migrationen.
+
+### Zusätzlich — Bridge-Härtung (aus derselben Session)
+
+- `lib-bridge/Souvera_mail/AppInfo/Application.php`: nach der
+  `namespace`-Deklaration wird jetzt `require_once vendor/autoload.php`
+  ausgeführt. Das schließt eine Race Condition, bei der Nextclouds
+  Memcache eine stale `core.appinfo`-Version ohne `<namespace>`-Tag
+  hielt und dadurch der Underscore-Namespace `OCA\Souvera_mail\` in
+  die Class-Resolution gelangte, ohne dass Hook 2 der Bridge (Klass-
+  Aliasing) registriert war. Live-Report SEG 2026-02-19 — der Fehler
+  ist per Memcache-Clear selbst-heilend, aber v0.14.10 macht ihn
+  strukturell unmöglich.
+
+### Notes
+
+- **Kritisch für die Aktivierung**: provider.tools-Token muss in
+  Souvera Central gesetzt sein (siehe v0.14.9-Changelog). Ohne Token
+  bleibt der Wizard komplett stumm — die Welcome-State-API meldet
+  `available: false`, das Frontend zeigt weder Popup noch Pill.
+- Neuer Regression-Test `tests/test_migration_wizard_frontend.php`
+  (46 Assertions) — pinnt Asset-Wiring in PageController, alle 9
+  Status im State-Machine-Enum, exakte Backend-Endpoints + Verben,
+  CSRF-Header, Password-Wipe nach Start, Poll-Intervall, Floating-Pill,
+  z-index-Range, Confirm-Screen-Cancel-Warnung, No-Preset-Providers,
+  Bridge-Härtung.
+- Total local suite: **39 suites / 1396 assertions passing**
+  (was 38 / 1338).
+
 ## [0.14.9] — 2026-02-19 (Migration-Wizard Phase 1 — Backend gegen provider.tools)
 
 ### Neu — Backend-Fundament für „Alte Mails importieren"

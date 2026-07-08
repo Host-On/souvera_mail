@@ -1,0 +1,294 @@
+/**
+ * Souvera Mail v0.14.10 — migration wizard styling.
+ *
+ * Deliberately self-contained: uses pixel/px units and hard colors,
+ * no dependency on Snappymail's CSS variables (which change between
+ * themes and are inside the sandboxed engine iframe-ish DOM). The
+ * overlay layers ABOVE Snappymail's chrome (z-index 2 100 000 000,
+ * above Snappymail's own popup z-index of 210).
+ *
+ * Palette: neutral dark background with a warm accent green so the
+ * migration flow feels supportive, not warning-shaped. Success/failure
+ * splashes use the standard NC green (#46ba61) / red (#e9322d) so
+ * users recognise the semantics from other NC surfaces.
+ */
+
+/* ── Floating pill (persistent trigger, bottom-right) ────────── */
+#smail-migration-pill {
+    position: fixed;
+    z-index: 2100000000;
+    right: 24px;
+    bottom: 24px;
+    padding: 10px 18px;
+    border: 0;
+    border-radius: 999px;
+    background: #2b3a4a;
+    color: #fff;
+    font: 500 13px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28), 0 2px 4px rgba(0, 0, 0, 0.18);
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease, background 200ms ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 260px;
+}
+#smail-migration-pill:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32); }
+#smail-migration-pill:focus-visible { outline: 2px solid #7cc4a3; outline-offset: 2px; }
+#smail-migration-pill[data-state="idle"] { background: #2b3a4a; }
+#smail-migration-pill[data-state="running"] {
+    background: #275c46;
+    animation: smail-mig-pulse 2s ease-in-out infinite;
+}
+#smail-migration-pill[data-state="done"] { background: #46ba61; }
+#smail-migration-pill[data-state="fail"] { background: #b8433f; }
+#smail-migration-pill .smail-pill-icon { font-size: 15px; line-height: 1; }
+#smail-migration-pill .smail-pill-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@keyframes smail-mig-pulse {
+    0%, 100% { box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28), 0 0 0 0 rgba(70, 186, 97, 0.5); }
+    50%      { box-shadow: 0 6px 22px rgba(0, 0, 0, 0.28), 0 0 0 12px rgba(70, 186, 97, 0); }
+}
+
+/* ── Overlay (backdrop + modal) ─────────────────────────────── */
+#smail-migration-overlay[aria-hidden="true"] { display: none; }
+#smail-migration-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2100000001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+    font: 400 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #eaeff5;
+}
+.smail-mig-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(6, 12, 20, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    cursor: pointer;
+}
+.smail-mig-modal {
+    position: relative;
+    max-width: 520px;
+    width: 100%;
+    max-height: calc(100vh - 40px);
+    overflow: auto;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #1a2431 0%, #131b26 100%);
+    border: 1px solid #2a3a4d;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55), 0 8px 20px rgba(0, 0, 0, 0.35);
+    padding: 32px 32px 22px;
+    animation: smail-mig-pop 180ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+@keyframes smail-mig-pop {
+    from { transform: translateY(8px) scale(0.98); opacity: 0; }
+    to   { transform: none; opacity: 1; }
+}
+
+.smail-mig-close {
+    position: absolute;
+    top: 10px; right: 10px;
+    width: 32px; height: 32px;
+    background: transparent;
+    border: 0;
+    color: #8a9baa;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: color 120ms, background 120ms;
+}
+.smail-mig-close:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
+
+/* ── Content ────────────────────────────────────────────────── */
+.smail-mig-body h2 {
+    margin: 0 0 8px;
+    font-size: 22px;
+    font-weight: 600;
+    color: #f4f7fb;
+    letter-spacing: -0.01em;
+}
+.smail-mig-body p { margin: 8px 0; color: #c0cad4; }
+.smail-mig-lead { color: #b0bccc; margin-bottom: 16px !important; }
+.smail-mig-lead-small { color: #8a9bab; font-size: 12px; }
+
+.smail-mig-icon-lg  { font-size: 42px; line-height: 1; margin-bottom: 4px; }
+.smail-mig-icon-huge { font-size: 68px; line-height: 1; margin-bottom: 12px; }
+.smail-mig-icon-ok { color: #46ba61; }
+.smail-mig-icon-fail { color: #e9322d; }
+.smail-mig-splash { text-align: center; padding: 20px 0 10px; }
+
+.smail-mig-usp {
+    margin: 12px 0 20px;
+    padding: 0 0 0 20px;
+    color: #c0cad4;
+}
+.smail-mig-usp li { margin: 6px 0; }
+
+/* ── Form ───────────────────────────────────────────────────── */
+.smail-mig-field {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0;
+}
+.smail-mig-field-label {
+    font-size: 13px;
+    color: #a0acbb;
+    text-align: right;
+}
+.smail-mig-field input[type="text"],
+.smail-mig-field input[type="password"],
+.smail-mig-field input[type="number"] {
+    width: 100%;
+    padding: 9px 12px;
+    background: #0f1721;
+    border: 1px solid #2a3a4d;
+    border-radius: 8px;
+    color: #eaeff5;
+    font: inherit;
+    box-sizing: border-box;
+    outline: 0;
+    transition: border-color 120ms, background 120ms;
+}
+.smail-mig-field input:focus {
+    border-color: #46ba61;
+    background: #142233;
+}
+.smail-mig-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #b0bccc;
+    cursor: pointer;
+}
+.smail-mig-inline input { accent-color: #46ba61; }
+
+/* ── Errors + warnings ──────────────────────────────────────── */
+.smail-mig-err {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(233, 50, 45, 0.12);
+    border: 1px solid rgba(233, 50, 45, 0.32);
+    color: #f7b6b3;
+    font-size: 13px;
+}
+.smail-mig-err-detail {
+    margin: 10px 0 0;
+    padding: 8px 10px;
+    background: #0e161f;
+    border: 1px solid #2a3a4d;
+    border-radius: 6px;
+    color: #c0cad4;
+    font: 12px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    white-space: pre-wrap;
+    max-height: 140px;
+    overflow: auto;
+}
+.smail-mig-warn {
+    margin-top: 18px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(255, 176, 0, 0.10);
+    border: 1px solid rgba(255, 176, 0, 0.36);
+    color: #f6d99a;
+    font-size: 13px;
+}
+.smail-mig-warn strong { color: #ffcb61; }
+
+/* ── Summary boxes ──────────────────────────────────────────── */
+.smail-mig-summary {
+    padding: 12px 14px;
+    background: rgba(70, 186, 97, 0.08);
+    border: 1px solid rgba(70, 186, 97, 0.32);
+    border-radius: 8px;
+    margin: 12px 0 8px;
+    color: #d1dde7;
+}
+.smail-mig-summary strong { color: #eaeff5; }
+.smail-mig-summary-count {
+    margin-top: 4px;
+    color: #7cc4a3;
+    font-weight: 600;
+}
+.smail-mig-queue {
+    margin: 8px 0 12px;
+    color: #c0cad4;
+    font-size: 13px;
+    text-align: center;
+}
+
+/* ── Progress bar ───────────────────────────────────────────── */
+.smail-mig-bar-wrap {
+    margin: 12px 0 8px;
+    height: 12px;
+    background: #0f1721;
+    border: 1px solid #2a3a4d;
+    border-radius: 999px;
+    overflow: hidden;
+}
+.smail-mig-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #46ba61 0%, #7cc4a3 100%);
+    transition: width 500ms ease;
+    border-radius: 999px;
+}
+.smail-mig-progress-stats {
+    display: flex;
+    justify-content: space-between;
+    margin: 4px 0 14px;
+    font-size: 12px;
+    color: #8a9baa;
+}
+
+/* ── Footer buttons ─────────────────────────────────────────── */
+.smail-mig-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #2a3a4d;
+}
+.smail-btn {
+    padding: 9px 20px;
+    border: 0;
+    border-radius: 8px;
+    font: 500 13px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    cursor: pointer;
+    transition: background 140ms, transform 80ms;
+}
+.smail-btn:disabled { opacity: 0.55; cursor: wait; }
+.smail-btn-primary { background: #46ba61; color: #fff; }
+.smail-btn-primary:hover:not(:disabled) { background: #3fa356; transform: translateY(-1px); }
+.smail-btn-secondary {
+    background: transparent;
+    color: #c0cad4;
+    border: 1px solid #2a3a4d;
+}
+.smail-btn-secondary:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); color: #fff; }
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 540px) {
+    .smail-mig-modal { padding: 24px 20px 18px; }
+    .smail-mig-field { grid-template-columns: 1fr; gap: 4px; }
+    .smail-mig-field-label { text-align: left; }
+    #smail-migration-pill {
+        right: 12px;
+        bottom: 12px;
+        padding: 9px 14px;
+    }
+    #smail-migration-pill .smail-pill-text { max-width: 140px; }
+}
