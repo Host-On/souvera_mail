@@ -1,0 +1,236 @@
+<?php
+
+declare(strict_types=1);
+
+namespace OCA\SouveraMail\Controller;
+
+use OCA\SouveraMail\Service\MigrationService;
+use OCA\SouveraMail\Service\ProviderToolsUnavailable;
+use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\DataResponse;
+use OCP\IRequest;
+use Psr\Log\LoggerInterface;
+
+/**
+ * REST endpoints powering the "Alte Mails importieren" welcome-wizard.
+ *
+ * All routes are scoped to the currently authenticated NC user — the
+ * user id is NEVER read from the client. Provider.tools credentials
+ * (source-side host / port / user / password) come from the request
+ * body, are forwarded straight to provider.tools, and NEVER touched
+ * again after that call returns.
+ *
+ * Endpoints (all prefixed by `/apps/souvera_mail/`):
+ *   GET  /migration/welcome-state         → whether to show welcome
+ *   POST /migration/dismiss-welcome       → mark "Nicht mehr zeigen"
+ *   POST /migration/test-connection       → pre-flight source-cred check
+ *   POST /migration/list-folders          → source folder inventory
+ *   POST /migration/start                 → begin migration job
+ *   GET  /migration/status                → active job + cached progress
+ *   POST /migration/dismiss/{jobId}       → hide a terminal job from UI
+ */
+class MigrationController extends Controller
+{
+    public function __construct(
+        string $appName,
+        IRequest $request,
+        private MigrationService $migrations,
+        private LoggerInterface $logger,
+        private ?string $userId,
+    ) {
+        parent::__construct($appName, $request);
+    }
+
+    #[NoAdminRequired]
+    public function welcomeState(): DataResponse
+    {
+        if ($this->userId === null) {
+            return $this->error('unauthenticated', Http::STATUS_UNAUTHORIZED);
+        }
+        return new DataResponse([
+            'status' => 'ok',
+            'state' => $this->migrations->getWelcomeStateForUser($this->userId),
+        ]);
+    }
+
+    #[NoAdminRequired]
+    public function dismissWelcome(): DataResponse
+    {
+        if ($this->userId === null) {
+            return $this->error('unauthenticated', Http::STATUS_UNAUTHORIZED);
+        }
+        $this->migrations->dismissWelcome($this->userId);
+        return new DataResponse(['status' => 'ok']);
+    }
+
+    #[NoAdminRequired]
+    public function testConnection(
+        string $host = '',
+        int $port = 993,
+        string $user = '',
+        string $password = '',
+        bool $secure = true,
+    ): DataResponse {
+        if ($this->userId === null) {
+            return $this->error('unauthenticated', Http::STATUS_UNAUTHORIZED);
+        }
+        $errors = $this->validateSourceInput($host, $port, $user, $password);
+        if ($errors !== []) {
+            return $this->error(\implode('; ', $errors), Http::STATUS_BAD_REQUEST);
+        }
+        if (!$this->migrations->isAvailable()) {
+            return $this->error(
+                'Import-Dienst ist auf dieser Instanz nicht aktiviert. Bitte den Administrator kontaktieren.',
+                Http::STATUS_SERVICE_UNAVAILABLE
+            );
+        }
+        try {
+            $result = $this->migrations->testSourceConnection($host, $port, $user, $password, $secure);
+            return new DataResponse(['status' => 'ok', 'result' => $result]);
+        } catch (ProviderToolsUnavailable $e) {
+            return $this->error($e->getMessage(), Http::STATUS_BAD_GATEWAY);
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Migration test-connection failed: ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
+            return $this->error($e->getMessage(), Http::STATUS_BAD_GATEWAY);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function listFolders(
+        string $host = '',
+        int $port = 993,
+        string $user = '',
+        string $password = '',
+        bool $secure = true,
+    ): DataResponse {
+        if ($this->userId === null) {
+            return $this->error('unauthenticated', Http::STATUS_UNAUTHORIZED);
+        }
+        $errors = $this->validateSourceInput($host, $port, $user, $password);
+        if ($errors !== []) {
+            return $this->error(\implode('; ', $errors), Http::STATUS_BAD_REQUEST);
+        }
+        if (!$this->migrations->isAvailable()) {
+            return $this->error(
+                'Import-Dienst ist auf dieser Instanz nicht aktiviert.',
+                Http::STATUS_SERVICE_UNAVAILABLE
+            );
+        }
+        try {
+            $result = $this->migrations->listSourceFolders($host, $port, $user, $password, $secure);
+            return new DataResponse(['status' => 'ok', 'result' => $result]);
+        } catch (ProviderToolsUnavailable $e) {
+            return $this->error($e->getMessage(), Http::STATUS_BAD_GATEWAY);
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Migration list-folders failed: ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
+            return $this->error($e->getMessage(), Http::STATUS_BAD_GATEWAY);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function start(
+        string $host = '',
+        int $port = 993,
+        string $user = '',
+        string $password = '',
+        bool $secure = true,
+    ): DataResponse {
+        if ($this->userId === null) {
+            return $this->error('unauthenticated', Http::STATUS_UNAUTHORIZED);
+        }
+        $errors = $this->validateSourceInput($host, $port, $user, $password);
+        if ($errors !== []) {
+            return $this->error(\implode('; ', $errors), Http::STATUS_BAD_REQUEST);
+        }
+        if (!$this->migrations->isAvailable()) {
+            return $this->error(
+                'Import-Dienst ist auf dieser Instanz nicht aktiviert.',
+                Http::STATUS_SERVICE_UNAVAILABLE
+            );
+        }
+        try {
+            $job = $this->migrations->startForUser($this->userId, $host, $port, $user, $password, $secure);
+            return new DataResponse(['status' => 'ok', 'job' => $job], Http::STATUS_CREATED);
+        } catch (\InvalidArgumentException $e) {
+            return $this->error($e->getMessage(), Http::STATUS_BAD_REQUEST);
+        } catch (ProviderToolsUnavailable $e) {
+            return $this->error($e->getMessage(), Http::STATUS_BAD_GATEWAY);
+        } catch (\RuntimeException $e) {
+            // Rate-limit-hit ("A migration is already active …") + other
+            // config-space runtime errors → 409 Conflict is the closest
+            // fit and lets the frontend surface a "resume-view" link.
+            $isRateLimit = \str_contains($e->getMessage(), 'already active');
+            return $this->error(
+                $e->getMessage(),
+                $isRateLimit ? Http::STATUS_CONFLICT : Http::STATUS_INTERNAL_SERVER_ERROR
+            );
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Migration start failed: ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
+            return $this->error($e->getMessage(), Http::STATUS_BAD_GATEWAY);
+        }
+    }
+
+    #[NoAdminRequired]
+    public function status(): DataResponse
+    {
+        if ($this->userId === null) {
+            return $this->error('unauthenticated', Http::STATUS_UNAUTHORIZED);
+        }
+        $active = $this->migrations->getActiveJobForUser($this->userId);
+        if ($active !== null) {
+            return new DataResponse(['status' => 'ok', 'active' => $active, 'latest' => null]);
+        }
+        $latest = $this->migrations->getLatestJobForUser($this->userId);
+        return new DataResponse(['status' => 'ok', 'active' => null, 'latest' => $latest]);
+    }
+
+    #[NoAdminRequired]
+    public function dismissJob(int $jobId = 0): DataResponse
+    {
+        if ($this->userId === null) {
+            return $this->error('unauthenticated', Http::STATUS_UNAUTHORIZED);
+        }
+        if ($jobId <= 0) {
+            return $this->error('jobId must be > 0', Http::STATUS_BAD_REQUEST);
+        }
+        $this->migrations->dismissJobForUser($this->userId, $jobId);
+        return new DataResponse(['status' => 'ok']);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function validateSourceInput(string $host, int $port, string $user, string $password): array
+    {
+        $errors = [];
+        if (\trim($host) === '') {
+            $errors[] = 'host must not be empty';
+        }
+        if ($port < 1 || $port > 65535) {
+            $errors[] = 'port must be 1..65535';
+        }
+        if (\trim($user) === '') {
+            $errors[] = 'user must not be empty';
+        }
+        if ($password === '') {
+            $errors[] = 'password must not be empty';
+        }
+        return $errors;
+    }
+
+    private function error(string $message, int $status): DataResponse
+    {
+        return new DataResponse(['status' => 'error', 'message' => $message], $status);
+    }
+}

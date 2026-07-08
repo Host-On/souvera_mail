@@ -6,6 +6,124 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.9] — 2026-02-19 (Migration-Wizard Phase 1 — Backend gegen provider.tools)
+
+### Neu — Backend-Fundament für „Alte Mails importieren"
+
+Erste Ausbaustufe des Import-Wizards. Frontend folgt in Phase 2
+(v0.14.10). Diese Version liefert das komplette Backend inkl.
+DB, Service-Layer, REST-Endpoints, Background-Jobs und Tests —
+funktional testbar per `curl`, sichtbar wird's für User erst mit
+dem UI-Patch in v0.14.10.
+
+### Was neu ist
+
+- **DB-Tabelle `oc_souvera_migrations`** — eine Zeile pro Import-Job,
+  mit Status (`pending`/`running`/`completed`/`failed`/`dismissed`),
+  gecachten Progress-JSON, Source-Fingerprint und Stalwart-App-PW-ID
+  für Auto-Revoke. Sensibles wird nie gespeichert: das Old-Provider-
+  Passwort fließt direkt zu provider.tools und wird nie in unserer DB
+  abgelegt. Migration `Version001409Date20260219000000` legt die
+  Tabelle inkl. drei Indizes (`sm_mig_uid_ctime`, `sm_mig_uid_status`,
+  `sm_mig_status_utime`) an.
+- **`ProviderToolsClient`** — HTTP-Client für provider.tools v1
+  (`https://provider.tools/api/v1/`). Konsumiert die vier IMAP-Endpoints
+  `POST /imap/test-connection` (15s), `POST /imap/list-folders` (30s),
+  `POST /imap/migrate` (30s) und `GET /imap/migrate/{id}` (10s).
+  Bearer-Auth mit Token aus Souvera Central
+  (`ProviderTokenService::getToken()` — read-only per
+  SHARED_PROVIDER_TOKEN.md-Contract). Fehler → `ProviderToolsUnavailable`,
+  Controller mappt auf HTTP 502.
+- **`MigrationService`** — Orchestrator: pre-flight Source-Cred-Check,
+  mint einer Stalwart-only App-Password (label
+  `Souvera Import YYYY-MM-DD HH:MM`, NICHT in NC-Device-Liste sichtbar),
+  destination-Stanza-Assembly (Host aus App-Config /
+  `overwrite.cli.url` / `trusted_domains[0]`, Port 993 fix,
+  `secure=true` fix), Job-Row-Insert VOR provider.tools-POST
+  (Zwei-Phasen-Commit), automatischer Two-Sided-Rollback bei
+  Start-Fehler. Rate-Limit: max **1** aktive Migration pro User (429
+  → 409 Conflict).
+- **`MigrationController`** — 7 Endpoints unter
+  `/apps/souvera_mail/migration/`:
+  - `GET  /welcome-state` — Wizard-Zustand (dismissed? active job?
+    last job?) beim Öffnen
+  - `POST /dismiss-welcome` — „Nicht mehr zeigen"-Flag pro User
+  - `POST /test-connection` — Pre-flight vor „Weiter"-Klick, User sieht
+    grünes ✓ / rotes ✗
+  - `POST /list-folders` — optional: Ordner-Preview „12 Ordner, 8 432
+    Nachrichten werden übertragen"
+  - `POST /start` — Job anlegen
+  - `GET  /status` — cached progress (Poller füttert)
+  - `POST /dismiss/{jobId}` — terminal-Job aus UI ausblenden
+- **`MigrationPoller`** (Background-Job) — läuft alle 60s, refresht alle
+  aktiven Jobs gegen provider.tools, cached Response in
+  `progress_json`. Batch-Size 50, `TIME_INSENSITIVE` (überlebt
+  NC-Cron-Load).
+- **`MigrationCleanup`** (Background-Job, täglich) — Belt-and-Suspenders:
+  scannt terminale Rows mit noch-nicht-widerrufener App-PW-ID und
+  wiederholt den Revoke, falls der Poller-Pfad einen Netz-Fehler hatte.
+- **`AppPasswordService`** um zwei neue public methods erweitert:
+  - `createStalwartOnlyForMigration(uid, label)` → **nur** Stalwart-Seite,
+    kein NC-Token, keine Mapping-Zeile, nicht in
+    Connected-Devices-Liste sichtbar.
+  - `revokeStalwartOnlyForMigration(uid, stalwartAppId, reason)` →
+    idempotent, non-fatal bei Fehler (Cleanup-Cron retry).
+
+### Voraussetzungen für die Aktivierung auf einer Instanz
+
+```bash
+# 1. provider.tools API-Token in Souvera Central setzen (einmalig):
+printf '%s' 'DEIN_PROVIDER_TOOLS_TOKEN' | \
+    sudo -u www-data php occ souvera:provider-token:set --stdin
+
+# 2. Ziel-IMAP-Host (Default: aus overwrite.cli.url ableiten,
+#    Override wenn IMAP-Endpoint anders heisst als NC-Host):
+sudo -u www-data php occ config:app:set souvera_mail \
+    stalwart_imap_host --value "mail.example.souvera.work"
+
+# 3. Nicht-Standard-Port oder unverschlüsselt? (Selten nötig)
+sudo -u www-data php occ config:app:set souvera_mail \
+    stalwart_imap_port --value "993"
+sudo -u www-data php occ config:app:set souvera_mail \
+    stalwart_imap_secure --value "true"
+```
+
+Wenn der Token in Central nicht gesetzt ist, gibt jedes Migration-
+Endpoint `503 Service Unavailable` mit einer klaren Hinweis-Message
+zurück — kein 500, keine kaputte UI, keine unfreiwilligen Migrations-
+Versuche gegen `null`-Token.
+
+### Sicherheit
+
+- **Source-Passwort wird NIEMALS in unserer DB gespeichert** — es
+  fließt einmal durch den Controller in den `ProviderToolsClient` in
+  die `POST /imap/migrate`-Payload und wird direkt danach aus dem PHP-
+  Prozess vergessen.
+- **Destination-Passwort ist ein short-lived Stalwart App-PW** mit
+  Label `Souvera Import <timestamp>`, automatisch widerrufen sobald
+  provider.tools `completed` oder `failed` meldet.
+- **Belt-and-Suspenders**: `MigrationCleanup`-Cron scannt täglich nach
+  terminalen Rows mit noch-nicht-widerrufener App-PW-ID.
+- **Rate-Limit**: max 1 aktive Migration pro User — verhindert
+  parallel-Runs, die die provider.tools-Queue oder das Ziel-Postfach
+  belasten würden.
+
+### Notes
+
+- Neue Regression-Tests:
+  - `tests/test_provider_tools_client.php` (34 Assertions) — pinnt
+    Base-URL, Auth-Header, Timeouts, Token-Resolution über Central,
+    Endpoint-Pfade, Error-Mapping.
+  - `tests/test_migration_backend.php` (~60 Assertions) — pinnt Entity-
+    Statuses, Mapper-Queries, DB-Schema (Spalten + Indizes),
+    Service-Rate-Limit, Start-Flow-Order (mint → insert → call),
+    Roll-back-Reasons, Refresh-Transition (`completed`/`failed` →
+    revoke + blank stalwart_app_id), Destination-Host-Cascade, alle 7
+    Controller-Endpoints + Auth + Validation, Routes, Background-Job-
+    Registrierung + Intervalle.
+- Total local suite: **38 suites / 1338 assertions passing**
+  (was 36 / 1205).
+
 ## [0.14.8] — 2026-02-19 (Send-As Identität wird automatisch vorausgewählt)
 
 ### Neu — Anwender-sichtbar

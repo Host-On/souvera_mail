@@ -447,6 +447,70 @@ class AppPasswordService
     }
 
     /**
+     * Migration-scoped app password: Stalwart side ONLY (no NC-token,
+     * no mapping row, no DAV surface). Returned secret is used exactly
+     * once by MigrationService to POST /imap/migrate at provider.tools,
+     * then revoked from BOTH the completion path (success/failure) and
+     * the nightly MigrationCleanup cron (belt-and-suspenders).
+     *
+     * We deliberately DO NOT reuse {@see createForUser} for imports:
+     *  - The user should not see the migration credential in their
+     *    connected-devices list (it's not a user-facing token).
+     *  - The DAV/filesystem scope on an NC auth token is unnecessary
+     *    for an IMAP-only receiving side and expands the blast radius
+     *    if the temp secret leaked before we revoke it.
+     *  - No mapping row means no bookkeeping cascade with the combined
+     *    revocation flow.
+     *
+     * @return array{id: string, secret: string, username: string}
+     */
+    public function createStalwartOnlyForMigration(string $userId, string $label): array
+    {
+        $label = \trim($label);
+        if ($label === '') {
+            throw new \InvalidArgumentException('label must not be empty');
+        }
+        if (\mb_strlen($label) > 120) {
+            $label = \mb_substr($label, 0, 120);
+        }
+        $email = $this->userContext->resolveEmail($userId);
+        $accountId = $this->userContext->resolveAccountId($userId);
+        $bearer = $this->userContext->resolveBearer($userId);
+
+        $created = $this->createStalwartAppPassword($accountId, $bearer, $label);
+        return [
+            'id' => $created['id'],
+            'secret' => $created['secret'],
+            'username' => $email,
+        ];
+    }
+
+    /**
+     * Revoke a migration-scoped app password (Stalwart side only).
+     * Safe to call even if the password was already destroyed (idempotent):
+     * the Stalwart destroy call itself is idempotent, and no mapping row
+     * to clean up.
+     */
+    public function revokeStalwartOnlyForMigration(string $userId, string $stalwartAppId, string $reason = 'migration-finished'): void
+    {
+        if ($stalwartAppId === '') {
+            return;
+        }
+        try {
+            $accountId = $this->userContext->resolveAccountId($userId);
+            $bearer = $this->userContext->resolveBearer($userId);
+            $this->destroyStalwartAppPassword($accountId, $bearer, $stalwartAppId, $reason);
+        } catch (\Throwable $e) {
+            // Non-fatal — the nightly MigrationCleanup cron will retry.
+            $this->logger->warning(
+                'Souvera Mail: migration app-password revoke failed (will retry via cron): '
+                . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
+        }
+    }
+
+    /**
      * @return array{id: string, secret: string}
      */
     private function createStalwartAppPassword(string $accountId, string $bearer, string $description): array

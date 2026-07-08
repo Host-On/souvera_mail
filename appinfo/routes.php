@@ -68,5 +68,41 @@ return [
             'url' => '/connected-devices/sign-out-others',
             'verb' => 'POST'
         ],
+        [
+            'name' => 'migration#welcomeState',
+            'url' => '/migration/welcome-state',
+            'verb' => 'GET'
+        ],
+        [
+            'name' => 'migration#dismissWelcome',
+            'url' => '/migration/dismiss-welcome',
+            'verb' => 'POST'
+        ],
+        [
+            'name' => 'migration#testConnection',
+            'url' => '/migration/test-connection',
+            'verb' => 'POST'
+        ],
+        [
+            'name' => 'migration#listFolders',
+            'url' => '/migration/list-folders',
+            'verb' => 'POST'
+        ],
+        [
+            'name' => 'migration#start',
+            'url' => '/migration/start',
+            'verb' => 'POST'
+        ],
+        [
+            'name' => 'migration#status',
+            'url' => '/migration/status',
+            'verb' => 'GET'
+        ],
+        [
+            'name' => 'migration#dismissJob',
+            'url' => '/migration/dismiss/{jobId}',
+            'verb' => 'POST',
+            'requirements' => ['jobId' => '\d+']
+        ],
     ]
 ];
