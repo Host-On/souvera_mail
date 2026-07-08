@@ -6,6 +6,98 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.11] — 2026-02-19 (Frontend-Vollumbau auf Vue 3 · Souvera Design System)
+
+### Neu — Souvera-weit einheitliches Layout
+
+Alle Souvera-eigenen UI-Flächen im Nextcloud-Wrapper von Souvera Mail sind
+jetzt in **Vue 3 mit `@nextcloud/vue` v9** aufgebaut — 1:1 nach dem
+gemeinsamen **Souvera Design System** (siehe `SOUVERA_DESIGN_SYSTEM.md`).
+Damit fügt sich Souvera Mail visuell und interaktiv nahtlos in Souvera
+Central und Souvera Shield ein — gleiche Höhen, gleiche Radien, gleiche
+Farben, gleiche Focus-Ringe, gleiche Icon-Sprache
+(`vue-material-design-icons`).
+
+Was der Anwender sieht:
+- **Migration-Wizard** komplett in Vue 3 neu gebaut. 5 Screens (Welcome,
+  IMAP-Form, Confirm, Progress, Terminal) als eigenständige Vue-SFCs
+  in `src/components/screens/*.vue`. Jeder Screen nutzt native NC-Vue-
+  Komponenten (`NcButton`, `NcTextField`, `NcCheckboxRadioSwitch`,
+  `NcNoteCard`, `NcLoadingIcon`, `NcDialog`) — automatisches Light-/
+  Dark-Theming, automatische Host-Theme-Übernahme, konsistente
+  44 px-Steuerhöhen, konsistente 12 px-Radien, konsistente Focus-Ringe.
+- **Floating Pill** unten rechts als eigene Vue-Komponente
+  (`MigrationPill.vue`). Farben kommen ausschließlich aus
+  `var(--color-primary-element)`, `var(--color-success)` und
+  `var(--color-error)` — kein einziger fester Hex-Wert mehr im Frontend.
+  Pulse-Animation nutzt jetzt `--color-success-rgb` statt eines
+  eingebrannten Grüns.
+- **Icon-Sprache**: Envelope, Check-Circle, Arrow-Right, Play,
+  Alert-Circle etc. aus `vue-material-design-icons` (per Design
+  System §8 verbindlich). Keine Emojis, keine eigenen SVGs im Overlay.
+
+### Was fachlich UNVERÄNDERT bleibt
+
+Der User hat es explizit so gefordert:
+- Alle 7 Backend-Endpunkte unter `/apps/souvera_mail/migration/*`
+- Rate-Limit (max. 1 aktiver Job pro User)
+- `MigrationPoller`- / `MigrationCleanup`-Cron
+- CSRF-Header `requesttoken`, `credentials: 'same-origin'`
+- Passwort-Wipe direkt nach `/start`
+- 5 s-Polling-Intervall gegen den 60 s-Backend-Cache
+- Auto-Resume bei laufender Migration
+
+### Technische Details
+
+- **Neu**: `package.json`, `webpack.config.js`, `babel.config.js`,
+  `src/main.js`, `src/App.vue`, `src/composables/useMigration.js`,
+  `src/components/MigrationPill.vue`, `src/components/MigrationWizard.vue`,
+  `src/components/screens/{Welcome,ImapForm,Confirm,Progress,Terminal}Screen.vue`,
+  `src/styles/forms.css` (mit den `--sc-*`-Tokens aus dem Design System
+  in genau der Form, die Central verwendet).
+- **Build**: `yarn install --ignore-engines` + `yarn build` → Bundle
+  liegt in `js/souvera_mail-migration-wizard.js` (~377 KB minimiert,
+  Vue 3 + `@nextcloud/vue` v9 + alle Komponenten inline via
+  `style-loader`).  Bundle wird ins Git-Repo committet — der User
+  deployt manuell ohne `yarn install` auf der Prod-Maschine.
+- **PageController** lädt nur noch `souvera_mail-migration-wizard.js`
+  via `addScript('souvera_mail', 'souvera_mail-migration-wizard')`.
+  Die alte `addStyle('souvera_mail', 'migration-wizard')`-Zeile ist
+  weg — die Style-Definitionen kommen inline aus dem Vue-Bundle
+  (jeder `<style scoped>`-Block wird beim Import injiziert).
+- **Gelöscht**: `js/migration-wizard.js` (516 LOC vanilla-JS) +
+  `css/migration-wizard.css` (295 LOC handgeschriebenes CSS).
+  Ersatzlos durch Vue-Komponenten mit `<style scoped>`-Blöcken.
+
+### Design-System-Konformität
+
+Die neue Frontend-Schicht erfüllt **jeden** Punkt der Checkliste
+„Sieht aus wie Central" aus `SOUVERA_DESIGN_SYSTEM.md` §14, sofern
+strukturell möglich (die Snappymail-Engine selbst — nicht Souvera-
+eigenes UI — bleibt Knockout, das ist eine 200 KB-Fremdcodebase):
+
+- ✅ Souvera-Content-Wrapper (`.souvera-content`)
+- ✅ Nur NC-Theme-Variablen für Farben/Radien; **keine** festen Hex-Werte
+- ✅ `forms.css`-Tokens 1:1 übernommen (44 px Höhe,
+  `--border-radius-large`, Feld-/Abschnittsabstände)
+- ✅ Icons aus `vue-material-design-icons`
+- ✅ `NcButton`/`NcTextField`/`NcNoteCard`/`NcLoadingIcon` statt Eigenbau
+- ✅ Response-Unwrap-freundliches JSON-Fetch mit vollständiger
+  `body.message`-Weiterreichung an den Anwender
+- ✅ `data-testid` an allen interaktiven Elementen (23 neue Testids)
+- ✅ Deutsche Quelltexte via `t()` / `n()`
+
+### Notes
+
+- Neuer Test: **`tests/test_migration_wizard_frontend.php`** komplett
+  umgeschrieben (60+ Assertions) — pinnt Package-Stack, Design-System-
+  Tokens, Composable-API-Verträge, Screen-Registration, CSRF-Header,
+  Passwort-Wipe, Poll-Intervall, keine Legacy-Assets mehr auf Platte,
+  Bundle >100 KB, PageController-Wiring, Bridge-Hardening, Version-
+  Bump + Changelog-Marker.
+- Total local suite: **39 suites / ~1450 assertions passing**
+  (was 39 / 1396 — nettes Plus durch die neuen Vue-Contract-Pins).
+
 ## [0.14.10] — 2026-02-19 (Migration-Wizard Phase 2 — Frontend/UI)
 
 ### Neu — Anwender-sichtbar

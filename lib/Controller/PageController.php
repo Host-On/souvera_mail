@@ -53,14 +53,15 @@ class PageController extends Controller
         $this->navigationManager->setActiveEntry('souvera_mail');
 
         \OCP\Util::addStyle('souvera_mail', 'embed');
-        // Souvera Mail v0.14.10: welcome-wizard for the IMAP-import
-        // flow. Loaded on EVERY page render — the wizard's own JS
-        // decides via GET /migration/welcome-state whether to actually
-        // show anything. The persistent floating pill is always shown
-        // for logged-in users so they can re-open the wizard from the
-        // main mail UI at any time.
-        \OCP\Util::addStyle('souvera_mail', 'migration-wizard');
-        \OCP\Util::addScript('souvera_mail', 'migration-wizard');
+        // Souvera Mail v0.14.11: welcome-wizard for the IMAP-import
+        // flow, now built on Vue 3 + @nextcloud/vue v9 following the
+        // Souvera Design System (shared with Central / Shield). The
+        // bundle carries its own CSS via style-loader, so a separate
+        // addStyle call is no longer needed. The wizard's own boot
+        // logic decides via GET /migration/welcome-state whether to
+        // actually render anything — a missing provider.tools token
+        // in Central keeps every visible element hidden.
+        \OCP\Util::addScript('souvera_mail', 'souvera_mail-migration-wizard');
 
         $this->engineHelper->startApp();
 

@@ -38,7 +38,7 @@
     background: var(--color-primary-element-light, #e3f2fd);
     color: var(--color-primary-element-text, #1e2b3a);
     border: 1px solid var(--color-primary-element, #1976d2);
-    border-radius: var(--border-radius-large, 8px);
+    border-radius: var(--border-radius-large, 12px);
     padding: 16px 20px;
     margin: 12px 0 24px 0;
     display: flex;
