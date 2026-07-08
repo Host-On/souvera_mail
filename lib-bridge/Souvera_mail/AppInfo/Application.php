@@ -44,6 +44,37 @@ declare(strict_types=1);
 
 namespace OCA\Souvera_mail\AppInfo;
 
+/*
+ * CRITICAL — pre-class `require_once` (added v0.14.10, 2026-02-19):
+ * When Nextcloud's memcache derives our namespace via `ucfirst($appId)`
+ * (i.e. before the `<namespace>` tag from info.xml has been repopulated
+ * into `core.appinfo`), NC autoloads THIS bridge Application via its
+ * composer classmap — NOT via the real \OCA\SouveraMail\AppInfo\Application
+ * file. If we don't require vendor/autoload.php HERE, the two spl hooks
+ * in `lib-bridge/namespace-bridge.php` (Hook 1 = PSR-4 fallback, Hook 2
+ * = underscore→CamelCase class_alias) never register — and the very
+ * next NC lookup (`OCA\Souvera_mail\Controller\PageController`) blows
+ * up with "class does not exist", crashing the app boot.
+ *
+ * v0.14.9 tickled this race window because `<background-jobs>` in
+ * info.xml shifted the Application load moment earlier in NC's boot.
+ * Live report SEG 2026-02-19 (self-recovered on cache clear).
+ *
+ * `require_once` is idempotent — if vendor/autoload.php has already
+ * been loaded (real Application, previous invocation, whatever) this
+ * is a no-op zero-cost line.
+ *
+ * Note: this require_once MUST live AFTER the namespace declaration
+ * (PHP forbids top-level statements between `declare` and `namespace`
+ * once the file has a namespace at all — hence the placement here).
+ * The `\dirname` walk goes up 3 dirs:
+ *   AppInfo → Souvera_mail → lib-bridge → app-root, then `/vendor/autoload.php`.
+ */
+$vendorAutoload = \dirname(__DIR__, 3) . '/vendor/autoload.php';
+if (\is_file($vendorAutoload)) {
+    require_once $vendorAutoload;
+}
+
 final class Application extends \OCA\SouveraMail\AppInfo\Application
 {
 }
