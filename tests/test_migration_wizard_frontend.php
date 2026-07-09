@@ -258,6 +258,53 @@ ok(str_contains($serviceSrc, 'public function findActiveJobForUser'),
     'MigrationService exposes findActiveJobForUser() (entity variant) for the controller',
     $passes, $failures);
 
+// v0.14.16 — user-initiated cancel while job is in the provider.tools queue
+$jobEntitySrc = (string) file_get_contents('/app/lib/Db/MigrationJob.php');
+$routesSrc    = (string) file_get_contents('/app/appinfo/routes.php');
+$progressSrc2 = (string) file_get_contents('/app/src/components/screens/ProgressScreen.vue');
+$composableSrc2 = (string) file_get_contents('/app/src/composables/useMigration.js');
+
+ok(str_contains($jobEntitySrc, "STATUS_CANCELLED  = 'cancelled'"),
+    'MigrationJob defines STATUS_CANCELLED', $passes, $failures);
+ok(str_contains($jobEntitySrc, 'self::STATUS_CANCELLED,'),
+    'STATUS_CANCELLED is in TERMINAL_STATUSES', $passes, $failures);
+
+ok(str_contains($serviceSrc, 'public function cancelJobForUser'),
+    'MigrationService exposes cancelJobForUser($userId, $jobId)',
+    $passes, $failures);
+ok(str_contains($serviceSrc, "!== MigrationJob::STATUS_PENDING"),
+    'cancelJobForUser refuses to cancel a non-pending row',
+    $passes, $failures);
+ok(str_contains($serviceSrc, "revokeStalwartOnlyForMigration")
+    && (bool) preg_match('#function cancelJobForUser[\s\S]{0,3000}revokeStalwartOnlyForMigration#', $serviceSrc),
+    'cancelJobForUser revokes the Stalwart temp app-password',
+    $passes, $failures);
+
+ok(str_contains($controllerSrc, 'public function cancelJob(int $jobId'),
+    'MigrationController exposes cancelJob endpoint', $passes, $failures);
+ok((bool) preg_match('#STATUS_CONFLICT#', $controllerSrc),
+    'cancelJob returns 409 CONFLICT when the job has already left pending',
+    $passes, $failures);
+ok(str_contains($routesSrc, "'migration#cancelJob'")
+    && str_contains($routesSrc, "'url' => '/migration/cancel/{jobId}'"),
+    'routes.php registers POST /migration/cancel/{jobId}',
+    $passes, $failures);
+
+ok(str_contains($composableSrc2, 'cancelActiveJob'),
+    'Composable exposes cancelActiveJob(jobId)', $passes, $failures);
+ok((bool) preg_match('#/migration/cancel/\$\{jobId\}#', $composableSrc2),
+    'Composable POSTs to /migration/cancel/{jobId}', $passes, $failures);
+
+ok(str_contains($progressSrc2, "state.value === 'pending'"),
+    'ProgressScreen only shows Cancel button while state === pending',
+    $passes, $failures);
+ok(str_contains($progressSrc2, 'cancelActiveJob'),
+    'ProgressScreen calls migration.cancelActiveJob on confirm',
+    $passes, $failures);
+ok(str_contains($progressSrc2, 'showConfirm'),
+    'ProgressScreen shows a Confirm dialog before cancelling',
+    $passes, $failures);
+
 // v0.14.14 — Backend (MigrationController.start) MUST accept and
 // forward `folders`; MigrationService.startForUser signature MUST
 // carry it into ProviderToolsClient::startMigration.
@@ -409,10 +456,10 @@ ok($nsPos !== false && $reqPos !== false && $nsPos < $reqPos,
 // ==============================================================
 // P — version bump + changelog markers
 // ==============================================================
-ok((bool) preg_match('#<version>0\.14\.(1[5-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
-    'info.xml version bumped to 0.14.15 (or later)', $passes, $failures);
-ok(str_contains($src['changelog'], '[0.14.15]'),
-    'CHANGELOG.md has a [0.14.15] section', $passes, $failures);
+ok((bool) preg_match('#<version>0\.14\.(1[6-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
+    'info.xml version bumped to 0.14.16 (or later)', $passes, $failures);
+ok(str_contains($src['changelog'], '[0.14.16]'),
+    'CHANGELOG.md has a [0.14.16] section', $passes, $failures);
 ok(stripos($src['changelog'], 'Vue 3') !== false
     || stripos($src['changelog'], 'Vue-3') !== false
     || stripos($src['changelog'], 'design system') !== false,

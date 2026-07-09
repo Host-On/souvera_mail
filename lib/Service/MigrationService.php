@@ -359,6 +359,75 @@ class MigrationService
     }
 
     /**
+     * v0.14.16 — user-initiated cancel while the job is still in the
+     * provider.tools queue (STATUS_PENDING).
+     *
+     * provider.tools has no cancel endpoint (see ProviderToolsClient.php
+     * §24-25). So we do the next best thing:
+     *
+     *   1. Revoke the temp Stalwart destination app-password NOW.
+     *      Any later worker-pickup at provider.tools will fail at
+     *      IMAP-AUTH — the job dies silently upstream.
+     *   2. Flip the local row to STATUS_CANCELLED with a friendly
+     *      errorMessage so the TerminalScreen can render it.
+     *   3. Bump updated_at + finished_at so the poller stops pinging
+     *      provider.tools for this row.
+     *
+     * We deliberately DO NOT allow cancel from STATUS_RUNNING: at that
+     * point provider.tools is actively APPENDing mails and yanking the
+     * app-password mid-transfer could corrupt a partially imported
+     * folder. If we ever need that path, add a separate `forceCancel`
+     * verb with a big red confirmation dialog.
+     *
+     * @throws \InvalidArgumentException  row does not belong to user
+     *                                     OR is not in STATUS_PENDING
+     * @throws DoesNotExistException      no such row
+     */
+    public function cancelJobForUser(string $userId, int $jobId): array
+    {
+        $job = $this->jobs->find($jobId);
+        if ($job->getUserId() !== $userId) {
+            throw new \InvalidArgumentException('job does not belong to user');
+        }
+        if ($job->getStatus() !== MigrationJob::STATUS_PENDING) {
+            throw new \InvalidArgumentException(
+                'Nur wartende Jobs (Warteschlange) können abgebrochen werden.'
+            );
+        }
+
+        // Step 1: revoke the destination app password so any later
+        // worker-pickup at provider.tools fails at IMAP-AUTH.  Failure
+        // to revoke is logged but NOT fatal — the nightly
+        // MigrationCleanup cron will pick up the orphan on the next
+        // run, and the job's terminal status still needs to stick.
+        $stalwartId = $job->getStalwartAppId();
+        if ($stalwartId !== null && $stalwartId !== '') {
+            try {
+                $this->appPasswords->revokeStalwartOnlyForMigration(
+                    $userId, $stalwartId, 'migration-cancelled'
+                );
+            } catch (\Throwable $e) {
+                $this->logger->warning(
+                    'Souvera Mail: revoke on cancel failed for jobId=' . $job->getId()
+                    . ' stalwartId=' . $stalwartId . ': ' . $e->getMessage(),
+                    ['app' => 'souvera_mail']
+                );
+            }
+            $job->setStalwartAppId(null);
+        }
+
+        // Step 2: flip local status to cancelled.
+        $now = $this->time->getTime();
+        $job->setStatus(MigrationJob::STATUS_CANCELLED);
+        $job->setErrorMessage('Vom Benutzer abgebrochen (war noch in der Warteschlange).');
+        $job->setUpdatedAt($now);
+        $job->setFinishedAt($now);
+        $this->jobs->update($job);
+
+        return $job->toApiArray();
+    }
+
+    /**
      * Poll provider.tools for the latest status of one job and persist
      * any state change. Called by both the MigrationPoller background
      * job (all active rows) and by the controller status endpoint when

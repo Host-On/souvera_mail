@@ -104,5 +104,14 @@ return [
             'verb' => 'POST',
             'requirements' => ['jobId' => '\d+']
         ],
+        [
+            // v0.14.16 — user-initiated cancel of a job that is still
+            // in the provider.tools queue (STATUS_PENDING). See
+            // MigrationService::cancelJobForUser() for the semantics.
+            'name' => 'migration#cancelJob',
+            'url' => '/migration/cancel/{jobId}',
+            'verb' => 'POST',
+            'requirements' => ['jobId' => '\d+']
+        ],
     ]
 ];

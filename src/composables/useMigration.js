@@ -223,6 +223,23 @@ export function useMigration() {
 		if (status.value?.id === jobId) status.value = null
 	}
 
+	/**
+	 * v0.14.16 — user-initiated cancel while the job is still in the
+	 * provider.tools queue. Backend rejects with HTTP 409 if the job
+	 * has already transitioned to STATUS_RUNNING.
+	 */
+	async function cancelActiveJob(jobId) {
+		const body = await jsonFetch(
+			generateUrl(`/apps/souvera_mail/migration/cancel/${jobId}`),
+			{ method: 'POST' },
+		)
+		activeJob.value = null
+		status.value = body?.job || null
+		lastJob.value = body?.job || null
+		stopPolling()
+		return body
+	}
+
 	// --- polling ----------------------------------------------------
 	function startPolling(intervalMs = 5000) {
 		if (pollHandle) return
@@ -261,6 +278,7 @@ export function useMigration() {
 		startMigration,
 		loadStatus,
 		dismissJob,
+		cancelActiveJob,
 		startPolling,
 		stopPolling,
 		// helpers

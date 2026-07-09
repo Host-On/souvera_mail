@@ -252,6 +252,46 @@ class MigrationController extends Controller
     }
 
     /**
+     * v0.14.16 — Cancel a job that is still in the provider.tools
+     * queue (STATUS_PENDING). Fails with HTTP 409 CONFLICT once the
+     * upstream worker has picked up the job (STATUS_RUNNING), because
+     * pulling the app-password mid-transfer could corrupt a partially
+     * imported folder.
+     */
+    #[NoAdminRequired]
+    public function cancelJob(int $jobId = 0): DataResponse
+    {
+        if ($this->userId === null) {
+            return $this->error('unauthenticated', Http::STATUS_UNAUTHORIZED);
+        }
+        if ($jobId <= 0) {
+            return $this->error('jobId must be > 0', Http::STATUS_BAD_REQUEST);
+        }
+        try {
+            $job = $this->migrations->cancelJobForUser($this->userId, $jobId);
+            return new DataResponse(['status' => 'ok', 'job' => $job]);
+        } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+            return $this->error('Auftrag nicht gefunden.', Http::STATUS_NOT_FOUND);
+        } catch (\InvalidArgumentException $e) {
+            // "does not belong to user" → 403; "not pending" → 409
+            $status = \str_contains($e->getMessage(), 'does not belong')
+                ? Http::STATUS_FORBIDDEN
+                : Http::STATUS_CONFLICT;
+            return $this->error($e->getMessage(), $status);
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                'Souvera Mail: cancel job failed uid=' . $this->userId
+                . ' jobId=' . $jobId . ': ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
+            return $this->error(
+                'Interner Fehler beim Abbruch.',
+                Http::STATUS_INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    /**
      * @return list<string>
      */
     private function validateSourceInput(string $host, int $port, string $user, string $password): array

@@ -53,15 +53,27 @@ class MigrationJob extends Entity
     public const STATUS_RUNNING    = 'running';
     public const STATUS_COMPLETED  = 'completed';
     public const STATUS_FAILED     = 'failed';
+    public const STATUS_CANCELLED  = 'cancelled';
     public const STATUS_DISMISSED  = 'dismissed';
 
     /** Statuses that still consume queue slots + require polling. */
     public const ACTIVE_STATUSES = [self::STATUS_PENDING, self::STATUS_RUNNING];
 
-    /** Statuses that are terminal — no more polling, ready for cleanup. */
+    /**
+     * Statuses that are terminal — no more polling, ready for cleanup.
+     *
+     * `cancelled` is a *terminal* state: the operator asked us to stop
+     * while the job was still in the provider.tools queue. Since
+     * provider.tools has no cancel endpoint (see ProviderToolsClient.php
+     * §24-25), we revoke the temp Stalwart app password locally. Any
+     * later worker-pickup fails at IMAP-AUTH and the job silently dies
+     * upstream — the local row already sits at `cancelled` and we
+     * never surface the upstream flake.
+     */
     public const TERMINAL_STATUSES = [
         self::STATUS_COMPLETED,
         self::STATUS_FAILED,
+        self::STATUS_CANCELLED,
         self::STATUS_DISMISSED,
     ];
 

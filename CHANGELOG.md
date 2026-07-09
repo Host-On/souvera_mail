@@ -6,6 +6,86 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.16] — 2026-02-19 (Feature: Cancel Migration während Warteschlange)
+
+### Operator-Wunsch
+
+> „Solange man noch in der Warteschlange ist, sollte man den Auftrag
+> doch abbrechen können oder?! Aktuell sind wir seit mehr als einer
+> Stunde in der Warteschlange und das würde ich gern abbrechen …"
+
+### Umsetzung
+
+provider.tools hat **kein** externes Cancel-Endpoint (steht so im
+Docblock von `ProviderToolsClient.php` §24-25). Wir umgehen das mit
+einem eleganten Trick, ganz ohne provider.tools-API zu erweitern:
+
+1. **Ziel-App-Passwort widerrufen** → wenn provider.tools später
+   einen Worker frei hat und den Job aufgreifen will, scheitert er
+   **automatisch** am IMAP-AUTH gegen Stalwart. Der Job stirbt
+   upstream silent.
+2. **Lokaler Job auf `STATUS_CANCELLED`** setzen. Bereits laufender
+   Poll-Cron bekommt beim nächsten Tick eine 401/AUTHFAIL, aber der
+   Job ist bereits terminal — kein UI-Impact.
+
+### Neu
+
+- **`MigrationJob::STATUS_CANCELLED`** — neuer terminaler Status
+  („cancelled"), aufgenommen in `TERMINAL_STATUSES`.
+- **`MigrationService::cancelJobForUser($uid, $jobId)`** — führt die
+  drei Schritte oben aus. Wirft `InvalidArgumentException` wenn Job
+  nicht dem User gehört (→ 403) oder nicht mehr im `pending`-Status
+  ist (→ 409 CONFLICT), damit ein bereits laufender Import nicht
+  mid-transfer geknackt werden kann.
+- **`MigrationController::cancelJob(int $jobId)`** — neuer Endpoint
+  `POST /apps/souvera_mail/migration/cancel/{jobId}` mit
+  `#[NoAdminRequired]`. HTTP-Codes: 200/409/403/404/500.
+- **`routes.php`** — neue Route mit `\d+`-jobId-Guard.
+- **`useMigration.cancelActiveJob(jobId)`** — Composable-Wrapper.
+- **`ProgressScreen.vue`** — neuer roter `NcButton` „Import abbrechen"
+  im Split-Footer. **Nur** sichtbar, wenn `state === 'pending'`. Klick
+  öffnet einen NcDialog-Confirm mit klaren Konsequenzen (3-Zeilen-
+  Liste). Nach erfolgreichem Cancel switcht der Wizard automatisch
+  auf TerminalScreen mit „Import abgebrochen".
+
+### Warum kein Cancel bei `running`?
+
+Bewusste Design-Entscheidung — bei laufendem Transfer würde ein
+Widerruf mid-flight einen Ordner unvollständig zurücklassen und der
+User könnte nicht mal sicher sagen, welche Mails schon rüber sind.
+Wenn wir das jemals brauchen, kommt ein separater `forceCancel`-Verb
+mit fetter roter Warnung dazu.
+
+### Files
+
+| File | Change |
+|---|---|
+| `lib/Db/MigrationJob.php` | STATUS_CANCELLED + TERMINAL_STATUSES-Update |
+| `lib/Service/MigrationService.php` | `cancelJobForUser()`: App-PW-Revoke + Status-Flip + `finished_at` |
+| `lib/Controller/MigrationController.php` | `cancelJob()` mit HTTP-409/403/404-Mapping |
+| `appinfo/routes.php` | POST `/migration/cancel/{jobId}` |
+| `src/composables/useMigration.js` | `cancelActiveJob()` |
+| `src/components/screens/ProgressScreen.vue` | Cancel-Button + Confirm-Dialog |
+| `tests/test_migration_wizard_frontend.php` | +13 Assertions (Backend + Frontend + Route) |
+| `appinfo/info.xml`, `package.json` | Version 0.14.15 → 0.14.16 |
+
+### Verifikation
+
+- `yarn build` clean → 400 KB Bundle.
+- `php -l` clean auf allen 4 Backend-Dateien + routes.php.
+- **`tests/test_migration_wizard_frontend.php`: 161 / 161 PASS** (war 148).
+- **Voller Suite-Run: 39 Suites / 1533 Assertions passing** (war 1520).
+
+### Live-Verifikation
+
+1. Rsync + `occ upgrade` → 0.14.16
+2. Import starten, ProgressScreen erscheint mit „Warteschlange"
+3. Neuer Button „Import abbrechen" ist sichtbar
+4. Klick → Confirm-Dialog „Import wirklich abbrechen?" mit 3 Konsequenz-Zeilen
+5. „Ja, jetzt abbrechen" → TerminalScreen zeigt „Import abgebrochen"
+6. Im Log erscheint `migration-cancelled: Stalwart app-pw revoked`
+7. Der Nutzer kann sofort einen neuen Import starten
+
 ## [0.14.15] — 2026-02-19 (Hotfix: Backend-Contract-Alignment im Progress + on-demand Poll)
 
 ### Operator-Report

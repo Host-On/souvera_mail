@@ -32,7 +32,23 @@
 			{{ t('souvera_mail', 'Der Import läuft im Hintergrund. Du kannst dieses Fenster jederzeit schließen — beim nächsten Öffnen von Souvera Mail siehst du den aktuellen Stand automatisch.') }}
 		</NcNoteCard>
 
-		<div class="souvera-actions">
+		<NcNoteCard v-if="cancelError" type="error" data-testid="wizard-progress-cancel-error">
+			{{ cancelError }}
+		</NcNoteCard>
+
+		<div class="souvera-actions" :class="{ 'souvera-actions--split': canCancel }">
+			<NcButton
+				v-if="canCancel"
+				type="tertiary"
+				:disabled="isCancelling"
+				data-testid="wizard-progress-cancel"
+				@click="onCancelClick">
+				<template #icon>
+					<NcLoadingIcon v-if="isCancelling" :size="20" />
+					<CancelIcon v-else :size="20" />
+				</template>
+				{{ isCancelling ? t('souvera_mail', 'Wird abgebrochen …') : t('souvera_mail', 'Import abbrechen') }}
+			</NcButton>
 			<NcButton
 				type="secondary"
 				data-testid="wizard-progress-close"
@@ -41,15 +57,56 @@
 				{{ t('souvera_mail', 'Im Hintergrund weiterlaufen lassen') }}
 			</NcButton>
 		</div>
+
+		<NcDialog
+			v-if="showConfirm"
+			:name="t('souvera_mail', 'Import wirklich abbrechen?')"
+			size="small"
+			container="body"
+			data-testid="wizard-progress-cancel-confirm"
+			@closing="showConfirm = false"
+			@update:open="v => { if (!v) showConfirm = false }">
+			<div class="souvera-progress__confirm">
+				<p>
+					{{ t('souvera_mail', 'Dein Job wartet aktuell in der Warteschlange bei provider.tools. Beim Abbruch:') }}
+				</p>
+				<ul>
+					<li>{{ t('souvera_mail', 'Das temporäre Ziel-App-Passwort wird sofort widerrufen.') }}</li>
+					<li>{{ t('souvera_mail', 'Sobald ein Worker den Job aufgreifen würde, scheitert er am Login und der Import läuft nicht.') }}</li>
+					<li>{{ t('souvera_mail', 'Es wurden noch keine Mails übertragen — nichts geht verloren.') }}</li>
+				</ul>
+				<div class="souvera-actions souvera-actions--split">
+					<NcButton
+						type="tertiary"
+						data-testid="wizard-progress-cancel-cancel"
+						@click="showConfirm = false">
+						{{ t('souvera_mail', 'Zurück') }}
+					</NcButton>
+					<NcButton
+						type="error"
+						:disabled="isCancelling"
+						data-testid="wizard-progress-cancel-confirm-btn"
+						@click="onCancelConfirm">
+						<template #icon>
+							<NcLoadingIcon v-if="isCancelling" :size="20" />
+							<CancelIcon v-else :size="20" />
+						</template>
+						{{ t('souvera_mail', 'Ja, jetzt abbrechen') }}
+					</NcButton>
+				</div>
+			</div>
+		</NcDialog>
 	</div>
 </template>
 
 <script>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcNoteCard from '@nextcloud/vue/components/NcNoteCard'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
+import NcDialog from '@nextcloud/vue/components/NcDialog'
 import Close from 'vue-material-design-icons/Close.vue'
+import CancelIcon from 'vue-material-design-icons/Cancel.vue'
 
 /**
  * v0.14.15 — Backend-contract-aware progress screen.
@@ -68,12 +125,12 @@ import Close from 'vue-material-design-icons/Close.vue'
  */
 export default {
 	name: 'ProgressScreen',
-	components: { NcButton, NcNoteCard, NcLoadingIcon, Close },
+	components: { NcButton, NcNoteCard, NcLoadingIcon, NcDialog, Close, CancelIcon },
 	props: {
 		migration: { type: Object, required: true },
 	},
 	emits: ['close'],
-	setup(props) {
+	setup(props, { emit }) {
 		const job = computed(() => props.migration.status.value)
 		const state = computed(() => job.value?.status || 'pending')
 
@@ -120,9 +177,37 @@ export default {
 			return t('souvera_mail', 'Mails werden nach Souvera Mail übertragen.')
 		})
 
+		// v0.14.16 — cancel path (queue only).
+		const showConfirm = ref(false)
+		const isCancelling = ref(false)
+		const cancelError = ref('')
+		const canCancel = computed(() => state.value === 'pending' && job.value?.id)
+
+		function onCancelClick() {
+			cancelError.value = ''
+			showConfirm.value = true
+		}
+		async function onCancelConfirm() {
+			if (!job.value?.id || isCancelling.value) return
+			isCancelling.value = true
+			try {
+				await props.migration.cancelActiveJob(Number(job.value.id))
+				showConfirm.value = false
+				// Wizard watches jobState → auto-transitions to Terminal.
+			} catch (e) {
+				cancelError.value = e?.message || t('souvera_mail', 'Der Import konnte nicht abgebrochen werden.')
+				showConfirm.value = false
+			} finally {
+				isCancelling.value = false
+			}
+		}
+
 		return {
 			state, percent, messagesDone, messagesTotal, foldersDone, foldersTotal,
 			currentFolder, progressTitle, progressSubtitle,
+			// cancel state
+			canCancel, showConfirm, isCancelling, cancelError,
+			onCancelClick, onCancelConfirm,
 		}
 	},
 }
@@ -211,5 +296,22 @@ export default {
 	font-size: 0.85rem;
 	background: transparent;
 	padding: 0;
+}
+.souvera-progress__confirm {
+	padding: var(--sc-field-gap);
+	color: var(--color-main-text);
+	line-height: 1.55;
+}
+.souvera-progress__confirm p {
+	margin: 0 0 12px;
+}
+.souvera-progress__confirm ul {
+	margin: 0 0 var(--sc-field-gap);
+	padding-left: 20px;
+	color: var(--color-text-maxcontrast);
+	font-size: 0.9rem;
+}
+.souvera-progress__confirm li {
+	margin: 4px 0;
 }
 </style>
