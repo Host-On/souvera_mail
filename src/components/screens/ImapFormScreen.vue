@@ -7,49 +7,49 @@
 		<div class="souvera-form__grid">
 			<div class="souvera-form__field">
 				<NcTextField
-					:value.sync="localForm.host"
+					:model-value="form.host"
 					:label="t('souvera_mail', 'IMAP-Server')"
-					:placeholder="'imap.beispiel.de'"
+					placeholder="imap.beispiel.de"
 					name="host"
 					autocomplete="off"
 					data-testid="wizard-form-host"
-					@update:value="v => update('host', v)" />
+					@update:model-value="v => update('host', v)" />
 			</div>
 			<div class="souvera-form__field souvera-form__field--narrow">
 				<NcTextField
-					:value.sync="localForm.port"
+					:model-value="String(form.port)"
 					:label="t('souvera_mail', 'Port')"
 					name="port"
 					type="number"
 					autocomplete="off"
 					data-testid="wizard-form-port"
-					@update:value="v => update('port', v)" />
+					@update:model-value="v => update('port', Number(v) || 0)" />
 			</div>
 			<div class="souvera-form__field souvera-form__field--full">
 				<NcTextField
-					:value.sync="localForm.username"
+					:model-value="form.username"
 					:label="t('souvera_mail', 'Benutzername (meist die E-Mail-Adresse)')"
-					:placeholder="'ich@beispiel.de'"
+					placeholder="ich@beispiel.de"
 					name="username"
 					autocomplete="off"
 					data-testid="wizard-form-username"
-					@update:value="v => update('username', v)" />
+					@update:model-value="v => update('username', v)" />
 			</div>
 			<div class="souvera-form__field souvera-form__field--full">
 				<NcTextField
-					:value.sync="localForm.password"
+					:model-value="form.password"
 					:label="t('souvera_mail', 'Passwort')"
 					name="password"
 					type="password"
 					autocomplete="new-password"
 					data-testid="wizard-form-password"
-					@update:value="v => update('password', v)" />
+					@update:model-value="v => update('password', v)" />
 			</div>
 			<div class="souvera-form__field souvera-form__field--full">
 				<NcCheckboxRadioSwitch
-					:checked="localForm.tls"
+					:model-value="form.tls"
 					data-testid="wizard-form-tls"
-					@update:checked="v => update('tls', v)">
+					@update:model-value="v => update('tls', v)">
 					{{ t('souvera_mail', 'Verschlüsselte Verbindung (TLS/SSL) — empfohlen') }}
 				</NcCheckboxRadioSwitch>
 			</div>
@@ -97,6 +97,23 @@ import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import ArrowLeft from 'vue-material-design-icons/ArrowLeft.vue'
 import ArrowRight from 'vue-material-design-icons/ArrowRight.vue'
 
+/**
+ * v0.14.12 — v-model bindings adapted to @nextcloud/vue v9 Vue-3 API.
+ *
+ * v9 collapsed every input surface onto Vue 3's `v-model` standard →
+ * every `NcTextField` / `NcCheckboxRadioSwitch` emits `update:modelValue`
+ * (not `update:value` / `update:checked` as in v2/legacy). Using the
+ * old Vue-2 `:value.sync` OR the legacy event names silently breaks
+ * two-way binding: the field renders once, the user's typing never
+ * reaches `form`, the derived `canSubmit` computed stays false → the
+ * "Verbindung prüfen" button never enables. Same root cause hits the
+ * TLS-Checkbox and the port default.
+ *
+ * Fix: explicit one-way `:model-value` + `@update:model-value` handler
+ * that forwards the fresh value through `update:form` up to the
+ * MigrationWizard's reactive `form`. Kept explicit (no `v-model`)
+ * because `form` is a prop, not a local ref — the wizard owns state.
+ */
 export default {
 	name: 'ImapFormScreen',
 	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcNoteCard, NcLoadingIcon, ArrowLeft, ArrowRight },
@@ -107,10 +124,12 @@ export default {
 	},
 	emits: ['advance', 'back', 'update:form'],
 	computed: {
-		localForm() { return this.form },
 		hasTestError() { return this.testResult && this.testResult.ok === false },
 		canSubmit() {
-			return this.localForm.host && this.localForm.port && this.localForm.username && this.localForm.password
+			return this.form.host
+				&& this.form.port > 0
+				&& this.form.username
+				&& this.form.password
 		},
 	},
 	methods: {

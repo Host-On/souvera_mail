@@ -161,9 +161,14 @@ assertTrue(str_contains($appSrc, 'use OCP\\IUserSession;'),
 assertTrue(str_contains($appSrc, 'use OCP\\INavigationManager;'),
     "Application.php imports OCP\\INavigationManager", $passes, $failures);
 
-// Exactly one INavigationManager::add() in production code
+// v0.14.12: TWO INavigationManager::add() calls in production code:
+//   1) main app entry (sidebar) with `type => 'link'` (implicit default)
+//   2) user-menu entry (top-right dropdown, `type => 'settings'`) for
+//      the "Alte Mails importieren"-reopen deep-link (?openMigration=1).
+// Both must live INSIDE the user+group gate — pre-auth and
+// out-of-group users never register navigation.
 $addCount = substr_count($appSrc, '$navigationManager->add(');
-assertTrue($addCount === 1, "Application.php has exactly ONE \$navigationManager->add() call (got: $addCount)", $passes, $failures);
+assertTrue($addCount === 2, "Application.php has exactly TWO \$navigationManager->add() calls — main + user-menu (got: $addCount)", $passes, $failures);
 
 // 0.13.6: the user + group gate is now OUTSIDE the closure (the
 // pre-0.13.6 design put it INSIDE and returned `[]`, which crashed

@@ -6,6 +6,95 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.12] — 2026-02-19 (Hotfix: Vue-3 v-model bindings + user-menu re-open)
+
+### Fixed — 3 Live-Bugs auf dem IMAP-Form-Screen
+
+Operator-Report (2026-02-19, Screenshot mit gefüllten Feldern):
+1. „Verschlüsselte Verbindung"-Checkbox lässt sich nicht aktivieren.
+2. Port-Default 993 verschwand nach dem ersten Interaction-Zyklus.
+3. „Verbindung prüfen"-Button bleibt trotz gefüllter Felder deaktiviert.
+
+**Root cause:** `@nextcloud/vue` **v9** hat die komplette Input-API auf
+Vue-3-`v-model`-Standard umgestellt — jede Komponente emitiert jetzt
+`update:modelValue` (nicht mehr `update:value` / `update:checked` wie
+in Vue 2 / dem legacy API). Der Vue-3-Umbau in v0.14.11 verwendete
+noch die Vue-2-Syntax `:value.sync="…"` und `@update:value="…"` —
+Vue 3 kennt `.sync` gar nicht mehr (silent no-op), und der Event-Name
+matcht nicht.
+
+Effekt: die Felder rendern zwar initial korrekt (weil `:value.sync`
+beim ersten Rendering wie ein statisches Attribut wirkt), aber jede
+User-Eingabe geht ins Leere. Die vom Parent gehaltene `reactive(form)`
+wird nie aktualisiert. Damit bleibt `canSubmit` false → Button
+deaktiviert. Selbe Ursache betrifft die TLS-Checkbox — der Klick
+wird schlicht nicht mehr weitergereicht.
+
+**Fix:** Alle Formular-Bindings in `ImapFormScreen.vue` auf
+`:model-value` + `@update:model-value` umgestellt. Explizit statt
+`v-model`, weil `form` ein Prop ist (state lebt im
+`MigrationWizard.vue`). Port-Feld cast eingehende Strings zurück zu
+`Number(v)`, damit der `canSubmit`-Guard `form.port > 0` trifft.
+
+### Neu — „Alte Mails importieren" im Nutzer-Menü (User-Direktive)
+
+Operator (2026-02-19): „Wenn man das Fenster mit ,Nicht mehr zeigen`
+schließt, sollte man es dennoch oben rechts im Dropdown-Menü wieder
+öffnen können."
+
+Umgesetzt per Souvera-Design-System §11 (Navigation dynamisch in
+`Application::boot()`, `type => 'settings'`):
+
+```php
+$navigationManager->add(function () use ($serverContainer) {
+    // …
+    return [
+        'id'    => 'souvera_mail_migration',
+        'type'  => 'settings',
+        'name'  => $l10n->t('Alte Mails importieren'),
+        'href'  => $urlGenerator->linkToRoute('souvera_mail.page.index')
+                 . '?openMigration=1',
+        'icon'  => $urlGenerator->imagePath(self::APP_ID, 'app.svg'),
+        'order' => 12,
+    ];
+});
+```
+
+Der Klick öffnet `/apps/souvera_mail/?openMigration=1` — das Vue-App
+in `App.vue` liest den URL-Parameter in `onMounted()` und öffnet den
+Wizard **erzwungen**, auch wenn der User „Nicht mehr zeigen" bereits
+gedrückt hat. Bei bereits laufender Migration landet er direkt auf
+dem Progress-Screen; bei terminalem letzten Job auf dem Terminal-
+Screen; sonst auf dem Welcome-Screen.
+
+### Files
+
+| File | Change |
+|---|---|
+| `src/components/screens/ImapFormScreen.vue` | Bindings komplett auf `:model-value` + `@update:model-value` umgestellt. Port-Cast `Number(v)`. `canSubmit` prüft `form.port > 0`. |
+| `src/App.vue` | `onMounted()` liest `?openMigration=1` und setzt `forceOpen` — bypasst `dismissed`-Flag, wählt korrekten initial-Screen (progress / terminal / welcome). |
+| `lib/AppInfo/Application.php` | Neuer Navigation-Entry `souvera_mail_migration` mit `type=settings` für das Nutzer-Menü. |
+| `tests/test_migration_wizard_frontend.php` | +10 Assertions — pinning der Vue-3-Bindings (kein `.sync` / `@update:value` / `@update:checked` mehr), `Number(v)`-Port-Cast, User-Menü-Entry, `?openMigration=1`-URL-Parser, `forceOpen`-Guard. |
+| `appinfo/info.xml` | Version bump 0.14.11 → 0.14.12. |
+| `package.json` | Version bump 0.14.11 → 0.14.12. |
+
+### Verification
+
+- `yarn build` clean, Bundle-Rebuild → weiterhin ~377 KB.
+- `php -l` clean auf `Application.php`.
+- **`tests/test_migration_wizard_frontend.php`: 103/103 PASS** (war 93).
+- Voller Suite-Run: **39 Suites / 1477 Assertions passing** (war 39 / 1467).
+
+### Live-Verifikation für User
+
+1. Rsync + `occ upgrade` → Version 0.14.12.
+2. Als Nutzer einloggen → oben rechts aufs Avatar klicken → im
+   Dropdown erscheint „Alte Mails importieren".
+3. Wizard öffnen → alle drei Formularfelder + Port + Checkbox
+   funktionieren jetzt korrekt (Zeichen tippen, Zahlen ändern,
+   TLS toggeln).
+4. Nach dem ersten Zeichen im letzten Feld wird der Button aktiv.
+
 ## [0.14.11] — 2026-02-19 (Frontend-Vollumbau auf Vue 3 · Souvera Design System)
 
 ### Neu — Souvera-weit einheitliches Layout

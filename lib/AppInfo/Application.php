@@ -186,5 +186,30 @@ class Application extends App implements IBootstrap
                 'order' => 4,
             ];
         });
+
+        // ------------------------------------------------------------------
+        // v0.14.12 — "Alte Mails importieren" in the user-menu drop-down
+        //
+        // Per user request (2026-02-19): even after the user hits
+        // "Nicht mehr zeigen" on the migration welcome popup, they must
+        // be able to re-open the wizard from the top-right avatar
+        // drop-down. That's the Nextcloud user-menu, registered with
+        // `type => 'settings'` per Souvera Design System §11.
+        //
+        // Deep-link to the mail page with `?openMigration=1` — the Vue
+        // bootstrap in main.js watches for that URL param and forces
+        // the wizard open regardless of the dismissed state.
+        // ------------------------------------------------------------------
+        $navigationManager->add(function () use ($serverContainer) {
+            $urlGenerator = $serverContainer->get(IURLGenerator::class);
+            return [
+                'id' => 'souvera_mail_migration',
+                'type' => 'settings',
+                'name' => $serverContainer->get(\OCP\IL10N::class)->t('Alte Mails importieren'),
+                'href' => $urlGenerator->linkToRoute('souvera_mail.page.index') . '?openMigration=1',
+                'icon' => $urlGenerator->imagePath(self::APP_ID, 'app.svg'),
+                'order' => 12,
+            ];
+        });
     }
 }

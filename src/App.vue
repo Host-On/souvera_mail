@@ -67,12 +67,26 @@ export default {
 				// wizard stays hidden — matches v0.14.10 semantics.
 				return
 			}
+
+			// v0.14.12 — user-menu deep-link `?openMigration=1`
+			// (from the "Alte Mails importieren" entry in the top-right
+			// avatar drop-down). Forces the wizard open regardless of
+			// the dismissed flag; the entry point exists precisely for
+			// users who previously clicked "Nicht mehr zeigen".
+			const forceOpen = new URLSearchParams(window.location.search).get('openMigration') === '1'
+
 			// Auto-resume active migration → straight to progress screen.
 			if (migration.hasActive.value) {
 				initialStep.value = 'progress'
 				migration.startPolling(5000)
-				// Do NOT auto-open the wizard; the pulsing pill is
-				// enough — the user clicks it if they want details.
+				if (forceOpen) {
+					isOpen.value = true
+				}
+				return
+			}
+			if (forceOpen) {
+				initialStep.value = migration.lastJob.value ? 'terminal' : 'welcome'
+				isOpen.value = true
 				return
 			}
 			// First-time welcome — open the wizard automatically unless

@@ -62,8 +62,8 @@ foreach ($paths as $k => $p) {
 // A — package.json declares Vue 3 + @nextcloud/vue v9 stack
 // ==============================================================
 $pkg = json_decode($src['pkg'], true) ?: [];
-ok(($pkg['version'] ?? '') === '0.14.11',
-    'package.json version matches info.xml (0.14.11)', $passes, $failures);
+ok(($pkg['version'] ?? '') === ($xmlVer = (preg_match('#<version>([\d.]+)</version>#', $src['info'], $m) ? $m[1] : '0')),
+    "package.json version matches info.xml (both {$xmlVer})", $passes, $failures);
 ok(preg_match('/^\^3\.[0-9]+\./', $pkg['dependencies']['vue'] ?? '') === 1,
     'package.json pins vue ^3.x', $passes, $failures);
 ok(preg_match('/^\^9\.[0-9]+\./', $pkg['dependencies']['@nextcloud/vue'] ?? '') === 1,
@@ -259,14 +259,69 @@ ok($nsPos !== false && $reqPos !== false && $nsPos < $reqPos,
 // ==============================================================
 // P — version bump + changelog markers
 // ==============================================================
-ok((bool) preg_match('#<version>0\.14\.(11|1[2-9]|\d{2,})</version>#', $src['info']),
-    'info.xml version bumped to 0.14.11 (or later)', $passes, $failures);
-ok(str_contains($src['changelog'], '[0.14.11]'),
-    'CHANGELOG.md has a [0.14.11] section', $passes, $failures);
+ok((bool) preg_match('#<version>0\.14\.(1[2-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
+    'info.xml version bumped to 0.14.12 (or later)', $passes, $failures);
+ok(str_contains($src['changelog'], '[0.14.12]'),
+    'CHANGELOG.md has a [0.14.12] section', $passes, $failures);
 ok(stripos($src['changelog'], 'Vue 3') !== false
     || stripos($src['changelog'], 'Vue-3') !== false
     || stripos($src['changelog'], 'design system') !== false,
-    'CHANGELOG [0.14.11] mentions Vue 3 / Souvera Design System',
+    'CHANGELOG mentions Vue 3 / Souvera Design System',
+    $passes, $failures);
+
+// ==============================================================
+// Q — v0.14.12 bug fixes: v-model bindings + user-menu entry
+// ==============================================================
+$formSrc = (string) file_get_contents('/app/src/components/screens/ImapFormScreen.vue');
+$appVueSrc = (string) file_get_contents('/app/src/App.vue');
+$appPhpSrc = (string) file_get_contents('/app/lib/AppInfo/Application.php');
+
+// v-model must use Vue-3 API (modelValue), not the Vue-2 legacy
+// (:value.sync / @update:value / @update:checked).
+// Regex-based: only real attribute usage `:value.sync="..."` is a bug —
+// mentions of the string in the file header comment are fine.
+ok(!preg_match('/:value\.sync\s*=/', $formSrc),
+    'ImapFormScreen no longer uses the Vue-2 :value.sync modifier as an attribute',
+    $passes, $failures);
+ok(!preg_match('/@update:value\s*=/', $formSrc),
+    'ImapFormScreen no longer listens on @update:value (deprecated in @nextcloud/vue v9)',
+    $passes, $failures);
+ok(!preg_match('/@update:checked\s*=/', $formSrc),
+    'ImapFormScreen no longer listens on @update:checked (deprecated in @nextcloud/vue v9)',
+    $passes, $failures);
+ok(str_contains($formSrc, ':model-value=')
+    && str_contains($formSrc, '@update:model-value='),
+    'ImapFormScreen uses :model-value / @update:model-value bindings',
+    $passes, $failures);
+// Port default (993) must be preserved as reactive number.
+ok(str_contains($formSrc, "Number(v)")
+    || str_contains($formSrc, "parseInt("),
+    'Port input is cast back to Number on update (default 993 stays numeric)',
+    $passes, $failures);
+// canSubmit computed still verifies all four fields.
+ok(str_contains($formSrc, 'this.form.host')
+    && str_contains($formSrc, 'this.form.username')
+    && str_contains($formSrc, 'this.form.password'),
+    'canSubmit still guards host/username/password',
+    $passes, $failures);
+
+// User-menu drop-down entry ("Alte Mails importieren")
+ok(str_contains($appPhpSrc, "'id' => 'souvera_mail_migration'"),
+    'Application::boot() registers the user-menu entry souvera_mail_migration',
+    $passes, $failures);
+ok(str_contains($appPhpSrc, "'type' => 'settings'"),
+    'User-menu entry uses type=settings per Souvera Design System §11',
+    $passes, $failures);
+ok(str_contains($appPhpSrc, "'?openMigration=1'"),
+    'User-menu entry deep-links with ?openMigration=1 query param',
+    $passes, $failures);
+
+// Frontend honours the URL parameter.
+ok(str_contains($appVueSrc, "openMigration"),
+    'App.vue parses ?openMigration=1 URL param and force-opens the wizard',
+    $passes, $failures);
+ok(str_contains($appVueSrc, "forceOpen"),
+    'App.vue uses a forceOpen guard to bypass the dismissed flag',
     $passes, $failures);
 
 // ==============================================================
