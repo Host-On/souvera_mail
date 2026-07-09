@@ -80,11 +80,28 @@ foreach ($paths as $pathTag) {
 }
 
 // ---------------------------------------------------------------
-// 3. Group cascade safety net — parent <g> should still have a dark
-//    fill so <img>-rendering without CSS color context stays visible.
+// 3. Group cascade — v0.14.25 update.
 // ---------------------------------------------------------------
-ok((bool) preg_match('~<g\b[^>]*fill\s*=\s*"#000000"~', $svg),
-    "parent <g> retains fill=\"#000000\" as safety-net cascade for <img> rendering",
+// v0.14.21 kept `<g fill="#000000">` as a safety-net cascade for
+// <img>-based rendering. That worked for the Dashboard widget (where
+// <img> falls back to `currentColor → black`), but broke the App-
+// Popover: NC's monochrome-SVG detector saw two colours (currentColor
+// + #000000) and re-classified the icon as *coloured*, rendering it
+// as a plain black <img> instead of a themed mask. Every other
+// Souvera app icon was white-in-blue-bubble; ours was black-in-blue-
+// bubble (2026-02-19 operator screenshot).
+//
+// v0.14.25: drop the hard-coded #000000 from the <g> so the SVG is
+// fully monochrome. NC re-classifies it as monochrome → renders it
+// as mask in the App-Popover with the theme colour (white on the
+// blue bubble). The Dashboard widget still works because `<img>`
+// with `currentColor` defaults to black, and dark-mode inverts via
+// `filter: invert(1)` in dashboard-widget.css.
+ok((bool) preg_match('~<g\b[^>]*fill\s*=\s*"currentColor"~', $svg),
+    "parent <g> uses fill=\"currentColor\" (fully monochrome, unlocks NC mask-rendering in App-Popover)",
+    $passes, $failures);
+ok(!(bool) preg_match('~<g\b[^>]*fill\s*=\s*"#000000"~', $svg),
+    "regression pin: parent <g> NO LONGER contains hard-coded fill=\"#000000\" (that broke App-Popover monochrome detection)",
     $passes, $failures);
 
 // ---------------------------------------------------------------

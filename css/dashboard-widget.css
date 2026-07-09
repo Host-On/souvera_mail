@@ -52,71 +52,30 @@ body[data-theme-dark] .panel--header img[src*="souvera_mail"] {
 }
 
 /* ------------------------------------------------------------
- * 2) App menu / Nav icon — Light → WHITE, Dark → BLACK
+ * 2) App menu / Nav icon — HANDLED BY NC AUTOMATICALLY (v0.14.25)
  * ------------------------------------------------------------
- * Operator correction (2026-02-19, THIRD pass — sorry, I misread the
- * second one). The final spec is:
+ * v0.14.22 → v0.14.24 tried to force App-Menu icon colours via
+ * `background-color !important` on `.app-menu-icon` and
+ * `filter: invert()` on `<img>`. Both failed because NC's App-Popover
+ * (`/apps` grid) checks whether the app SVG is *monochrome* and only
+ * treats monochrome SVGs as mask-image with theme-driven fill.
  *
- *   • Light-mode Nav icon = WHITE
- *   • Dark-mode  Nav icon = BLACK
+ * `img/app.svg` carried `<g fill="#000000">` as a safety-net cascade
+ * for v0.14.21's `<img>` fallback → NC's detector saw *two* colours
+ * (currentColor + #000000) and classified the icon as COLORED,
+ * rendering it as a plain `<img>` in black — while every other
+ * Souvera app icon was rendered as a mask in white (2026-02-19
+ * operator screenshot: 14 apps white, only Souvera Mail black).
  *
- * (This IS inverse to the Dashboard widget rule from block (1) — the
- * two use different rendering pipelines: the widget icon is an <img>
- * on a light-mode-white / dark-mode-dark background, whereas the
- * Souvera Nav header uses inverse-tinted backgrounds against which
- * the icon needs the opposite treatment.)
+ * v0.14.25 fix: drop the `<g fill="#000000">` (now `currentColor`).
+ * The SVG is fully monochrome → NC renders it as mask → automatic
+ * white-in-blue-bubble in the App-Popover, matching every other app.
+ * No CSS override needed here anymore — NC drives the palette.
  *
- * NC 34+ renders app-menu icons via `mask-image` on a
- * `.app-menu-icon` element with `background-color` driving colour.
- * The NC-core theme sets that colour inline per theme, so `!important`
- * is required on our override (only place in this file).
- *
- * Selectors are duplicated across the couple of DOM shapes NC 33/34/35
- * ships (data-id vs data-app-id vs id).
+ * Dashboard-Widget-Icon block (1) above still uses `filter: invert(1)`
+ * for dark-mode because the Widget uses `<img>` rendering (not mask),
+ * which is a separate code path and needs its own theme logic.
  */
-.app-menu-entry[data-app-id="souvera_mail"] .app-menu-icon,
-li[data-id="souvera_mail"] .app-menu-icon,
-#app-menu li[data-id="souvera_mail"] .app-menu-icon,
-.app-menu-main [data-app-id="souvera_mail"] svg {
-    background-color: #ffffff !important;
-    color: #ffffff !important;
-}
-
-body[data-theme-dark] .app-menu-entry[data-app-id="souvera_mail"] .app-menu-icon,
-body[data-theme-dark] li[data-id="souvera_mail"] .app-menu-icon,
-body[data-theme-dark] #app-menu li[data-id="souvera_mail"] .app-menu-icon,
-body[data-theme-dark] .app-menu-main [data-app-id="souvera_mail"] svg {
-    background-color: #000000 !important;
-    color: #000000 !important;
-}
-
-/* ------------------------------------------------------------
- * 2b) Belt-and-braces for NC versions that render the Nav icon
- *     as an <img> (some NC 33/34 setups) instead of a masked
- *     background. `filter: invert(1)` flips currentColor-black
- *     to white in light mode; in dark mode we leave it alone so
- *     the icon stays black.
- * ------------------------------------------------------------
- */
-.app-menu-entry[data-app-id="souvera_mail"] img,
-.app-menu-main [data-app-id="souvera_mail"] img,
-li[data-id="souvera_mail"] a > img,
-#app-menu li[data-id="souvera_mail"] img,
-.header-appmenu li[data-id="souvera_mail"] img,
-.header-appmenu a[href*="/apps/souvera_mail/"] img,
-nav [data-id="souvera_mail"] img {
-    filter: invert(1) brightness(2) !important;
-}
-
-body[data-theme-dark] .app-menu-entry[data-app-id="souvera_mail"] img,
-body[data-theme-dark] .app-menu-main [data-app-id="souvera_mail"] img,
-body[data-theme-dark] li[data-id="souvera_mail"] a > img,
-body[data-theme-dark] #app-menu li[data-id="souvera_mail"] img,
-body[data-theme-dark] .header-appmenu li[data-id="souvera_mail"] img,
-body[data-theme-dark] .header-appmenu a[href*="/apps/souvera_mail/"] img,
-body[data-theme-dark] nav [data-id="souvera_mail"] img {
-    filter: none !important;
-}
 
 /* ------------------------------------------------------------
  * 3) Empty-state checkmark (matches Souvera Shield)

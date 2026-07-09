@@ -6,7 +6,99 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.14.24] — 2026-02-19 (Hotfix: Menu-Icon-Farbregel — dritter Anlauf + Belt-and-braces)
+## [0.14.25] — 2026-02-19 (Root-Cause-Fix: App-Popover-Icon monochrom — NC macht den Rest automatisch)
+
+### Operator-Report (2026-02-19, mit sehr klarem Screenshot)
+
+> „Es ist immer noch falsch. Alle sind weiß (Lite Mode) Nur Mail nicht ...
+> Was soll der Bums? Fix es endlich"
+
+Screenshot zeigt den App-Popover (`/apps`-Grid): 14 Souvera-Apps mit
+weißer Silhouette in blauem Kreis — nur unser Souvera Mail rendert
+als **schwarzer** Umschlag im blauen Kreis. Der Bug war reproduzierbar
+und hätte in v0.14.22/23/24 nicht behoben werden können, weil ich die
+falsche Ebene angepackt habe.
+
+### Der wirkliche Root-Cause (endlich gefunden)
+
+NC's App-Popover (der `/apps`-Grid, den man über das App-Menu-Icon
+öffnet) rendert App-Icons in **zwei Modi**:
+
+1. **Monochrom-SVG** → `mask-image` mit `background-color: var(--color-primary-element-text)`.
+   Ergebnis: **weiße Silhouette im blauen Kreis**.
+2. **Farbiges SVG** → plain `<img>` (Original-Farben behalten).
+   Ergebnis: SVG so wie es ist, ohne Umfärbung.
+
+NC klassifiziert ein SVG als „monochrom", wenn genau eine Farbe im
+SVG-Payload steht (`currentColor` zählt als „farb-neutral").
+
+Unser `img/app.svg` hatte:
+- `<g fill="#000000">` (v0.14.21-Safety-Net-Kaskade)
+- `<path style="fill:currentColor" />`
+
+Zwei Farben → NC klassifiziert als COLORED → rendert als schwarzes
+`<img>`. Alle anderen Souvera-Apps liefern reines `currentColor`-SVG
+→ NC rendert als Mask → weiße Silhouette.
+
+### Fix
+
+Ein Wert im SVG:
+
+```diff
+- <g … fill="#000000" …>
++ <g … fill="currentColor" …>
+```
+
+Damit:
+- **App-Popover** (mask-image-Rendering): weiße Silhouette im blauen
+  Kreis, automatisch, ohne CSS-Override. Matches Files/Contacts/Shield/etc.
+- **Dashboard-Widget** (`<img>`-Rendering): browser fällt bei `<img>` +
+  `currentColor` auf `black` zurück (Light-Mode: sichtbar). Dark-Mode
+  wird per `filter: invert(1)` in `dashboard-widget.css` invertiert
+  (unverändert seit v0.14.22).
+- **Nav-Bar-Icon**: analog zum App-Popover monochrom → NC theme-driven.
+
+### CSS-Override entfernt
+
+Die v0.14.22-24-CSS-Overrides für `.app-menu-entry[data-app-id="souvera_mail"]`
+(`background-color !important` + `filter: invert(1) !important`)
+sind gelöscht. Waren counter-productive: sie haben nur *manche*
+Rendering-Pfade getroffen und den „verdreht"-Effekt produziert.
+NC's Auto-Rendering macht das jetzt einheitlich für uns.
+
+### Files
+
+| File | Change |
+|---|---|
+| `img/app.svg` | `<g fill="#000000">` → `<g fill="currentColor">` |
+| `css/dashboard-widget.css` | Block (2)+(2b) entfernt, Dokumentations-Kommentar behalten |
+| `tests/test_dashboard_icon_not_inverted.php` | Assertion auf `fill="currentColor"` umgestellt |
+| `tests/test_dashboard_widget_polish.php` | Regression-Pins gegen alte Overrides |
+| `appinfo/info.xml`, `package.json` | 0.14.24 → 0.14.25 |
+
+### Verifikation
+
+- **`tests/test_dashboard_icon_not_inverted.php`: alle Assertions PASS.**
+- **`tests/test_dashboard_widget_polish.php`: alle Assertions PASS.**
+- **Voller Suite-Run: 41 Suites / 1594 Assertions PASS, 0 Fehler.**
+
+### Live-Verifikation
+
+1. Rsync `img/app.svg` + `css/dashboard-widget.css` + `info.xml` +
+   `package.json` → Live.
+2. `occ upgrade` → 0.14.25. Hard-Reload (`Strg+F5`) wg. SVG- + CSS-Cache.
+3. App-Popover öffnen: Souvera Mail-Icon jetzt **weiß in blauem Kreis**
+   wie alle anderen 13 Souvera-Apps.
+4. Dashboard-Widget: unverändert (Light=schwarz, Dark=weiß per Filter).
+
+### Lernkurve
+
+Vier Runden gebraucht, um Root-Cause zu finden — sorry für den Umweg.
+Screenshot war der Schlüssel: „alle weiß, nur Mail schwarz" war das
+eindeutige Signal, dass **unser SVG** anders klassifiziert wird als
+die anderen, nicht dass eine Farb-Regel „verdreht" ist.
+
+
 
 ### Operator-Report (2026-02-19, dritter Durchlauf)
 
@@ -113,6 +205,13 @@ bleiben unverändert.
 1. Rsync `css/dashboard-widget.css` + `info.xml` + `package.json` → Live.
 2. `occ upgrade` (auf 0.14.23) + Hard-Reload (`Strg+F5`).
 3. App-Menu-Icon jetzt **Light=schwarz, Dark=weiß** (matches Widget).
+
+## [0.14.24] — 2026-02-19 (Zwischenversion — durch v0.14.25 abgelöst)
+
+**Note:** Diese Zwischenversion hat den `background-color !important`-
+Override + `filter: invert(1)`-Belt für App-Menu-Icon eingeführt.
+v0.14.25 findet den echten Root-Cause (SVG war nicht monochrom → NC
+klassifiziert als coloured) und entfernt beide Overrides wieder.
 
 ## [0.14.23] — 2026-02-19 (Hotfix zwischenzeitlich — durch v0.14.24 überschrieben)
 
