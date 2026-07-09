@@ -6,7 +6,89 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.14.26] — 2026-02-19 (Root-Cause endgültig: SVG mit hardcoded `#ffffff` — matches sister-app pipeline)
+## [0.14.27] — 2026-02-19 (Endlich richtig: Zwei getrennte SVG-Dateien, damit Menu und Widget sich nie wieder gegenseitig kaputt machen)
+
+### Operator (2026-02-19, absolut zurecht sauer)
+
+> „Nun hast du es auf dem Dashboard Widget auch geändert. DA WAR ES
+> KORREKT ... Da muss es genau umgedreht sein als beim Menu..."
+
+Der letzte v0.14.26-Fix hat das Menu repariert (Sister-App-Pipeline via
+weißes SVG + NC-Auto-Invert), aber dabei das Widget kaputt gemacht —
+weil beide dasselbe SVG teilten. Meine `.panel--header`-CSS-Scoping
+war fehlerhaft, weil der Widget-Header-Selektor auf dem Live-DOM eine
+andere Klasse hat.
+
+### Root-Fix — architektonisch
+
+Das Problem war, dass Menu- und Widget-Icon dasselbe SVG-Asset teilten
+und ich versucht habe, per CSS die eine oder andere Nutzung zu
+invertieren. Der Fix: **zwei komplett getrennte Dateien**, die jeweils
+in der Farbe geliefert werden, die ihr Rendering-Pfad braucht.
+
+| Kontext | SVG | Base-Farbe | Light-Mode | Dark-Mode |
+|---|---|---|---|---|
+| **App-Popover / Nav** | `img/app.svg` | `#ffffff` | weiß ✓ (direkt gerendert) | schwarz ✓ (NC Auto-Invert) |
+| **Dashboard-Widget** | `img/app-widget.svg` **NEU** | `#000000` | schwarz ✓ (direkt gerendert) | weiß ✓ (unser CSS Filter) |
+
+### Konkrete Änderungen
+
+- **`img/app-widget.svg`** — neu, exakte Kopie von `app.svg` aber alle
+  `fill`-Attribute auf `#000000`.
+- **`lib/Dashboard/UnreadMailWidget.php`** — `getIconUrl()` zeigt jetzt
+  auf `app-widget.svg` (nicht mehr `app.svg`). Der Widget-Icon-Pfad ist
+  damit exklusiv für uns; kein anderes NC-Feature lädt dieses File.
+- **`css/dashboard-widget.css`** — Filter-Regeln jetzt gescoped auf
+  `img[src*="app-widget.svg"]` statt auf `.panel--header`. Der neue
+  Src-basierte Selektor ist bombenfest — kann nur unser Widget-Icon
+  treffen, weil kein anderes NC-Element diesen SVG-Pfad hat.
+
+### Warum das die letzte Runde ist
+
+- Das App-Popover kann das Widget-SVG nie versehentlich laden (Menu-
+  Registry zeigt fest auf `app.svg`).
+- Das Widget kann das Menu-SVG nie versehentlich laden (`getIconUrl()`
+  hardcoded auf `app-widget.svg`).
+- Der CSS-Filter kann nur das Widget-SVG treffen (Src-basierter Selektor
+  matcht keinen anderen Kontext).
+- Beide SVGs haben ihre Ziel-Farbe hardcoded — kein `currentColor`-
+  Gymnastik mehr, kein Ratespiel.
+
+### Files
+
+| File | Change |
+|---|---|
+| `img/app-widget.svg` | **Neu** — schwarze Kopie fürs Widget |
+| `lib/Dashboard/UnreadMailWidget.php` | `getIconUrl()` → `app-widget.svg` |
+| `css/dashboard-widget.css` | Src-basierter Selector (`app-widget.svg`), einfacher Filter |
+| `tests/test_dashboard_icon_not_inverted.php` | Widget-Icon-Path + Farb-Assertions |
+| `appinfo/info.xml`, `package.json` | 0.14.26 → 0.14.27 |
+
+### Verifikation
+
+- **`tests/test_dashboard_icon_not_inverted.php`: 19/19 PASS.**
+- **`tests/test_dashboard_widget_polish.php`: 28/28 PASS.**
+- **Voller Suite-Run: 41 Suites / 1589+ Assertions PASS, 0 Fehler.**
+
+### Live-Verifikation
+
+1. Rsync `img/app.svg` (unverändert weiß) + `img/app-widget.svg` (**neu**,
+   schwarz) + `css/dashboard-widget.css` + `lib/Dashboard/UnreadMailWidget.php` +
+   `appinfo/info.xml` + `package.json` → Live.
+2. `occ upgrade` → 0.14.27. **`Strg+Shift+R`** wg. SVG-Cache.
+3. **Menu / App-Popover:** Light=weiß, Dark=schwarz (unverändert seit v0.14.26).
+4. **Dashboard-Widget:** Light=schwarz, Dark=weiß (wie es vor meinem
+   v0.14.26-Refactor war).
+
+### Entschuldigung + Lesson
+
+- Fünf Runden für einen Icon-Farbfix. Der Fehler war architektonisch:
+  ein Asset für zwei Rendering-Pipelines mit gegensätzlichen Farb-
+  Anforderungen. Die richtige Antwort war von Anfang an: zwei Dateien.
+- Screenshots haben mich jedes Mal aus dem Nebel geholt — danke fürs
+  Nachliefern trotz der Frustration.
+
+
 
 ### Operator (2026-02-19, sichtlich frustriert)
 
@@ -296,6 +378,13 @@ bleiben unverändert.
 1. Rsync `css/dashboard-widget.css` + `info.xml` + `package.json` → Live.
 2. `occ upgrade` (auf 0.14.23) + Hard-Reload (`Strg+F5`).
 3. App-Menu-Icon jetzt **Light=schwarz, Dark=weiß** (matches Widget).
+
+## [0.14.26] — 2026-02-19 (Zwischenversion — durch v0.14.27 abgelöst)
+
+**Note:** Diese Zwischenversion hat das Menu-Icon repariert (Sister-App-
+Pipeline via weißes SVG), aber dabei das Widget-Icon kaputt gemacht —
+weil beide dasselbe SVG teilten. v0.14.27 löst das architektonisch:
+zwei getrennte SVG-Dateien.
 
 ## [0.14.25] — 2026-02-19 (Zwischenversion — durch v0.14.26 abgelöst)
 

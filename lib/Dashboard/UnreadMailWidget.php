@@ -202,6 +202,23 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function getIconUrl(): string
     {
-        return $this->urlGenerator->imagePath('souvera_mail', 'app.svg');
+        // Dashboard-Widget-only icon (BLACK on Light-mode / WHITE on
+        // Dark-mode via CSS filter in css/dashboard-widget.css).
+        //
+        // We deliberately serve a SEPARATE SVG (`app-widget.svg`) from
+        // the App-Popover / Nav-Menu icon (`app.svg`). Why: the two
+        // rendering pipelines demand OPPOSITE base colours —
+        //
+        //   • `app.svg` is white → App-Popover shows white-in-blue
+        //     (Light) and NC's auto-invert flips it to black (Dark).
+        //   • `app-widget.svg` is black → Widget header shows black on
+        //     white (Light), and our own CSS filter inverts it to
+        //     white on dark (Dark) inside `.panel--header`.
+        //
+        // Using two files eliminates the risk of a CSS filter or
+        // `currentColor` gymnastic accidentally swapping the two
+        // (which is exactly what happened v0.14.22 → v0.14.26 while
+        // debugging the operator's "verdreht" report).
+        return $this->urlGenerator->imagePath('souvera_mail', 'app-widget.svg');
     }
 }

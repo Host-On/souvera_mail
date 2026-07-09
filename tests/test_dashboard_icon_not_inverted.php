@@ -36,6 +36,22 @@ $svgPath = '/app/img/app.svg';
 ok(is_file($svgPath), "img/app.svg exists", $passes, $failures);
 $svg = (string) file_get_contents($svgPath);
 
+// v0.14.27: Widget uses a SEPARATE SVG so the two rendering pipelines
+// can never trip over each other again (menu-icon vs widget-icon).
+$widgetSvgPath = '/app/img/app-widget.svg';
+ok(is_file($widgetSvgPath),
+    "img/app-widget.svg exists (dedicated widget icon, v0.14.27 split)",
+    $passes, $failures);
+$widgetSvg = (string) file_get_contents($widgetSvgPath);
+ok(str_contains($widgetSvg, 'fill="#000000"')
+    && str_contains($widgetSvg, 'fill:#000000'),
+    "img/app-widget.svg uses hard-coded fill=#000000 (widget needs black on light-mode header)",
+    $passes, $failures);
+ok(!str_contains($widgetSvg, 'fill:#ffffff')
+    && !str_contains($widgetSvg, 'fill="#ffffff"'),
+    "img/app-widget.svg does NOT contain any #ffffff fill (regression pin against reverting to white)",
+    $passes, $failures);
+
 // ---------------------------------------------------------------
 // v0.14.26 rewrite: the SVG now ships with hard-coded `#ffffff` on
 // every path AND on the parent <g>. This matches every other Souvera
@@ -107,9 +123,9 @@ ok(str_contains($widget, 'implements IAPIWidgetV2, IIconWidget'),
     "UnreadMailWidget implements IIconWidget",
     $passes, $failures);
 ok((bool) preg_match(
-    "#getIconUrl\(\)[\s\S]{0,400}urlGenerator->imagePath\(\s*'souvera_mail'\s*,\s*'app\.svg'\s*\)#",
+    "#getIconUrl\(\)[\s\S]{0,2000}urlGenerator->imagePath\(\s*'souvera_mail'\s*,\s*'app-widget\.svg'\s*\)#",
     $widget
-), "UnreadMailWidget::getIconUrl() serves 'app.svg' via imagePath()",
+), "UnreadMailWidget::getIconUrl() serves 'app-widget.svg' via imagePath() (v0.14.27 split from app.svg)",
     $passes, $failures);
 ok((bool) preg_match(
     "#getIconClass\(\)[\s\S]{0,400}return\s+'icon-souvera-mail'#",

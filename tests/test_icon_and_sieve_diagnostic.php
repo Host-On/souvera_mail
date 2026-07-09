@@ -76,11 +76,14 @@ assertTrue(!\str_contains($app, "'logo-white-64x64.png'"),
     "Application.php no longer references the rasterised logo-white-64x64.png",
     $passes, $failures);
 
-// The img/ folder is now clean: ONLY app.svg lives there
+// The img/ folder holds two canonical files: app.svg (menu, white) +
+// app-widget.svg (dashboard widget, black). v0.14.27 split them so the
+// two rendering pipelines can never trip over each other again.
 $imgFolder = '/app/img';
 $imgFiles = \array_values(\array_diff(\scandir($imgFolder), ['.', '..']));
-assertTrue($imgFiles === ['app.svg'],
-    "img/ folder contains exactly one file: app.svg (got: " . \implode(',', $imgFiles) . ")",
+\sort($imgFiles);
+assertTrue($imgFiles === ['app-widget.svg', 'app.svg'],
+    "img/ folder contains exactly app.svg + app-widget.svg (got: " . \implode(',', $imgFiles) . ")",
     $passes, $failures);
 
 // ---------------------------------------------------------------
