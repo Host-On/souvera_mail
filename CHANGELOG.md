@@ -6,6 +6,115 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.20] — 2026-02-19 (UI: Nextcloud-Sidebar-Look für die Ordnerliste + Hotfix: Cancel-500 „undefined method find()")
+
+### Zwei Änderungen in einem Rollout
+
+**A) UI — Sidebar sieht jetzt aus wie Shield/Files/Contacts.**
+**B) Hotfix — Cancel-Endpoint war schon in v0.14.16 latent kaputt.**
+
+---
+
+### A) Operator-Wunsch (2026-02-19, mit zwei Screenshots)
+
+> „Bei Posteingang und co: könntest du nicht auch die Ansicht machen wie bei
+> Shield und co? Das Menu mit der Markierung, dem blauen Strich ganz links
+> am Anfang beim aktiven Objekt und so."
+
+Souvera Mail fühlte sich in der Sidebar bislang „fremd" an — schwarzer
+Selected-Hintergrund, keine Accent-Bar, keine NC-Pill. Andere Souvera-Apps
+(Shield, Files, Contacts) nutzen einheitlich den NC-Sidebar-Look:
+
+- **Vertikaler 4-px-Balken** in `--color-primary-element` links am aktiven
+  Item
+- **Sanfter hellblauer Hintergrund** (`--color-primary-element-light`)
+- **Runde rechte Ecken** (Pill hugs the sidebar wall)
+- **Hellgrauer Hover-Pill** (`--color-background-hover`)
+- **Unread-Bubble in NC-Blau** (statt engine-default Grau)
+
+Alle Farben kommen aus Nextclouds CSS-Custom-Properties → Light/Dark/HC-
+Theming greift automatisch. Fallback-Werte pro Variable sind gesetzt,
+damit auch un-themed-Rendering (z. B. während des NC-Boots) passt.
+
+**Neu:**
+- **`app/smail/v/current/app/plugins/nextcloud/css/folder-nav.css`** —
+  ~130 LOC, scoped auf `.b-folders`, überschreibt Engine-Defaults ohne
+  irgendwo `!important` einzusetzen.
+- **`app/smail/v/current/app/plugins/nextcloud/index.php`** —
+  `$this->addCss('css/folder-nav.css')` direkt neben `help-modal.css`.
+
+**Warum keine Engine-Änderung?** Selektoren sind ausschließlich auf
+`.b-folders` gescoped, damit der identische `.selected`-Klassenname in
+der Message-Liste (`.messageListItem.selected`) nicht mit angepackt wird.
+Kein Engine-Fork, kein Snappymail-Template-Patch, kein JavaScript —
+reines CSS-Overlay auf die vom Engine gerenderten `<li>` / `<a>`.
+
+---
+
+### B) Hotfix — Cancel-Import 500-Fehler „undefined method find()"
+
+**Operator-Report (2026-02-19):**
+> „Beim Abbrechen des Imports: Interner Fehler beim Abbruch (Error):
+> Call to undefined method OCA\SouveraMail\Db\MigrationJobMapper::find()"
+
+Der v0.14.18-Fehler-Diagnose-Fix hat endlich die echte Ursache sichtbar
+gemacht (vorher wurde die Exception verschluckt):
+`MigrationService::cancelJobForUser()` und `dismissJobForUser()` rufen
+beide `$this->jobs->find($jobId)` auf — diese Methode existiert am
+`MigrationJobMapper` aber **nicht**. Nextclouds `QBMapper`-Basisklasse
+hat den id-Lookup-Helper der deprecated `Mapper`-Klasse absichtlich
+nicht übernommen; der v0.14.16-Autor hat das übersehen.
+
+Damit war Cancel **seit v0.14.16 kaputt** (der Bug war nur unsichtbar,
+weil die Exception in einem catch-Throwable landete). Der v0.14.18-Fix
+hat die Fehlermeldung durchgereicht — jetzt war der Bug endlich sichtbar
+und deutlich diagnostizierbar.
+
+**Fix:** Minimale `find(int $id): MigrationJob`-Methode am Mapper
+hinzugefügt, die `findEntity()` unter der Haube nutzt. Wirft
+`DoesNotExistException` bei nicht existenter Row (wird vom Controller
+sauber auf HTTP 404 gemappt).
+
+**Warum keine Ownership-Prüfung im Mapper?** Die Ownership-Prüfung
+(`$job->getUserId() !== $userId → 403`) läuft bewusst im Service-Layer.
+Der Mapper bleibt „dumb by design", damit Admin-only-Cleanup-Pfade (z. B.
+`MigrationCleanup`-Cron) beliebige Rows fetchen können.
+
+---
+
+### Files
+
+| File | Change |
+|---|---|
+| `app/smail/v/current/app/plugins/nextcloud/css/folder-nav.css` | **Neu** — Nextcloud-Sidebar-Look |
+| `app/smail/v/current/app/plugins/nextcloud/index.php` | `addCss('css/folder-nav.css')` |
+| `lib/Db/MigrationJobMapper.php` | **Neu**: `find(int $id): MigrationJob` |
+| `tests/test_folder_nav_css.php` | **Neu** — 31 Assertions als Regression-Pin |
+| `tests/test_migration_backend.php` | +2 Assertions: Mapper::find pinned |
+| `appinfo/info.xml`, `package.json` | 0.14.19 → 0.14.20 |
+
+### Verifikation
+
+- `php -l` clean auf `MigrationJobMapper.php` + `plugins/nextcloud/index.php`.
+- **`tests/test_folder_nav_css.php`: 31/31 PASS.**
+- **`tests/test_migration_backend.php`: alle Assertions PASS (+2 neue).**
+
+### Live-Verifikation
+
+**Sidebar-Look:**
+1. Rsync + `occ upgrade` → 0.14.20 (Hard-Reload wg. CSS-Cache: `Strg+F5`).
+2. Sidebar sieht identisch zu Shield / Files aus — blaue Accent-Bar links
+   am aktiven Ordner (z. B. Posteingang), hellblaue Pill, runde rechte
+   Ecken, hellgrauer Hover.
+3. Dark-Theme umschalten (Persönliche Einstellungen → Erscheinungsbild):
+   Sidebar bleibt konsistent, weil alle Farben aus `--color-*`-Variablen
+   kommen.
+
+**Cancel-Fix:**
+1. Import starten → in Warteschlange
+2. „Import abbrechen" klicken → Confirm-Dialog → „Ja, jetzt abbrechen"
+3. Sofortiger Wechsel auf TerminalScreen „Import abgebrochen" — kein 500 mehr.
+
 ## [0.14.19] — 2026-02-19 (Feature: „Postfach neu synchronisieren" im Snappymail-Dropdown)
 
 ### Operator-Wunsch

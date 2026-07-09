@@ -24,6 +24,30 @@ class MigrationJobMapper extends QBMapper
     }
 
     /**
+     * Look up a single row by its primary key.
+     *
+     * Nextcloud's `QBMapper` intentionally dropped the id-lookup helper
+     * that the older deprecated `Mapper` class exposed as `find($id)`,
+     * so we re-add a minimal one here — dismissJobForUser() and
+     * cancelJobForUser() in MigrationService rely on it. Ownership
+     * scoping happens in the service layer (comparing
+     * `$job->getUserId()` against the current uid), NOT here — the
+     * mapper is dumb by design so admin-only cleanup paths can still
+     * fetch any row.
+     *
+     * @throws DoesNotExistException  no row with that id
+     */
+    public function find(int $id): MigrationJob
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from(self::TABLE)
+            ->where($qb->expr()->eq('id', $qb->createNamedParameter($id, IQueryBuilder::PARAM_INT)))
+            ->setMaxResults(1);
+        return $this->findEntity($qb);
+    }
+
+    /**
      * Latest migration row for a user, regardless of status. Used to
      * decide whether the wizard opens on the welcome-screen (no history)
      * or jumps directly to the progress-screen (there's an active job).

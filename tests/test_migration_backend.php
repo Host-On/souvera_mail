@@ -91,6 +91,20 @@ foreach (['findLatestForUser', 'findActiveForUser', 'findAllActive', 'findStaleT
     ok(str_contains($src['mapper'], "function {$fn}("),
         "Mapper exposes {$fn}()", $passes, $failures);
 }
+// v0.14.20 — Mapper::find(int $id) must exist so cancelJobForUser /
+// dismissJobForUser can look up a row by primary key. QBMapper (the
+// base class since NC 21) intentionally dropped the id-lookup helper
+// that the older deprecated Mapper base class exposed. Regression pin
+// against the "Call to undefined method …::find()" 500 the operator
+// reported on 2026-02-19.
+ok((bool) preg_match('#public function find\(int \$id\)\s*:\s*MigrationJob#', $src['mapper']),
+    "Mapper exposes find(int \$id): MigrationJob (used by cancel + dismiss)",
+    $passes, $failures);
+ok((bool) preg_match(
+    '#public function find\(int \$id\)[\s\S]{0,400}\$qb->expr\(\)->eq\(\s*\'id\',\s*\$qb->createNamedParameter\(\$id,\s*IQueryBuilder::PARAM_INT\)#',
+    $src['mapper']
+), "Mapper::find() builds a WHERE id = :id (INT-typed) query",
+    $passes, $failures);
 ok(str_contains($src['mapper'], "public const TABLE = 'souvera_migrations'"),
     "Table name pinned to 'souvera_migrations' (prefix-managed by NC)",
     $passes, $failures);

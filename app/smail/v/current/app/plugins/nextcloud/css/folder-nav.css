@@ -1,0 +1,161 @@
+/*
+ * Souvera Mail — Nextcloud-Sidebar look for the Snappymail folder tree.
+ * -----------------------------------------------------------------------
+ * WHY
+ * ~~~
+ * Snappymail's default sidebar renders the active folder with a dark
+ * background (`--folders-selected-bg-color` default `#333`) and no
+ * accent bar. That's completely off-brand next to native Nextcloud
+ * apps (Mail, Files, Shield, Contacts) which universally use:
+ *
+ *   • A vibrant blue vertical bar (4 px) on the left edge of the
+ *     active menu item
+ *   • A soft light-blue background tint on the active item
+ *   • Rounded right corners so the pill hugs the sidebar wall
+ *   • Grey hover state as a discovery affordance
+ *
+ * Applying that same visual grammar to Snappymail's folder list makes
+ * Souvera Mail feel like a native NC app instead of an embedded webmail
+ * client. All colours come from Nextcloud's CSS custom-properties with
+ * sensible off-brand fallbacks so the sidebar still looks right even if
+ * the theme is Snappymail-only (e.g. when the plugin is used outside
+ * NC in future).
+ *
+ * SCOPE
+ * ~~~~~
+ * Selectors are scoped to `.b-folders` so we can't accidentally repaint
+ * the message-list `.selected` state (which uses the same class name).
+ * Specificity climbs one notch above the engine's own rule
+ * (`.b-folders li a.selectable.selected` → we match at the same
+ * specificity but ship last, so cascade wins).
+ *
+ * SPACING NOTE
+ * ~~~~~~~~~~~~
+ * The engine's default `padding: 0 2em 0 7px` collides with the
+ * left-border we want (we'd be painting the border underneath the
+ * text). We reset `padding-left` to `12px` to leave visual air, and
+ * increase `line-height` to `36px` so the rows breathe the way NC
+ * sidebar rows do (Files uses 44 px, but 36 keeps parity with the
+ * unread-badge alignment further down in this file).
+ * -----------------------------------------------------------------------
+ */
+
+/* Container: match Nextcloud sidebar background (subtle off-white) */
+.b-folders {
+        background: var(--color-main-background, transparent);
+}
+
+/* Base row — reset the dark defaults and give NC-style breathing room. */
+.b-folders li a {
+        border-left: 4px solid transparent;
+        border-radius: 0 var(--border-radius-large, 12px) var(--border-radius-large, 12px) 0;
+        color: var(--color-main-text, #222);
+        line-height: 36px;
+        margin: 2px 8px 2px 0;
+        padding: 0 12px 0 12px;
+        transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+/* Hover — soft grey NC pill. Keep text colour stable (don't blank it). */
+.b-folders li a.selectable:hover {
+        background-color: var(--color-background-hover, #ebebeb);
+        color: var(--color-main-text, #222);
+}
+
+/* Drop-target while dragging a message — same look as hover but with a
+   dashed hint colour so the user sees the drop is valid. */
+.b-folders li a.selectable.droppableHover {
+        background-color: var(--color-primary-element-light-hover, #d5e6f4);
+        color: var(--color-main-text, #222);
+}
+
+/* SELECTED — the money selector. Left accent bar + light-blue tint. */
+.b-folders li a.selectable.selected {
+        background-color: var(--color-primary-element-light, #e7f1fa);
+        border-left-color: var(--color-primary-element, #0693e3);
+        color: var(--color-main-text, #222);
+        font-weight: 600;
+}
+
+/* Selected + focused (keyboard nav) — bring the accent forward. */
+.b-folders li a.selectable.selected.focused,
+.focused .b-folders a.focused {
+        background-color: var(--color-primary-element-light, #e7f1fa);
+        color: var(--color-main-text, #222);
+        outline: 2px solid var(--color-primary-element, #0693e3);
+        outline-offset: -2px;
+}
+
+/* Disabled headings (namespace roots like "Geteilte Postfächer") — stay
+   subtle: no border, no hover, italic label. */
+.b-folders li a:not(.selectable) {
+        color: var(--color-text-maxcontrast, #6b6b6b);
+        font-style: normal;
+        font-weight: 500;
+        margin-top: 8px;
+        opacity: 0.75;
+        padding-left: 12px;
+}
+
+/* Unread bubble — colour parity with NC primary. Keep the shape/size
+   from the engine but repaint the background so it doesn't clash with
+   the selected pill (dark grey → NC blue). */
+.b-folders .b-folders-system a[data-unread]::after,
+.b-folders .b-folders-user a[data-unread]:not(.system)::after {
+        background-color: var(--color-primary-element, #0693e3);
+        color: var(--color-primary-element-text, #fff);
+        font-weight: 600;
+        text-shadow: none;
+}
+
+/* System-folder list — first block (Posteingang, Gesendet, …).
+   Preserve the engine's `font-weight: bold` on the whole block but
+   fine-tune to NC weight (600 vs 700 is barely visible on system UI
+   fonts and matches NcAppNavigationItem). */
+.b-folders .b-folders-system {
+        font-weight: 500;
+        margin-bottom: 4px;
+}
+
+/* Divider between system and user folders — thinner + NC border colour. */
+.b-folders hr {
+        background: transparent;
+        border: 0;
+        border-top: 1px solid var(--color-border, #ededed);
+        margin: 8px 8px;
+}
+
+/* Toolbar (Verfassen + Kontakte) — Nextcloud spacing. */
+.b-folders .b-toolbar {
+        padding: 8px 8px;
+}
+
+/* Search input for folder filter — NC input style. */
+.b-folders .search-input-wrp {
+        margin: 4px 8px;
+}
+.b-folders .search-input-wrp input[type="search"] {
+        border-radius: var(--border-radius, 8px);
+        border: 1px solid var(--color-border, #ededed);
+}
+
+/* "Only unread" checkbox row — align with the folder rows above. */
+.b-folders .e-checkbox {
+        border-radius: 0 var(--border-radius-large, 12px) var(--border-radius-large, 12px) 0;
+        margin: 2px 8px 2px 0;
+        padding: 4px 12px;
+}
+.b-folders .e-checkbox:hover {
+        background-color: var(--color-background-hover, #ebebeb);
+}
+
+/*
+ * Dark-theme parity
+ * -----------------
+ * Nextcloud's dark theme swaps `--color-primary-element-light` to a
+ * translucent blue overlay (`rgba(0, 130, 201, 0.35)`). Our fallback
+ * hex (#e7f1fa) would look wrong on a dark background — but the CSS
+ * variable already handles that switch when NC theming is active, so
+ * we don't need to duplicate the media query. This comment stays as
+ * documentation for future maintainers.
+ */

@@ -40,6 +40,7 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			$this->addJs('js/folder-names.js');
 
 			$this->addCss('css/help-modal.css');
+			$this->addCss('css/folder-nav.css');
 
 			$this->addTemplate('templates/PopupsNextcloudFiles.html');
 			$this->addTemplate('templates/PopupsNextcloudCalendars.html');
