@@ -6,6 +6,69 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.21] — 2026-02-19 (Hotfix: Dashboard-Widget-Icon nicht mehr „invertiert")
+
+### Operator-Report (2026-02-19)
+
+> „Das Dashboard Widget zeigt leider das Mail Icon Inverted an, das
+> sollte nicht so sein."
+
+### Root cause
+
+`img/app.svg` hatte die richtige Group-Kaskade `<g fill="#000000">`
+(aus Step 22 / v0.13.12: „currentColor-only so NC theming picks it up") —
+**aber** die zwei `<path>`-Kinder trugen inline
+`style="fill:#ffffff"` und haben damit die Group-Kaskade überschrieben.
+
+Nextclouds Dashboard rendert Widget-Icons via `<img src="app.svg">`
+(`IIconWidget::getIconUrl()`). Bei `<img>`-Rendering fällt `currentColor`
+auf **`black`** zurück — was gewollt wäre und funktionieren würde. Aber
+die inline `fill:#ffffff` haben das kurzgeschlossen: die Pfade wurden
+**weiß auf weißem Widget-Header** gemalt ⇒ unsichtbar bzw. „invertiert".
+
+### Fix
+
+Beide `<path>`-Inline-Styles von `fill:#ffffff` auf `fill:currentColor`
+umgestellt. Damit:
+
+| Kontext | Verhalten |
+|---|---|
+| Dashboard `<img>`-Rendering | `currentColor` → schwarzer Fallback → sichtbar |
+| NC Nav-Icon (`mask-image`) | Alpha-Kanal zählt, Fill irrelevant → unverändert |
+| Zukünftige Inline-SVG-Einbindung | Nimmt CSS `color` an → theme-fähig |
+
+Group-Kaskade `<g fill="#000000">` bleibt als Safety-Net.
+
+### Warum ist das jetzt aufgefallen?
+
+Der Fehler war seit Step 22 (v0.13.12) drin — jemand hat später (oder
+Inkscape beim Speichern) die weißen Fills eingefügt. Fällt auf dem
+dunklen NC-Sidebar-Nav-Icon nicht auf (dort war weißes Icon sogar
+korrekt), aber im hellen Dashboard-Widget-Header sofort sichtbar.
+
+### Files
+
+| File | Change |
+|---|---|
+| `img/app.svg` | Beide `<path style="fill:#ffffff">` → `fill:currentColor` |
+| `tests/test_dashboard_icon_not_inverted.php` | **Neu** — Regression-Pin gegen weiße Fills + Dashboard-Wiring |
+| `appinfo/info.xml`, `package.json` | 0.14.20 → 0.14.21 |
+
+### Verifikation
+
+- `xmllint --noout img/app.svg` (falls installiert) — SVG-Wohlgeformtheit.
+- **`tests/test_dashboard_icon_not_inverted.php`: alle Assertions PASS.**
+- **Volle Suite: 40 Suites / 1567+ Assertions PASS, 0 Fehler.**
+
+### Live-Verifikation
+
+1. Rsync `img/app.svg` + `appinfo/info.xml` + `package.json` → Live-Server.
+2. Nextcloud → Übersicht (Dashboard) → das „Souvera Mail · Inbox"-Widget:
+   Icon oben links jetzt **schwarze Umriss-Silhouette** auf hellem Header
+   (statt vorher weiß-auf-weiß).
+3. Hard-Reload (`Strg+F5`) wg. Browser-Icon-Cache.
+4. Nav-Icon in der NC-Top-Bar bleibt unverändert (nutzt Mask-Rendering).
+
 ## [0.14.20] — 2026-02-19 (UI: Nextcloud-Sidebar-Look für die Ordnerliste + Hotfix: Cancel-500 „undefined method find()")
 
 ### Zwei Änderungen in einem Rollout
