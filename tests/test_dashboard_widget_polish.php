@@ -118,20 +118,30 @@ ok((bool) preg_match(
 ), "CSS inverts widget <img> icon in dark mode (body[data-theme-dark] + filter: invert(1))",
     $passes, $failures);
 
-// App-menu icon: Light → BLACK, Dark → WHITE (v0.14.23 operator correction)
+// App-menu icon: Light → WHITE, Dark → BLACK (v0.14.24 final spec)
 ok((bool) preg_match(
-    '~\.app-menu-entry\[data-app-id="souvera_mail"\][\s\S]{0,400}background-color\s*:\s*\#000000#',
+    '~\.app-menu-entry\[data-app-id="souvera_mail"\][\s\S]{0,400}background-color\s*:\s*\#ffffff~',
     $css
-) || (bool) preg_match(
-    '~\.app-menu-entry\[data-app-id="souvera_mail"\][\s\S]{0,400}background-color\s*:\s*\#000000~',
-    $css
-), "CSS forces App-Menu icon to BLACK in Light mode (v0.14.23 correction)",
+), "CSS forces App-Menu icon to WHITE in Light mode (v0.14.24 final)",
     $passes, $failures);
 
 ok((bool) preg_match(
-    '~body\[data-theme-dark\][\s\S]{0,600}\.app-menu-entry\[data-app-id="souvera_mail"\][\s\S]{0,400}background-color\s*:\s*\#ffffff~',
+    '~body\[data-theme-dark\][\s\S]{0,600}\.app-menu-entry\[data-app-id="souvera_mail"\][\s\S]{0,400}background-color\s*:\s*\#000000~',
     $css
-), "CSS forces App-Menu icon to WHITE in Dark mode (v0.14.23 correction)",
+), "CSS forces App-Menu icon to BLACK in Dark mode (v0.14.24 final)",
+    $passes, $failures);
+
+// v0.14.24 belt-and-braces: <img>-based Nav icons need filter treatment too
+ok((bool) preg_match(
+    '~\.app-menu-entry\[data-app-id="souvera_mail"\] img[\s\S]{0,600}filter\s*:\s*invert\(1\)~',
+    $css
+), "CSS also applies filter: invert(1) for <img>-rendered Nav variants (Light)",
+    $passes, $failures);
+
+ok((bool) preg_match(
+    '~body\[data-theme-dark\][\s\S]{0,900}\.app-menu-entry\[data-app-id="souvera_mail"\] img[\s\S]{0,600}filter\s*:\s*none~',
+    $css
+), "CSS resets filter:none for <img>-rendered Nav variants in Dark mode",
     $passes, $failures);
 
 // Empty-state checkmark styling

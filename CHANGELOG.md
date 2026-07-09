@@ -6,7 +6,68 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.14.23] — 2026-02-19 (Hotfix: App-Menu-Icon Light/Dark verdreht — Korrektur)
+## [0.14.24] — 2026-02-19 (Hotfix: Menu-Icon-Farbregel — dritter Anlauf + Belt-and-braces)
+
+### Operator-Report (2026-02-19, dritter Durchlauf)
+
+> „Es wird immer noch das Icon im Hauptmenu weiß gezeigt im Dark mode,
+> und im lite mode ist es noch schwarz — das muss genau umgedreht sein!"
+
+### Warum ein dritter Anlauf?
+
+Meine v0.14.22-Regel (Light=weiß, Dark=schwarz) war schon richtig. Bei
+der v0.14.23-Iteration habe ich „verdreht" vom Operator falsch als
+„die Regel ist verdreht" gelesen und die Farben getauscht — der
+Operator meinte aber „die tatsächliche Anzeige ist verdreht, meine
+Regel greift nicht im Menu-DOM". Jetzt final:
+
+- **Widget-Icon:** Light → schwarz, Dark → weiß (unverändert seit v0.14.22)
+- **Nav / Menu-Icon:** Light → **weiß**, Dark → **schwarz** (final, v0.14.24)
+
+### Was wurde ausserdem gefixt?
+
+Die Vermutung: mein v0.14.22-Override griff im Live-DOM gar nicht
+(deshalb blieb das NC-Default-Rendering sichtbar). Deshalb v0.14.24
+mit **Belt-and-braces**: neben dem bisherigen `background-color`-
+Override auf `.app-menu-icon`-Elemente (`mask-image`-Rendering)
+kommt zusätzlich ein `filter: invert(1)`-Override auf `img`-basierte
+Nav-Rendering-Pfade. Damit sind beide Rendering-Wege (Mask + `<img>`)
+abgedeckt, unabhängig davon welchen NC 33/34/35 tatsächlich fährt.
+
+Selektoren-Set für die neue `<img>`-Belt-Regel:
+- `.app-menu-entry[data-app-id="souvera_mail"] img`
+- `.app-menu-main [data-app-id="souvera_mail"] img`
+- `li[data-id="souvera_mail"] a > img`
+- `#app-menu li[data-id="souvera_mail"] img`
+- `.header-appmenu li[data-id="souvera_mail"] img`
+- `.header-appmenu a[href*="/apps/souvera_mail/"] img`
+- `nav [data-id="souvera_mail"] img`
+
+`filter: invert(1) brightness(2)` im Light-Mode dreht das schwarze
+`currentColor`-Icon (v0.14.21) auf weiß; `filter: none` im
+Dark-Mode lässt es wieder schwarz.
+
+### Files
+
+| File | Change |
+|---|---|
+| `css/dashboard-widget.css` | App-Menu-Block getauscht + `<img>`-Filter-Belt hinzugefügt |
+| `tests/test_dashboard_widget_polish.php` | Assertions auf finale Farben + Filter-Belt |
+| `appinfo/info.xml`, `package.json` | 0.14.23 → 0.14.24 |
+
+### Verifikation
+
+- **`tests/test_dashboard_widget_polish.php`: alle Assertions PASS.**
+- **Voller Suite-Run: 41 Suites / 1594+ Assertions PASS, 0 Fehler.**
+
+### Live-Verifikation
+
+1. Rsync `css/dashboard-widget.css` + `info.xml` + `package.json` → Live.
+2. `occ upgrade` → 0.14.24. Hard-Reload (`Strg+F5`) wg. CSS-Cache.
+3. Nav-Icon jetzt **Light=weiß, Dark=schwarz**. Widget-Icon bleibt
+   Light=schwarz, Dark=weiß.
+
+
 
 ### Operator-Report (2026-02-19, zweiter Durchlauf)
 
@@ -52,6 +113,12 @@ bleiben unverändert.
 1. Rsync `css/dashboard-widget.css` + `info.xml` + `package.json` → Live.
 2. `occ upgrade` (auf 0.14.23) + Hard-Reload (`Strg+F5`).
 3. App-Menu-Icon jetzt **Light=schwarz, Dark=weiß** (matches Widget).
+
+## [0.14.23] — 2026-02-19 (Hotfix zwischenzeitlich — durch v0.14.24 überschrieben)
+
+**Note:** Diese Zwischenversion hat die Menu-Icon-Regel fälschlich auf
+„Light=schwarz, Dark=weiß" gedreht (Missinterpretation des Operator-
+Berichts). v0.14.24 dreht sie final zurück auf **„Light=weiß, Dark=schwarz"**.
 
 ## [0.14.22] — 2026-02-19 (Dashboard-Widget Polish: Titel · Empty-State · Default-Modus · Theme-Icon)
 
