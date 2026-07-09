@@ -202,10 +202,14 @@ class Application extends App implements IBootstrap
         // ------------------------------------------------------------------
         $navigationManager->add(function () use ($serverContainer) {
             $urlGenerator = $serverContainer->get(IURLGenerator::class);
+            // IL10N is app-scoped — must be obtained via IFactory, not
+            // directly from the ServerContainer (that raises
+            // "Could not resolve OCP\IL10N! Class can not be instantiated").
+            $l10n = $serverContainer->get(\OCP\L10N\IFactory::class)->get(self::APP_ID);
             return [
                 'id' => 'souvera_mail_migration',
                 'type' => 'settings',
-                'name' => $serverContainer->get(\OCP\IL10N::class)->t('Alte Mails importieren'),
+                'name' => $l10n->t('Alte Mails importieren'),
                 'href' => $urlGenerator->linkToRoute('souvera_mail.page.index') . '?openMigration=1',
                 'icon' => $urlGenerator->imagePath(self::APP_ID, 'app.svg'),
                 'order' => 12,

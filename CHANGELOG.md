@@ -6,6 +6,42 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.12b] — 2026-02-19 (Hotfix-über-Hotfix: `IL10N` app-scoped resolve)
+
+Nach dem 0.14.12-Deploy meldete der Operator im Nextcloud-Log:
+
+```
+Could not resolve OCP\IL10N! Class can not be instantiated
+```
+
+**Root cause (mein Fehler):** In `Application::boot()` habe ich für den
+neuen User-Menü-Eintrag den `IL10N`-Service direkt aus dem
+`ServerContainer` geholt:
+
+```php
+$serverContainer->get(\OCP\IL10N::class)->t('Alte Mails importieren');
+```
+
+`IL10N` ist in Nextcloud aber **app-scoped** — jede App hat ihre
+eigene Übersetzungs-Instanz. Der ServerContainer kennt keinen
+generischen `IL10N`-Bind (nur `Server::getL10N($appId)`), also wirft
+er die Not-instantiable-Exception. Der Wizard-Reopen-Menü-Eintrag
+wurde nicht registriert; jeder Seitenaufruf loggte den Fehler.
+
+**Fix:** Auflösung über `\OCP\L10N\IFactory::get($appId)` — der
+kanonische Nextcloud-Weg für app-scoped-Translations:
+
+```php
+$l10n = $serverContainer->get(\OCP\L10N\IFactory::class)->get(self::APP_ID);
+$l10n->t('Alte Mails importieren');
+```
+
+**Regression-Pin:** `tests/test_migration_wizard_frontend.php` +2
+Assertions: **(a)** `Application.php` darf `IL10N` nicht mehr direkt
+aus dem ServerContainer holen; **(b)** die Übersetzung MUSS über
+`\OCP\L10N\IFactory::class` laufen. **Total local suite: 1480
+Assertions passing.**
+
 ## [0.14.12] — 2026-02-19 (Hotfix: Vue-3 v-model bindings + user-menu re-open)
 
 ### Fixed — 3 Live-Bugs auf dem IMAP-Form-Screen

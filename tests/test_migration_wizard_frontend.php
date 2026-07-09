@@ -315,6 +315,15 @@ ok(str_contains($appPhpSrc, "'type' => 'settings'"),
 ok(str_contains($appPhpSrc, "'?openMigration=1'"),
     'User-menu entry deep-links with ?openMigration=1 query param',
     $passes, $failures);
+// v0.14.12-hotfix — IL10N is app-scoped and must be resolved via
+// IFactory. Directly asking the ServerContainer for IL10N raises
+// "Could not resolve OCP\IL10N! Class can not be instantiated".
+ok(!preg_match('/\$serverContainer->get\(\s*\\\\?OCP\\\\IL10N::class/', $appPhpSrc),
+    'Application.php does NOT resolve IL10N directly from ServerContainer',
+    $passes, $failures);
+ok(str_contains($appPhpSrc, '\\OCP\\L10N\\IFactory::class'),
+    'Application.php resolves translations via OCP\\L10N\\IFactory (app-scoped)',
+    $passes, $failures);
 
 // Frontend honours the URL parameter.
 ok(str_contains($appVueSrc, "openMigration"),
