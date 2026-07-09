@@ -456,10 +456,10 @@ ok($nsPos !== false && $reqPos !== false && $nsPos < $reqPos,
 // ==============================================================
 // P — version bump + changelog markers
 // ==============================================================
-ok((bool) preg_match('#<version>0\.14\.(1[7-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
-    'info.xml version bumped to 0.14.17 (or later)', $passes, $failures);
-ok(str_contains($src['changelog'], '[0.14.17]'),
-    'CHANGELOG.md has a [0.14.17] section', $passes, $failures);
+ok((bool) preg_match('#<version>0\.14\.(1[8-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
+    'info.xml version bumped to 0.14.18 (or later)', $passes, $failures);
+ok(str_contains($src['changelog'], '[0.14.18]'),
+    'CHANGELOG.md has a [0.14.18] section', $passes, $failures);
 ok(stripos($src['changelog'], 'Vue 3') !== false
     || stripos($src['changelog'], 'Vue-3') !== false
     || stripos($src['changelog'], 'design system') !== false,

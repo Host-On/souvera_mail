@@ -6,6 +6,70 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.18] — 2026-02-19 (Hotfix: Cancel-500 diagnostisch machen + defensive Setter)
+
+### Operator-Report
+
+Nach `POST /migration/cancel/{jobId}` HTTP 500 mit generischer
+Meldung „Interner Fehler beim Abbruch". Die eigentliche
+Exception-Message war in NC-Logs versteckt und für den Operator
+im Web-UI komplett unsichtbar.
+
+### Fix (zwei Ebenen)
+
+**Ebene 1 — Diagnose-First:** Die 500-Response im Controller gibt
+jetzt Klassenname + `message` der geworfenen Exception verbatim
+zurück:
+
+```
+"Interner Fehler beim Abbruch (DBException): SQLSTATE[HY000]: General …"
+```
+
+Damit sieht der Operator im nächsten Cancel-Versuch sofort die
+konkrete Ursache und braucht keinen Log-Grep mehr.
+
+**Ebene 2 — Defensive Setter:** `cancelJobForUser()` in
+`MigrationService` wrappt jetzt `$job->setStalwartAppId(null)` in
+einen eigenen try/catch. NC-AppFramework's
+`->addType('stalwartAppId','string')` verhält sich in einzelnen
+PHP-8.3-Patch-Levels beim Übergeben von `null` inkonsistent — der
+Setter kann eine `ArgumentCountError`-artige Flake werfen. Selbst
+wenn das passiert: das temp Ziel-App-Passwort ist zu diesem
+Zeitpunkt schon widerrufen (`revokeStalwartOnlyForMigration()`
+lief vorher), also gehen keine Ressourcen verloren. Der
+Cleanup-Cron greift orphaned Referenzen sowieso täglich ab.
+
+Was passiert im Detail:
+- Status-Flip auf `cancelled` läuft **immer** (harter Fehler-Pfad).
+- App-PW-Revoke läuft in eigenem try/catch (loggt, non-fatal).
+- Null-out von `stalwart_app_id` läuft in eigenem try/catch (loggt,
+  non-fatal).
+
+Damit ist das Feature robust gegen jeden einzelnen Sub-Failure.
+
+### Files
+
+| File | Change |
+|---|---|
+| `lib/Controller/MigrationController.php` | 500-Response gibt jetzt ExceptionClass + Message zurück |
+| `lib/Service/MigrationService.php` | `cancelJobForUser`: eigener try/catch um `setStalwartAppId(null)` |
+| `appinfo/info.xml`, `package.json` | 0.14.17 → 0.14.18 |
+
+### Verifikation
+
+- `php -l` clean auf Controller + Service.
+- **Voller Suite-Run: 39 Suites / 1536 Assertions passing.**
+
+### Live-Verifikation
+
+1. Rsync + `occ upgrade` → 0.14.18
+2. Erneut abbrechen probieren.
+3. **Falls es funktioniert**: TerminalScreen „Import abgebrochen" erscheint sofort.
+4. **Falls es wieder 500 gibt**: Die Fehlermeldung im UI zeigt jetzt
+   die echte Ursache (z. B. `DBException: SQLSTATE[HY000]: …`) —
+   bitte diese Message zurück an mich, dann fix ich das Root Cause
+   Problem gezielt.
+
 ## [0.14.17] — 2026-02-19 (UX-Fix: Menü-Eintrag ins Snappymail-Dropdown umziehen)
 
 ### Operator-Report

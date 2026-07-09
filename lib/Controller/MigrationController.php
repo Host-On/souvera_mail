@@ -279,13 +279,21 @@ class MigrationController extends Controller
                 : Http::STATUS_CONFLICT;
             return $this->error($e->getMessage(), $status);
         } catch (\Throwable $e) {
+            // Full trace to the log; short human-facing summary to the
+            // client — the operator asked us to stop swallowing errors
+            // silently after the "Interner Fehler beim Abbruch"-report
+            // gave zero clue what went wrong. The class name + message
+            // suffix is deliberate: PHP-level flakes (SQL truncation,
+            // AppFramework type-mismatches, …) become traceable without
+            // handing the user a stack trace.
             $this->logger->error(
                 'Souvera Mail: cancel job failed uid=' . $this->userId
                 . ' jobId=' . $jobId . ': ' . $e->getMessage(),
                 ['app' => 'souvera_mail', 'exception' => $e]
             );
+            $short = (new \ReflectionClass($e))->getShortName();
             return $this->error(
-                'Interner Fehler beim Abbruch.',
+                'Interner Fehler beim Abbruch (' . $short . '): ' . $e->getMessage(),
                 Http::STATUS_INTERNAL_SERVER_ERROR
             );
         }

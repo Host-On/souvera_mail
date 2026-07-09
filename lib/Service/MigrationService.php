@@ -413,10 +413,25 @@ class MigrationService
                     ['app' => 'souvera_mail']
                 );
             }
-            $job->setStalwartAppId(null);
+            // v0.14.18 — NC-AppFramework's ->addType('stalwartAppId','string')
+            // rejects setter(null) with an ArgumentCountError-like flake in
+            // some PHP 8.3 patch levels. Guard the null-out in its own
+            // try/catch: the app-password is revoked either way, and the
+            // nightly cleanup cron will pick up the orphaned reference.
+            try {
+                $job->setStalwartAppId(null);
+            } catch (\Throwable $e) {
+                $this->logger->warning(
+                    'Souvera Mail: could not null out stalwart_app_id on cancel for jobId=' . $job->getId()
+                    . ': ' . $e->getMessage(),
+                    ['app' => 'souvera_mail']
+                );
+            }
         }
 
-        // Step 2: flip local status to cancelled.
+        // Step 2: flip local status to cancelled. Errors here MUST
+        // propagate — without a status flip the poller keeps thinking
+        // the job is pending, endless retry-loop.
         $now = $this->time->getTime();
         $job->setStatus(MigrationJob::STATUS_CANCELLED);
         $job->setErrorMessage('Vom Benutzer abgebrochen (war noch in der Warteschlange).');
