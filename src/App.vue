@@ -14,6 +14,11 @@
 			data-testid="migration-wizard"
 			@close="closeWizard"
 			@dismiss-forever="onDismissForever" />
+
+		<ResyncDialog
+			v-if="isResyncOpen"
+			data-testid="resync-dialog-root"
+			@close="isResyncOpen = false" />
 	</div>
 </template>
 
@@ -22,13 +27,15 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useMigration } from './composables/useMigration.js'
 import MigrationPill from './components/MigrationPill.vue'
 import MigrationWizard from './components/MigrationWizard.vue'
+import ResyncDialog from './components/ResyncDialog.vue'
 
 export default {
 	name: 'App',
-	components: { MigrationPill, MigrationWizard },
+	components: { MigrationPill, MigrationWizard, ResyncDialog },
 	setup() {
 		const migration = useMigration()
 		const isOpen = ref(false)
+		const isResyncOpen = ref(false)
 		const initialStep = ref('welcome')
 
 		const showPill = computed(() => migration.available.value)
@@ -97,6 +104,12 @@ export default {
 					})
 			})
 
+			// v0.14.19 — Snappymail dropdown injects a "🔄 Postfach neu
+			// synchronisieren" entry that dispatches this event.
+			window.addEventListener('souvera-mail:open-resync', () => {
+				isResyncOpen.value = true
+			})
+
 			// Auto-resume active migration → straight to progress screen.
 			if (migration.hasActive.value) {
 				initialStep.value = 'progress'
@@ -126,6 +139,7 @@ export default {
 		return {
 			migration,
 			isOpen,
+			isResyncOpen,
 			initialStep,
 			showPill,
 			openWizard,

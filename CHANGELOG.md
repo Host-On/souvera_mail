@@ -6,6 +6,102 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.19] — 2026-02-19 (Feature: „Postfach neu synchronisieren" im Snappymail-Dropdown)
+
+### Operator-Wunsch
+
+> „Auch in das Dropdown Menu innerhalb der Mail App: dass man den
+> Resync/Reindex von Stalwart selbst starten kann. Klick im Menu =
+> Modal mit der Beschreibung und dann die Möglichkeit den Reindex zu
+> starten."
+
+### Ehrlichkeit zuerst
+
+Stalwart 0.16 **hat kein per-User-FTS-Reindex-Endpoint** — die
+REST-Management-API wurde in 0.16 entfernt und FTS-Indizierung läuft
+automatisch im Hintergrund. Was ein Endnutzer aber tatsächlich
+gebrauchen kann, ist ein **kompletter Client-Neusync**: Cache leeren,
+Snappymail neu bootstrappen, frische `Session/get`-Antwort vom Server
+holen. Das behebt >90% der realen Sync-Symptome (stale Ordner-Zähler,
+fehlende Ordner nach Quota-Änderung, hängende Entwürfe, nach
+Migration nicht sichtbare Nachrichten).
+
+Der neue Dialog **kommuniziert das offen** in einer grünen Info-Note
+— keine „Reindex"-Fake-Versprechen.
+
+### Neu
+
+- **`lib/Controller/StalwartController.php`** — neuer Controller mit
+  einer `#[NoAdminRequired]` `resync()`-Methode. Zweck: Audit-Trail
+  (Logger-Info-Line pro Klick) + Health-Check der NC-Session. Kein
+  Server-side FTS-Aufruf (gibt es nicht).
+- **`routes.php`** — `POST /apps/souvera_mail/stalwart/resync`.
+- **`src/components/ResyncDialog.vue`** — Vue-Modal mit drei Stages:
+  - **Intro**: freundliche Beschreibung + 3-Punkte-Wann-hilft-das +
+    zwei NcNoteCards (⚠️ ungespeicherte Entwürfe gehen verloren,
+    ℹ️ FTS läuft automatisch — kein manueller Reindex nötig).
+  - **Busy**: Loading-Spinner + Live-Text „Sende Anfrage … Lösche
+    lokalen Cache … Lade Souvera Mail neu (N Cache-Einträge geleert)".
+  - **Error**: freundlicher Fehler-Splash mit „Erneut versuchen"-Button.
+- **`src/App.vue`** — Event-Listener `souvera-mail:open-resync` +
+  bedingte Mount.
+- **`plugins/nextcloud/js/dropdown-menu.js`** — refaktoriert:
+  wiederverwendbare `buildItem()`-Funktion. Injiziert jetzt ZWEI
+  Menüeinträge im Snappymail-Top-Right-Dropdown:
+
+  ```
+    ⚙ Einstellungen
+    🔄 Postfach neu synchronisieren   ← NEU
+    📥 Alte Mails importieren
+    🛈 Hilfe
+    ⏻ Ausloggen
+  ```
+
+  Beide Einträge sind idempotent (`data-sv-resync-menu` /
+  `data-sv-mig-menu`).
+
+### Sync-Effekt im Detail
+
+```
+Client-side clearSnappymailLocalStorage()
+  → entfernt jeden localStorage-Key mit Prefix
+    rl., snappymail., rainloop., smail.
+Backend-Call POST /stalwart/resync
+  → NC-Log: „user-initiated mailbox resync uid=…"
+  → Session-Cache-Refresh implizit durch die request
+Full window.location.reload()
+  → Snappymail bootstraps neu, holt fresh JMAP Session/get,
+    Ordner-Tree + Message-List werden aus dem Server neu aufgebaut
+```
+
+### Files
+
+| File | Change |
+|---|---|
+| `lib/Controller/StalwartController.php` | **Neu** — 40 LOC, audit trail only |
+| `appinfo/routes.php` | POST `/stalwart/resync` |
+| `app/smail/v/current/app/plugins/nextcloud/js/dropdown-menu.js` | Zweiter Menü-Eintrag, refaktoriert mit `buildItem()` |
+| `src/App.vue` | Event-Listener + ResyncDialog mount |
+| `src/components/ResyncDialog.vue` | **Neu** — 3-Stage-Dialog (Intro/Busy/Error) |
+| `tests/test_migration_wizard_frontend.php` | +14 Assertions |
+| `tests/test_souvera_mail_rename.php`, `tests/test_connected_devices.php` | Route-Count 21 → 22 |
+| `appinfo/info.xml`, `package.json` | 0.14.18 → 0.14.19 |
+
+### Verifikation
+
+- `yarn build` clean → 400 KB Bundle.
+- `php -l` clean.
+- `node -e new Function(dropdownJs)` OK.
+- **Voller Suite-Run: 39 Suites / 1550 Assertions passing** (war 1536).
+
+### Live-Verifikation
+
+1. Rsync + `occ upgrade` → 0.14.19
+2. In Mail einloggen → 👤 oben rechts → Dropdown öffnen
+3. Neuer Eintrag „🔄 Postfach neu synchronisieren" zwischen ⚙ Einstellungen und 📥 Alte Mails importieren
+4. Klick → Modal öffnet mit ehrlicher Beschreibung + „Jetzt neu synchronisieren"-Button
+5. Klick → Spinner mit Live-Text → automatischer Full Reload → sauberes Snappymail
+
 ## [0.14.18] — 2026-02-19 (Hotfix: Cancel-500 diagnostisch machen + defensive Setter)
 
 ### Operator-Report

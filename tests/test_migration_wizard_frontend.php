@@ -456,10 +456,54 @@ ok($nsPos !== false && $reqPos !== false && $nsPos < $reqPos,
 // ==============================================================
 // P — version bump + changelog markers
 // ==============================================================
-ok((bool) preg_match('#<version>0\.14\.(1[8-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
-    'info.xml version bumped to 0.14.18 (or later)', $passes, $failures);
-ok(str_contains($src['changelog'], '[0.14.18]'),
-    'CHANGELOG.md has a [0.14.18] section', $passes, $failures);
+ok((bool) preg_match('#<version>0\.14\.(19|[2-9]\d|\d{3,})</version>#', $src['info']),
+    'info.xml version bumped to 0.14.19 (or later)', $passes, $failures);
+ok(str_contains($src['changelog'], '[0.14.19]'),
+    'CHANGELOG.md has a [0.14.19] section', $passes, $failures);
+
+// ==============================================================
+// R — v0.14.19: "Postfach neu synchronisieren" in Snappymail-Dropdown
+// ==============================================================
+$dropdownJs2  = (string) @file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/js/dropdown-menu.js');
+$resyncDialog = (string) @file_get_contents('/app/src/components/ResyncDialog.vue');
+$stalwartCtl  = (string) @file_get_contents('/app/lib/Controller/StalwartController.php');
+$routesSrc2   = (string) @file_get_contents('/app/appinfo/routes.php');
+
+ok($resyncDialog !== '',
+    'ResyncDialog.vue exists', $passes, $failures);
+ok($stalwartCtl !== '',
+    'StalwartController.php exists', $passes, $failures);
+ok(str_contains($dropdownJs2, "'souvera-mail:open-resync'"),
+    'dropdown-menu.js dispatches souvera-mail:open-resync', $passes, $failures);
+ok(str_contains($dropdownJs2, 'RESYNC_MARKER'),
+    'dropdown-menu.js uses a separate idempotent marker for the resync entry',
+    $passes, $failures);
+ok(str_contains($src['app'], "'souvera-mail:open-resync'"),
+    'App.vue listens for souvera-mail:open-resync', $passes, $failures);
+ok(str_contains($src['app'], 'ResyncDialog'),
+    'App.vue mounts ResyncDialog conditionally', $passes, $failures);
+ok(str_contains($routesSrc2, "'stalwart#resync'")
+    && str_contains($routesSrc2, "'/stalwart/resync'"),
+    'routes.php registers POST /stalwart/resync', $passes, $failures);
+ok((bool) preg_match('/class\s+StalwartController\s+extends\s+Controller/', $stalwartCtl),
+    'StalwartController extends AppFramework Controller', $passes, $failures);
+ok(str_contains($stalwartCtl, '#[NoAdminRequired]'),
+    'StalwartController::resync is #[NoAdminRequired]', $passes, $failures);
+
+// Honesty check: the ResyncDialog MUST NOT claim to trigger a
+// server-side FTS reindex — Stalwart 0.16 has no such endpoint.
+ok(str_contains($resyncDialog, 'FTS')
+    && (str_contains($resyncDialog, 'automatisch') || str_contains($resyncDialog, 'automatic')),
+    'ResyncDialog is honest about FTS (no fake server-side reindex claim)',
+    $passes, $failures);
+ok(str_contains($resyncDialog, 'clearSnappymailLocalStorage')
+    && (str_contains($resyncDialog, "'rl.'")
+        || str_contains($resyncDialog, "'snappymail.'")),
+    'ResyncDialog clears Snappymail localStorage keys before reload',
+    $passes, $failures);
+ok(str_contains($resyncDialog, 'window.location.reload'),
+    'ResyncDialog does a full page reload for the actual sync effect',
+    $passes, $failures);
 ok(stripos($src['changelog'], 'Vue 3') !== false
     || stripos($src['changelog'], 'Vue-3') !== false
     || stripos($src['changelog'], 'design system') !== false,

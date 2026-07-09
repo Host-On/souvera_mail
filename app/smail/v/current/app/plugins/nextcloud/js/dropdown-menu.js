@@ -40,6 +40,7 @@
 	if (!window.rl) return;
 
 	var MARKER = 'sv-mig-menu';
+	var RESYNC_MARKER = 'sv-resync-menu';
 	var MENU_SEL = 'menu[aria-labelledby="top-system-dropdown-id"]';
 	var HELP_SEL = 'a[data-i18n="GLOBAL/HELP"]';
 
@@ -55,41 +56,72 @@
 		}
 	}
 
-	function injectInto(menu) {
-		if (!menu || menu.querySelector('[data-' + MARKER + ']')) return;
-		var helpLink = menu.querySelector(HELP_SEL);
-		var helpLi = helpLink ? helpLink.closest('li') : null;
+	function openResync() {
+		try {
+			window.dispatchEvent(new CustomEvent('souvera-mail:open-resync'));
+		} catch (e) { /* very old browser — silent no-op */ }
+	}
 
+	function closeDropdown() {
+		var toggle = document.getElementById('top-system-dropdown-id');
+		if (toggle && toggle.getAttribute('aria-expanded') === 'true') {
+			try { toggle.click(); } catch (_e) { /* silent */ }
+		}
+	}
+
+	function buildItem(marker, icon, label, testid, onClick) {
 		var li = document.createElement('li');
 		li.setAttribute('role', 'presentation');
-		li.setAttribute('data-' + MARKER, '1');
-
+		li.setAttribute('data-' + marker, '1');
 		var a = document.createElement('a');
 		a.setAttribute('href', '#');
 		a.setAttribute('tabindex', '-1');
-		a.setAttribute('data-icon', '📥');
-		a.setAttribute('data-testid', 'souvera-mail-menu-migration');
-		// Deutsch — no i18n placeholder because Snappymail's translation
-		// engine treats data-i18n as an in-house key, not a free string.
-		a.textContent = 'Alte Mails importieren';
+		a.setAttribute('data-icon', icon);
+		a.setAttribute('data-testid', testid);
+		a.textContent = label;
 		a.addEventListener('click', function (ev) {
 			ev.preventDefault();
-			// Close the dropdown by clicking its toggle a second time;
-			// Bootstrap-KO honours the second click as toggle-off.
-			var toggle = document.getElementById('top-system-dropdown-id');
-			if (toggle && toggle.getAttribute('aria-expanded') === 'true') {
-				try { toggle.click(); } catch (_e) { /* silent */ }
-			}
-			openMigration();
+			closeDropdown();
+			onClick();
 		});
 		li.appendChild(a);
+		return li;
+	}
 
-		if (helpLi && helpLi.parentNode === menu) {
-			menu.insertBefore(li, helpLi);
-		} else {
-			// Fallback: append near the top so it never lands on the
-			// logout row (which is the visual danger zone).
-			menu.appendChild(li);
+	function injectInto(menu) {
+		if (!menu) return;
+		var helpLink = menu.querySelector(HELP_SEL);
+		var helpLi = helpLink ? helpLink.closest('li') : null;
+
+		// v0.14.17 — migration entry (idempotent)
+		if (!menu.querySelector('[data-' + MARKER + ']')) {
+			var migLi = buildItem(
+				MARKER, '📥', 'Alte Mails importieren',
+				'souvera-mail-menu-migration', openMigration
+			);
+			if (helpLi && helpLi.parentNode === menu) {
+				menu.insertBefore(migLi, helpLi);
+			} else {
+				menu.appendChild(migLi);
+			}
+		}
+
+		// v0.14.19 — resync entry (idempotent), sits above the migration
+		// entry so the order is: Einstellungen ⚙ · 🔄 Postfach sync ·
+		// 📥 Import · 🛈 Hilfe · ⏻ Ausloggen.
+		if (!menu.querySelector('[data-' + RESYNC_MARKER + ']')) {
+			var resyncLi = buildItem(
+				RESYNC_MARKER, '🔄', 'Postfach neu synchronisieren',
+				'souvera-mail-menu-resync', openResync
+			);
+			var migAnchor = menu.querySelector('[data-' + MARKER + ']');
+			if (migAnchor && migAnchor.parentNode === menu) {
+				menu.insertBefore(resyncLi, migAnchor);
+			} else if (helpLi && helpLi.parentNode === menu) {
+				menu.insertBefore(resyncLi, helpLi);
+			} else {
+				menu.appendChild(resyncLi);
+			}
 		}
 	}
 

@@ -113,5 +113,14 @@ return [
             'verb' => 'POST',
             'requirements' => ['jobId' => '\d+']
         ],
+        [
+            // v0.14.19 — user-facing "Postfach neu synchronisieren".
+            // Server just records an audit trail; the actual sync
+            // effect happens client-side (Snappymail localStorage
+            // clear + full reload). See StalwartController.php.
+            'name' => 'stalwart#resync',
+            'url' => '/stalwart/resync',
+            'verb' => 'POST',
+        ],
     ]
 ];

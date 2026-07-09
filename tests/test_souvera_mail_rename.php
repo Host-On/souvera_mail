@@ -8,7 +8,7 @@
  *  - lib/ namespace declarations + php -l
  *  - templates/settings.php renders with stubbed deps (both appPasswordsAvailable branches)
  *  - templates/not_configured.php renders + contains 'occ souvera_mail:bootstrap'
- *  - appinfo/routes.php exactly 21 routes incl. settings#index
+ *  - appinfo/routes.php exactly 22 routes incl. settings#index
  *  - SettingsController.php
  *  - PersonalSettings/PersonalSection/personal_settings.php deleted
  *  - l10n register key is 'souvera_mail'
@@ -131,7 +131,7 @@ assertTrue(strlen($ncUser) > 0, "not_configured.php (non-admin) renders some out
 $routes = require '/app/appinfo/routes.php';
 assertTrue(is_array($routes) && isset($routes['routes']), "routes.php returns array with 'routes' key", $passes, $failures);
 $routeCount = count($routes['routes']);
-assertTrue($routeCount === 21, "routes.php registers exactly 21 routes (got: $routeCount)", $passes, $failures);
+assertTrue($routeCount === 22, "routes.php registers exactly 22 routes (got: $routeCount)", $passes, $failures);
 $routeNames = array_column($routes['routes'], 'name');
 assertTrue(in_array('settings#index', $routeNames, true), "routes.php has settings#index", $passes, $failures);
 $settingsRoute = null;
