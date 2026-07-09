@@ -1,0 +1,115 @@
+/*
+ * Souvera Mail — Dashboard widget theming & empty-state polish.
+ * -----------------------------------------------------------------
+ * WHY THIS FILE EXISTS
+ * ~~~~~~~~~~~~~~~~~~~~
+ * Nextcloud's dashboard widget grid renders `IIconWidget::getIconUrl()`
+ * as a plain `<img>` inside `.panel--header` — that means CSS-driven
+ * `currentColor` doesn't reach the SVG (browsers don't propagate
+ * `color` into <img>). So a currentColor-only SVG shows black
+ * everywhere: perfect on the light-mode widget header, invisible on
+ * the dark-mode header (2026-02-19 operator report + screenshot).
+ *
+ * Operator's exact spec (2026-02-19):
+ *   • Nav / App-menu icon: Light → white, Dark → black
+ *   • Dashboard widget icon: Light → black, Dark → white
+ *
+ * The rules below reproduce this with CSS filters on the <img>
+ * elements NC injects. We rely on `body[data-theme-dark]` (NC 25+)
+ * as the dark-mode marker; a fallback rule using
+ * `prefers-color-scheme: dark` catches early-boot before NC has
+ * annotated the body.
+ *
+ * The empty-state block (`.souvera-mail-widget-empty-icon`) is
+ * populated by `dashboard-widget-enhancer.js` — it injects an SVG
+ * checkmark into NcEmptyContent's `.empty-content__icon` slot to
+ * match the Souvera Shield "Mail-Quarantäne" empty state. The CSS
+ * here only sizes / colours the checkmark; the SVG itself lives in
+ * the enhancer JS.
+ * -----------------------------------------------------------------
+ */
+
+/* ------------------------------------------------------------
+ * 1) Dashboard widget icon — Light → black, Dark → white
+ * ------------------------------------------------------------
+ * Match every <img> whose src points at our app.svg, no matter what
+ * URL-normalisation NC applies (index.php prefix, /apps/, /apps-pkg/).
+ * Light-mode is the default (currentColor → black via <img>), so we
+ * only need to invert it in dark mode.
+ */
+body[data-theme-dark] img[src*="/souvera_mail/img/app.svg"],
+body[data-theme-dark] img[src*="souvera_mail/app.svg"],
+body[data-theme-dark] .panel--header img[src*="souvera_mail"] {
+    filter: invert(1) brightness(1.1);
+}
+
+@media (prefers-color-scheme: dark) {
+    /* Pre-NC-theme-hydration fallback. Body class wins once NC boots. */
+    body:not([data-theme-light]) img[src*="/souvera_mail/img/app.svg"],
+    body:not([data-theme-light]) img[src*="souvera_mail/app.svg"] {
+        filter: invert(1) brightness(1.1);
+    }
+}
+
+/* ------------------------------------------------------------
+ * 2) App menu / Nav icon — Light → white, Dark → black
+ * ------------------------------------------------------------
+ * NC 34+ renders app-menu icons via `mask-image` on a
+ * `.app-menu-icon` element with `background-color` driving colour.
+ * Souvera's brand requirement is INVERSE to the NC default palette,
+ * so we override background-color explicitly for our entry.
+ *
+ * Selectors are duplicated across the couple of DOM shapes NC 33/34/35
+ * ships (data-id vs data-app-id vs id), because verifying the exact
+ * shape on the operator's Proxmox NC without live access is unsafe.
+ * `!important` is used here (only place in this file) because the
+ * app-menu CSS in the NC-core theme uses inline styles for the
+ * background-color.
+ */
+.app-menu-entry[data-app-id="souvera_mail"] .app-menu-icon,
+li[data-id="souvera_mail"] .app-menu-icon,
+#app-menu li[data-id="souvera_mail"] .app-menu-icon,
+.app-menu-main [data-app-id="souvera_mail"] svg {
+    background-color: #ffffff !important;
+    color: #ffffff !important;
+}
+
+body[data-theme-dark] .app-menu-entry[data-app-id="souvera_mail"] .app-menu-icon,
+body[data-theme-dark] li[data-id="souvera_mail"] .app-menu-icon,
+body[data-theme-dark] #app-menu li[data-id="souvera_mail"] .app-menu-icon,
+body[data-theme-dark] .app-menu-main [data-app-id="souvera_mail"] svg {
+    background-color: #000000 !important;
+    color: #000000 !important;
+}
+
+/* ------------------------------------------------------------
+ * 3) Empty-state checkmark (matches Souvera Shield)
+ * ------------------------------------------------------------
+ * The enhancer JS injects a `<div class="souvera-mail-widget-empty-icon">`
+ * containing the checkmark SVG into the NcEmptyContent icon slot of
+ * OUR widget only. The rules below size + colour it identically to
+ * Souvera Shield's quarantine empty state.
+ */
+.souvera-mail-widget-empty-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 8px;
+    color: var(--color-text-maxcontrast, #929292);
+    opacity: 0.7;
+}
+
+.souvera-mail-widget-empty-icon svg {
+    width: 64px;
+    height: 64px;
+    fill: currentColor;
+}
+
+/* Empty-state description text — align typography with Shield. */
+.souvera-mail-widget[data-widget="souvera_mail-unread"] .empty-content__description,
+.dashboard--panels [id*="souvera_mail-unread"] .empty-content__description {
+    color: var(--color-text-maxcontrast, #6b6b6b);
+    font-size: 0.95em;
+}

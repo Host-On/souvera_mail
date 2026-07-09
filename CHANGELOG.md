@@ -6,6 +6,108 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.22] — 2026-02-19 (Dashboard-Widget Polish: Titel · Empty-State · Default-Modus · Theme-Icon)
+
+### Operator-Report (2026-02-19, mit Screenshot)
+
+> „Bei der Souvera Mail Inbox der Titel nur »Souvera Mail« ohne Inbox,
+> und wie bei Quarantäne der Haken dort sein mit »Ihre Mailbox ist
+> derzeit leer« wenn sie wirklich leer ist. Ausserdem werden mir keine
+> Mails im Dashboard Widget gezeigt. Es sollten nicht nur Ungelesende
+> sondern die letzten Mails gezeigt werden."
+
+Plus zusätzliche Icon-Theme-Regel:
+
+> „Im Dark Modus muss das Icon im Menu Schwarz sein. Im Lite Modus muss
+> das Icon im Menu Weiss sein. Im Dark Modus muss das Icon im Dashboard
+> Widget Weiss sein. Im Lite Modus muss das Icon im Dashboard Widget
+> Schwarz sein."
+
+### Vier Änderungen zusammen — Sichtvergleich zu Souvera Shield
+
+| Aspekt | Vorher | Nachher |
+|---|---|---|
+| Widget-Titel | „Souvera Mail · Inbox" | **„Souvera Mail"** |
+| Default-Modus | `MODE_UNREAD` | **`MODE_ALL`** (letzte Mails) |
+| Empty-State | leerer Widget, kein Icon, kein Text | **NC-Haken + „Ihre Mailbox ist derzeit leer"** |
+| Widget-Icon (Dashboard) | wg. v0.14.21 immer schwarz | **Light=schwarz, Dark=weiß** |
+| App-Menu-Icon (Nav) | NC-Default (theme-driven) | **Light=weiß, Dark=schwarz** (explizit) |
+
+### Root-Cause-Analyse Empty-State
+
+`WidgetItems` hat drei Konstruktor-Argumente:
+`(array $items, string $emptyContentMessage, string $halfEmptyContentMessage)`.
+Der v0.13.x-Code hat den Empty-Text als **3. Argument** (`halfEmptyContent`)
+übergeben — der wird von `NcDashboardWidget` aber nur **unter einer bereits
+gefüllten Item-Liste** angezeigt, **niemals** wenn `items` komplett leer ist.
+Bei leerer Inbox zeigt NC deshalb ein komplett leeres Widget-Panel — genau
+das, was der Operator im Screenshot dokumentiert hat.
+
+Fix: Text ins **2. Argument** (`emptyContentMessage`). Damit rendert
+`NcEmptyContent` den Text zentriert. Der Haken kommt oben drüber per
+Enhancer-JS in den `emptyContentIcon`-Slot injiziert.
+
+### Warum das Enhancer-JS statt IAPIWidgetV2-Erweiterung?
+
+`IAPIWidgetV2` serialisiert nur JSON — es gibt keinen server-seitigen
+Weg, den Vue-Slot `emptyContentIcon` von `NcDashboardWidget` zu befüllen.
+Alternative wäre ein komplettes eigenes Vue-Widget (via
+`Bootstrap::register(IWidget…)`), aber das opfert die Auto-Reload-Cron-
+Integration von `IAPIWidgetV2`. Der Enhancer-Ansatz ist deutlich
+weniger invasiv: <100 LOC JS, MutationObserver-basiert, komplett idle
+wenn wir nicht auf der Dashboard-Seite sind.
+
+### Icon-Theme-Regel — Warum Filter + Mask-Override kombinieren?
+
+- **Widget-Icon** wird von NC-Dashboard als `<img>` gerendert.
+  `currentColor` fällt bei `<img>` auf `black` zurück (v0.14.21 Fix).
+  Im Dark-Mode ist das unsichtbar → wir invertieren per `filter: invert(1)`.
+  Der `filter`-Trick funktioniert nur, weil das Icon monochrom ist.
+
+- **Nav-/App-Menu-Icon** wird von NC 34+ als `mask-image` mit
+  `background-color: var(--color-primary-element-text)` gerendert
+  (per Default weiß in Light + Dark). Der Operator will die Farben
+  **invers zum NC-Default** haben → wir überschreiben `background-color`
+  explizit per Selector auf `data-app-id="souvera_mail"`. Ein `!important`
+  ist hier zwingend, weil die NC-Core-Theme-CSS diese Property inline
+  setzt.
+
+### Files
+
+| File | Change |
+|---|---|
+| `lib/Dashboard/UnreadMailWidget.php` | Titel · MODE_DEFAULT · Empty-Arg · load() |
+| `css/dashboard-widget.css` | **Neu** — Theme-Icon + Empty-Check Styling |
+| `js/dashboard-widget-enhancer.js` | **Neu** — Haken-SVG-Injektor + Theme-Stamp |
+| `l10n/de.json`, `l10n/de.js` | „Your mailbox is currently empty" → DE |
+| `tests/test_dashboard_widget_polish.php` | **Neu** — Regression-Pin (26 Assertions) |
+| `appinfo/info.xml`, `package.json` | 0.14.21 → 0.14.22 |
+
+### Verifikation
+
+- `php -l` clean auf `UnreadMailWidget.php`.
+- `node --check` clean auf `dashboard-widget-enhancer.js`.
+- JSON-Validität auf `de.json` verifiziert (`python3 json.load`).
+- **`tests/test_dashboard_widget_polish.php`: alle Assertions PASS.**
+- **Volle Suite: 40+ Suites / 1591+ Assertions PASS, 0 Fehler.**
+
+### Live-Verifikation
+
+1. Rsync `lib/Dashboard/UnreadMailWidget.php` + `css/dashboard-widget.css`
+   + `js/dashboard-widget-enhancer.js` + `l10n/de.json` + `l10n/de.js` +
+   `appinfo/info.xml` + `package.json` → Live.
+2. `occ upgrade` (auf 0.14.22).
+3. Nextcloud → Übersicht (Dashboard):
+   - Widget-Header zeigt nur noch **„Souvera Mail"**.
+   - Bei leerer Inbox: großer NC-Haken (SVG) + Text
+     „Ihre Mailbox ist derzeit leer" (matches Shield-Look).
+   - Bei nicht-leerer Inbox: die **letzten 7 Mails** (statt vorher nur
+     ungelesenen). Ein User kann per `occ user:setting <uid> souvera_mail
+     dashboard-mode unread` zurück auf Nur-Ungelesen wechseln.
+4. Icon-Verhalten (Screenshot-Vergleich Light ↔ Dark):
+   - **Widget-Icon:** Light-Mode schwarz, Dark-Mode weiß.
+   - **App-Menu-Icon:** Light-Mode weiß, Dark-Mode schwarz.
+
 ## [0.14.21] — 2026-02-19 (Hotfix: Dashboard-Widget-Icon nicht mehr „invertiert")
 
 ### Operator-Report (2026-02-19)

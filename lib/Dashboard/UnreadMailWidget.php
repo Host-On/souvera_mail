@@ -33,7 +33,13 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
     public const WIDGET_ID = 'souvera_mail-unread';
     public const MODE_UNREAD = 'unread';
     public const MODE_ALL = 'all';
-    public const MODE_DEFAULT = self::MODE_UNREAD;
+    // Operator decision 2026-02-19 with screenshot attachment: default the
+    // widget to "all recent mails" (was "unread only"). Rationale: the
+    // widget looked empty for most users because the vast majority of
+    // inboxes are fully read most of the time. The personal setting
+    // `souvera_mail/dashboard-mode` still lets a user pin it to "unread"
+    // via `occ user:setting <uid> souvera_mail dashboard-mode unread`.
+    public const MODE_DEFAULT = self::MODE_ALL;
     public const USER_CONFIG_MODE = 'dashboard-mode';
 
     public function __construct(
@@ -52,10 +58,11 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function getTitle(): string
     {
-        // Title is mode-agnostic — the widget item list itself communicates
-        // whether the user is currently in "unread only" or "all" mode via
-        // the empty-content message.
-        return $this->l10n->t('Souvera Mail · Inbox');
+        // Operator decision 2026-02-19 (with screenshot): drop the
+        // "· Inbox" suffix so the widget header matches the Souvera
+        // Shield / Souvera Contacts pattern of a single, brand-clean
+        // name.  Mode is still communicated via the emptyContentMessage.
+        return $this->l10n->t('Souvera Mail');
     }
 
     public function getOrder(): int
@@ -77,6 +84,25 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
 
     public function load(): void
     {
+        // Load the dashboard-widget enhancer bundle on every dashboard
+        // render. It does two things that can't be expressed via the
+        // IAPIWidgetV2 JSON contract:
+        //
+        //   1. Injects a large ✓ checkmark icon into the NcEmptyContent
+        //      slot of *our* widget when items are empty, matching the
+        //      Souvera Shield "Mail-Quarantäne" empty state (2026-02-19
+        //      operator request with screenshot).
+        //   2. Applies theme-aware colour rules for the widget icon:
+        //      Light-mode → black, Dark-mode → white (via CSS filter on
+        //      the <img> that NC injects for `getIconUrl()`).  Also
+        //      forces the App-Menu / Nav icon to the operator's spec:
+        //      Light-mode → white, Dark-mode → black.
+        //
+        // Both files are registered on every dashboard load — cheap
+        // because the JS is a MutationObserver that idles unless our
+        // widget re-renders, and the CSS is <1 KB.
+        \OCP\Util::addStyle('souvera_mail', 'dashboard-widget');
+        \OCP\Util::addScript('souvera_mail', 'dashboard-widget-enhancer');
     }
 
     private function resolveMode(string $userId): string
@@ -147,10 +173,16 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
             }
 
             if (empty($items)) {
+                // Match the Souvera Shield "Ihre Quarantäne ist derzeit
+                // leer" pattern: put the message in `emptyContentMessage`
+                // (2nd arg) so NcEmptyContent renders it centred with an
+                // icon slot — NOT in `halfEmptyContentMessage` (3rd arg,
+                // which only shows *below* an existing item list and
+                // stays invisible when items are empty).
                 $empty = $mode === self::MODE_UNREAD
                     ? $this->l10n->t('No unread mail')
-                    : $this->l10n->t('Inbox is empty');
-                return new WidgetItems([], '', $empty);
+                    : $this->l10n->t('Your mailbox is currently empty');
+                return new WidgetItems([], $empty, '');
             }
 
             return new WidgetItems($items);

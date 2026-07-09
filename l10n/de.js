@@ -58,6 +58,7 @@ OC.L10N.register(
     "Unread mail" : "Ungelesene E-Mails",
     "Open Souvera Mail to connect" : "Souvera Mail öffnen zum Verbinden",
     "No unread mail" : "Keine ungelesenen E-Mails",
+    "Your mailbox is currently empty" : "Ihre Mailbox ist derzeit leer",
     "Settings" : "Einstellungen",
     "Identities & Signatures" : "Identitäten & Signaturen",
     "Manage sender addresses, display names, reply-to and signatures." : "Absenderadressen, Anzeigenamen, Antwortadresse und Signaturen verwalten.",
