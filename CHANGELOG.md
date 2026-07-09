@@ -6,6 +6,86 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.17] — 2026-02-19 (UX-Fix: Menü-Eintrag ins Snappymail-Dropdown umziehen)
+
+### Operator-Report
+
+> „Der ,Alte Mails Importieren'-Eintrag ist im Nextcloud-Dropdown gelandet,
+> aber ich meinte das Dropdown innerhalb von Mail wo auch der Hilfe-Button
+> für die Tastenkürzel drin ist."
+
+### Umsetzung
+
+- **Entfernt**: NC-Global-User-Menü-Eintrag `souvera_mail_migration`
+  aus `Application::boot()` (war v0.14.12).
+- **Neu**: `app/smail/v/current/app/plugins/nextcloud/js/dropdown-menu.js`
+  injiziert einen neuen `<li>` **direkt vor dem Hilfe-Item** in
+  Snappymails `menu[aria-labelledby="top-system-dropdown-id"]`
+  (siehe `SystemDropDown.html`).
+- **DOM-Injection**: `MutationObserver` auf `document.body`, weil
+  Snappymail das Dropdown erst beim ersten Klick materialisiert.
+  Idempotent via `data-sv-mig-menu="1"`-Marker.
+- **Klick-Verhalten**: Dropdown wird geschlossen, dann
+  `window.dispatchEvent(new CustomEvent('souvera-mail:open-migration'))`.
+- **`App.vue`** lauscht auf das Event, ruft `loadState()` neu ab,
+  wählt den passenden Initial-Screen (progress / terminal / welcome)
+  und öffnet den Wizard — bypasst den `dismissed`-Guard, exakt wie
+  der `?openMigration=1`-URL-Parameter.
+- **Kompatibilität**: `?openMigration=1` bleibt als Fallback für
+  Bookmark-Links / Operator-Skripte.
+
+### Files
+
+| File | Change |
+|---|---|
+| `lib/AppInfo/Application.php` | NC-User-Menü-Eintrag entfernt |
+| `app/smail/v/current/app/plugins/nextcloud/js/dropdown-menu.js` | **Neu** — 120 LOC DOM-Injector |
+| `app/smail/v/current/app/plugins/nextcloud/index.php` | `addJs('js/dropdown-menu.js')` |
+| `src/App.vue` | Event-Listener `souvera-mail:open-migration` |
+| `tests/test_migration_wizard_frontend.php` | Assertions umgestellt: kein NC-User-Menü mehr, dafür Snappymail-Dropdown-Contract |
+| `appinfo/info.xml`, `package.json` | Version 0.14.16 → 0.14.17 |
+
+### Verifikation
+
+- `yarn build` clean → 400 KB Bundle.
+- `php -l` clean auf Application.php + plugins/nextcloud/index.php.
+- `node -e new Function(dropdownJs)` OK.
+- **Voller Suite-Run: 39 Suites / 1541 Assertions passing**.
+
+### Live-Verifikation
+
+1. Rsync + `occ upgrade` → 0.14.17
+2. In Mail einloggen → oben rechts auf 👤 klicken
+3. Zwischen „Einstellungen" (⚙) und „Hilfe" (🛈) erscheint jetzt
+   „📥 Alte Mails importieren"
+4. Klick → Dropdown schließt sich, Wizard öffnet sofort
+5. NC-Global-Dropdown (oben rechts außerhalb von Mail) enthält
+   den Eintrag **nicht mehr** — sauber isoliert auf Mail.
+
+### BookStack-Dokumentation (nachgezogen aus P2-Backlog)
+
+Der Import-Wizard hatte trotz 5 Iterationen (v0.14.11-v0.14.17) noch
+**keine** Doku in BookStack — direkt beim gleichen Rollout nachgezogen:
+
+- **User-Seite** (Shelf „Benutzer" → Book „Souvera Mail", ID 92):
+  „Alte Mails importieren" — kompletter Screen-für-Screen-Guide
+  (Welcome → Form → Mapping → Confirm → Progress → Terminal + Cancel),
+  Screenshot-Placeholder pro Screen, FAQ am Ende (App-Passwörter beim
+  alten Anbieter, Verbindungsabbruch, Passwort-Änderung, doppelte
+  Nachrichten, Support-Kontakt).
+  URL: `https://doku.souvera.eu/link/92`
+- **Admin-Seite** (neues Book „Souvera Mail – Admin", ID 13, in
+  Shelf „Administratoren"): „Import-Wizard — Betrieb &
+  Fehlerbehebung" — Aktivierung, DB-Schema, Ende-zu-Ende-Fluss,
+  Cancel-Flow, Cronjobs, häufige Fehlerbilder mit HTTP-Codes und
+  Fixes, Datenschutz-Kapitel, geplante `occ`-Kommandos für v0.14.18.
+  URL: `https://doku.souvera.eu/link/93`
+
+Beide Seiten wurden über die BookStack-REST-API mit den in
+`memory/bookstack_access.md` hinterlegten Credentials angelegt.
+Skripte in `/tmp/seed_import_wizard_*_bookstack.py` (idempotent —
+POST beim ersten Lauf, PUT beim zweiten).
+
 ## [0.14.16] — 2026-02-19 (Feature: Cancel Migration während Warteschlange)
 
 ### Operator-Wunsch

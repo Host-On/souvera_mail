@@ -187,33 +187,12 @@ class Application extends App implements IBootstrap
             ];
         });
 
-        // ------------------------------------------------------------------
-        // v0.14.12 — "Alte Mails importieren" in the user-menu drop-down
-        //
-        // Per user request (2026-02-19): even after the user hits
-        // "Nicht mehr zeigen" on the migration welcome popup, they must
-        // be able to re-open the wizard from the top-right avatar
-        // drop-down. That's the Nextcloud user-menu, registered with
-        // `type => 'settings'` per Souvera Design System §11.
-        //
-        // Deep-link to the mail page with `?openMigration=1` — the Vue
-        // bootstrap in main.js watches for that URL param and forces
-        // the wizard open regardless of the dismissed state.
-        // ------------------------------------------------------------------
-        $navigationManager->add(function () use ($serverContainer) {
-            $urlGenerator = $serverContainer->get(IURLGenerator::class);
-            // IL10N is app-scoped — must be obtained via IFactory, not
-            // directly from the ServerContainer (that raises
-            // "Could not resolve OCP\IL10N! Class can not be instantiated").
-            $l10n = $serverContainer->get(\OCP\L10N\IFactory::class)->get(self::APP_ID);
-            return [
-                'id' => 'souvera_mail_migration',
-                'type' => 'settings',
-                'name' => $l10n->t('Alte Mails importieren'),
-                'href' => $urlGenerator->linkToRoute('souvera_mail.page.index') . '?openMigration=1',
-                'icon' => $urlGenerator->imagePath(self::APP_ID, 'app.svg'),
-                'order' => 12,
-            ];
-        });
+        // v0.14.17: "Alte Mails importieren" was briefly registered as a
+        // Nextcloud user-menu entry (`type => 'settings'`) in v0.14.12,
+        // but the operator asked for it to live INSIDE Snappymail —
+        // specifically next to the F1 help entry in the top-right user
+        // dropdown (SystemDropDown.html). That entry is now injected by
+        // the Snappymail plugin's `js/dropdown-menu.js`, so the NC-menu
+        // entry has been removed here to avoid the double-entry.
     }
 }

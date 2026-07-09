@@ -75,6 +75,28 @@ export default {
 			// users who previously clicked "Nicht mehr zeigen".
 			const forceOpen = new URLSearchParams(window.location.search).get('openMigration') === '1'
 
+			// v0.14.17 — the Snappymail SystemDropDown injects the
+			// "Alte Mails importieren" entry client-side and dispatches
+			// this event when clicked (no page reload).  Reuses the same
+			// force-open semantics as ?openMigration=1.
+			window.addEventListener('souvera-mail:open-migration', () => {
+				// Refresh state so we jump to the correct screen even
+				// after a long idle session.
+				migration.loadState()
+					.catch(() => { /* silent — treat as fresh session */ })
+					.finally(() => {
+						if (migration.hasActive.value) {
+							initialStep.value = 'progress'
+							migration.startPolling(5000)
+						} else if (migration.lastJob.value) {
+							initialStep.value = 'terminal'
+						} else {
+							initialStep.value = 'welcome'
+						}
+						isOpen.value = true
+					})
+			})
+
 			// Auto-resume active migration → straight to progress screen.
 			if (migration.hasActive.value) {
 				initialStep.value = 'progress'

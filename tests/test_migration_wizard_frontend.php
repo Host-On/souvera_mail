@@ -456,10 +456,10 @@ ok($nsPos !== false && $reqPos !== false && $nsPos < $reqPos,
 // ==============================================================
 // P — version bump + changelog markers
 // ==============================================================
-ok((bool) preg_match('#<version>0\.14\.(1[6-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
-    'info.xml version bumped to 0.14.16 (or later)', $passes, $failures);
-ok(str_contains($src['changelog'], '[0.14.16]'),
-    'CHANGELOG.md has a [0.14.16] section', $passes, $failures);
+ok((bool) preg_match('#<version>0\.14\.(1[7-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
+    'info.xml version bumped to 0.14.17 (or later)', $passes, $failures);
+ok(str_contains($src['changelog'], '[0.14.17]'),
+    'CHANGELOG.md has a [0.14.17] section', $passes, $failures);
 ok(stripos($src['changelog'], 'Vue 3') !== false
     || stripos($src['changelog'], 'Vue-3') !== false
     || stripos($src['changelog'], 'design system') !== false,
@@ -502,29 +502,42 @@ ok(str_contains($formSrc, 'this.form.host')
     'canSubmit still guards host/username/password',
     $passes, $failures);
 
-// User-menu drop-down entry ("Alte Mails importieren")
-ok(str_contains($appPhpSrc, "'id' => 'souvera_mail_migration'"),
-    'Application::boot() registers the user-menu entry souvera_mail_migration',
+// v0.14.17 — the "Alte Mails importieren" entry lives inside the
+// Snappymail SystemDropDown (top-right user menu, next to the F1 help
+// item), NOT the Nextcloud user-menu. The NC entry from v0.14.12 has
+// been removed and replaced by a client-side DOM injector.
+ok(!str_contains($appPhpSrc, "'id' => 'souvera_mail_migration'"),
+    'Application.php no longer registers the Nextcloud user-menu entry (moved into Snappymail)',
     $passes, $failures);
-ok(str_contains($appPhpSrc, "'type' => 'settings'"),
-    'User-menu entry uses type=settings per Souvera Design System §11',
-    $passes, $failures);
-ok(str_contains($appPhpSrc, "'?openMigration=1'"),
-    'User-menu entry deep-links with ?openMigration=1 query param',
-    $passes, $failures);
-// v0.14.12-hotfix — IL10N is app-scoped and must be resolved via
-// IFactory. Directly asking the ServerContainer for IL10N raises
-// "Could not resolve OCP\IL10N! Class can not be instantiated".
-ok(!preg_match('/\$serverContainer->get\(\s*\\\\?OCP\\\\IL10N::class/', $appPhpSrc),
-    'Application.php does NOT resolve IL10N directly from ServerContainer',
-    $passes, $failures);
-ok(str_contains($appPhpSrc, '\\OCP\\L10N\\IFactory::class'),
-    'Application.php resolves translations via OCP\\L10N\\IFactory (app-scoped)',
+ok(!str_contains($appPhpSrc, "'type' => 'settings'"),
+    'No settings-type navigation entry remains from the v0.14.12 attempt',
     $passes, $failures);
 
-// Frontend honours the URL parameter.
+$dropdownJs = (string) @file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/js/dropdown-menu.js');
+$pluginIdx  = (string) @file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/index.php');
+ok($dropdownJs !== '',
+    'Snappymail plugin ships js/dropdown-menu.js (menu-entry enricher)',
+    $passes, $failures);
+ok(str_contains($dropdownJs, 'top-system-dropdown-id')
+    && str_contains($dropdownJs, 'GLOBAL/HELP'),
+    'dropdown-menu.js hooks the Snappymail SystemDropDown near the Help item',
+    $passes, $failures);
+ok(str_contains($dropdownJs, "'souvera-mail:open-migration'"),
+    'dropdown-menu.js dispatches souvera-mail:open-migration on click',
+    $passes, $failures);
+ok(str_contains($dropdownJs, 'MutationObserver'),
+    'dropdown-menu.js uses a MutationObserver (Snappymail lazily renders the menu)',
+    $passes, $failures);
+ok(str_contains($pluginIdx, "\$this->addJs('js/dropdown-menu.js')"),
+    'Snappymail plugin (index.php) registers js/dropdown-menu.js',
+    $passes, $failures);
+ok(str_contains($appVueSrc, "'souvera-mail:open-migration'"),
+    'App.vue listens for souvera-mail:open-migration and force-opens the wizard',
+    $passes, $failures);
+
+// Backward-compat: ?openMigration=1 URL param stays as a fallback path.
 ok(str_contains($appVueSrc, "openMigration"),
-    'App.vue parses ?openMigration=1 URL param and force-opens the wizard',
+    'App.vue keeps ?openMigration=1 URL param as a compatibility path',
     $passes, $failures);
 ok(str_contains($appVueSrc, "forceOpen"),
     'App.vue uses a forceOpen guard to bypass the dismissed flag',
