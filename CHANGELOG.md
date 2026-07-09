@@ -6,6 +6,53 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.23] — 2026-02-19 (Hotfix: App-Menu-Icon Light/Dark verdreht — Korrektur)
+
+### Operator-Report (2026-02-19, zweiter Durchlauf)
+
+> „Bei dem Widget sind die Farben für das Icon nun korrekt, aber im Menu,
+> sind Lite und Dark noch verdreht. Bitte NUR IM MENU das noch anpassen."
+
+### Root cause
+
+In v0.14.22 hatte ich die App-Menu-Regel als „Light=weiß, Dark=schwarz"
+implementiert (auf Basis der ersten Nachricht vom Operator). Die
+korrekte Regel ist dieselbe wie beim Widget:
+
+**Light → schwarz · Dark → weiß**
+
+Das ist erwartungskonform (identische Regel für Widget + Menu) und
+matcht auch das NC-Standard-Verhalten (dunkle Silhouette auf hellem
+Menu-Popup, helle Silhouette auf dunklem Menu-Popup).
+
+### Fix
+
+- **`css/dashboard-widget.css`** — Block (2) invertiert:
+  - Light-Mode: `background-color: #000000 !important;`
+  - Dark-Mode: `background-color: #ffffff !important;`
+
+Selektoren, `!important`-Notwendigkeit und Dokumentations-Kommentar
+bleiben unverändert.
+
+### Files
+
+| File | Change |
+|---|---|
+| `css/dashboard-widget.css` | App-Menu-Farben getauscht (Block 2) |
+| `tests/test_dashboard_widget_polish.php` | Assertions auf neue Farben aktualisiert |
+| `appinfo/info.xml`, `package.json` | 0.14.22 → 0.14.23 |
+
+### Verifikation
+
+- **`tests/test_dashboard_widget_polish.php`: alle Assertions PASS.**
+- **Voller Suite-Run: 41 Suites / 1592+ Assertions PASS, 0 Fehler.**
+
+### Live-Verifikation
+
+1. Rsync `css/dashboard-widget.css` + `info.xml` + `package.json` → Live.
+2. `occ upgrade` (auf 0.14.23) + Hard-Reload (`Strg+F5`).
+3. App-Menu-Icon jetzt **Light=schwarz, Dark=weiß** (matches Widget).
+
 ## [0.14.22] — 2026-02-19 (Dashboard-Widget Polish: Titel · Empty-State · Default-Modus · Theme-Icon)
 
 ### Operator-Report (2026-02-19, mit Screenshot)
@@ -106,7 +153,7 @@ wenn wir nicht auf der Dashboard-Seite sind.
      dashboard-mode unread` zurück auf Nur-Ungelesen wechseln.
 4. Icon-Verhalten (Screenshot-Vergleich Light ↔ Dark):
    - **Widget-Icon:** Light-Mode schwarz, Dark-Mode weiß.
-   - **App-Menu-Icon:** Light-Mode weiß, Dark-Mode schwarz.
+   - **App-Menu-Icon:** Light-Mode weiß, Dark-Mode schwarz. *(korrigiert in v0.14.23: Light=schwarz, Dark=weiß)*
 
 ## [0.14.21] — 2026-02-19 (Hotfix: Dashboard-Widget-Icon nicht mehr „invertiert")
 

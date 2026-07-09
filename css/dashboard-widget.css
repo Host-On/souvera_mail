@@ -52,34 +52,35 @@ body[data-theme-dark] .panel--header img[src*="souvera_mail"] {
 }
 
 /* ------------------------------------------------------------
- * 2) App menu / Nav icon — Light → white, Dark → black
+ * 2) App menu / Nav icon — Light → BLACK, Dark → WHITE
  * ------------------------------------------------------------
+ * Operator correction (2026-02-19, second pass): the v0.14.22 rule
+ * had it inverted — the correct spec is Light-mode = black, Dark-mode
+ * = white, matching the Dashboard widget icon rule from block (1).
+ *
  * NC 34+ renders app-menu icons via `mask-image` on a
  * `.app-menu-icon` element with `background-color` driving colour.
- * Souvera's brand requirement is INVERSE to the NC default palette,
- * so we override background-color explicitly for our entry.
+ * The NC-core theme sets that colour inline per theme, so `!important`
+ * is required on our override (only place in this file).
  *
  * Selectors are duplicated across the couple of DOM shapes NC 33/34/35
  * ships (data-id vs data-app-id vs id), because verifying the exact
  * shape on the operator's Proxmox NC without live access is unsafe.
- * `!important` is used here (only place in this file) because the
- * app-menu CSS in the NC-core theme uses inline styles for the
- * background-color.
  */
 .app-menu-entry[data-app-id="souvera_mail"] .app-menu-icon,
 li[data-id="souvera_mail"] .app-menu-icon,
 #app-menu li[data-id="souvera_mail"] .app-menu-icon,
 .app-menu-main [data-app-id="souvera_mail"] svg {
-    background-color: #ffffff !important;
-    color: #ffffff !important;
+    background-color: #000000 !important;
+    color: #000000 !important;
 }
 
 body[data-theme-dark] .app-menu-entry[data-app-id="souvera_mail"] .app-menu-icon,
 body[data-theme-dark] li[data-id="souvera_mail"] .app-menu-icon,
 body[data-theme-dark] #app-menu li[data-id="souvera_mail"] .app-menu-icon,
 body[data-theme-dark] .app-menu-main [data-app-id="souvera_mail"] svg {
-    background-color: #000000 !important;
-    color: #000000 !important;
+    background-color: #ffffff !important;
+    color: #ffffff !important;
 }
 
 /* ------------------------------------------------------------
