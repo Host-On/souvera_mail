@@ -167,7 +167,13 @@ class UnreadMailWidget implements IAPIWidgetV2, IIconWidget, IReloadableWidget
                     $Message->From()->ToString(),
                     $Message->Subject(),
                     $baseURL . '/mailbox/INBOX/m' . $Message->Uid(),
-                    $this->urlGenerator->imagePath('souvera_mail', 'app.svg'),
+                    // Item icon: same file as the widget-header icon
+                    // (`app-widget.svg`, hard-coded black). The white
+                    // `app.svg` would be invisible on the widget's
+                    // light-mode content area (2026-02-19 operator
+                    // screenshot). Dark-mode inversion is handled by
+                    // the src-scoped filter in css/dashboard-widget.css.
+                    $this->urlGenerator->imagePath('souvera_mail', 'app-widget.svg'),
                     $Message->ETag('')
                 );
             }

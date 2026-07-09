@@ -6,7 +6,54 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.14.27] — 2026-02-19 (Endlich richtig: Zwei getrennte SVG-Dateien, damit Menu und Widget sich nie wieder gegenseitig kaputt machen)
+## [0.14.28] — 2026-02-19 (Fix: Item-Icons vor jeder Mail im Widget nutzen nun auch das schwarze SVG)
+
+### Operator-Report (2026-02-19, mit Screenshot)
+
+> „Fast... wie du im Screenshot sehen kannst ist das Logo im Widget
+> oben nun korrekt, aber nicht vor der Mail in der Liste ..."
+
+### Root cause
+
+`UnreadMailWidget::getIconUrl()` wurde in v0.14.27 auf `app-widget.svg`
+umgestellt (schwarz) — aber der Icon-Pfad für **jede einzelne Mail
+in der Item-Liste** (`WidgetItem`, Zeile 170) zeigte weiterhin auf
+`app.svg` (weiß aus v0.14.26). Ergebnis: weißes Item-Icon auf hellem
+Widget-Content-Bereich → unsichtbar.
+
+### Fix (1 Zeile)
+
+```diff
+- $this->urlGenerator->imagePath('souvera_mail', 'app.svg')
++ $this->urlGenerator->imagePath('souvera_mail', 'app-widget.svg')
+```
+
+Damit ist der komplette Widget-Rendering-Pfad (Header + Item-Icons)
+konsistent auf `app-widget.svg` — und der src-basierte CSS-Filter aus
+v0.14.27 (`img[src*="app-widget.svg"]`) invertiert beide Icon-Klassen
+im Dark-Mode automatisch.
+
+### Files
+
+| File | Change |
+|---|---|
+| `lib/Dashboard/UnreadMailWidget.php` | `WidgetItem`-Icon-Pfad → `app-widget.svg` |
+| `tests/test_dashboard_icon_not_inverted.php` | +2 Assertions (Item-Icon + Regression-Pin) |
+| `appinfo/info.xml`, `package.json` | 0.14.27 → 0.14.28 |
+
+### Verifikation
+
+- **`tests/test_dashboard_icon_not_inverted.php`: alle Assertions PASS.**
+- **Volle Suite: 41 Suites / 1594 Assertions PASS, 0 Fehler.**
+
+### Live-Verifikation
+
+1. Rsync `lib/Dashboard/UnreadMailWidget.php` + `info.xml` + `package.json` → Live.
+2. `occ upgrade` → 0.14.28. Hard-Reload.
+3. Widget zeigt jetzt **schwarzes Umschlag-Icon vor jeder Mail-Zeile**
+   im Light-Mode, weiß im Dark-Mode.
+
+
 
 ### Operator (2026-02-19, absolut zurecht sauer)
 
@@ -378,6 +425,13 @@ bleiben unverändert.
 1. Rsync `css/dashboard-widget.css` + `info.xml` + `package.json` → Live.
 2. `occ upgrade` (auf 0.14.23) + Hard-Reload (`Strg+F5`).
 3. App-Menu-Icon jetzt **Light=schwarz, Dark=weiß** (matches Widget).
+
+## [0.14.27] — 2026-02-19 (Zwei getrennte SVG-Dateien: `app.svg` = Menu weiß, `app-widget.svg` = Widget schwarz)
+
+**Note:** Widget-Header-Icon war nun korrekt (schwarz auf hellem
+Header, weiß auf dunklem). Aber der Icon-Pfad für **jedes Item in der
+Mail-Liste** zeigte noch auf das Menu-SVG (`app.svg`, weiß) → für den
+Light-Mode unsichtbar. v0.14.28 zieht auch diesen Pfad auf `app-widget.svg`.
 
 ## [0.14.26] — 2026-02-19 (Zwischenversion — durch v0.14.27 abgelöst)
 

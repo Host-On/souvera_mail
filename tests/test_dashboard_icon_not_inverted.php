@@ -127,6 +127,22 @@ ok((bool) preg_match(
     $widget
 ), "UnreadMailWidget::getIconUrl() serves 'app-widget.svg' via imagePath() (v0.14.27 split from app.svg)",
     $passes, $failures);
+
+// v0.14.28: the WidgetItem icon (the small icon shown before each
+// mail entry in the item list) must ALSO use app-widget.svg — not
+// app.svg (white), which was invisible on the widget content area
+// (2026-02-19 operator screenshot). One src, one filter rule, both
+// icons covered.
+ok((bool) preg_match(
+    "#new WidgetItem\([\s\S]{0,1500}urlGenerator->imagePath\(\s*'souvera_mail'\s*,\s*'app-widget\.svg'\s*\)#",
+    $widget
+), "WidgetItem icon (per-message list icon) also uses app-widget.svg (v0.14.28)",
+    $passes, $failures);
+ok(!(bool) preg_match(
+    "#new WidgetItem\([\s\S]{0,1500}urlGenerator->imagePath\(\s*'souvera_mail'\s*,\s*'app\.svg'\s*\)#",
+    $widget
+), "regression pin: WidgetItem icon NO LONGER uses app.svg (was invisible on light-mode content area)",
+    $passes, $failures);
 ok((bool) preg_match(
     "#getIconClass\(\)[\s\S]{0,400}return\s+'icon-souvera-mail'#",
     $widget
