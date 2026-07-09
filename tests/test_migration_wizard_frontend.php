@@ -109,6 +109,7 @@ ok(str_contains($src['main'], "createApp(App)"),
 foreach ([
     'WelcomeScreen',
     'ImapFormScreen',
+    'FolderMappingScreen',
     'ConfirmScreen',
     'ProgressScreen',
     'TerminalScreen',
@@ -116,6 +117,21 @@ foreach ([
     ok(str_contains($src['wizard'], $screen),
         "MigrationWizard registers the {$screen} component", $passes, $failures);
 }
+
+// v0.14.14 — the wizard MUST insert a `mapping` step between `form`
+// and `confirm`, because provider.tools 2026-02 now demands a
+// non-empty `folders` array in POST /start.
+ok(str_contains($src['wizard'], "'mapping'"),
+    "MigrationWizard defines a 'mapping' step (folder picker)",
+    $passes, $failures);
+ok(str_contains($src['wizard'], "selectedFolders"),
+    'Wizard tracks selectedFolders (Set) as import scope',
+    $passes, $failures);
+ok(str_contains($src['wizard'], "startMigration(conn, folders)"),
+    'Wizard forwards `folders` array to composable.startMigration()',
+    $passes, $failures);
+ok(file_exists('/app/src/components/screens/FolderMappingScreen.vue'),
+    'FolderMappingScreen.vue exists', $passes, $failures);
 
 // v0.14.13 — onAdvance must catch testConnection() network errors
 // and surface them via testResult, else the wizard freezes silently
@@ -184,6 +200,51 @@ ok(str_contains($src['composable'], "body?.active")
     $passes, $failures);
 ok(str_contains($src['composable'], "welcomeDismissed"),
     "loadState uses `welcomeDismissed` field name (backend contract)",
+    $passes, $failures);
+
+// v0.14.14 — startMigration MUST forward the folders selection.
+ok((bool) preg_match('#startMigration\s*\(\s*uiConn\s*,\s*folders#', $src['composable']),
+    'Composable.startMigration accepts a `folders` array (provider.tools 2026-02 contract)',
+    $passes, $failures);
+ok(str_contains($src['composable'], 'folders }'),
+    'startMigration body includes the folders array',
+    $passes, $failures);
+
+// v0.14.14 — Backend (MigrationController.start) MUST accept and
+// forward `folders`; MigrationService.startForUser signature MUST
+// carry it into ProviderToolsClient::startMigration.
+$controllerSrc = (string) file_get_contents('/app/lib/Controller/MigrationController.php');
+$serviceSrc    = (string) file_get_contents('/app/lib/Service/MigrationService.php');
+ok((bool) preg_match('#public function start\([\s\S]{0,400}array \$folders\s*=\s*\[\]#', $controllerSrc),
+    'MigrationController::start() accepts `array $folders = []` from the request',
+    $passes, $failures);
+ok(str_contains($controllerSrc, 'mindestens einen Ordner')
+    || str_contains($controllerSrc, 'non-empty array'),
+    'MigrationController::start() rejects empty folder list with a friendly message',
+    $passes, $failures);
+ok((bool) preg_match('#startForUser\([\s\S]{0,600}array \$folders#', $serviceSrc),
+    'MigrationService::startForUser() carries the folders parameter',
+    $passes, $failures);
+ok(str_contains($serviceSrc, 'startMigration($source, $destination, $folders)'),
+    'MigrationService forwards folders to ProviderToolsClient::startMigration',
+    $passes, $failures);
+
+// v0.14.14 — FolderMappingScreen has the intelligent auto-select
+// logic (ROLE_ALIASES with INBOX/Sent/Drafts/Trash/Junk/Archive).
+$mappingSrc = (string) @file_get_contents('/app/src/components/screens/FolderMappingScreen.vue');
+foreach (['inbox', 'sent', 'drafts', 'trash', 'junk', 'archive'] as $role) {
+    ok(str_contains($mappingSrc, "'{$role}':")
+        || str_contains($mappingSrc, "{$role}:"),
+        "FolderMappingScreen ROLE_ALIASES defines the '{$role}' role",
+        $passes, $failures);
+}
+ok(str_contains($mappingSrc, "isSystemFolder"),
+    'FolderMappingScreen has isSystemFolder() to de-select [Gmail]/.dotfolders',
+    $passes, $failures);
+ok(str_contains($mappingSrc, 'selectRecommended')
+    && str_contains($mappingSrc, 'selectAll')
+    && str_contains($mappingSrc, 'selectNone'),
+    'FolderMappingScreen exposes Empfohlene / Alle / Keine toolbar actions',
     $passes, $failures);
 
 // ==============================================================
@@ -300,10 +361,10 @@ ok($nsPos !== false && $reqPos !== false && $nsPos < $reqPos,
 // ==============================================================
 // P — version bump + changelog markers
 // ==============================================================
-ok((bool) preg_match('#<version>0\.14\.(1[3-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
-    'info.xml version bumped to 0.14.13 (or later)', $passes, $failures);
-ok(str_contains($src['changelog'], '[0.14.13]'),
-    'CHANGELOG.md has a [0.14.13] section', $passes, $failures);
+ok((bool) preg_match('#<version>0\.14\.(1[4-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
+    'info.xml version bumped to 0.14.14 (or later)', $passes, $failures);
+ok(str_contains($src['changelog'], '[0.14.14]'),
+    'CHANGELOG.md has a [0.14.14] section', $passes, $failures);
 ok(stripos($src['changelog'], 'Vue 3') !== false
     || stripos($src['changelog'], 'Vue-3') !== false
     || stripos($src['changelog'], 'design system') !== false,

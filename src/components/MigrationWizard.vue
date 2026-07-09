@@ -18,12 +18,15 @@
 				:test-result="testResult"
 				:start-error="startError"
 				:is-busy="isBusy"
+				:folders="folderList"
+				:selected="selectedFolders"
 				@advance="onAdvance"
 				@back="onBack"
 				@retry="onRetry"
 				@close="onClose"
 				@dismiss-forever="$emit('dismiss-forever')"
-				@update:form="onFormUpdate" />
+				@update:form="onFormUpdate"
+				@update:selected="onSelectedUpdate" />
 		</div>
 	</NcDialog>
 </template>
@@ -34,16 +37,38 @@ import { computed, reactive, ref, watch } from 'vue'
 
 import WelcomeScreen from './screens/WelcomeScreen.vue'
 import ImapFormScreen from './screens/ImapFormScreen.vue'
+import FolderMappingScreen from './screens/FolderMappingScreen.vue'
 import ConfirmScreen from './screens/ConfirmScreen.vue'
 import ProgressScreen from './screens/ProgressScreen.vue'
 import TerminalScreen from './screens/TerminalScreen.vue'
 
+/**
+ * v0.14.14 — new `mapping` step between `form` and `confirm`.
+ *
+ * provider.tools 2026-02 now requires a non-empty `folders` array in
+ * the start payload, so the wizard must let the user pick source
+ * folders before we can call /start. We also use the mapping screen
+ * to communicate a nice UX truth: standard-role folders (INBOX, Sent,
+ * Drafts, Trash, Junk, Archive) land in the corresponding canonical
+ * Souvera folders — no manual rename needed.
+ */
 const SCREENS = {
 	welcome: WelcomeScreen,
 	form: ImapFormScreen,
+	mapping: FolderMappingScreen,
 	confirm: ConfirmScreen,
 	progress: ProgressScreen,
 	terminal: TerminalScreen,
+}
+
+// System folders we DON'T pre-select — user can opt in.
+function isSystemFolder(path) {
+	if (!path) return false
+	const p = String(path).toLowerCase()
+	if (p.startsWith('[gmail]') || p.startsWith('[google mail]')) return true
+	if (p.startsWith('.') || p.includes('/.')) return true
+	if (p === 'outbox' || p === 'postausgang') return true
+	return false
 }
 
 export default {
@@ -65,6 +90,8 @@ export default {
 			tls: true,
 		})
 		const folderPreview = ref(null) // {folders: n, messages: n}
+		const folderList = ref([])      // full [{path, messages}, …] for mapping screen
+		const selectedFolders = ref(new Set()) // Set<string>
 		const testResult = ref(null)    // {ok: true} | {ok: false, error: '…'}
 		const startError = ref('')
 
@@ -74,6 +101,7 @@ export default {
 			switch (step.value) {
 				case 'welcome':  return t('souvera_mail', 'Alte Mails importieren')
 				case 'form':     return t('souvera_mail', 'Verbindung zum alten Postfach')
+				case 'mapping':  return t('souvera_mail', 'Ordner auswählen')
 				case 'confirm':  return t('souvera_mail', 'Import bestätigen')
 				case 'progress': return t('souvera_mail', 'Import läuft')
 				case 'terminal': return t('souvera_mail', 'Import abgeschlossen')
@@ -81,8 +109,7 @@ export default {
 			}
 		})
 
-		// If the migration reports a terminal state while we're on
-		// the progress screen, jump automatically to terminal.
+		// Terminal-state watcher on the progress screen.
 		watch(
 			() => props.migration.jobState.value,
 			(next) => {
@@ -95,8 +122,11 @@ export default {
 		function onFormUpdate(patch) {
 			Object.assign(form, patch)
 		}
+		function onSelectedUpdate(next) {
+			selectedFolders.value = next
+		}
 
-		async function onAdvance(payload) {
+		async function onAdvance() {
 			try {
 				if (step.value === 'welcome') {
 					step.value = 'form'
@@ -106,14 +136,8 @@ export default {
 					isBusy.value = true
 					testResult.value = null
 					folderPreview.value = null
+					folderList.value = []
 					const conn = { host: form.host, port: Number(form.port), username: form.username, password: form.password, tls: !!form.tls }
-					// v0.14.13 — the backend may respond with 4xx / 5xx
-					// (HTTP-level failure) or with 200 + { ok: false }
-					// (logical failure). Both branches must surface to
-					// the user; without a `catch` here the exception
-					// path silently swallowed and the wizard appeared
-					// frozen. jsonFetch()'s Error carries the parsed
-					// `body.message` so we forward it verbatim.
 					let t1
 					try {
 						t1 = await props.migration.testConnection(conn)
@@ -126,14 +150,35 @@ export default {
 						return
 					}
 					testResult.value = { ok: true }
-					// Optional folder preview — non-fatal on error.
+					// Full folder inventory — needed by the mapping screen.
+					// Failure here IS fatal because we can't ask
+					// provider.tools to migrate an empty folder list.
 					try {
 						const fp = await props.migration.listFolders(conn)
+						folderList.value = Array.isArray(fp?.folders) ? fp.folders : []
 						folderPreview.value = {
-							folders: fp?.folders?.length || fp?.folder_count || 0,
-							messages: fp?.message_count || 0,
+							folders: fp?.folder_count ?? folderList.value.length,
+							messages: fp?.message_count ?? 0,
 						}
-					} catch (e) { folderPreview.value = null }
+					} catch (e) {
+						testResult.value = { ok: false, error: e?.message || t('souvera_mail', 'Ordnerliste konnte nicht abgerufen werden.') }
+						return
+					}
+					if (folderList.value.length === 0) {
+						testResult.value = { ok: false, error: t('souvera_mail', 'Im alten Postfach wurden keine Ordner gefunden.') }
+						return
+					}
+					// Auto-preselect all NON-system folders.
+					selectedFolders.value = new Set(
+						folderList.value
+							.map(f => String(f.path || ''))
+							.filter(p => p && !isSystemFolder(p))
+					)
+					step.value = 'mapping'
+					return
+				}
+				if (step.value === 'mapping') {
+					if (selectedFolders.value.size === 0) return
 					step.value = 'confirm'
 					return
 				}
@@ -141,13 +186,13 @@ export default {
 					isBusy.value = true
 					startError.value = ''
 					const conn = { host: form.host, port: Number(form.port), username: form.username, password: form.password, tls: !!form.tls }
+					const folders = Array.from(selectedFolders.value)
 					try {
-						await props.migration.startMigration(conn)
+						await props.migration.startMigration(conn, folders)
 					} catch (e) {
 						startError.value = e?.message || t('souvera_mail', 'Import konnte nicht gestartet werden.')
 						return
 					}
-					// Wipe the source-provider password from memory immediately.
 					form.password = ''
 					step.value = 'progress'
 					props.migration.startPolling(5000)
@@ -164,7 +209,8 @@ export default {
 
 		function onBack() {
 			if (step.value === 'form') step.value = 'welcome'
-			else if (step.value === 'confirm') step.value = 'form'
+			else if (step.value === 'mapping') step.value = 'form'
+			else if (step.value === 'confirm') step.value = 'mapping'
 		}
 
 		function onRetry() {
@@ -172,12 +218,11 @@ export default {
 			startError.value = ''
 			testResult.value = null
 			folderPreview.value = null
+			folderList.value = []
+			selectedFolders.value = new Set()
 		}
 
 		function onClose() {
-			// Never allow force-close while a network request is in
-			// flight — the dialog's `no-close` prop already blocks
-			// the header ✕; this is defence-in-depth.
 			if (isBusy.value) return
 			props.migration.stopPolling()
 			emit('close')
@@ -192,6 +237,8 @@ export default {
 			isBusy,
 			form,
 			folderPreview,
+			folderList,
+			selectedFolders,
 			testResult,
 			startError,
 			currentScreenComponent,
@@ -201,6 +248,7 @@ export default {
 			onRetry,
 			onClose,
 			onFormUpdate,
+			onSelectedUpdate,
 			onUpdateOpen,
 		}
 	},
@@ -208,8 +256,6 @@ export default {
 </script>
 
 <style>
-/* Give the NcDialog body a comfortable, Central-aligned padding.
-   Scoped to the wizard root so we never leak into other dialogs. */
 .souvera-migration-wizard {
 	padding: var(--sc-field-gap);
 	color: var(--color-main-text);

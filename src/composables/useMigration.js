@@ -187,10 +187,11 @@ export function useMigration() {
 		return { folders: [], folder_count: 0, message_count: 0 }
 	}
 
-	async function startMigration(uiConn) {
+	async function startMigration(uiConn, folders = []) {
+		const backendConn = toBackendConn(uiConn)
 		const body = await jsonFetch(generateUrl('/apps/souvera_mail/migration/start'), {
 			method: 'POST',
-			body: JSON.stringify(toBackendConn(uiConn)),
+			body: JSON.stringify({ ...backendConn, folders }),
 		})
 		activeJob.value = body?.job || null
 		status.value = body?.job || null

@@ -168,11 +168,16 @@ class MigrationService
     /**
      * Start a new migration job for the given NC user.
      *
-     * @param string $sourceHost     Old provider IMAP host (e.g. imap.gmx.net)
-     * @param int    $sourcePort     Old provider port (typ. 993 / 143)
-     * @param string $sourceUser     Old provider login (usually email)
-     * @param string $sourcePassword Old provider password — NEVER stored locally
-     * @param bool   $sourceSecure   TLS-on-connect (993) vs STARTTLS (143)
+     * @param string        $sourceHost     Old provider IMAP host (e.g. imap.gmx.net)
+     * @param int           $sourcePort     Old provider port (typ. 993 / 143)
+     * @param string        $sourceUser     Old provider login (usually email)
+     * @param string        $sourcePassword Old provider password — NEVER stored locally
+     * @param bool          $sourceSecure   TLS-on-connect (993) vs STARTTLS (143)
+     * @param list<string>  $folders        Source folder paths to migrate.
+     *                                      Empty list is NOT accepted since
+     *                                      provider.tools 2026-02 —
+     *                                      MigrationController blocks that
+     *                                      before we ever reach this method.
      *
      * @return array<string, mixed>  toApiArray() of the freshly created row
      *
@@ -186,6 +191,7 @@ class MigrationService
         string $sourceUser,
         string $sourcePassword,
         bool $sourceSecure,
+        array $folders = [],
     ): array {
         $this->assertNoActiveJob($userId);
         if (!$this->isAvailable()) {
@@ -230,7 +236,7 @@ class MigrationService
         $job = $this->jobs->insert($job);
 
         try {
-            $started = $this->providerTools->startMigration($source, $destination);
+            $started = $this->providerTools->startMigration($source, $destination, $folders);
         } catch (\Throwable $e) {
             // Roll back both the local row AND the temp Stalwart password.
             $job->setStatus(MigrationJob::STATUS_FAILED);

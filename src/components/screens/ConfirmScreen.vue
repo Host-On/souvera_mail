@@ -20,6 +20,12 @@
 					<span v-if="folderPreview.messages > 0"> · {{ n('souvera_mail', '%n Nachricht', '%n Nachrichten', folderPreview.messages) }}</span>
 				</dd>
 			</div>
+			<div v-if="selectedCount > 0" data-testid="wizard-confirm-selected-count">
+				<dt>{{ t('souvera_mail', 'Zu importieren') }}</dt>
+				<dd>
+					<strong>{{ n('souvera_mail', '%n Ordner ausgewählt', '%n Ordner ausgewählt', selectedCount) }}</strong>
+				</dd>
+			</div>
 		</dl>
 
 		<NcNoteCard type="warning" :heading="t('souvera_mail', 'Wichtig')">
@@ -72,8 +78,12 @@ export default {
 		folderPreview: { type: Object, default: null },
 		startError: { type: String, default: '' },
 		isBusy: { type: Boolean, default: false },
+		selected: { type: Set, default: () => new Set() },
 	},
 	emits: ['advance', 'back'],
+	computed: {
+		selectedCount() { return this.selected ? this.selected.size : 0 },
+	},
 }
 </script>
 

@@ -6,6 +6,130 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.14] — 2026-02-19 (Neues Feature: Folder-Mapping-Screen + folders-Contract-Fix)
+
+### Operator-Report
+
+Screenshot vom ConfirmScreen: „Verbindung erfolgreich · 57 Ordner"
+gefolgt von der roten NcNoteCard:
+
+> **provider.tools HTTP 400: folders must be a non-empty array**
+
+Erklärung: provider.tools hat im Februar 2026 den `/imap/migrate`-
+Contract gehärtet — `folders` ist jetzt Pflichtfeld und muss ein
+non-empty Array von Quell-Ordner-Pfaden sein. Der Kommentar in
+`ProviderToolsClient::startMigration()` („Empty list = ALL folders")
+ist damit veraltet. Frontend sendete gar kein Array → 400.
+
+### Neu — Folder-Mapping-Screen (User-Wunsch: „Klug und Optisch hübsch")
+
+Zwischen ConfirmScreen und Progress kommt der neue **`FolderMappingScreen`**:
+
+**Layout** (2-Spalten, Design-System-konform):
+
+```
+┌───────────────────────────────────────────────────────┐
+│  ☑ 52 Ordner ausgewählt / 57                          │
+│  [Empfohlene] [Alle] [Keine]                          │
+├───────────────────────────────────────────────────────┤
+│  ☑ 📥 INBOX          ──►   📥 INBOX      [8 234 Mails]│
+│  ☑ 📤 Sent Items     ──►   📤 Sent       [3 141 Mails]│
+│  ☑ 📝 Drafts         ──►   📝 Drafts     [ 42 Mails]  │
+│  ☑ 🗑 Trash          ──►   🗑 Trash      [ 118 Mails] │
+│  ☑ ⚠ Spam            ──►   ⚠ Junk        [1 023 Mails]│
+│  ☐ ⚙ [Gmail]/All Mail  ──► ⚙ [Gmail]/All Mail         │
+│  ☑ 📁 Projekte       ──►   📁 Projekte    [ 87 Mails] │
+│  …                                                    │
+└───────────────────────────────────────────────────────┘
+```
+
+**Intelligente Auto-Selektion:**
+
+- **Standard-Rollen** werden multi-lingual erkannt (Deutsch, Englisch,
+  Französisch, Spanisch) und mit Rollen-Icon + kanonischem Ziel-Namen
+  markiert: INBOX, Sent, Drafts, Trash, Junk, Archive.
+- **System-Ordner** (`[Gmail]/…`, `[Google Mail]/…`, `.foo`,
+  `Outbox`/`Postausgang`) werden **abgewählt** vorgezeichnet, mit
+  gedämpfter Opacity + Cog-Icon — sind aber immer noch anwählbar
+  wenn der Nutzer sie wirklich haben will.
+- **Sort-Order:** INBOX oben, dann restliche Rollen, dann Custom-
+  Ordner alphabetisch, System-Ordner ganz unten.
+
+**3-Klick-Toolbar:**
+
+- **„Empfohlene"** → alles außer System-Ordnern
+- **„Alle"** → 57 von 57
+- **„Keine"** → 0 (Button „Weiter" wird deaktiviert)
+
+**Optische Details** (aus Souvera Design System):
+
+- Icons aus `vue-material-design-icons` (Inbox, SendOutline,
+  FileEditOutline, TrashCanOutline, EmailAlertOutline, ArchiveOutline,
+  CogOutline, FolderOutline).
+- Selektierte Zeilen: sanfter Primary-Element-Tint + Primary-Border.
+- Message-Counts als Pill (`background-hover` + `border-radius: 999px`).
+- Mobile Responsive: unter 620 px klappt die Ziel-Spalte unter die
+  Quell-Spalte.
+
+### Neu — Zielserver-Übernahme-Vorschau in ConfirmScreen
+
+Nach dem Mapping-Schritt zeigt der ConfirmScreen eine zusätzliche
+Zeile „**Zu importieren**: 52 Ordner ausgewählt" damit der Nutzer
+seine Auswahl vor dem finalen Start-Klick nochmal sieht.
+
+### Backend-Erweiterung (minimal invasiv)
+
+Der User-Direktive folgend („Funktionen nicht anfassen") wurde
+**kein bestehender Backend-Code geändert** — nur das durchgereichte
+Datenfeld ist neu:
+
+- **`MigrationController::start()`**: nimmt zusätzlich
+  `array $folders = []` entgegen, validiert dass die Liste nicht
+  leer ist (HTTP 400 mit deutscher Meldung „Bitte wähle mindestens
+  einen Ordner …"), reicht sie an `MigrationService::startForUser()`
+  weiter.
+- **`MigrationService::startForUser()`**: neue Signatur-Position
+  `array $folders = []`, wird an
+  `ProviderToolsClient::startMigration($source, $destination, $folders)`
+  weitergegeben — dieser dritte Parameter existierte bereits.
+- **`ProviderToolsClient`**: unverändert (bekam schon immer `folders`).
+- **Ziel-Server-App-Passwort** (`AppPasswordService::createStalwartOnlyForMigration`):
+  unverändert. Wird beim `/start`-Aufruf automatisch angelegt, an
+  provider.tools als Destination weitergegeben, und beim Ende des
+  Jobs (Success/Fail/Cancel) automatisch wieder revokiert. Der
+  MigrationCleanup-Cron fängt Orphaned-Passwörter zusätzlich ab.
+
+### Files
+
+| File | Change |
+|---|---|
+| `src/components/screens/FolderMappingScreen.vue` | **Neu** — 270 LOC Vue-SFC mit intelligenter Auto-Selektion und 2-Spalten-Mapping-Layout. |
+| `src/components/MigrationWizard.vue` | Neuer `mapping`-Step, `folderList` + `selectedFolders`-State, `startMigration(conn, folders)`. |
+| `src/composables/useMigration.js` | `startMigration(uiConn, folders)` reicht das Array an POST /start weiter. |
+| `src/components/screens/ConfirmScreen.vue` | Neuer `selected`-Prop + „Zu importieren: X Ordner ausgewählt"-Zeile. |
+| `lib/Controller/MigrationController.php` | `array $folders = []`, non-empty-Check mit deutscher Fehlermeldung. |
+| `lib/Service/MigrationService.php` | `startForUser(…, array $folders = [])`, Weitergabe an ProviderToolsClient. |
+| `tests/test_migration_wizard_frontend.php` | +20 neue Assertions (Mapping-Screen, ROLE_ALIASES, isSystemFolder, Backend-Signaturen). |
+| `appinfo/info.xml`, `package.json` | Version-Bump 0.14.13 → 0.14.14. |
+
+### Verifikation
+
+- `yarn build` clean → 400 KB Bundle (+22 KB durch die neuen Icons + Screen).
+- `php -l` clean auf Controller + Service.
+- **`tests/test_migration_wizard_frontend.php`: 134 / 134 PASS** (war 115).
+- **Voller Suite-Run: 39 Suites / 1508 Assertions passing** (war 1489).
+
+### Live-Verifikation für Operator
+
+1. Rsync + `occ upgrade` → 0.14.14
+2. Wizard → Verbindung prüfen → **neuer Mapping-Screen erscheint**
+3. Alle 57 Ordner sichtbar, INBOX/Sent/Drafts/Trash/Junk/Archive
+   auto-preselected mit passenden Icons.
+4. „Empfohlene" klicken → System-Ordner rausfallen.
+5. „Weiter" → ConfirmScreen zeigt „Zu importieren: 52 Ordner ausgewählt".
+6. „Import jetzt starten" → provider.tools bekommt endlich das
+   erwartete `folders`-Array → Job wird korrekt erstellt.
+
 ## [0.14.13] — 2026-02-19 (Hotfix: Composable ↔ Backend Contract-Alignment)
 
 ### Fixed — „Spinner geht kurz, dann nichts" beim IMAP-Verbindungstest

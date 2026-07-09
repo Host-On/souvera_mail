@@ -142,6 +142,7 @@ class MigrationController extends Controller
         string $user = '',
         string $password = '',
         bool $secure = true,
+        array $folders = [],
     ): DataResponse {
         if ($this->userId === null) {
             return $this->error('unauthenticated', Http::STATUS_UNAUTHORIZED);
@@ -150,6 +151,20 @@ class MigrationController extends Controller
         if ($errors !== []) {
             return $this->error(\implode('; ', $errors), Http::STATUS_BAD_REQUEST);
         }
+        // v0.14.14 — provider.tools tightened its contract: `folders`
+        // MUST be a non-empty array of source-mailbox paths. Reject
+        // empty selection early with a friendly message rather than
+        // letting the upstream 400 bubble up unhelpfully.
+        $folderPaths = \array_values(\array_filter(
+            \array_map('strval', $folders),
+            static fn (string $p): bool => $p !== '',
+        ));
+        if ($folderPaths === []) {
+            return $this->error(
+                'Bitte wähle mindestens einen Ordner zum Importieren aus.',
+                Http::STATUS_BAD_REQUEST
+            );
+        }
         if (!$this->migrations->isAvailable()) {
             return $this->error(
                 'Import-Dienst ist auf dieser Instanz nicht aktiviert.',
@@ -157,7 +172,9 @@ class MigrationController extends Controller
             );
         }
         try {
-            $job = $this->migrations->startForUser($this->userId, $host, $port, $user, $password, $secure);
+            $job = $this->migrations->startForUser(
+                $this->userId, $host, $port, $user, $password, $secure, $folderPaths
+            );
             return new DataResponse(['status' => 'ok', 'job' => $job], Http::STATUS_CREATED);
         } catch (\InvalidArgumentException $e) {
             return $this->error($e->getMessage(), Http::STATUS_BAD_REQUEST);
