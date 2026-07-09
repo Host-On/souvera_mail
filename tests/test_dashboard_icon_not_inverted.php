@@ -37,28 +37,32 @@ ok(is_file($svgPath), "img/app.svg exists", $passes, $failures);
 $svg = (string) file_get_contents($svgPath);
 
 // ---------------------------------------------------------------
-// 1. No white fill anywhere in the SVG (regression against the 0.14.20
-//    "invertiert" report). Cover common casings + spacings.
+// v0.14.26 rewrite: the SVG now ships with hard-coded `#ffffff` on
+// every path AND on the parent <g>. This matches every other Souvera
+// app icon so NC's App-Popover renders our icon white-in-blue like
+// the rest. NC's default dark-mode invert-filter then flips it to
+// black on the dark-mode popover — again identical to sister apps.
+//
+// The Dashboard widget's inverse rendering (Light→black, Dark→white)
+// is driven by `.panel--header`-scoped CSS filters in
+// css/dashboard-widget.css. This test only pins the SVG contract.
 // ---------------------------------------------------------------
+
+// 1. Every <path> MUST use fill:#ffffff (opposite of v0.14.21-25).
 foreach ([
-    'fill:#ffffff',
-    'fill: #ffffff',
-    'fill:#FFFFFF',
-    'fill:white',
-    'fill: white',
-    'fill="#ffffff"',
-    'fill="#FFFFFF"',
-    'fill="white"',
+    'fill:currentColor',
+    'fill: currentColor',
+    'fill="currentColor"',
+    'fill:#000000',
+    'fill: #000000',
+    'fill="#000000"',
+    'fill:black',
+    'fill="black"',
 ] as $badPattern) {
-    ok(!str_contains($svg, $badPattern),
-        "img/app.svg does NOT contain '$badPattern' (invert regression pin)",
-        $passes, $failures);
+    // <g> is allowed to keep currentColor cascade until we swap; the
+    // patterns we forbid are on <path> only. Extract paths first.
 }
 
-// ---------------------------------------------------------------
-// 2. Every <path> must carry a currentColor fill. Extract each path
-//    element, then verify its style attribute mentions currentColor.
-// ---------------------------------------------------------------
 preg_match_all('#<path\b[^>]*/?>#s', $svg, $pathMatches);
 $paths = $pathMatches[0] ?? [];
 ok(count($paths) >= 2,
@@ -68,40 +72,29 @@ ok(count($paths) >= 2,
 $idx = 0;
 foreach ($paths as $pathTag) {
     $idx++;
-    // Match `style="…fill:currentColor…"` OR `fill="currentColor"` OR
-    // no fill at all (cascades from group). All three are safe.
-    $hasCurrent = str_contains($pathTag, 'fill:currentColor')
-        || str_contains($pathTag, 'fill: currentColor')
-        || str_contains($pathTag, 'fill="currentColor"');
-    $noExplicitFill = !preg_match('#fill\s*[:=]#', $pathTag);
-    ok($hasCurrent || $noExplicitFill,
-        "path #$idx uses currentColor OR cascades from group (no hard-coded colour)",
+    $hasWhite = str_contains($pathTag, 'fill:#ffffff')
+        || str_contains($pathTag, 'fill: #ffffff')
+        || str_contains($pathTag, 'fill="#ffffff"');
+    ok($hasWhite,
+        "path #$idx uses hard-coded fill:#ffffff (matches sister-app render pipeline)",
+        $passes, $failures);
+    // Regression pin against v0.14.21-25 currentColor artefact
+    ok(!str_contains($pathTag, 'fill:currentColor')
+        && !str_contains($pathTag, 'fill: currentColor')
+        && !str_contains($pathTag, 'fill="currentColor"'),
+        "path #$idx does NOT use currentColor (that produced black-in-blue popover — v0.14.21-25 regression)",
         $passes, $failures);
 }
 
-// ---------------------------------------------------------------
-// 3. Group cascade — v0.14.25 update.
-// ---------------------------------------------------------------
-// v0.14.21 kept `<g fill="#000000">` as a safety-net cascade for
-// <img>-based rendering. That worked for the Dashboard widget (where
-// <img> falls back to `currentColor → black`), but broke the App-
-// Popover: NC's monochrome-SVG detector saw two colours (currentColor
-// + #000000) and re-classified the icon as *coloured*, rendering it
-// as a plain black <img> instead of a themed mask. Every other
-// Souvera app icon was white-in-blue-bubble; ours was black-in-blue-
-// bubble (2026-02-19 operator screenshot).
-//
-// v0.14.25: drop the hard-coded #000000 from the <g> so the SVG is
-// fully monochrome. NC re-classifies it as monochrome → renders it
-// as mask in the App-Popover with the theme colour (white on the
-// blue bubble). The Dashboard widget still works because `<img>`
-// with `currentColor` defaults to black, and dark-mode inverts via
-// `filter: invert(1)` in dashboard-widget.css.
-ok((bool) preg_match('~<g\b[^>]*fill\s*=\s*"currentColor"~', $svg),
-    "parent <g> uses fill=\"currentColor\" (fully monochrome, unlocks NC mask-rendering in App-Popover)",
+// 2. Group cascade — v0.14.26.
+ok((bool) preg_match('~<g\b[^>]*fill\s*=\s*"#ffffff"~i', $svg),
+    "parent <g> uses fill=\"#ffffff\" (matches sister-app pipeline)",
     $passes, $failures);
-ok(!(bool) preg_match('~<g\b[^>]*fill\s*=\s*"#000000"~', $svg),
-    "regression pin: parent <g> NO LONGER contains hard-coded fill=\"#000000\" (that broke App-Popover monochrome detection)",
+ok(!(bool) preg_match('~<g\b[^>]*fill\s*=\s*"currentColor"~i', $svg),
+    "regression pin: parent <g> NO LONGER uses currentColor",
+    $passes, $failures);
+ok(!(bool) preg_match('~<g\b[^>]*fill\s*=\s*"#000000"~i', $svg),
+    "regression pin: parent <g> NO LONGER uses hard-coded #000000",
     $passes, $failures);
 
 // ---------------------------------------------------------------

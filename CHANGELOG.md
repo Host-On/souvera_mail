@@ -6,7 +6,98 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.14.25] — 2026-02-19 (Root-Cause-Fix: App-Popover-Icon monochrom — NC macht den Rest automatisch)
+## [0.14.26] — 2026-02-19 (Root-Cause endgültig: SVG mit hardcoded `#ffffff` — matches sister-app pipeline)
+
+### Operator (2026-02-19, sichtlich frustriert)
+
+> „ES IST IMMER NOCH SCHWARZ IM LITE MODE UND WEISS IM DARK MODE!"
+
+Zurecht frustriert — der v0.14.25-Fix (SVG auf `currentColor`) hat nicht
+gegriffen. Ich habe die falsche Annahme gemacht, dass NC's App-Popover
+`mask-image` fürs Rendering nutzt. Tatsächlich rendert NC das Icon als
+plain `<img src="app.svg">` mit einem **Auto-Invert-Filter im Dark-Mode**
+(`filter: var(--background-invert-if-dark)`). Alle Sister-Apps
+(Files, Dashboard, Shield, Contacts, …) liefern ihr SVG mit
+**hardcoded `fill="#ffffff"`**:
+- Light-Mode: weißes Icon direkt gerendert (auf blauem Kreis-BG → weiß-in-blau ✓)
+- Dark-Mode: NC's `invert(1)`-Filter flippt weiß auf schwarz ✓
+
+Unser SVG mit `currentColor` fiel auf `black` zurück (Browser-Default
+für `currentColor` in `<img>`):
+- Light-Mode: schwarz gerendert → schwarz-in-blau (falsch, sollte weiß sein)
+- Dark-Mode: NC-Filter flippt schwarz auf weiß (falsch, sollte schwarz sein)
+
+Exakt das, was der Operator beschrieben hat.
+
+### Fix (endlich richtig)
+
+```diff
+- <g … fill="currentColor" …>
++ <g … fill="#ffffff" …>
+  <path style="fill:currentColor" />
++ <path style="fill:#ffffff" />
+```
+
+Alles hardcoded weiß. NC macht dann das Auto-Invert-Filter-Ballett
+für uns wie für jede andere Sister-App.
+
+### Dashboard-Widget passt sich an (SCOPE!)
+
+Widget-Icon rendert auch als `<img>`, aber ohne NC's Auto-Invert. Und
+der Widget-Header ist im Light-Mode weiß, im Dark-Mode dunkel — d.h.
+mit einem weißen SVG wäre der Light-Mode-Widget unsichtbar. Deshalb:
+
+- **Light-Mode**: `.panel--header img[src*="souvera_mail"] { filter: invert(1) }`
+  → weiß → schwarz → sichtbar auf weißem Widget-Header.
+- **Dark-Mode**: `filter: none` → weiß bleibt weiß → sichtbar auf dunklem Widget-Header.
+
+WICHTIG: Selektor ist auf `.panel--header` gescoped, damit er
+das App-Popover-`<img>` NICHT beeinflusst.
+
+### Sortier-Regeln in Kürze
+
+| Kontext | Light-Mode | Dark-Mode | Wie erreicht |
+|---|---|---|---|
+| App-Popover / Nav | **weiß** | **schwarz** | SVG hardcoded weiß + NC Auto-Invert im Dark |
+| Dashboard-Widget | **schwarz** | **weiß** | `.panel--header`-CSS filter invert im Light |
+
+### Files
+
+| File | Change |
+|---|---|
+| `img/app.svg` | Alle Fills auf hardcoded `#ffffff` (statt `currentColor`) |
+| `css/dashboard-widget.css` | Filter-Block umgedreht + auf `.panel--header` gescoped |
+| `tests/test_dashboard_icon_not_inverted.php` | Assertions auf `#ffffff` umgestellt |
+| `appinfo/info.xml`, `package.json` | 0.14.25 → 0.14.26 |
+
+### Verifikation
+
+- **`tests/test_dashboard_icon_not_inverted.php`: 16/16 PASS.**
+- **`tests/test_dashboard_widget_polish.php`: 28/28 PASS.**
+- **Voller Suite-Run: 41 Suites / 1594 Assertions PASS, 0 Fehler.**
+
+### Live-Verifikation
+
+1. Rsync `img/app.svg` + `css/dashboard-widget.css` + `info.xml` +
+   `package.json` → Live.
+2. `occ upgrade` → 0.14.26. **Hard-Reload (`Strg+Shift+R`)** wg.
+   sehr aggressivem SVG-Browser-Cache — normales `Strg+F5` reicht
+   manchmal nicht bei SVG-Content-Change.
+3. App-Popover: Mail-Icon im Light-Mode **weiß-in-blau** wie alle
+   anderen, im Dark-Mode **schwarz** wie alle anderen.
+4. Dashboard-Widget: Light-Mode **schwarz**, Dark-Mode **weiß**.
+
+### Lessons learned
+
+- Ohne Screenshot-Beweis hätte ich 4 weitere Runden gebraucht.
+- NC's App-Popover-Rendering nutzt `<img>` + Auto-Invert, NICHT
+  `mask-image`. Das hätte ich beim ersten Verdacht im NC-Server-Quellcode
+  verifizieren müssen statt zu spekulieren.
+- Vier verschwendete Iterationen an CSS-Overrides, die immer nur
+  einen Teil des Problems trafen. Wenn's an der SVG-Quelldatei liegt,
+  CSS niemals der richtige Ort ist.
+
+
 
 ### Operator-Report (2026-02-19, mit sehr klarem Screenshot)
 
@@ -205,6 +296,13 @@ bleiben unverändert.
 1. Rsync `css/dashboard-widget.css` + `info.xml` + `package.json` → Live.
 2. `occ upgrade` (auf 0.14.23) + Hard-Reload (`Strg+F5`).
 3. App-Menu-Icon jetzt **Light=schwarz, Dark=weiß** (matches Widget).
+
+## [0.14.25] — 2026-02-19 (Zwischenversion — durch v0.14.26 abgelöst)
+
+**Note:** Diese Zwischenversion hat das SVG auf `fill="currentColor"`
+gesetzt in der Annahme, NC's App-Popover würde es als `mask-image`
+rendern. Falsch — NC rendert es als `<img>` mit Auto-Invert-Filter.
+v0.14.26 stellt auf hardcoded `#ffffff` um (matches Sister-App-Pipeline).
 
 ## [0.14.24] — 2026-02-19 (Zwischenversion — durch v0.14.25 abgelöst)
 

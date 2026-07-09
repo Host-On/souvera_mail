@@ -30,24 +30,48 @@
  */
 
 /* ------------------------------------------------------------
- * 1) Dashboard widget icon — Light → black, Dark → white
+ * 1) Dashboard widget icon — Light → BLACK, Dark → WHITE
  * ------------------------------------------------------------
- * Match every <img> whose src points at our app.svg, no matter what
- * URL-normalisation NC applies (index.php prefix, /apps/, /apps-pkg/).
- * Light-mode is the default (currentColor → black via <img>), so we
- * only need to invert it in dark mode.
+ * v0.14.26 rewrite: The SVG now ships with hard-coded `fill="#ffffff"`
+ * (matches every other Souvera app icon, so NC's App-Popover renders
+ * white-in-blue automatically and its dark-mode auto-invert flips it
+ * to black — exactly like Files, Contacts, Shield, Dashboard, …).
+ *
+ * The Dashboard widget uses a DIFFERENT rendering path — it draws the
+ * icon as a plain `<img>` inside `.panel--header`, with NO auto-invert.
+ * That means without our filter:
+ *   • Light-mode widget header (white) + white SVG → invisible
+ *   • Dark-mode widget header (dark)  + white SVG → visible ✓
+ *
+ * So we invert the icon in LIGHT-mode only (bringing white → black,
+ * visible on the white header) and leave DARK-mode alone (white stays
+ * white on the dark header). This is the OPPOSITE polarity from
+ * v0.14.22-25 because the SVG source colour flipped.
+ *
+ * SCOPING: the selector is anchored on `.panel--header` (and the
+ * NC-Dashboard-specific `.dashboard-widget-header` variant) so we do
+ * NOT accidentally hit the App-Popover / App-Menu / Nav <img> —
+ * those live outside `.panel--header` and are handled by NC's own
+ * `background-invert-if-dark` filter machinery.
  */
-body[data-theme-dark] img[src*="/souvera_mail/img/app.svg"],
-body[data-theme-dark] img[src*="souvera_mail/app.svg"],
-body[data-theme-dark] .panel--header img[src*="souvera_mail"] {
+.panel--header img[src*="souvera_mail"],
+.dashboard-widget-header img[src*="souvera_mail"],
+[data-widget="souvera_mail-unread"] .panel--header img,
+[data-id="souvera_mail-unread"] .panel--header img {
     filter: invert(1) brightness(1.1);
 }
 
+body[data-theme-dark] .panel--header img[src*="souvera_mail"],
+body[data-theme-dark] .dashboard-widget-header img[src*="souvera_mail"],
+body[data-theme-dark] [data-widget="souvera_mail-unread"] .panel--header img,
+body[data-theme-dark] [data-id="souvera_mail-unread"] .panel--header img {
+    filter: none;
+}
+
 @media (prefers-color-scheme: dark) {
-    /* Pre-NC-theme-hydration fallback. Body class wins once NC boots. */
-    body:not([data-theme-light]) img[src*="/souvera_mail/img/app.svg"],
-    body:not([data-theme-light]) img[src*="souvera_mail/app.svg"] {
-        filter: invert(1) brightness(1.1);
+    body:not([data-theme-light]) .panel--header img[src*="souvera_mail"],
+    body:not([data-theme-light]) .dashboard-widget-header img[src*="souvera_mail"] {
+        filter: none;
     }
 }
 
