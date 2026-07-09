@@ -107,7 +107,20 @@ export default {
 					testResult.value = null
 					folderPreview.value = null
 					const conn = { host: form.host, port: Number(form.port), username: form.username, password: form.password, tls: !!form.tls }
-					const t1 = await props.migration.testConnection(conn)
+					// v0.14.13 — the backend may respond with 4xx / 5xx
+					// (HTTP-level failure) or with 200 + { ok: false }
+					// (logical failure). Both branches must surface to
+					// the user; without a `catch` here the exception
+					// path silently swallowed and the wizard appeared
+					// frozen. jsonFetch()'s Error carries the parsed
+					// `body.message` so we forward it verbatim.
+					let t1
+					try {
+						t1 = await props.migration.testConnection(conn)
+					} catch (e) {
+						testResult.value = { ok: false, error: e?.message || t('souvera_mail', 'Verbindung fehlgeschlagen.') }
+						return
+					}
 					if (!t1?.ok) {
 						testResult.value = { ok: false, error: t1?.message || t('souvera_mail', 'Verbindung fehlgeschlagen.') }
 						return

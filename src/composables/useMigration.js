@@ -1,22 +1,31 @@
 /**
  * Souvera Mail — Migration API composable (Vue 3, Composition API).
  *
- * Wraps the 7 backend endpoints under /apps/souvera_mail/migration/*.
- * The backend behaviour is unchanged from v0.14.10 — this composable
- * only exposes the same operations through a Vue-friendly reactive API.
+ * Adapter layer between the UI components (which use ergonomic keys
+ * like `username`, `tls`, `ok`) and the actual PHP backend contract
+ * (which uses `user`, `secure`, `{status:'ok', result:{...}}`).
  *
- *   loadState()           GET   /migration/welcome-state
- *   dismissWelcome()      POST  /migration/dismiss-welcome
- *   testConnection()      POST  /migration/test-connection
- *   listFolders()         POST  /migration/list-folders
- *   startMigration()      POST  /migration/start
- *   loadStatus()          GET   /migration/status
- *   dismissJob(jobId)     POST  /migration/dismiss/{jobId}
+ * Backend endpoints under /apps/souvera_mail/migration/*:
  *
- * All calls carry the NC `requesttoken` header for CSRF protection and
- * `credentials: 'same-origin'`.  Networking is a plain fetch() call —
- * @nextcloud/axios would add ~30 KB to the bundle and we don't need
- * anything beyond what fetch provides.
+ *   GET  /welcome-state       → {status:'ok', state:{
+ *                                    welcomeDismissed, activeJob,
+ *                                    lastJob, available}}
+ *   POST /dismiss-welcome     → {status:'ok'}
+ *   POST /test-connection     body: {host, port, user, password, secure}
+ *                             ok : {status:'ok', result:{success, message}}
+ *                             err: HTTP 4xx/5xx + {status:'error', message}
+ *   POST /list-folders        body: {host, port, user, password, secure}
+ *                             ok : {status:'ok', result:[…]}
+ *   POST /start               body: {host, port, user, password, secure}
+ *                             ok : 201 + {status:'ok', job:{…}}
+ *                             err: HTTP 4xx/5xx + {status:'error', message}
+ *   GET  /status              → {status:'ok', active:{…}|null, latest:{…}|null}
+ *   POST /dismiss/{jobId}     → {status:'ok'}
+ *
+ * This composable owns the key mapping in ONE place, so every Vue
+ * component can stay contract-agnostic.  A HTTP-non-2xx response
+ * raises via `jsonFetch()` with `err.message` sourced from
+ * `body.message` — callers handle it with try/catch.
  */
 
 import { ref, computed, readonly } from 'vue'
@@ -66,6 +75,17 @@ async function jsonFetch(url, init = {}) {
 	return body
 }
 
+// UI-shape (username / tls) → backend-shape (user / secure).
+function toBackendConn(uiConn) {
+	return {
+		host: uiConn.host,
+		port: Number(uiConn.port) || 993,
+		user: uiConn.username || uiConn.user || '',
+		password: uiConn.password || '',
+		secure: !!(uiConn.tls ?? uiConn.secure ?? true),
+	}
+}
+
 export function useMigration() {
 	// --- reactive state ----------------------------------------------
 	const available = ref(false)
@@ -102,10 +122,11 @@ export function useMigration() {
 		isLoading.value = true
 		try {
 			const body = await jsonFetch(generateUrl('/apps/souvera_mail/migration/welcome-state'))
-			available.value = !!body.available
-			dismissed.value = !!body.dismissed
-			activeJob.value = body.activeJob || null
-			lastJob.value = body.lastJob || null
+			const state = body?.state || {}
+			available.value = !!state.available
+			dismissed.value = !!state.welcomeDismissed
+			activeJob.value = state.activeJob || null
+			lastJob.value = state.lastJob || null
 			if (activeJob.value) {
 				status.value = activeJob.value
 			}
@@ -119,35 +140,72 @@ export function useMigration() {
 		dismissed.value = true
 	}
 
-	async function testConnection(payload) {
-		return jsonFetch(generateUrl('/apps/souvera_mail/migration/test-connection'), {
+	/**
+	 * Pre-flight IMAP source-cred check.
+	 *
+	 * @param {Object} uiConn — UI-shaped connection ({host, port, username, password, tls})
+	 * @returns {Promise<{ok: boolean, message: string}>}
+	 */
+	async function testConnection(uiConn) {
+		const body = await jsonFetch(generateUrl('/apps/souvera_mail/migration/test-connection'), {
 			method: 'POST',
-			body: JSON.stringify(payload),
+			body: JSON.stringify(toBackendConn(uiConn)),
 		})
+		const result = body?.result || {}
+		return {
+			ok: !!(result.success ?? true),
+			message: result.message || '',
+			raw: result,
+		}
 	}
 
-	async function listFolders(payload) {
-		return jsonFetch(generateUrl('/apps/souvera_mail/migration/list-folders'), {
+	/**
+	 * Pre-flight source folder inventory (best-effort, non-fatal in UI).
+	 *
+	 * @returns {Promise<{folders: Array, message_count: number, folder_count: number}>}
+	 */
+	async function listFolders(uiConn) {
+		const body = await jsonFetch(generateUrl('/apps/souvera_mail/migration/list-folders'), {
 			method: 'POST',
-			body: JSON.stringify(payload),
+			body: JSON.stringify(toBackendConn(uiConn)),
 		})
+		const result = body?.result
+		// provider.tools may return either an array of folder names, an
+		// object with { folders, message_count }, or a plain count. We
+		// normalise all three so the ConfirmScreen can render a preview.
+		if (Array.isArray(result)) {
+			return { folders: result, folder_count: result.length, message_count: 0 }
+		}
+		if (result && typeof result === 'object') {
+			const folders = Array.isArray(result.folders) ? result.folders : []
+			return {
+				folders,
+				folder_count: result.folder_count ?? folders.length,
+				message_count: result.message_count ?? 0,
+			}
+		}
+		return { folders: [], folder_count: 0, message_count: 0 }
 	}
 
-	async function startMigration(payload) {
+	async function startMigration(uiConn) {
 		const body = await jsonFetch(generateUrl('/apps/souvera_mail/migration/start'), {
 			method: 'POST',
-			body: JSON.stringify(payload),
+			body: JSON.stringify(toBackendConn(uiConn)),
 		})
-		activeJob.value = body.job || null
-		status.value = body.job || null
+		activeJob.value = body?.job || null
+		status.value = body?.job || null
 		return body
 	}
 
 	async function loadStatus() {
 		const body = await jsonFetch(generateUrl('/apps/souvera_mail/migration/status'))
-		status.value = body.job || null
-		if (isTerminal(status.value?.state)) {
-			lastJob.value = status.value
+		const next = body?.active || body?.latest || null
+		status.value = next
+		if (body?.active) {
+			activeJob.value = body.active
+		} else if (activeJob.value) {
+			// Transitioned from active → terminal.
+			lastJob.value = next
 			activeJob.value = null
 			stopPolling()
 		}

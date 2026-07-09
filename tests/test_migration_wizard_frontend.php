@@ -117,6 +117,17 @@ foreach ([
         "MigrationWizard registers the {$screen} component", $passes, $failures);
 }
 
+// v0.14.13 — onAdvance must catch testConnection() network errors
+// and surface them via testResult, else the wizard freezes silently
+// after a brief loading spinner (operator bug report 2026-02-19).
+ok((bool) preg_match('#let\s+t1[\s\S]{0,200}try\s*\{[\s\S]{0,200}testConnection#s', $src['wizard'])
+    || (bool) preg_match('#try\s*\{[\s\S]{0,200}await\s+.*testConnection#s', $src['wizard']),
+    'onAdvance wraps testConnection() in a try/catch (network errors go to testResult)',
+    $passes, $failures);
+ok(substr_count($src['wizard'], 'testResult.value = { ok: false') >= 2,
+    'onAdvance sets testResult={ok:false} for both HTTP-throw and logical-fail paths',
+    $passes, $failures);
+
 // ==============================================================
 // E — Composable exposes every backend endpoint + safety contract
 // ==============================================================
@@ -144,6 +155,36 @@ ok(str_contains($src['composable'], "credentials: 'same-origin'"),
 ok(str_contains($src['composable'], "'completed'")
     && str_contains($src['composable'], "'failed'"),
     'Terminal-state enum includes completed + failed', $passes, $failures);
+
+// v0.14.13 — Composable ↔ Backend contract alignment.
+// Backend (MigrationController.php) expects `user`/`secure` (not
+// `username`/`tls`), and wraps all IMAP-check responses as
+// `{status:'ok', result:{...}}`. Frontend keys stay ergonomic
+// (`username`, `tls`) — the composable maps them.
+ok(str_contains($src['composable'], "toBackendConn"),
+    "Composable owns the UI→backend key mapping in ONE place (toBackendConn)",
+    $passes, $failures);
+ok(str_contains($src['composable'], "user: uiConn.username")
+    || str_contains($src['composable'], "user: uiConn.username || uiConn.user"),
+    'toBackendConn maps `username` → `user` (backend contract)',
+    $passes, $failures);
+ok(str_contains($src['composable'], "secure: !!("),
+    'toBackendConn maps `tls` → `secure` (backend contract)',
+    $passes, $failures);
+ok(str_contains($src['composable'], "body?.state"),
+    "loadState() reads body.state.* (backend wraps in .state)",
+    $passes, $failures);
+ok(str_contains($src['composable'], "body?.result")
+    || str_contains($src['composable'], "body?.result || {}"),
+    "testConnection/listFolders unwrap body.result (backend contract)",
+    $passes, $failures);
+ok(str_contains($src['composable'], "body?.active")
+    && str_contains($src['composable'], "body?.latest"),
+    "loadStatus reads body.active || body.latest (not body.job)",
+    $passes, $failures);
+ok(str_contains($src['composable'], "welcomeDismissed"),
+    "loadState uses `welcomeDismissed` field name (backend contract)",
+    $passes, $failures);
 
 // ==============================================================
 // F — Poll cadence matches backend cache (5s frontend / 60s poller)
@@ -259,10 +300,10 @@ ok($nsPos !== false && $reqPos !== false && $nsPos < $reqPos,
 // ==============================================================
 // P — version bump + changelog markers
 // ==============================================================
-ok((bool) preg_match('#<version>0\.14\.(1[2-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
-    'info.xml version bumped to 0.14.12 (or later)', $passes, $failures);
-ok(str_contains($src['changelog'], '[0.14.12]'),
-    'CHANGELOG.md has a [0.14.12] section', $passes, $failures);
+ok((bool) preg_match('#<version>0\.14\.(1[3-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
+    'info.xml version bumped to 0.14.13 (or later)', $passes, $failures);
+ok(str_contains($src['changelog'], '[0.14.13]'),
+    'CHANGELOG.md has a [0.14.13] section', $passes, $failures);
 ok(stripos($src['changelog'], 'Vue 3') !== false
     || stripos($src['changelog'], 'Vue-3') !== false
     || stripos($src['changelog'], 'design system') !== false,

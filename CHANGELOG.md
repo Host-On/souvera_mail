@@ -6,6 +6,87 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.13] — 2026-02-19 (Hotfix: Composable ↔ Backend Contract-Alignment)
+
+### Fixed — „Spinner geht kurz, dann nichts" beim IMAP-Verbindungstest
+
+Operator-Report (2026-02-19): „Wenn ich auf ,Verbindung prüfen' klicke,
+hat der Button kurz einen Loading-Spinner, und das war's dann auch."
+
+**Root cause:** Der Vue-3-Umbau in v0.14.11 hat den Composable auf
+Basis einer **erfundenen** Backend-Response-Shape gebaut. Der echte
+Backend-Vertrag (`MigrationController.php`) sieht ganz anders aus:
+
+|                | Backend erwartet / liefert                | Frontend sendete / erwartete       |
+|----------------|-------------------------------------------|------------------------------------|
+| Request-Body   | `{host, port, user, password, secure}`    | `{host, port, username, password, tls}` |
+| Response-OK    | `{status:'ok', result:{success, message}}` | `{ok: true}`                       |
+| Welcome-State  | `body.state.{available,welcomeDismissed,activeJob,lastJob}` | `body.{available,dismissed,activeJob,lastJob}` |
+| Status         | `body.{active, latest}` (null / Job)      | `body.job`                         |
+
+Wirkung: Jeder POST /test-connection kam beim Backend mit fehlendem
+`user`-Feld an → 400 „user must not be empty". Der Composable
+`jsonFetch()` warf; die `onAdvance`-Funktion hatte keinen `catch`
+im test-connection-Zweig; die Exception wurde stumm geschluckt;
+`finally { isBusy = false }` beendete den Spinner — Wizard sah
+eingefroren aus.
+
+### Fix
+
+1. **`src/composables/useMigration.js`** — komplette Adapter-Schicht:
+   - Neue interne Funktion `toBackendConn(uiConn)` bildet
+     `{host, port, username, password, tls}` → `{host, port, user, password, secure}` ab.
+   - `testConnection()` unwrappt `body.result` und normalisiert
+     auf `{ok, message}`; Netzwerk-Errors werfen weiterhin.
+   - `listFolders()` unwrappt `body.result` und normalisiert zu
+     `{folders, folder_count, message_count}` — akzeptiert Array,
+     Objekt oder Zahl (provider.tools ist da wechselhaft).
+   - `startMigration()` liest `body.job` (unverändert korrekt).
+   - `loadState()` liest jetzt korrekt `body.state.{available,
+     welcomeDismissed, activeJob, lastJob}`.
+   - `loadStatus()` liest `body.active || body.latest` (statt
+     `body.job`) und erkennt den Active→Terminal-Übergang.
+
+2. **`src/components/MigrationWizard.vue`** — `onAdvance()` bekam
+   einen expliziten `try/catch` um `testConnection()`. HTTP-Errors
+   (400/500) landen jetzt sichtbar in der `NcNoteCard` unten am
+   Formular, statt still zu verschwinden. Die Message aus dem
+   Backend-`body.message` wird verbatim durchgereicht (z. B.
+   „user must not be empty; password must not be empty").
+
+3. **`tests/test_migration_wizard_frontend.php`** — +10 Assertions,
+   die den Backend-Contract dauerhaft pinnen: existiert
+   `toBackendConn`, mappt es `username→user` und `tls→secure`,
+   liest der Composable `body.state.*` (statt `body.*`),
+   unwrappt er `body.result`, liest er `body.active || body.latest`
+   (statt `body.job`), fängt `onAdvance` HTTP-Errors, setzt es
+   `testResult` mind. an zwei Stellen.
+
+### Files
+
+| File | Change |
+|---|---|
+| `src/composables/useMigration.js` | Adapter-Layer zwischen UI- und Backend-Shape |
+| `src/components/MigrationWizard.vue` | `onAdvance()`: expliziter try/catch für testConnection |
+| `tests/test_migration_wizard_frontend.php` | +10 Assertions als Contract-Lock |
+| `appinfo/info.xml`, `package.json` | Version-Bump 0.14.12 → 0.14.13 |
+
+### Verification
+
+- `yarn build` clean → 377 KB Bundle.
+- **`tests/test_migration_wizard_frontend.php`: 115 / 115 PASS** (war 106).
+- **Voller Suite-Run: 39 Suites / 1489 Assertions passing** (war 1480).
+
+### Live-Verifikation für Operator
+
+1. Rsync + `occ upgrade` → 0.14.13.
+2. Wizard aufrufen → IMAP-Daten eingeben → „Verbindung prüfen".
+3. **Bei erfolgreicher Verbindung**: Sprung auf ConfirmScreen mit
+   Ordner-Vorschau.
+4. **Bei Fehler** (falsche Credentials, unerreichbarer Server, …):
+   Sofort rote NcNoteCard mit der echten Backend-Fehlermeldung —
+   kein stiller Freeze mehr.
+
 ## [0.14.12b] — 2026-02-19 (Hotfix-über-Hotfix: `IL10N` app-scoped resolve)
 
 Nach dem 0.14.12-Deploy meldete der Operator im Nextcloud-Log:
