@@ -57,8 +57,11 @@ export default {
 	},
 	emits: ['close'],
 	setup(props) {
+		// v0.14.15 — backend contract uses `status` (top-level) and
+		// nested progress: { progress: {…}, queue: {…} }. See docblock
+		// in ProgressScreen.vue / MigrationJob::toApiArray().
 		const s = computed(() => props.migration.status.value || props.migration.lastJob.value || {})
-		const state = computed(() => s.value.state || 'completed')
+		const state = computed(() => s.value.status || 'completed')
 
 		const isSuccess = computed(() => state.value === 'completed')
 		const isFail = computed(() => state.value === 'failed' || state.value === 'cancelled')
@@ -76,11 +79,23 @@ export default {
 			return t('souvera_mail', 'Es gab ein Problem beim Übertragen der Mails. Bitte kontaktiere den Support mit den Fehler-Details unten.')
 		})
 
-		const messagesDone = computed(() => s.value.messages_done || 0)
-		const foldersDone = computed(() => s.value.folders_done || 0)
-		const duration = computed(() => s.value.duration || null)
+		const progressBlock = computed(() => s.value.progress?.progress || {})
+		const messagesDone = computed(() => Number(progressBlock.value.messagesDone) || 0)
+		const foldersDone = computed(() => Number(progressBlock.value.foldersDone) || 0)
+		const duration = computed(() => {
+			const started = Number(s.value.createdAt) || 0
+			const finished = Number(s.value.finishedAt) || 0
+			if (!started || !finished || finished < started) return null
+			const totalSec = finished - started
+			const h = Math.floor(totalSec / 3600)
+			const m = Math.floor((totalSec % 3600) / 60)
+			const sec = totalSec % 60
+			if (h > 0) return `${h} h ${m} min`
+			if (m > 0) return `${m} min ${sec} s`
+			return `${sec} s`
+		})
 		const hasStats = computed(() => messagesDone.value || foldersDone.value || duration.value)
-		const errorDetail = computed(() => s.value.error_message || s.value.error || '')
+		const errorDetail = computed(() => s.value.error || '')
 
 		return { state, isSuccess, isFail, stateClass, stateIcon, title, subtitle, messagesDone, foldersDone, duration, hasStats, errorDetail }
 	},

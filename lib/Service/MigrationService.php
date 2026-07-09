@@ -309,6 +309,20 @@ class MigrationService
     }
 
     /**
+     * Variant of getActiveJobForUser() that returns the MigrationJob
+     * entity itself (or null) so the controller can pass it directly
+     * to refreshFromProvider() for the on-demand /status poll path.
+     */
+    public function findActiveJobForUser(string $userId): ?MigrationJob
+    {
+        try {
+            return $this->jobs->findActiveForUser($userId);
+        } catch (DoesNotExistException) {
+            return null;
+        }
+    }
+
+    /**
      * @return ?array<string, mixed>  toApiArray() or null
      */
     public function getLatestJobForUser(string $userId): ?array

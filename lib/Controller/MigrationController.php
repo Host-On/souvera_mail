@@ -204,6 +204,32 @@ class MigrationController extends Controller
         if ($this->userId === null) {
             return $this->error('unauthenticated', Http::STATUS_UNAUTHORIZED);
         }
+        // v0.14.15 — on-demand refresh from provider.tools when the
+        // cached row is older than 10s.  Without this the frontend
+        // would sit on "Warteschlange …" for up to 60s because the
+        // MigrationPoller cron only ticks once a minute.  The service
+        // already de-dupes concurrent refreshes and swallows upstream
+        // flakes, so it's safe to call on every /status hit for a
+        // pending row.
+        try {
+            $jobRow = $this->migrations->findActiveJobForUser($this->userId);
+            if ($jobRow !== null) {
+                $ageSec = \time() - (int) $jobRow->getUpdatedAt();
+                if ($ageSec >= 10) {
+                    $active = $this->migrations->refreshFromProvider($jobRow);
+                } else {
+                    $active = $jobRow->toApiArray();
+                }
+                return new DataResponse(['status' => 'ok', 'active' => $active, 'latest' => null]);
+            }
+        } catch (\Throwable $e) {
+            $this->logger->info(
+                'Souvera Mail: /status on-demand refresh errored uid=' . $this->userId
+                . ': ' . $e->getMessage(),
+                ['app' => 'souvera_mail']
+            );
+            // Fall through to the cached-array path below.
+        }
         $active = $this->migrations->getActiveJobForUser($this->userId);
         if ($active !== null) {
             return new DataResponse(['status' => 'ok', 'active' => $active, 'latest' => null]);

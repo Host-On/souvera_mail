@@ -6,6 +6,119 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.15] — 2026-02-19 (Hotfix: Backend-Contract-Alignment im Progress + on-demand Poll)
+
+### Operator-Report
+
+Screenshot: „Import läuft" → „Warteschlange …" bei 2 %. Frage:
+
+> „Bekommst du von der API keine Antwort das ein Worker läuft?!"
+
+**Zwei getrennte Bugs auf einmal:**
+
+**Bug #1: Frontend liest falsche Feldnamen**
+
+Der echte `MigrationJob::toApiArray()`-Contract im Backend ist:
+
+```json
+{
+  "id": 42,
+  "status": "pending" | "running" | "completed" | "failed" | "dismissed",
+  "progress": {
+    "progress": { "foldersDone": 0, "foldersTotal": 52,
+                   "messagesDone": 0, "messagesTotal": 8432,
+                   "currentFolder": "INBOX" },
+    "queue":    { "position": 3, "totalInQueue": 5 }
+  },
+  "error": null,
+  "createdAt": …, "updatedAt": …, "finishedAt": null,
+  "isActive": true, "isTerminal": false
+}
+```
+
+Mein Composable + ProgressScreen + TerminalScreen aus v0.14.11 lasen:
+
+- `state` (existiert nicht — richtig: `status`)
+- `messages_total` / `messages_done` (snake_case — richtig: `progress.progress.messagesTotal/messagesDone` camelCase nested)
+- `folders_total` / `folders_done` (dito)
+- `queue_position` (richtig: `progress.queue.position`)
+- `current_folder` (richtig: `progress.progress.currentFolder`)
+
+Effekt: Selbst wenn der MigrationPoller frische Provider-Daten holt,
+zeigt der ProgressScreen `undefined %` und „Warteschlange …" — weil
+alle Werte am falschen Pfad gelesen werden.
+
+**Bug #2: 60-Sekunden-Cron-Lücke**
+
+Der `MigrationPoller`-Cron aktualisiert Job-Status nur alle 60 s aus
+provider.tools. Frisch gestartete Jobs bleiben bis zu 60 s auf
+`pending` in der DB, obwohl der provider.tools-Worker vielleicht
+schon aktiv arbeitet. Der Nutzer sieht bis zu einer Minute lang
+„Warteschlange …" ohne Fortschritt.
+
+### Fix
+
+**Frontend:**
+- `src/composables/useMigration.js`: `jobState`-Computed liest jetzt
+  `status.value?.status` (nicht `.state`).
+- `src/components/screens/ProgressScreen.vue`: komplette Umstellung
+  auf die verschachtelte `progress.progress.{…}` / `progress.queue.{…}`-
+  Struktur mit camelCase. Neue Meta-Zeile zeigt live „Ordner: 3 / 52 ·
+  Aktueller Ordner: INBOX". Bar-Progress rechnet erst aus Messages,
+  fällt auf Folders zurück wenn Message-Zählung noch nicht bekannt.
+- `src/components/screens/TerminalScreen.vue`: dito für `status`,
+  `progress.progress.messagesDone`, `progress.progress.foldersDone`.
+  Duration wird jetzt aus `createdAt`/`finishedAt` berechnet
+  (Backend liefert kein `duration`-Feld).
+
+**Backend:**
+- **`MigrationController::status()`**: neuer On-Demand-Poll-Pfad.
+  Wenn ein aktiver Job existiert UND `updated_at` älter als 10 s ist,
+  ruft der Controller `MigrationService::refreshFromProvider($job)`
+  synchron auf und liefert den frischen Status zurück. Die 60 s-Cron-
+  Lücke schließt sich damit auf ein Poll-Intervall (5 s Frontend).
+  Bei einem Upstream-Flake fällt der Code auf den gecachten
+  DB-Zustand zurück — kein UI-Freeze.
+- **`MigrationService::findActiveJobForUser()`**: neuer Wrapper der
+  die `MigrationJob`-Entity direkt zurückgibt (statt `toApiArray`).
+  Der Controller braucht die Entity um `refreshFromProvider()`
+  aufzurufen.
+- `refreshFromProvider()` selbst ist **unangetastet** — die Methode
+  war explizit für diesen zweiten Aufrufer vorgesehen (Docblock
+  vom v0.14.9-Autor: „Called by both the MigrationPoller background
+  job (all active rows) and by the controller status endpoint when
+  the cached row is older than …").
+
+### Files
+
+| File | Change |
+|---|---|
+| `src/composables/useMigration.js` | `jobState`: `.state` → `.status` |
+| `src/components/screens/ProgressScreen.vue` | Kompletter Rewrite auf echten Backend-Contract |
+| `src/components/screens/TerminalScreen.vue` | Setup-Block auf echten Backend-Contract |
+| `lib/Controller/MigrationController.php` | On-Demand-Refresh in `status()` bei stale row |
+| `lib/Service/MigrationService.php` | Neuer `findActiveJobForUser()`-Entity-Wrapper |
+| `tests/test_migration_wizard_frontend.php` | +14 Assertions (nested Progress-Contract + On-Demand-Poll) |
+| `appinfo/info.xml`, `package.json` | Version 0.14.14 → 0.14.15 |
+
+### Verifikation
+
+- `yarn build` clean → 400 KB Bundle.
+- `php -l` clean auf Controller + Service.
+- **`tests/test_migration_wizard_frontend.php`: 148 / 148 PASS** (war 134).
+- **Voller Suite-Run: 39 Suites / 1522 Assertions passing** (war 1508).
+
+### Live-Verifikation
+
+1. Rsync + `occ upgrade` → 0.14.15
+2. Wizard komplett durchklicken bis Progress-Screen
+3. **Innerhalb von <15 Sekunden** wechselt der Screen von „Warteschlange …"
+   auf „Import läuft …" mit realem Prozentwert (aus dem live-Poll)
+4. Zeile „Ordner: 3 / 52 · Aktueller Ordner: INBOX" erscheint sobald
+   provider.tools den ersten Ordner meldet
+5. TerminalScreen zeigt am Ende „Übertragene Nachrichten: 8 432 ·
+   Ordner: 52 · Dauer: 4 min 12 s"
+
 ## [0.14.14] — 2026-02-19 (Neues Feature: Folder-Mapping-Screen + folders-Contract-Fix)
 
 ### Operator-Report

@@ -210,6 +210,54 @@ ok(str_contains($src['composable'], 'folders }'),
     'startMigration body includes the folders array',
     $passes, $failures);
 
+// v0.14.15 — Frontend reads the ACTUAL MigrationJob::toApiArray()
+// shape, not the invented one from v0.14.11:
+//   status  (top-level, camelCase, NOT `.state`)
+//   progress.progress.{messagesDone, messagesTotal, foldersDone, foldersTotal}
+//   progress.queue.{position, totalInQueue}
+ok(str_contains($src['composable'], "status.value?.status"),
+    'jobState computed reads status.value?.status (top-level, matches backend)',
+    $passes, $failures);
+$progressSrc = (string) @file_get_contents('/app/src/components/screens/ProgressScreen.vue');
+$terminalSrc = (string) @file_get_contents('/app/src/components/screens/TerminalScreen.vue');
+ok(str_contains($progressSrc, 'job.value?.progress?.progress')
+    && str_contains($progressSrc, 'job.value?.progress?.queue'),
+    'ProgressScreen reads the nested progress.progress and progress.queue blocks',
+    $passes, $failures);
+foreach (['messagesDone', 'messagesTotal', 'foldersDone', 'foldersTotal'] as $k) {
+    ok(str_contains($progressSrc, $k),
+        "ProgressScreen reads camelCase `{$k}` (backend field name)",
+        $passes, $failures);
+}
+ok(!preg_match('/[.\[\'"](messages_total|folders_total|queue_position)[\'"\]]/', $progressSrc),
+    'ProgressScreen no longer uses invented snake_case field names',
+    $passes, $failures);
+ok(str_contains($terminalSrc, 'status ||')
+    || str_contains($terminalSrc, 's.value.status'),
+    'TerminalScreen reads job.status (top-level, camelCase)',
+    $passes, $failures);
+ok(!str_contains($terminalSrc, 'messages_done')
+    && !str_contains($terminalSrc, 'folders_done'),
+    'TerminalScreen no longer uses invented snake_case field names',
+    $passes, $failures);
+
+// v0.14.15 — /status must trigger an on-demand refresh from
+// provider.tools when the cached row is stale (>=10s), so the
+// wizard doesn't sit on "Warteschlange…" for up to 60 seconds
+// waiting on the MigrationPoller cron.
+$controllerSrc = (string) file_get_contents('/app/lib/Controller/MigrationController.php');
+$serviceSrc    = (string) file_get_contents('/app/lib/Service/MigrationService.php');
+ok(str_contains($controllerSrc, 'refreshFromProvider')
+    && str_contains($controllerSrc, 'findActiveJobForUser'),
+    'MigrationController::status() calls refreshFromProvider on stale active rows',
+    $passes, $failures);
+ok((bool) preg_match('#\$ageSec\s*=\s*\\\\?time\(\)\s*-\s*\(int\)\s*\$jobRow->getUpdatedAt#', $controllerSrc),
+    'MigrationController::status() checks row age before refreshing',
+    $passes, $failures);
+ok(str_contains($serviceSrc, 'public function findActiveJobForUser'),
+    'MigrationService exposes findActiveJobForUser() (entity variant) for the controller',
+    $passes, $failures);
+
 // v0.14.14 — Backend (MigrationController.start) MUST accept and
 // forward `folders`; MigrationService.startForUser signature MUST
 // carry it into ProviderToolsClient::startMigration.
@@ -361,10 +409,10 @@ ok($nsPos !== false && $reqPos !== false && $nsPos < $reqPos,
 // ==============================================================
 // P — version bump + changelog markers
 // ==============================================================
-ok((bool) preg_match('#<version>0\.14\.(1[4-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
-    'info.xml version bumped to 0.14.14 (or later)', $passes, $failures);
-ok(str_contains($src['changelog'], '[0.14.14]'),
-    'CHANGELOG.md has a [0.14.14] section', $passes, $failures);
+ok((bool) preg_match('#<version>0\.14\.(1[5-9]|[2-9]\d|\d{3,})</version>#', $src['info']),
+    'info.xml version bumped to 0.14.15 (or later)', $passes, $failures);
+ok(str_contains($src['changelog'], '[0.14.15]'),
+    'CHANGELOG.md has a [0.14.15] section', $passes, $failures);
 ok(stripos($src['changelog'], 'Vue 3') !== false
     || stripos($src['changelog'], 'Vue-3') !== false
     || stripos($src['changelog'], 'design system') !== false,

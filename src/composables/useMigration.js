@@ -100,7 +100,11 @@ export function useMigration() {
 
 	// --- derived views ----------------------------------------------
 	const hasActive = computed(() => activeJob.value !== null)
-	const jobState = computed(() => status.value?.state || activeJob.value?.state || null)
+	// v0.14.15 — backend field is `status` (top-level), NOT `state`.
+	// `progress` is a nested object (see MigrationJob::toApiArray).
+	// The provider.tools upstream status ('pending'/'running'/…) is
+	// mirrored 1:1 onto our DB `status` column by refreshFromProvider.
+	const jobState = computed(() => status.value?.status || activeJob.value?.status || null)
 	const pillState = computed(() => {
 		const s = jobState.value
 		if (s === 'running' || s === 'pending') return 'running'
