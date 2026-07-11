@@ -69,12 +69,56 @@
         color: var(--color-main-text, #222);
 }
 
-/* SELECTED — the money selector. Left accent bar + light-blue tint. */
-.b-folders li a.selectable.selected {
-        background-color: var(--color-primary-element-light, #e7f1fa);
-        border-left-color: var(--color-primary-element, #0693e3);
-        color: var(--color-main-text, #222);
+/* SELECTED — the money selector. Left accent bar + light-blue tint.
+   v0.14.29: `!important` on `border-left` because the engine's own
+   rule (`.b-folders li a { border-left: 3px solid transparent }` in
+   static/css/app.css:1780) matches with equal specificity and the
+   engine ships later depending on CSS-load order in a subset of NC
+   themes (operator screenshot 2026-02-19: hellblaue Pill sichtbar
+   aber KEIN Balken). Using the shorthand + !important pins it. */
+.b-folders li a.selectable.selected,
+.b-folders li a.selected {
+        background-color: var(--color-primary-element-light, #e7f1fa) !important;
+        border-left: 4px solid var(--color-primary-element, #0693e3) !important;
+        color: var(--color-main-text, #222) !important;
         font-weight: 600;
+}
+
+/* -----------------------------------------------------------------
+ * UNREAD-ROLLUP for collapsed namespace headers (v0.14.29).
+ * -----------------------------------------------------------------
+ * Operator report (2026-02-19, with screenshot): when the "Geteilte
+ * Postfächer" (Shared Folders) namespace is collapsed, you can't see
+ * that a sub-folder inside it has unread mail — the badge only
+ * appears once you expand the tree. Terrible UX.
+ *
+ * Snappymail already flags parents-of-unread with the `.unread-sub`
+ * class (see MailFolderListItem.html template + engine app.css:1813
+ * where it currently only sets `font-weight: bold` — invisible on an
+ * already-bold namespace header). We turn that into a proper NC-blue
+ * bullet, BUT only when the child <ul> is `.collapsed` — otherwise
+ * the user is already looking at the per-folder badges and the extra
+ * dot on the parent is noise.
+ *
+ * `:has()` is supported in Chromium 105+ (Aug 2022) and Firefox 121+
+ * (Dec 2023). NC 33+ requires modern browsers already, so the fallback
+ * (no dot when :has is unavailable) degrades gracefully — old-browser
+ * users just see what they saw before.
+ * -----------------------------------------------------------------
+ */
+.b-folders li:has(> ul.collapsed) > a.unread-sub::before {
+        content: "";
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: var(--color-primary-element, #0693e3);
+        margin-right: 8px;
+        vertical-align: middle;
+        /* Small shadow so the dot pops against the light-blue selected
+           background too (edge case: the operator selects a collapsed
+           namespace parent that has unread children). */
+        box-shadow: 0 0 0 1px var(--color-main-background, #fff);
 }
 
 /* Selected + focused (keyboard nav) — bring the accent forward. */

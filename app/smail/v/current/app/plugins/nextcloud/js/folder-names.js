@@ -39,210 +39,232 @@
  * the single source of truth.)
  */
 (rl => {
-	'use strict';
+        'use strict';
 
-	if (!rl || !rl.i18n) {
-		return;
-	}
+        if (!rl || !rl.i18n) {
+                return;
+        }
 
-	// -----------------------------------------------------------------
-	// Translation tables — derived once from the engine's i18n loader.
-	// rl.i18n('FOLDERS/X') returns the localised string OR the bare
-	// key if the language file has no entry; we filter those out.
-	// -----------------------------------------------------------------
-	const trans = key => {
-		const v = rl.i18n('FOLDERS/' + key);
-		return (v && v !== 'FOLDERS/' + key) ? v : null;
-	};
-	const NAMESPACE_LABEL = trans('SHARED_NAMESPACE') || 'Shared mailboxes';
-	const OTHER_USERS_LABEL = trans('OTHER_USERS_NAMESPACE') || 'Other mailboxes';
+        // -----------------------------------------------------------------
+        // Translation tables — derived once from the engine's i18n loader.
+        // rl.i18n('FOLDERS/X') returns the localised string OR the bare
+        // key if the language file has no entry; we filter those out.
+        // -----------------------------------------------------------------
+        const trans = key => {
+                const v = rl.i18n('FOLDERS/' + key);
+                return (v && v !== 'FOLDERS/' + key) ? v : null;
+        };
+        const NAMESPACE_LABEL = trans('SHARED_NAMESPACE') || 'Shared mailboxes';
+        const OTHER_USERS_LABEL = trans('OTHER_USERS_NAMESPACE') || 'Other mailboxes';
 
-	// IMAP-leaf-name → localised-display-name. Keys are uppercased + the
-	// IMAP separator stripped so "Sent" / "sent" / "Sent Items" / "SENT"
-	// all hit the same translation. Values fall back to the bare leaf if
-	// no translation exists (e.g. the locale file is incomplete).
-	const LEAF_MAP = new Map();
-	const addLeaf = (variants, key) => {
-		const v = trans(key);
-		if (!v) return;
-		variants.forEach(s => LEAF_MAP.set(s.toUpperCase(), v));
-	};
-	addLeaf(['Inbox'], 'INBOX');
-	addLeaf(['Sent'], 'SENT');
-	addLeaf(['Sent Items', 'Sent Messages', 'Sent Mail'], 'SENT_ITEMS');
-	addLeaf(['Drafts'], 'DRAFTS');
-	addLeaf(['Trash'], 'TRASH');
-	addLeaf(['Deleted Items', 'Deleted Messages', 'Deleted'], 'DELETED_ITEMS');
-	addLeaf(['Archive'], 'ARCHIVE');
-	addLeaf(['Outbox'], 'OUTBOX');
-	// We deliberately keep Junk/Spam IN the map so the localised display
-	// name renders correctly in the rare case the operator chooses NOT
-	// to hide them (override below).
-	addLeaf(['Junk', 'Junk E-mail', 'Junk Email'], 'JUNK');
-	addLeaf(['Spam'], 'SPAM');
+        // IMAP-leaf-name → localised-display-name. Keys are uppercased + the
+        // IMAP separator stripped so "Sent" / "sent" / "Sent Items" / "SENT"
+        // all hit the same translation. Values fall back to the bare leaf if
+        // no translation exists (e.g. the locale file is incomplete).
+        const LEAF_MAP = new Map();
+        const addLeaf = (variants, key) => {
+                const v = trans(key);
+                if (!v) return;
+                variants.forEach(s => LEAF_MAP.set(s.toUpperCase(), v));
+        };
+        addLeaf(['Inbox'], 'INBOX');
+        addLeaf(['Sent'], 'SENT');
+        addLeaf(['Sent Items', 'Sent Messages', 'Sent Mail'], 'SENT_ITEMS');
+        addLeaf(['Drafts'], 'DRAFTS');
+        addLeaf(['Trash'], 'TRASH');
+        addLeaf(['Deleted Items', 'Deleted Messages', 'Deleted'], 'DELETED_ITEMS');
+        addLeaf(['Archive'], 'ARCHIVE');
+        addLeaf(['Outbox'], 'OUTBOX');
+        // We deliberately keep Junk/Spam IN the map so the localised display
+        // name renders correctly in the rare case the operator chooses NOT
+        // to hide them (override below).
+        addLeaf(['Junk', 'Junk E-mail', 'Junk Email'], 'JUNK');
+        addLeaf(['Spam'], 'SPAM');
 
-	const JUNK_LEAVES = new Set(['JUNK', 'JUNK E-MAIL', 'JUNK EMAIL', 'SPAM']);
+        const JUNK_LEAVES = new Set(['JUNK', 'JUNK E-MAIL', 'JUNK EMAIL', 'SPAM']);
 
-	// -----------------------------------------------------------------
-	// Helpers
-	// -----------------------------------------------------------------
+        // -----------------------------------------------------------------
+        // Helpers
+        // -----------------------------------------------------------------
 
-	/** True if the given full IMAP path ends with a Spam/Junk leaf. */
-	const isJunkPath = fullName => {
-		if (!fullName) return false;
-		const parts = String(fullName).split(/[\/\\.]/);
-		const leaf = parts[parts.length - 1] || '';
-		return JUNK_LEAVES.has(leaf.toUpperCase());
-	};
+        /** True if the given full IMAP path ends with a Spam/Junk leaf. */
+        const isJunkPath = fullName => {
+                if (!fullName) return false;
+                const parts = String(fullName).split(/[\/\\.]/);
+                const leaf = parts[parts.length - 1] || '';
+                return JUNK_LEAVES.has(leaf.toUpperCase());
+        };
 
-	/** Extract the leaf portion of an IMAP full name. */
-	const leafOf = fullName => {
-		if (!fullName) return '';
-		const parts = String(fullName).split(/[\/\\.]/);
-		return parts[parts.length - 1] || '';
-	};
+        /** Extract the leaf portion of an IMAP full name. */
+        const leafOf = fullName => {
+                if (!fullName) return '';
+                const parts = String(fullName).split(/[\/\\.]/);
+                return parts[parts.length - 1] || '';
+        };
 
-	/**
-	 * Patch a single Folder observable. We replace the `name` observable's
-	 * return value, NOT the underlying `fullName` — anything that needs
-	 * the IMAP path (compose, fetch, …) still gets the unmodified path.
-	 */
-	const patchFolder = folder => {
-		if (!folder || folder.__svPatched) return;
-		try {
-			const fullName = folder.fullName || folder.FullName || '';
-			const leaf = leafOf(fullName).toUpperCase();
-			const translated = LEAF_MAP.get(leaf);
+        /**
+         * Patch a single Folder observable. We replace the `name` observable's
+         * return value, NOT the underlying `fullName` — anything that needs
+         * the IMAP path (compose, fetch, …) still gets the unmodified path.
+         */
+        const patchFolder = folder => {
+                if (!folder || folder.__svPatched) return;
+                try {
+                        const fullName = folder.fullName || folder.FullName || '';
+                        const leaf = leafOf(fullName).toUpperCase();
+                        const translated = LEAF_MAP.get(leaf);
 
-			if (translated && typeof folder.name === 'function') {
-				const original = folder.name();
-				if (original && original.toUpperCase() === leaf) {
-					folder.name(translated);
-				}
-			}
+                        if (translated && typeof folder.name === 'function') {
+                                const original = folder.name();
+                                if (original && original.toUpperCase() === leaf) {
+                                        folder.name(translated);
+                                }
+                        }
 
-			// Mark Junk folders so CSS can hide them. We use both a
-			// CSS class on the folder model (engine renders it on
-			// the <li>) and a Knockout-friendly observable when the
-			// engine exposes one. Anything that wraps this in a
-			// system-folder lookup will still find the original path.
-			if (isJunkPath(fullName)) {
-				folder.__svJunk = true;
-				if (typeof folder.collapsed === 'function') {
-					folder.collapsed(true);
-				}
-			}
+                        // v0.14.29 — namespace-root header translation via the
+                        // Knockout observable (NOT via DOM). Stalwart surfaces
+                        // the shared-namespace as a bare pseudo-folder whose
+                        // fullName / name is literally "Shared Folders" (no
+                        // leaf separator). The engine renders it via a Knockout
+                        // text-node (`<!-- ko text: name -->`) inside the <a>
+                        // — no `.folder-name` wrapper exists, so the DOM
+                        // selector-based fallback in applyJunkDOMMarks never
+                        // hits. Patching `folder.name()` is the only reliable
+                        // hook.
+                        const normalizedFN = fullName.replace(/[\/\\]+$/, '').trim();
+                        if (typeof folder.name === 'function') {
+                                if (/^shared( folders)?$/i.test(normalizedFN)) {
+                                        folder.name(NAMESPACE_LABEL);
+                                        folder.__svHeader = true;
+                                } else if (/^other users?$/i.test(normalizedFN)) {
+                                        folder.name(OTHER_USERS_LABEL);
+                                        folder.__svHeader = true;
+                                }
+                        }
 
-			folder.__svPatched = true;
-		} catch (e) {
-			/* defensive: never break the folder list because of us */
-		}
 
-		// Recurse into subfolders if the model exposes them.
-		const subs = (folder.subFolders && folder.subFolders()) || folder.children || [];
-		try {
-			(typeof subs.forEach === 'function' ? subs : []).forEach(patchFolder);
-		} catch (e) { /* noop */ }
-	};
+                        // Mark Junk folders so CSS can hide them. We use both a
+                        // CSS class on the folder model (engine renders it on
+                        // the <li>) and a Knockout-friendly observable when the
+                        // engine exposes one. Anything that wraps this in a
+                        // system-folder lookup will still find the original path.
+                        if (isJunkPath(fullName)) {
+                                folder.__svJunk = true;
+                                if (typeof folder.collapsed === 'function') {
+                                        folder.collapsed(true);
+                                }
+                        }
 
-	const patchAllFolders = () => {
-		try {
-			const store = rl.app && rl.app.folderList;
-			const flat = (rl.app && typeof rl.app.foldersListWithSingleInboxRootFolder === 'function')
-				? rl.app.foldersListWithSingleInboxRootFolder()
-				: null;
-			if (flat && typeof flat.forEach === 'function') {
-				flat.forEach(patchFolder);
-			} else if (store && typeof store.forEach === 'function') {
-				store.forEach(patchFolder);
-			}
-		} catch (e) {
-			/* engine state not ready yet — caller re-tries */
-		}
-	};
+                        folder.__svPatched = true;
+                } catch (e) {
+                        /* defensive: never break the folder list because of us */
+                }
 
-	// -----------------------------------------------------------------
-	// CSS — hide Junk/Spam folders globally
-	// -----------------------------------------------------------------
-	const css = document.createElement('style');
-	css.textContent = `
-		/* Hide every folder row marked as Junk/Spam by patchFolder().
-		   We target the engine's rendered <li> by data-attribute we
-		   inject below + a fallback that walks for the IMAP path. */
-		li[data-folder-junk="1"] { display: none !important; }
-	`;
-	document.head.appendChild(css);
+                // Recurse into subfolders if the model exposes them.
+                const subs = (folder.subFolders && folder.subFolders()) || folder.children || [];
+                try {
+                        (typeof subs.forEach === 'function' ? subs : []).forEach(patchFolder);
+                } catch (e) { /* noop */ }
+        };
 
-	// Walk the rendered DOM and add the data-attribute to any folder
-	// row whose engine-bound full-name ends with a Junk leaf. The
-	// engine uses `data-imap-full-name` on the folder <li>.
-	const applyJunkDOMMarks = () => {
-		document.querySelectorAll('li[data-imap-full-name]').forEach(li => {
-			const fn = li.getAttribute('data-imap-full-name') || '';
-			if (isJunkPath(fn)) {
-				li.setAttribute('data-folder-junk', '1');
-			}
-			// Translate the namespace header if the row is the bare
-			// "Shared Folders" / "Other Users" prefix.
-			const leaf = leafOf(fn).toUpperCase();
-			if (fn && !fn.includes('/') && (fn === 'Shared Folders' || fn === 'Shared')) {
-				const labelEl = li.querySelector('.folder-name, [data-bind*="text: name"]');
-				if (labelEl && !labelEl.__svHeader) {
-					labelEl.textContent = NAMESPACE_LABEL;
-					labelEl.__svHeader = true;
-				}
-			} else if (fn === 'Other Users') {
-				const labelEl = li.querySelector('.folder-name, [data-bind*="text: name"]');
-				if (labelEl && !labelEl.__svHeader) {
-					labelEl.textContent = OTHER_USERS_LABEL;
-					labelEl.__svHeader = true;
-				}
-			}
-			// Translate the leaf name if it's a known English IMAP name.
-			const translated = LEAF_MAP.get(leaf);
-			if (translated) {
-				const labelEl = li.querySelector('.folder-name, [data-bind*="text: name"]');
-				if (labelEl && !labelEl.__svLeaf) {
-					labelEl.textContent = translated;
-					labelEl.__svLeaf = true;
-				}
-			}
-		});
-	};
+        const patchAllFolders = () => {
+                try {
+                        const store = rl.app && rl.app.folderList;
+                        const flat = (rl.app && typeof rl.app.foldersListWithSingleInboxRootFolder === 'function')
+                                ? rl.app.foldersListWithSingleInboxRootFolder()
+                                : null;
+                        if (flat && typeof flat.forEach === 'function') {
+                                flat.forEach(patchFolder);
+                        } else if (store && typeof store.forEach === 'function') {
+                                store.forEach(patchFolder);
+                        }
+                } catch (e) {
+                        /* engine state not ready yet — caller re-tries */
+                }
+        };
 
-	// -----------------------------------------------------------------
-	// Re-run on folder-list updates. The engine doesn't expose a clean
-	// event so we settle for an idle interval that's cheap (~200 ms
-	// debounce) and a MutationObserver on the folder-list container.
-	// -----------------------------------------------------------------
-	const runAll = () => {
-		patchAllFolders();
-		applyJunkDOMMarks();
-	};
+        // -----------------------------------------------------------------
+        // CSS — hide Junk/Spam folders globally
+        // -----------------------------------------------------------------
+        const css = document.createElement('style');
+        css.textContent = `
+                /* Hide every folder row marked as Junk/Spam by patchFolder().
+                   We target the engine's rendered <li> by data-attribute we
+                   inject below + a fallback that walks for the IMAP path. */
+                li[data-folder-junk="1"] { display: none !important; }
+        `;
+        document.head.appendChild(css);
 
-	// First pass, then keep checking until the engine settles. After
-	// the engine is fully booted the MutationObserver below does the
-	// heavy lifting.
-	let bootTries = 0;
-	const bootTimer = setInterval(() => {
-		runAll();
-		if (++bootTries > 20) {
-			clearInterval(bootTimer);
-		}
-	}, 500);
+        // Walk the rendered DOM and add the data-attribute to any folder
+        // row whose engine-bound full-name ends with a Junk leaf. The
+        // engine uses `data-imap-full-name` on the folder <li>.
+        const applyJunkDOMMarks = () => {
+                document.querySelectorAll('li[data-imap-full-name]').forEach(li => {
+                        const fn = li.getAttribute('data-imap-full-name') || '';
+                        if (isJunkPath(fn)) {
+                                li.setAttribute('data-folder-junk', '1');
+                        }
+                        // Translate the namespace header if the row is the bare
+                        // "Shared Folders" / "Other Users" prefix.
+                        const leaf = leafOf(fn).toUpperCase();
+                        if (fn && !fn.includes('/') && (fn === 'Shared Folders' || fn === 'Shared')) {
+                                const labelEl = li.querySelector('.folder-name, [data-bind*="text: name"]');
+                                if (labelEl && !labelEl.__svHeader) {
+                                        labelEl.textContent = NAMESPACE_LABEL;
+                                        labelEl.__svHeader = true;
+                                }
+                        } else if (fn === 'Other Users') {
+                                const labelEl = li.querySelector('.folder-name, [data-bind*="text: name"]');
+                                if (labelEl && !labelEl.__svHeader) {
+                                        labelEl.textContent = OTHER_USERS_LABEL;
+                                        labelEl.__svHeader = true;
+                                }
+                        }
+                        // Translate the leaf name if it's a known English IMAP name.
+                        const translated = LEAF_MAP.get(leaf);
+                        if (translated) {
+                                const labelEl = li.querySelector('.folder-name, [data-bind*="text: name"]');
+                                if (labelEl && !labelEl.__svLeaf) {
+                                        labelEl.textContent = translated;
+                                        labelEl.__svLeaf = true;
+                                }
+                        }
+                });
+        };
 
-	addEventListener('DOMContentLoaded', runAll);
+        // -----------------------------------------------------------------
+        // Re-run on folder-list updates. The engine doesn't expose a clean
+        // event so we settle for an idle interval that's cheap (~200 ms
+        // debounce) and a MutationObserver on the folder-list container.
+        // -----------------------------------------------------------------
+        const runAll = () => {
+                patchAllFolders();
+                applyJunkDOMMarks();
+        };
 
-	const observer = new MutationObserver(() => {
-		runAll();
-	});
-	addEventListener('load', () => {
-		const target = document.getElementById('rl-folder-list')
-			|| document.querySelector('.b-folders, .folderList, #app')
-			|| document.body;
-		if (target) {
-			observer.observe(target, {childList: true, subtree: true});
-		}
-	});
+        // First pass, then keep checking until the engine settles. After
+        // the engine is fully booted the MutationObserver below does the
+        // heavy lifting.
+        let bootTries = 0;
+        const bootTimer = setInterval(() => {
+                runAll();
+                if (++bootTries > 20) {
+                        clearInterval(bootTimer);
+                }
+        }, 500);
+
+        addEventListener('DOMContentLoaded', runAll);
+
+        const observer = new MutationObserver(() => {
+                runAll();
+        });
+        addEventListener('load', () => {
+                const target = document.getElementById('rl-folder-list')
+                        || document.querySelector('.b-folders, .folderList, #app')
+                        || document.body;
+                if (target) {
+                        observer.observe(target, {childList: true, subtree: true});
+                }
+        });
 
 })(window.rl);

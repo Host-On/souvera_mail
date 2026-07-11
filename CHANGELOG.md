@@ -6,6 +6,103 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.29] — 2026-02-19 (Sidebar-Polish: blauer Balken robust · Unread-Rollup · Namespace-Übersetzung)
+
+### Operator-Report (2026-02-19, mit zwei Screenshots)
+
+> „1. sieht man bei den Shared Folders (was übrigens auch immer noch
+> nicht übersetzt ist?!) nicht wenn eine Ungelesene Mail da ist, erst
+> wenn man es komplett aufklappt — das ist NICHT gut!
+> 2. Fehlt immer noch die blaue markierung bei den aktiven Menu Punkten
+> (linkes Submenu/Ordner)"
+
+### Drei Fixes in einem Rollout
+
+**A) Blauer Accent-Bar links am aktiven Ordner — jetzt robust.**
+
+v0.14.20 hatte die Regel als `border-left-color: primary` gesetzt.
+Engine-CSS (`static/css/app.css:1780`) hat aber
+`.b-folders li a { border-left: 3px solid transparent }` mit gleicher
+Specificity → in manchen NC-Theme-CSS-Load-Reihenfolgen gewinnt die
+Engine-Regel und der Balken verschwindet.
+
+Fix: Shorthand + `!important` + zusätzliche Selektor-Variante
+`.b-folders li a.selected` (ohne `.selectable`), damit auch User-Sub-
+Folder ohne `canBeSelected`-Flag getroffen werden.
+
+```css
+.b-folders li a.selectable.selected,
+.b-folders li a.selected {
+    border-left: 4px solid var(--color-primary-element) !important;
+    …
+}
+```
+
+**B) Unread-Rollup auf zugeklappten Namespace-Headern.**
+
+Snappymail flaggt bereits Parents-of-Unread mit der Klasse
+`.unread-sub` (siehe `MailFolderListItem.html` Zeile 3) — nutzt sie
+aber nur für `font-weight: bold`, was auf ohnehin fetten Namespace-
+Headern unsichtbar bleibt. Wir zeigen jetzt einen kleinen NC-blauen
+Bullet als `::before` an, **aber nur** wenn der Child-`<ul>` als
+`.collapsed` markiert ist (`:has(> ul.collapsed)`):
+
+```css
+.b-folders li:has(> ul.collapsed) > a.unread-sub::before {
+    content: "";
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background-color: var(--color-primary-element);
+    margin-right: 8px;
+    …
+}
+```
+
+- Zugeklappt: NC-blauer Dot vor „Geteilte Postfächer" wenn drin unread ist.
+- Aufgeklappt: kein Dot (die Sub-Folder-Badges sind sichtbar → kein noise).
+- `:has()`-Support: Chromium 105+ (2022), Firefox 121+ (2023) — passt zu NC 33+.
+
+**C) „Shared Folders" → „Geteilte Postfächer" — Übersetzung greift jetzt.**
+
+`langs/de.json` hatte `SHARED_NAMESPACE: "Geteilte Postfächer"` schon
+lange. Aber der v0.14.20-Fallback `applyJunkDOMMarks()` suchte per
+`.folder-name`-CSS-Selektor — Snappymail rendert den Namen aber als
+Knockout-Text-Node (`<!-- ko text: name -->`) direkt im `<a>`, ohne
+`.folder-name`-Wrapper. Selektor traf nie.
+
+Fix: Übersetzung jetzt direkt auf der Knockout-Observable
+(`folder.name(NAMESPACE_LABEL)`) im `patchFolder()`-Weg. Regex-basiert
+(`/^shared( folders)?$/i`) tolerant gegenüber Case und Trailing-Slash-
+Variationen verschiedener IMAP-Implementierungen. Zusätzlich der
+„Other Users"-Namespace für Multi-User-Setups.
+
+### Files
+
+| File | Change |
+|---|---|
+| `app/smail/v/current/app/plugins/nextcloud/css/folder-nav.css` | `!important` + Rollup-Bullet |
+| `app/smail/v/current/app/plugins/nextcloud/js/folder-names.js` | Namespace-KO-Observable-Patch |
+| `tests/test_sidebar_polish_v14_29.php` | **Neu** — 12 Regression-Pins |
+| `appinfo/info.xml`, `package.json` | 0.14.28 → 0.14.29 |
+
+### Verifikation
+
+- `node --check` clean auf `folder-names.js`.
+- **`tests/test_sidebar_polish_v14_29.php`: alle Assertions PASS.**
+- **Voller Suite-Run: 42 Suites / 1600+ Assertions PASS, 0 Fehler.**
+
+### Live-Verifikation
+
+1. Rsync `app/smail/v/current/app/plugins/nextcloud/css/folder-nav.css`
+   + `.../js/folder-names.js` + `appinfo/info.xml` + `package.json` → Live.
+2. `occ upgrade` → 0.14.29. **`Strg+Shift+R`** wg. CSS/JS-Cache.
+3. Namespace-Header zeigt „Geteilte Postfächer" statt „Shared Folders".
+4. Zugeklappter Namespace mit unread Sub-Folder zeigt NC-blauen Dot.
+5. Aktiver Ordner (auch Sub-Folder unter Shared) hat **linken blauen
+   4-px-Balken**.
+
+
+
 ## [0.14.28] — 2026-02-19 (Fix: Item-Icons vor jeder Mail im Widget nutzen nun auch das schwarze SVG)
 
 ### Operator-Report (2026-02-19, mit Screenshot)

@@ -109,15 +109,17 @@ assertTrue(empty($noFallback),
 
 // ---------------------------------------------------------------
 // 5. The money selectors — selected state = blue bar + light-blue tint
+// (v0.14.29 combined the `.selectable.selected` and plain `.selected`
+// rules into one comma-list — regex tolerates both shapes.)
 // ---------------------------------------------------------------
 assertTrue((bool) preg_match(
-    '#\.b-folders li a\.selectable\.selected\s*\{[^}]*background-color\s*:\s*var\(--color-primary-element-light#s',
+    '#\.b-folders li a\.selectable\.selected[\s\S]{0,200}\{[^}]*background-color\s*:\s*var\(--color-primary-element-light#s',
     $css
 ), "selected row uses --color-primary-element-light as background",
     $passes, $failures);
 
 assertTrue((bool) preg_match(
-    '#\.b-folders li a\.selectable\.selected\s*\{[^}]*border-left-color\s*:\s*var\(--color-primary-element#s',
+    '#\.b-folders li a\.selectable\.selected[\s\S]{0,200}\{[^}]*border-left(?:-color)?\s*:\s*(?:4px solid )?var\(--color-primary-element#s',
     $css
 ), "selected row uses --color-primary-element as border-left accent colour",
     $passes, $failures);
