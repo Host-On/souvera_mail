@@ -103,7 +103,10 @@ class CURL extends \Smail\Engine\HTTP\Request
 			}
 			return new Response($request_url, $code, $this->response_headers, $this->response_body);
 		} finally {
-			\curl_close($c);
+			// PHP 8.0+: curl_close() is a no-op (the handle is freed
+			// when $c goes out of scope). PHP 8.5 emits E_DEPRECATED
+			// on every call. Unset makes the intent explicit.
+			unset($c);
 			$this->response_headers = array();
 			$this->response_body = '';
 			$this->streamed_bytes = 0;

@@ -6,6 +6,77 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.32] — 2026-02-19 (PHP 8.5 `curl_close()`-Deprecation entfernt)
+
+### Operator-Report (2026-02-19)
+
+> „evtl. ist es das: Function curl_close() is deprecated since 8.5, as
+> it has no effect since PHP 8.0 at …/souvera_central/lib/Service/
+> StalwartService.php#1013?"
+
+Der Operator sah diese Warnung im NC-Log und fragte, ob sie den 404
+verursacht. **Kurz: nein** — `E_DEPRECATED` ist ein Log-Eintrag, kein
+Fatal. Ein 404 kommt immer aus einer `Exception` / `Fatal Error` /
+Routing-Miss, nicht aus einer Deprecation. **Trotzdem** hat unsere
+Engine dieselbe Call-Site (`__doRequest()` finally-Block), also wird
+sie mit dem gleichen Log-Grund geflutet, sobald PHP 8.5 läuft. Fix
+in einem Schritt mit erledigt.
+
+### Ursache
+
+`curl_close()` ist seit PHP 8.0 ein No-Op (Handles werden automatisch
+freigegeben, sobald die Variable aus dem Scope fällt). PHP 8.5 hat
+den Deprecation-Marker aktiviert.
+
+### Fix (`app/smail/v/current/app/libraries/Smail/Engine/http/request/curl.php`)
+
+```diff
+- } finally {
+-     \curl_close($c);
++ } finally {
++     // PHP 8.0+: curl_close() is a no-op (the handle is freed
++     // when $c goes out of scope). PHP 8.5 emits E_DEPRECATED
++     // on every call. Unset makes the intent explicit.
++     unset($c);
+      $this->response_headers = array();
+      $this->response_body = '';
+      $this->streamed_bytes = 0;
+  }
+```
+
+### Locked-in-Test
+
+`tests/test_curl_close_deprecation.php` (NEU, 10 Assertions):
+
+1. `curl.php` existiert + parst
+2. **Kein einziger `curl_close(`-Aufruf** irgendwo im Repo
+   (Kommentare rausgestrippt, Vendor-Blobs geskippt)
+3. Der finally-Block setzt weiterhin `response_headers`, `response_body`,
+   `streamed_bytes` zurück (keine Regression im Cleanup)
+4. Der Inline-Kommentar erwähnt PHP 8.5 + no-op/deprecated (damit
+   niemand den Call in einem späteren Refactor „zurückrestauriert")
+5. `php -l` clean
+
+### Verification
+
+- `php -l` clean auf `curl.php`
+- **`tests/test_curl_close_deprecation.php`: 10/10 PASS**
+- Volle lokale Suite unverändert grün (Version 0.14.31 → 0.14.32)
+
+### Für den 404 („Seite nicht gefunden")
+
+Diese Deprecation ist NICHT die Ursache. Bitte im `nextcloud.log` die
+Zeile UNMITTELBAR vor oder nach dem 404-Request suchen — es muss dort
+ein `Exception`, `Error`, oder `notFound` mit einem konkreten
+Stacktrace stehen. Die häufigsten Kandidaten:
+
+1. `EnforceGroupRestriction`-Repair-Step hat die App an `souvera-users`
+   gebunden, dein Login-User ist aber nicht in der Gruppe →
+   `IAppManager::isEnabledForUser()` = false → 404.
+   Fix: `sudo -u www-data php occ group:adduser souvera-users <uid>`.
+2. Autoloader-Miss für den `PageController` (siehe 0.13.5 – NC34
+   memcache stale). Fix: `redis-cli FLUSHALL` oder Cache-Backend leeren.
+
 ## [0.14.31] — 2026-02-19 (Sidebar-Polish: NC-Style Icons vor jedem Ordner)
 
 ### Operator-Report (2026-02-19, mit Referenz-Screenshot)
