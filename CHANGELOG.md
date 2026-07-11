@@ -6,6 +6,82 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.35] — 2026-02-19 (Balken jetzt über volle Pillen-Höhe sichtbar)
+
+### Operator-Report (2026-02-19)
+
+> „Du siehst schon den Unterschied, oder? Ich will das es Exakt gleich
+> aussieht!"
+
+Zwei Side-by-Side-Screenshots. Beim v0.14.34-Look war der Balken zwar
+per `box-shadow: inset 4px 0 0 …` gezeichnet, aber er verschwand oben
+und unten in den Rundungen der Pille. Im Central-Screenshot ist der
+Balken über die **volle Höhe der Pille** sichtbar mit nur minimaler
+Verjüngung an den Ecken.
+
+### Root Cause
+
+`box-shadow: inset` wird von `border-radius` geclippt — das ist by
+design. Wenn `border-radius > box-shadow-Breite`, wird der Shadow oben
+und unten "verschluckt", weil in der Rundung nichts mehr rechteckiges
+gezeichnet werden kann.
+
+Unsere Konfiguration (v0.14.34):
+- `border-radius: var(--border-radius-large, 12px)` — **12 px**
+- `box-shadow: inset 4px 0 …` — **4 px** Balken
+
+→ Der Balken war nur im mittleren `44 − 2·12 = 20 px` sichtbar, oben
+und unten je 12 px in den Corner-Arcs verschluckt.
+
+Central-App (aus dem Screenshot analysiert):
+- `border-radius: var(--border-radius, 8px)` — **8 px**
+- Balken ~5 px breit
+
+→ Balken ist im mittleren `~30 px` sichtbar, nur je 8 px in den
+Corner-Arcs verschluckt → wirkt fast über die volle Höhe.
+
+### Fix (`css/folder-nav.css`)
+
+```diff
+  .b-folders li a {
+-     border-radius: var(--border-radius-large, 12px);
++     border-radius: var(--border-radius, 8px);
+  }
+
+  .b-folders li a.selectable.selected,
+  .b-folders li a.selected {
+-     box-shadow: inset 4px 0 0 0 var(--color-primary-element, #0693e3);
++     box-shadow: inset 5px 0 0 0 var(--color-primary-element, #0693e3);
+  }
+
+  .b-folders .e-checkbox {
+-     border-radius: var(--border-radius-large, 12px);
++     border-radius: var(--border-radius, 8px);
+  }
+```
+
+Zwei kleine Änderungen mit großer Wirkung:
+1. **`--border-radius` (8 px)** statt `--border-radius-large` (12 px) —
+   kleinere Corner-Arcs → mehr Balken bleibt sichtbar
+2. **5 px Balken** statt 4 px — deckt den restlichen kleinen
+   Höhenverlust an den Enden aus und wirkt kräftiger
+
+### Regression-Tests
+
+- `tests/test_folder_nav_css.php` (35/35): NC-Variable jetzt
+  `--border-radius` (nicht `--border-radius-large`) + Balken auf 5 px
+  gepinnt
+- `tests/test_sidebar_polish_v14_29.php` (15/15): Balken-Regex auf 5 px
+
+### Verifikation
+- Volle Suite: **46 Suites / 1691 Assertions PASS**
+
+### Live-Verifikation
+Rsync `css/folder-nav.css` + `info.xml` + `package.json` → `occ upgrade`
++ Hard-Reload. Erwartet: aktiver Ordner ist eine 8-px-gerundete
+hellblaue Pille mit **kräftigem 5-px blauen Balken links, sichtbar
+über nahezu die volle Pillen-Höhe** — exakt der Central-App-Look.
+
 ## [0.14.34] — 2026-02-19 (Sidebar-Pille: blauer Balken *innerhalb* der Rundung)
 
 ### Operator-Report (2026-02-19, mit Vergleichs-Screenshots)

@@ -84,7 +84,7 @@ $ncVars = [
     '--color-background-hover',       // hover pill
     '--color-main-text',              // row text
     '--color-border',                 // divider
-    '--border-radius-large',          // pill corner radius
+    '--border-radius',                // pill corner radius (v0.14.35: was --border-radius-large in 0.14.20-0.14.34, reduced so the inset-shadow bar covers the full pill height)
 ];
 foreach ($ncVars as $var) {
     assertTrue(str_contains($css, "var($var"),
@@ -133,12 +133,14 @@ assertTrue(
     "selected row does NOT paint a border-left 4-px accent bar (v0.14.33 removed it)",
     $passes, $failures);
 
-// v0.14.34: the vertical bar IS painted, but as an inset box-shadow
-// so it follows the pill's rounded corners.
+// v0.14.35: the vertical bar IS painted, but as an inset box-shadow
+// so it follows the pill's rounded corners. Bar is 5 px wide (was
+// 4 px in 0.14.34) so it fills the pill height even with rounded
+// corners — matches Central-App reference.
 assertTrue((bool) preg_match(
-    '#\.b-folders li a(?:\.selectable)?\.selected[\s\S]{0,300}\{[^}]*box-shadow\s*:\s*inset\s+4px\s+0\s+0\s+0?\s*var\(--color-primary-element#s',
+    '#\.b-folders li a(?:\.selectable)?\.selected[\s\S]{0,300}\{[^}]*box-shadow\s*:\s*inset\s+5px\s+0\s+0\s+0?\s*var\(--color-primary-element#s',
     $css
-), "selected row paints a 4-px NC-primary bar via `box-shadow: inset 4px 0 …` (follows the pill radius)",
+), "selected row paints a 5-px NC-primary bar via `box-shadow: inset 5px 0 …` (follows the pill radius)",
     $passes, $failures);
 
 // v0.14.33: selected label + icon paint in NC-primary blue so the
@@ -170,13 +172,13 @@ assertTrue((bool) preg_match(
 ), "base row margin is 2px 8px on BOTH sides (pill floats inside sidebar)",
     $passes, $failures);
 
-// Fully-rounded pill on both sides — the money look. Regex accepts
-// either the shorthand `var(--border-radius-large)` or a 4-value form
-// where all four corners share the same radius.
+// Fully-rounded pill on both sides — the money look. v0.14.35 uses
+// `--border-radius` (8 px) instead of `--border-radius-large` (12 px)
+// so the inset-shadow bar isn't swallowed by the top/bottom corners.
 assertTrue((bool) preg_match(
-    '#\.b-folders li a\s*\{[^}]*border-radius\s*:\s*var\(--border-radius-large#s',
+    '#\.b-folders li a\s*\{[^}]*border-radius\s*:\s*var\(--border-radius(?!-large)#s',
     $css
-), "base row is fully-rounded (single radius, both sides — Central-App parity)",
+), "base row is rounded with --border-radius (8 px, Central-App parity — v0.14.35 reduced from --border-radius-large)",
     $passes, $failures);
 
 // Hover pill background — NC grey, not the engine's dark default

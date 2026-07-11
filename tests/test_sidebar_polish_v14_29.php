@@ -49,9 +49,9 @@ ok(
     $passes, $failures);
 
 ok((bool) preg_match(
-    '~\.b-folders li a\.selectable\.selected,?\s*\.b-folders li a\.selected\s*\{[\s\S]{0,400}box-shadow\s*:\s*inset\s+4px\s+0\s+0\s+0?\s*var\(--color-primary-element~',
+    '~\.b-folders li a\.selectable\.selected,?\s*\.b-folders li a\.selected\s*\{[\s\S]{0,400}box-shadow\s*:\s*inset\s+5px\s+0\s+0\s+0?\s*var\(--color-primary-element~',
     $css
-), "Selected folder row paints an INSET 4-px bar via `box-shadow: inset 4px 0 0 …` (v0.14.34: follows the pill radius)",
+), "Selected folder row paints an INSET 5-px bar via `box-shadow: inset 5px 0 0 …` (v0.14.35: full-height bar with 8-px pill radius)",
     $passes, $failures);
 
 ok((bool) preg_match(

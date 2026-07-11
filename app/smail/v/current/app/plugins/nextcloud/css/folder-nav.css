@@ -43,11 +43,14 @@
 }
 
 /* Base row — reset the dark defaults and give NC-style breathing room.
-   v0.14.33: fully rounded pill on BOTH sides, no left border, 44 px
-   line-height (NC Files baseline). */
+   v0.14.35: `border-radius` reduced to `--border-radius` (8 px) so the
+   `box-shadow: inset` bar on the selected row is not swallowed by the
+   corners — the Central-App reference uses this exact 8-px radius, and
+   with our previous 12-px large radius the bar was only visible in the
+   middle third of the pill height. */
 .b-folders li a {
         border-left: 0 !important;
-        border-radius: var(--border-radius-large, 12px);
+        border-radius: var(--border-radius, 8px);
         color: var(--color-main-text, #222);
         line-height: 44px;
         margin: 2px 8px;
@@ -68,11 +71,11 @@
         color: var(--color-main-text, #222);
 }
 
-/* SELECTED — the money selector. Fully rounded light-blue pill
-   + inset 4-px blue bar on the left that follows the pill's rounded
-   corners (v0.14.34 — operator screenshot 2026-02-19 zeigt einen
-   Balken innerhalb der Rundung; `border-left` würde die linke Rundung
-   zerstören, `box-shadow: inset` respektiert sie).
+/* SELECTED — the money selector. 8-px rounded light-blue pill
+   + inset 5-px blue bar on the left that follows the pill's rounded
+   corners (v0.14.35 — operator screenshot 2026-02-19 zeigt, dass der
+   Balken die volle Pillen-Höhe abdecken soll; mit dem alten 12-px
+   Radius wurde der 4-px Balken oben und unten zu stark geclippt).
 
    Why `!important` on `border-left: 0`: the engine's own rule
    `.b-folders li a { border-left: 3px solid transparent }` in
@@ -80,17 +83,16 @@
    engine ships later depending on CSS-load order in a subset of NC
    themes. Zeroing the border-left keeps the pill visually symmetric.
 
-   The `box-shadow: inset 4px 0 0 0 …` paints a 4-px-wide vertical
+   The `box-shadow: inset 5px 0 0 0 …` paints a 5-px-wide vertical
    strip on the inner-left edge of the pill. Because it's an inset
-   shadow, `border-radius` clips it — the strip stops exactly where
-   the pill's top-left and bottom-left corners curve away. That's
-   the behaviour the operator wants (see the two side-by-side
-   reference screenshots). */
+   shadow, `border-radius` clips it — with the pill now at 8 px radius
+   the bar covers the full pill height minus tiny 8-px corner arcs
+   (matches Central-App reference exactly). */
 .b-folders li a.selectable.selected,
 .b-folders li a.selected {
         background-color: var(--color-primary-element-light, #e7f1fa) !important;
         border-left: 0 !important;
-        box-shadow: inset 4px 0 0 0 var(--color-primary-element, #0693e3);
+        box-shadow: inset 5px 0 0 0 var(--color-primary-element, #0693e3);
         color: var(--color-primary-element, #0693e3) !important;
         font-weight: 600;
 }
@@ -195,9 +197,9 @@
 }
 
 /* "Only unread" checkbox row — align with the folder rows above.
-   v0.14.33: fully-rounded pill (both sides) matching the folder-row style. */
+   v0.14.35: 8-px radius matching the folder rows (Central-App parity). */
 .b-folders .e-checkbox {
-        border-radius: var(--border-radius-large, 12px);
+        border-radius: var(--border-radius, 8px);
         margin: 2px 8px;
         padding: 8px 12px;
 }
