@@ -6,7 +6,85 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.14.29] — 2026-02-19 (Sidebar-Polish: blauer Balken robust · Unread-Rollup · Namespace-Übersetzung)
+## [0.14.30] — 2026-02-19 (Neues Feature: Mail-Speicher-Anzeige in Sidebar + NC-Header-Menu)
+
+### Operator-Request (2026-02-19)
+
+> „Cool wäre auch ne Anzeige wie viel Speicher man von seinem Quota
+> belegt hat …"
+
+Mit Follow-up-Präferenzen:
+- Sidebar unten in Snappymail + NC-Persönliches-Menü
+- Quelle: Stalwart JMAP (`x:Account/get` mit `usedDiskQuota` + `quotas.MaxDiskQuota`)
+- Aktualisierung: alle 5 Minuten
+- Farbschwellen: 80 % orange, 95 % rot + Toast-Warnung
+- Unlimited: nur „X verwendet" ohne Bar
+
+### Zwei Anzeige-Surfaces
+
+**A) Snappymail-Sidebar unten (in `.b-folders`)**
+- Datei-Bar via neuem `plugins/nextcloud/js/quota.js` + `css/quota-bar.css`.
+- Poll: alle 5 Min. Farben via `data-quota-tier` (ok/warn/alert) →
+  `--color-primary-element` / `--color-warning` / `--color-error`.
+- Toast bei ≥95 % via `rl.Notification` (Fallback: inline-DOM-Toast).
+  Once per Session, um Spam zu vermeiden.
+- Unlimited: „X verwendet" — kein Track.
+
+**B) Nextcloud-Header-Persönliches-Menü (jede NC-Seite)**
+- Neuer Listener `NcHeaderMenuQuotaListener` hängt sich auf
+  `BeforeTemplateRenderedEvent` — läuft AUF JEDER NC-Seite (nicht nur
+  im Mail-App).
+- Guards: nur für authentifizierte souvera-users, nur wenn
+  `QuotaService::isAvailable()` true.
+- Injiziert `js/nc-header-menu-quota.js` + inline JSON-Config-Tag
+  mit dem Quota-Endpoint-URL (via `IURLGenerator`, funktioniert unter
+  Sub-Path + Reverse-Proxy).
+- Das JS öffnet Menu-DOM via `MutationObserver`, injiziert
+  `<li id="souvera-mail-quota-menu-entry">` mit Umschlag-Icon + Text
+  „Mail-Speicher: 12 MB / 5 GB". **Non-clickable** — reines Info-Feld.
+
+### Was war schon da? Was ist neu?
+
+Der Backend-Layer war komplett fertig (aus v0.13.x):
+- `QuotaService.php` (Stalwart JMAP-Client + 60s In-Memory-Cache)
+- `QuotaController.php` (GET `/api/apps/souvera_mail/quota`)
+- Route in `appinfo/routes.php` (`quota#index`)
+
+Diese Release baut nur die zwei Anzeige-Surfaces obendrauf.
+
+### Files
+
+| File | Change |
+|---|---|
+| `app/smail/v/current/app/plugins/nextcloud/js/quota.js` | Komplett neu — Sidebar-Bar statt Top-Pill |
+| `app/smail/v/current/app/plugins/nextcloud/css/quota-bar.css` | **Neu** — Bar-Styling |
+| `app/smail/v/current/app/plugins/nextcloud/index.php` | +`addCss('css/quota-bar.css')` |
+| `js/nc-header-menu-quota.js` | **Neu** — NC-Menu-Injektor |
+| `lib/Listeners/NcHeaderMenuQuotaListener.php` | **Neu** — PHP-Event-Listener |
+| `lib/AppInfo/Application.php` | Registriert den neuen Listener |
+| `tests/test_quota_ui_v14_30.php` | **Neu** — 30 Regression-Pins |
+| `appinfo/info.xml`, `package.json` | 0.14.29 → 0.14.30 |
+
+### Verifikation
+
+- `php -l` clean auf allen berührten PHP-Files.
+- `node --check` clean auf beiden JS-Files.
+- **`tests/test_quota_ui_v14_30.php`: alle Assertions PASS.**
+- **Volle Suite: 43 Suites / 1636+ Assertions PASS, 0 Fehler.**
+
+### Live-Verifikation
+
+1. Rsync komplett (`img/` ist NICHT betroffen, aber `app/` + `lib/` +
+   `js/` + `appinfo/` + `package.json`) → Live.
+2. `occ upgrade` → 0.14.30. **`Strg+Shift+R`** (JS/CSS-Cache).
+3. **Snappymail:** ganz unten in der Ordnerliste erscheint die
+   Quota-Bar. Farbwechsel automatisch bei 80 % → orange, 95 % → rot,
+   plus Toast-Warnung oben rechts wenn ≥95 %.
+4. **Jede NC-Seite (Files/Kalender/Dashboard/…):** Klick aufs Avatar
+   oben rechts → neuer Menüeintrag „Mail-Speicher: 12 MB / 5 GB" mit
+   Umschlag-Icon.
+
+
 
 ### Operator-Report (2026-02-19, mit zwei Screenshots)
 
@@ -101,7 +179,12 @@ Variationen verschiedener IMAP-Implementierungen. Zusätzlich der
 5. Aktiver Ordner (auch Sub-Folder unter Shared) hat **linken blauen
    4-px-Balken**.
 
+## [0.14.29] — 2026-02-19 (Sidebar-Polish: blauer Balken robust · Unread-Rollup · Namespace-Übersetzung)
 
+Siehe Details in v0.14.30-Sektion (v0.14.29 ist ihr direkter Vorgänger).
+Kern-Fixes: `!important` auf Selected-Border-Left, `.unread-sub`-Bullet
+für zugeklappte Namespaces via `:has()`, „Shared Folders" → „Geteilte
+Postfächer" via Knockout `folder.name()`-Observable statt DOM-Selektor.
 
 ## [0.14.28] — 2026-02-19 (Fix: Item-Icons vor jeder Mail im Widget nutzen nun auch das schwarze SVG)
 

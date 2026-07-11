@@ -23,6 +23,7 @@ use OCA\SouveraMail\Dashboard\UnreadMailWidget;
 use OCA\SouveraMail\Listeners\ImpersonateListener;
 use OCA\SouveraMail\Listeners\LoginBridgeListener;
 use OCA\SouveraMail\Listeners\LogoutListener;
+use OCA\SouveraMail\Listeners\NcHeaderMenuQuotaListener;
 use OCA\SouveraMail\Listeners\NcTokenInvalidatedListener;
 use OCA\SouveraMail\Listeners\SecurityPageHijackListener;
 use OCA\SouveraMail\Search\Provider;
@@ -124,6 +125,17 @@ class Application extends App implements IBootstrap
         $context->registerEventListener(
             TokenInvalidatedEvent::class,
             NcTokenInvalidatedListener::class
+        );
+
+        // (c) v0.14.30 — Show the mailbox quota in the NC user menu
+        //     (top-right avatar popover) on EVERY NC page. Operator
+        //     request 2026-02-19: "Cool wäre auch ne Anzeige wie viel
+        //     Speicher man von seinem Quota belegt hat …" — one of the
+        //     two requested surfaces (the other being the Snappymail
+        //     sidebar bottom, handled by the engine plugin's quota.js).
+        $context->registerEventListener(
+            BeforeTemplateRenderedEvent::class,
+            NcHeaderMenuQuotaListener::class
         );
     }
 

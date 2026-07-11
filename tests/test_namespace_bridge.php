@@ -177,14 +177,21 @@ assertTrue(str_contains((string)$out, 'ALL OK'),
     $passes, $failures);
 
 // ---------------------------------------------------------------
-// 6. quota.js — the redundant "⚙ Settings" fallback pill is gone
+// 6. quota.js — the v0.13.x top-right pill is fully gone.
+// v0.14.30 replaces it with a sidebar-bottom bar (`souvera-mail-quota-bar`).
+// This section pins that both the old "⚙ Settings" pill fallback AND
+// the top-right pill styling are gone, and the new sidebar bar id
+// is used instead.
 // ---------------------------------------------------------------
 $quota = file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/js/quota.js');
 assertTrue(!preg_match("/textContent\\s*=\\s*['\"]\\\\u2699[^'\"]*Settings['\"]/", $quota),
     "quota.js no longer renders the standalone '⚙ Settings' fallback pill",
     $passes, $failures);
-assertTrue((bool)preg_match("/renderSettingsOnly[\\s\\S]{0,500}removePill\\(\\)/", $quota),
-    "quota.js renderSettingsOnly() now degrades by simply removing the pill",
+assertTrue(!str_contains($quota, "top:8px"),
+    "quota.js no longer positions the pill at top:8px (was v0.13.x style)",
+    $passes, $failures);
+assertTrue(str_contains($quota, "souvera-mail-quota-bar"),
+    "quota.js now writes into #souvera-mail-quota-bar (v0.14.30 sidebar bar)",
     $passes, $failures);
 
 // ---------------------------------------------------------------

@@ -1,159 +1,219 @@
 /*
- * Souvera Mail — live mailbox-quota pill + in-app settings entry-point.
+ * Souvera Mail — mailbox-quota display, v0.14.30 rewrite.
  *
- * Reads two URLs from the FilterAppData payload:
- *   - rl.settings.get('Nextcloud').SmailQuotaUrl     → JSON quota endpoint
- *   - rl.settings.get('Nextcloud').SmailSettingsUrl  → in-app settings page
+ * ───────────────────────────────────────────────────────────────
+ * WHAT
+ *   • A slim quota bar at the BOTTOM of Snappymail's folder sidebar
+ *     (`.b-folders`), matching the operator's 2026-02-19 request:
+ *     "Unten in der Snappymail-Ordner-Sidebar".
+ *   • Colour thresholds:  0-79%   NC-blue
+ *                        80-94%   orange (`--color-warning`)
+ *                        95-100%  red   (`--color-error`)
+ *   • Poll every 5 minutes (was 60 s; operator asked for slower cadence
+ *     because Stalwart JMAP is already cached server-side and hourly
+ *     usage swings are the norm).
+ *   • Toast warning INSIDE the Snappymail engine when usage crosses
+ *     95 %  — once per browser session, not per poll.
+ *   • Graceful degradation: no bar when the backend returns
+ *     unavailable / 503 / no cfg.
  *
- * Renders a small pill in the top-right corner of the engine UI. Clicking
- * the pill (or its fallback ⚙ icon when quota is unavailable) opens the
- * Souvera Mail in-app settings page (App Passwords, Dashboard widget mode)
- * in a new tab. Falls back gracefully when the quota endpoint returns 503.
+ * WHY drop the top-right pill?
+ *   Two reasons. First, the operator explicitly asked to move it into
+ *   the sidebar. Second, the pill overlapped the NC-native badge column
+ *   in a couple of NC 34+ themes and confused users into thinking it
+ *   was a NC notification. The sidebar placement is where every other
+ *   webmail client parks the quota gauge (Roundcube, Rainloop, Kolab).
+ * ───────────────────────────────────────────────────────────────
  */
 (rl => {
-	'use strict';
+    'use strict';
 
-	const cfg = rl && rl.settings && rl.settings.get && rl.settings.get('Nextcloud');
-	if (!cfg) {
-		return;
-	}
+    const cfg = rl && rl.settings && rl.settings.get && rl.settings.get('Nextcloud');
+    if (!cfg) {
+        return;
+    }
 
-	const PILL_ID = 'souvera-mail-quota-pill';
-	const REFRESH_MS = 60000;
+    const BAR_ID       = 'souvera-mail-quota-bar';
+    const REFRESH_MS   = 5 * 60 * 1000;       // 5 minutes
+    const WARN_THRESHOLD  = 80;
+    const ALERT_THRESHOLD = 95;
 
-	const settingsUrl = cfg.SmailSettingsUrl
-		? (cfg.SmailSettingsUrl.split('#')[0] + '#/settings/souvera-account')
-		: '';
-	const quotaUrl = cfg.SmailQuotaUrl || '';
+    const quotaUrl    = cfg.SmailQuotaUrl || '';
+    const settingsUrl = cfg.SmailSettingsUrl
+        ? (cfg.SmailSettingsUrl.split('#')[0] + '#/settings/souvera-account')
+        : '';
 
-	const fmtPill = data => {
-		if (!data) {
-			return '\u2699'; // gear glyph as fallback when no quota
-		}
-		if (data.unlimited) {
-			return `${data.formatted.used} used`;
-		}
-		return `${data.formatted.used} / ${data.formatted.total}`;
-	};
+    let alertShown = false;
 
-	const pillStyle = (pct, hasQuota) => {
-		const warn = hasQuota && pct >= 90;
-		const high = hasQuota && pct >= 75 && !warn;
-		const bg = warn ? '#c0392b' : (high ? '#e67e22' : 'rgba(0,0,0,0.55)');
-		return [
-			'position:fixed',
-			'top:8px',
-			'right:12px',
-			'z-index:9999',
-			'padding:4px 12px',
-			'border-radius:100px',
-			'background:' + bg,
-			'color:#fff',
-			'font:500 12px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif',
-			'box-shadow:0 2px 8px rgba(0,0,0,0.18)',
-			'pointer-events:auto',
-			'user-select:none',
-			'cursor:' + (settingsUrl ? 'pointer' : 'default'),
-			'backdrop-filter:blur(8px)',
-			'-webkit-backdrop-filter:blur(8px)',
-			'text-decoration:none',
-			'display:inline-flex',
-			'align-items:center',
-			'gap:6px',
-			'transition:transform 100ms ease, box-shadow 100ms ease'
-		].join(';');
-	};
+    // ---------------------------------------------------------------
+    // DOM helpers
+    // ---------------------------------------------------------------
+    const findSidebar = () =>
+        document.querySelector('#rl-folder-list')
+        || document.querySelector('.b-folders')
+        || document.querySelector('[class*="b-folders"]');
 
-	const ensurePill = () => {
-		let el = document.getElementById(PILL_ID);
-		if (!el) {
-			el = document.createElement(settingsUrl ? 'a' : 'div');
-			el.id = PILL_ID;
-			el.setAttribute('role', 'status');
-			el.setAttribute('aria-live', 'polite');
-			el.setAttribute('data-testid', 'souvera-mail-quota-pill');
-			if (settingsUrl) {
-				el.href = settingsUrl;
-				// Same-tab navigation: the URL is the engine itself with a
-				// hash route. If the user is already on the mailbox page,
-				// it is a hash-only change (no reload). If they opened the
-				// pill from another NC app, the engine takes over the tab.
-				el.target = '_self';
-				el.rel = 'noopener';
-				el.title = 'Open Souvera Mail settings';
-				el.addEventListener('mouseenter', function () {
-					el.style.transform = 'translateY(-1px)';
-					el.style.boxShadow = '0 4px 14px rgba(0,0,0,0.25)';
-				});
-				el.addEventListener('mouseleave', function () {
-					el.style.transform = '';
-					el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.18)';
-				});
-			}
-			document.body.appendChild(el);
-		}
-		return el;
-	};
+    const ensureBar = () => {
+        let el = document.getElementById(BAR_ID);
+        if (el) return el;
 
-	const removePill = () => {
-		const el = document.getElementById(PILL_ID);
-		if (el && el.parentNode) {
-			el.parentNode.removeChild(el);
-		}
-	};
+        const sidebar = findSidebar();
+        if (!sidebar) return null;
 
-	const renderQuota = data => {
-		const el = ensurePill();
-		el.style.cssText = pillStyle(data.percentage, true);
-		el.textContent = fmtPill(data);
-		if (settingsUrl) {
-			// re-set after textContent wipe
-			el.title = `${data.percentage}% used · Click for settings`;
-		} else if (!data.unlimited) {
-			el.title = data.percentage + '% used';
-		} else {
-			el.title = 'No quota limit configured';
-		}
-	};
+        el = document.createElement(settingsUrl ? 'a' : 'div');
+        el.id = BAR_ID;
+        el.setAttribute('data-testid', BAR_ID);
+        if (settingsUrl) {
+            el.href = settingsUrl;
+            el.target = '_self';
+            el.rel = 'noopener';
+        }
 
-	const renderSettingsOnly = () => {
-		// 0.13.5: there is no longer a separate "Settings" landing — the
-		// in-engine Snappymail tab "Sicherheit & Geräte" is reachable
-		// directly from the engine's own settings cog. When quota is
-		// unavailable we simply hide the pill instead of degrading to
-		// a redundant "⚙ Settings" entry-point that confused users
-		// after the consolidation.
-		removePill();
-	};
+        el.innerHTML = `
+            <div class="quota-label">
+                <span class="quota-title" data-testid="quota-label-title"></span>
+                <span class="quota-numbers" data-testid="quota-label-numbers"></span>
+            </div>
+            <div class="quota-track">
+                <div class="quota-fill" data-testid="quota-fill"></div>
+            </div>
+        `.trim();
 
-	const refresh = () => {
-		if (!quotaUrl) {
-			renderSettingsOnly();
-			return;
-		}
-		fetch(quotaUrl, {
-			credentials: 'same-origin',
-			headers: { 'Accept': 'application/json' },
-			cache: 'no-store'
-		})
-		.then(resp => {
-			if (!resp.ok) {
-				renderSettingsOnly();
-				return null;
-			}
-			return resp.json();
-		})
-		.then(body => {
-			if (!body || body.status !== 'ok') {
-				renderSettingsOnly();
-				return;
-			}
-			renderQuota(body);
-		})
-		.catch(() => renderSettingsOnly());
-	};
+        sidebar.appendChild(el);
+        return el;
+    };
 
-	setTimeout(refresh, 1500);
-	setInterval(refresh, REFRESH_MS);
+    const removeBar = () => {
+        const el = document.getElementById(BAR_ID);
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+    };
+
+    const applyState = (el, data) => {
+        const fill  = el.querySelector('.quota-fill');
+        const numEl = el.querySelector('.quota-numbers');
+
+        if (data.unlimited) {
+            // No bar for unlimited accounts — just the usage number
+            // (operator spec 2026-02-19 → option a).
+            el.setAttribute('data-quota-mode', 'unlimited');
+            fill.style.width = '0%';
+            numEl.textContent = `${data.formatted.used} verwendet`;
+            el.title = 'Kein Speicherlimit konfiguriert';
+            return;
+        }
+
+        el.removeAttribute('data-quota-mode');
+        fill.style.width = data.percentage + '%';
+        numEl.textContent = `${data.formatted.used} / ${data.formatted.total}`;
+
+        // Colour tier
+        let tier = 'ok';
+        if (data.percentage >= ALERT_THRESHOLD) tier = 'alert';
+        else if (data.percentage >= WARN_THRESHOLD) tier = 'warn';
+        el.setAttribute('data-quota-tier', tier);
+
+        el.title = `${data.percentage}% belegt`
+            + (settingsUrl ? ' · Klicken für Einstellungen' : '');
+
+        // Toast escalation at ≥95 % — once per session.
+        if (tier === 'alert' && !alertShown) {
+            alertShown = true;
+            showAlertToast(data);
+        }
+    };
+
+    const showAlertToast = data => {
+        // Prefer Snappymail's own notification pipeline when available.
+        // rl.Notification is provided by the engine and hooks into its
+        // localisation + accessibility. Falls back to a lightweight
+        // inline toast when the engine hasn't booted it yet.
+        const msg = `Ihr Postfach ist zu ${data.percentage}% belegt `
+            + `(${data.formatted.used} / ${data.formatted.total}). `
+            + `Bitte alte E-Mails oder Anhänge löschen, damit neue Nachrichten `
+            + `weiterhin angenommen werden können.`;
+
+        try {
+            if (rl && rl.Notification && typeof rl.Notification.showI18n === 'function') {
+                rl.Notification.showI18n(msg);
+                return;
+            }
+            if (rl && rl.Notification && typeof rl.Notification.show === 'function') {
+                rl.Notification.show(msg);
+                return;
+            }
+        } catch (e) { /* fall through to DOM toast */ }
+
+        const toast = document.createElement('div');
+        toast.className = 'souvera-quota-toast';
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('data-testid', 'souvera-quota-toast');
+        toast.textContent = msg;
+        Object.assign(toast.style, {
+            position: 'fixed',
+            top: '12px',
+            right: '12px',
+            zIndex: '10000',
+            maxWidth: '420px',
+            padding: '12px 18px',
+            background: 'var(--color-error, #c0392b)',
+            color: 'var(--color-primary-element-text, #fff)',
+            borderRadius: '10px',
+            boxShadow: '0 6px 24px rgba(0,0,0,0.25)',
+            font: '500 13px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif',
+            cursor: 'pointer',
+        });
+        toast.addEventListener('click', () => {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        });
+        document.body.appendChild(toast);
+        // Auto-dismiss after 15 s so the user isn't blocked forever.
+        setTimeout(() => {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 15000);
+    };
+
+    // ---------------------------------------------------------------
+    // Fetch loop
+    // ---------------------------------------------------------------
+    const refresh = () => {
+        if (!quotaUrl) {
+            removeBar();
+            return;
+        }
+        fetch(quotaUrl, {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store',
+        })
+        .then(resp => resp.ok ? resp.json() : null)
+        .then(body => {
+            if (!body || body.status !== 'ok') {
+                removeBar();
+                return;
+            }
+            const el = ensureBar();
+            if (!el) return;
+            const title = el.querySelector('.quota-title');
+            if (title) title.textContent = 'Mail-Speicher';
+            applyState(el, body);
+        })
+        .catch(() => removeBar());
+    };
+
+    // The sidebar is a KO template — it may still be booting when this
+    // script runs. Retry the initial paint until the container exists
+    // (max 30 attempts × 250 ms = 7.5 s).
+    let bootAttempts = 0;
+    const boot = () => {
+        if (findSidebar()) {
+            refresh();
+            setInterval(refresh, REFRESH_MS);
+            return;
+        }
+        if (++bootAttempts < 30) {
+            setTimeout(boot, 250);
+        }
+    };
+    boot();
 
 })(window.rl);
