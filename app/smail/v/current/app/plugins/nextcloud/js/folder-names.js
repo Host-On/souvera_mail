@@ -229,6 +229,34 @@
                                         labelEl.__svLeaf = true;
                                 }
                         }
+
+                        // v0.14.31 — tag the row with a folder type so CSS
+                        // can render the correct NC-style icon before it.
+                        // Priority: namespace-header > known system leaf > user.
+                        let ftype = 'user';
+                        if (!fn.includes('/') && !fn.includes('\\')
+                            && (/^shared( folders)?$/i.test(fn) || /^other users?$/i.test(fn))) {
+                                ftype = 'namespace';
+                        } else if (leaf === 'INBOX') {
+                                ftype = 'inbox';
+                        } else if (leaf === 'SENT') {
+                                ftype = 'sent';
+                        } else if (leaf === 'DRAFTS') {
+                                ftype = 'drafts';
+                        } else if (leaf === 'SPAM' || leaf === 'JUNK') {
+                                ftype = 'spam';
+                        } else if (leaf === 'TRASH' || leaf === 'BIN' || leaf === 'DELETED') {
+                                ftype = 'trash';
+                        } else if (leaf === 'ARCHIVE') {
+                                ftype = 'archive';
+                        } else if (leaf === 'TEMPLATES') {
+                                ftype = 'templates';
+                        } else if (leaf === 'OUTBOX') {
+                                ftype = 'outbox';
+                        }
+                        if (li.getAttribute('data-folder-type') !== ftype) {
+                                li.setAttribute('data-folder-type', ftype);
+                        }
                 });
         };
 

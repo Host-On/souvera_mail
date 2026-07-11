@@ -194,12 +194,110 @@
 }
 
 /*
- * Dark-theme parity
- * -----------------
- * Nextcloud's dark theme swaps `--color-primary-element-light` to a
- * translucent blue overlay (`rgba(0, 130, 201, 0.35)`). Our fallback
- * hex (#e7f1fa) would look wrong on a dark background — but the CSS
- * variable already handles that switch when NC theming is active, so
- * we don't need to duplicate the media query. This comment stays as
- * documentation for future maintainers.
+ * v0.14.31 — NC-style folder icons prefixed on every row.
+ * ----------------------------------------------------------------
+ * Operator request 2026-02-19 (with reference screenshot from a
+ * sister Souvera app): "so sollte das Sidebar Menu aussehen, wie
+ * bei den anderen Apps halt".
+ *
+ * Implementation:
+ *   - `folder-names.js` tags every `<li[data-imap-full-name]>` row
+ *     with a `data-folder-type` attribute derived from the IMAP
+ *     leaf name (inbox / sent / drafts / spam / trash / archive /
+ *     templates / outbox / namespace / user).
+ *   - CSS below renders the corresponding NC-blue Material Design
+ *     icon via a `::before` pseudo-element on the row's <a>.
+ *   - Icons are inline data:image/svg+xml so no extra HTTP hop.
+ *   - Colour follows `currentColor`, so it picks up NC theming
+ *     automatically (blue on light, light-grey on dark, etc.).
+ *
+ * The system-folder block already uses `font-weight: bold` from the
+ * engine — we intentionally do NOT change that so users who rely on
+ * visual weight to spot Inbox get the same experience.
+ * ----------------------------------------------------------------
  */
+
+/* Reserve room for the icon on every row, keep the label aligned. */
+.b-folders li[data-folder-type] a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Icon slot */
+.b-folders li[data-folder-type] a::before {
+    content: "";
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    background-color: currentColor;
+    mask-repeat: no-repeat;
+    mask-position: center;
+    mask-size: 18px 18px;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: 18px 18px;
+    opacity: 0.85;
+}
+
+/* Icon variants — Material Design source silhouettes, monochrome */
+.b-folders li[data-folder-type="inbox"] a::before {
+    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 3H5c-1.11 0-2 .89-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2m0 12h-4c0 1.66-1.35 3-3 3s-3-1.34-3-3H5V5h14z"/></svg>');
+    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 3H5c-1.11 0-2 .89-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2m0 12h-4c0 1.66-1.35 3-3 3s-3-1.34-3-3H5V5h14z"/></svg>');
+}
+
+.b-folders li[data-folder-type="sent"] a::before {
+    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg>');
+    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg>');
+}
+
+.b-folders li[data-folder-type="drafts"] a::before {
+    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z"/></svg>');
+    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z"/></svg>');
+}
+
+.b-folders li[data-folder-type="spam"] a::before {
+    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m1 15h-2v-2h2zm0-4h-2V7h2z"/></svg>');
+    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2m1 15h-2v-2h2zm0-4h-2V7h2z"/></svg>');
+}
+
+.b-folders li[data-folder-type="trash"] a::before {
+    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z"/></svg>');
+    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6zM19 4h-3.5l-1-1h-5l-1 1H5v2h14z"/></svg>');
+}
+
+.b-folders li[data-folder-type="archive"] a::before {
+    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.54 5.23 19.15 3.55A1.85 1.85 0 0 0 17.71 3H6.29c-.58 0-1.1.24-1.44.55L3.46 5.23A1.9 1.9 0 0 0 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5c0-.5-.17-.96-.46-1.27M12 17.5 6.5 12H10v-2h4v2h3.5z"/></svg>');
+    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.54 5.23 19.15 3.55A1.85 1.85 0 0 0 17.71 3H6.29c-.58 0-1.1.24-1.44.55L3.46 5.23A1.9 1.9 0 0 0 3 6.5V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.5c0-.5-.17-.96-.46-1.27M12 17.5 6.5 12H10v-2h4v2h3.5z"/></svg>');
+}
+
+.b-folders li[data-folder-type="templates"] a::before {
+    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM6 20V4h7v5h5v11zm10-7H8v-2h8zm-4 4H8v-2h4z"/></svg>');
+    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM6 20V4h7v5h5v11zm10-7H8v-2h8zm-4 4H8v-2h4z"/></svg>');
+}
+
+.b-folders li[data-folder-type="outbox"] a::before {
+    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 15v4H5v-4H3v6h18v-6zM8 9h3V4h2v5h3l-4 4z"/></svg>');
+    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 15v4H5v-4H3v6h18v-6zM8 9h3V4h2v5h3l-4 4z"/></svg>');
+}
+
+.b-folders li[data-folder-type="namespace"] a::before {
+    /* Envelope silhouette — matches the operator's screenshot */
+    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2m0 4-8 5-8-5V6l8 5 8-5z"/></svg>');
+    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2m0 4-8 5-8-5V6l8 5 8-5z"/></svg>');
+    opacity: 0.6;
+}
+
+.b-folders li[data-folder-type="user"] a::before {
+    mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 4H4c-1.11 0-2 .89-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8z"/></svg>');
+    -webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 4H4c-1.11 0-2 .89-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-8z"/></svg>');
+    opacity: 0.6;
+}
+
+/* On selected rows, the icon should track the NC-blue text colour
+   for maximum contrast against the light-blue pill. */
+.b-folders li[data-folder-type] a.selected::before,
+.b-folders li[data-folder-type] a.selectable.selected::before {
+    opacity: 1;
+}
+

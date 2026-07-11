@@ -6,6 +6,61 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.31] — 2026-02-19 (Sidebar-Polish: NC-Style Icons vor jedem Ordner)
+
+### Operator-Report (2026-02-19, mit Referenz-Screenshot)
+
+> „So sollte das Sidebar Menu aussehen, wie bei den anderen Apps halt …"
+
+Screenshot einer Sister-Souvera-App zeigt jeden Nav-Eintrag mit einem
+schwarzen Material-Design-Icon vor dem Label. Diese Optik jetzt auch
+für den Snappymail-Ordnerbaum.
+
+### Umsetzung
+
+**JS (`folder-names.js`):** in `applyJunkDOMMarks()` (jetzt eher
+„applyRowMarks") wird pro Row ein `data-folder-type`-Attribut auf
+`<li[data-imap-full-name]>` gesetzt — Priorität:
+
+1. `namespace` — bei bare Namespace-Header „Shared Folders" / „Other Users"
+2. `inbox` / `sent` / `drafts` / `spam` / `trash` / `archive` /
+   `templates` / `outbox` — via IMAP-Leaf-Name (case-insensitive)
+3. `user` — Default für alle anderen
+
+**CSS (`folder-nav.css`):** neue Sektion mit einem `::before`-Slot
+pro Type. Jedes Icon ist ein inline-Data-URI SVG (Material Design
+Silhouetten), gerendert als `mask-image` auf einem `currentColor`-
+Background → kein extra HTTP-Hop, Icon adaptiert automatisch NC-
+Theming (Light/Dark/HC).
+
+Zusätzlich `-webkit-mask-image`-Duplikat für Safari, `opacity: 0.85`
+default, `opacity: 1` auf `.selected` Rows für Lesbarkeit.
+
+### Files
+
+| File | Change |
+|---|---|
+| `app/smail/v/current/app/plugins/nextcloud/js/folder-names.js` | `data-folder-type` Attribut-Setter |
+| `app/smail/v/current/app/plugins/nextcloud/css/folder-nav.css` | 10 Icon-Regeln + Base-Slot |
+| `tests/test_folder_type_icons_v14_31.php` | **Neu** — 30+ Regression-Pins |
+| `appinfo/info.xml`, `package.json` | 0.14.30 → 0.14.31 |
+
+### Verifikation
+
+- `node --check` clean auf `folder-names.js`.
+- **`tests/test_folder_type_icons_v14_31.php`: alle Assertions PASS.**
+- **Voller Suite-Run: 44 Suites / 1680+ Assertions PASS, 0 Fehler.**
+
+### Live-Verifikation
+
+1. Rsync `app/smail/v/current/app/plugins/nextcloud/js/folder-names.js`
+   + `.../css/folder-nav.css` + `appinfo/info.xml` + `package.json` → Live.
+2. `occ upgrade` → 0.14.31. **`Strg+Shift+R`** wg. CSS-Cache.
+3. Sidebar zeigt jetzt vor jedem Ordner ein Material-Design-Icon:
+   Umschlag (Inbox), Papierflieger (Sent), Bleistift (Drafts),
+   Fragezeichen-Kreis (Spam), Mülleimer (Trash), Archiv (Archive),
+   Ordner (User-Folder), Envelope (Namespace-Header).
+
 ## [0.14.30] — 2026-02-19 (Neues Feature: Mail-Speicher-Anzeige in Sidebar + NC-Header-Menu)
 
 ### Operator-Request (2026-02-19)
