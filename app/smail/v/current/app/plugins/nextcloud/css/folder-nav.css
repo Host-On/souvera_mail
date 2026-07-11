@@ -68,19 +68,29 @@
         color: var(--color-main-text, #222);
 }
 
-/* SELECTED — the money selector. Fully rounded light-blue pill.
-   v0.14.33: `!important` on `border-left: 0` because the engine's own
-   rule (`.b-folders li a { border-left: 3px solid transparent }` in
-   static/css/app.css:1780) matches with equal specificity and the
+/* SELECTED — the money selector. Fully rounded light-blue pill
+   + inset 4-px blue bar on the left that follows the pill's rounded
+   corners (v0.14.34 — operator screenshot 2026-02-19 zeigt einen
+   Balken innerhalb der Rundung; `border-left` würde die linke Rundung
+   zerstören, `box-shadow: inset` respektiert sie).
+
+   Why `!important` on `border-left: 0`: the engine's own rule
+   `.b-folders li a { border-left: 3px solid transparent }` in
+   static/css/app.css:1780 matches with equal specificity and the
    engine ships later depending on CSS-load order in a subset of NC
-   themes. Zeroing the border-left keeps the pill visually symmetric
-   (no phantom vertical bar breaking the rounded left corner). Active
-   label + icon paint in NC-primary so the pill has clear focus even
-   for colour-blind users who can't spot the background tint change. */
+   themes. Zeroing the border-left keeps the pill visually symmetric.
+
+   The `box-shadow: inset 4px 0 0 0 …` paints a 4-px-wide vertical
+   strip on the inner-left edge of the pill. Because it's an inset
+   shadow, `border-radius` clips it — the strip stops exactly where
+   the pill's top-left and bottom-left corners curve away. That's
+   the behaviour the operator wants (see the two side-by-side
+   reference screenshots). */
 .b-folders li a.selectable.selected,
 .b-folders li a.selected {
         background-color: var(--color-primary-element-light, #e7f1fa) !important;
         border-left: 0 !important;
+        box-shadow: inset 4px 0 0 0 var(--color-primary-element, #0693e3);
         color: var(--color-primary-element, #0693e3) !important;
         font-weight: 600;
 }

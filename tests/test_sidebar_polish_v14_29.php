@@ -34,20 +34,24 @@ $cssPath = '/app/app/smail/v/current/app/plugins/nextcloud/css/folder-nav.css';
 $css = (string) file_get_contents($cssPath);
 
 // ---------------------------------------------------------------
-// 1. Selected row: v0.14.33 replaced the 4-px `border-left` accent
-//    with a fully-rounded blue pill (Central-App parity — operator
-//    screenshot 2026-02-19: "das sieht anders aus als bei den
-//    anderen apps"). Regression guard: the OLD 4-px bar must be
-//    GONE (would produce a phantom vertical line breaking the
-//    rounded left corner). The NEW selected style must paint the
-//    label in primary-blue so the pill has focus without a bar.
+// 1. Selected row: v0.14.33 removed the 4-px `border-left`
+//    accent (would kill the rounded left corner). v0.14.34 puts
+//    the bar back via `box-shadow: inset 4px 0 0 …` which respects
+//    the pill's radius — operator screenshot 2026-02-19 zeigt genau
+//    diesen inset-Balken innerhalb der Rundung.
 // ---------------------------------------------------------------
 ok(
     !(bool) preg_match(
         '~\.b-folders li a\.selectable\.selected,?\s*\.b-folders li a\.selected\s*\{[\s\S]{0,400}border-left\s*:\s*4px solid var\(--color-primary-element~',
         $css
     ),
-    "Selected folder row NO LONGER paints a 4-px left accent bar (v0.14.33 removed it)",
+    "Selected folder row NO LONGER paints a border-left 4-px bar (v0.14.33 removed it)",
+    $passes, $failures);
+
+ok((bool) preg_match(
+    '~\.b-folders li a\.selectable\.selected,?\s*\.b-folders li a\.selected\s*\{[\s\S]{0,400}box-shadow\s*:\s*inset\s+4px\s+0\s+0\s+0?\s*var\(--color-primary-element~',
+    $css
+), "Selected folder row paints an INSET 4-px bar via `box-shadow: inset 4px 0 0 …` (v0.14.34: follows the pill radius)",
     $passes, $failures);
 
 ok((bool) preg_match(

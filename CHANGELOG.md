@@ -6,6 +6,68 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.34] — 2026-02-19 (Sidebar-Pille: blauer Balken *innerhalb* der Rundung)
+
+### Operator-Report (2026-02-19, mit Vergleichs-Screenshots)
+
+> „SO sieht ein aktiver Menueintrag aus, vorn mit dem blauen Balken!
+> Aber der geht nicht in den Rundungen ‚mit'."
+
+Der Referenz-Screenshot der Central-App zeigt: **beides** — voll
+gerundete blaue Pille + ein dicker blauer Balken links, der aber
+**innerhalb** der Rundung sitzt und den Konturen der Pille folgt.
+
+**Der Bug am 0.14.33-Fix:** ich hatte den Balken ersatzlos entfernt,
+weil `border-left` die linke Rundung zerstört. Das war die falsche
+Lösung — der Balken gehört rein, aber als `box-shadow: inset`, weil
+inset-Shadows von `border-radius` automatisch mit geclippt werden und
+so die Rundung respektieren.
+
+### Fix (`app/smail/v/current/app/plugins/nextcloud/css/folder-nav.css`)
+
+```diff
+  .b-folders li a.selectable.selected,
+  .b-folders li a.selected {
+      background-color: var(--color-primary-element-light, #e7f1fa) !important;
+      border-left: 0 !important;
++     box-shadow: inset 4px 0 0 0 var(--color-primary-element, #0693e3);
+      color: var(--color-primary-element, #0693e3) !important;
+      font-weight: 600;
+  }
+```
+
+**Warum `inset` das Richtige ist:**
+- `border-left: 4px solid …` würde 4 px an die *Außenseite* des Border-Box
+  malen — die `border-radius` wirkt nur auf die Ecken, nicht auf die
+  Kante zwischen Border und Content-Box. Ergebnis: rechteckiger Balken
+  ragt aus der Rundung heraus (der ursprüngliche 0.14.20–0.14.32 Look).
+- `box-shadow: inset 4px 0 0 …` malt einen 4-px breiten Schatten auf
+  die *Innenseite* der linken Kante. Weil der Shadow *inside* der
+  Pille sitzt, wird er von der `border-radius` genauso geclippt wie
+  der `background-color` — der Balken folgt dem oberen und unteren
+  Corner-Bogen.
+
+### Regression-Tests
+
+**`tests/test_folder_nav_css.php`** (34/34):
+- **negativer Guard**: `border-left: 4px solid var(--color-primary-element)` darf NICHT vorkommen (regression gegen den alten Look)
+- **positiver Guard**: `box-shadow: inset 4px 0 0 …var(--color-primary-element)` MUSS vorkommen
+
+**`tests/test_sidebar_polish_v14_29.php`** (15/15):
+- Zwei neue Assertions: kein `border-left`-Balken + inset-shadow gepinnt
+
+### Verifikation
+- `tests/test_folder_nav_css.php`: **34/34 PASS**
+- `tests/test_sidebar_polish_v14_29.php`: **15/15 PASS**
+- Volle Suite: **46 Suites / 1690 Assertions PASS**
+
+### Live-Verifikation
+Rsync `css/folder-nav.css` + `info.xml` + `package.json`, dann
+`occ upgrade` + Hard-Reload. Erwartet: aktiver Ordner ist eine
+voll-gerundete hellblaue Pille MIT dickem blauem Balken links, der
+den oberen/unteren Rundungsbogen sauber mitmacht (= exakt der
+Referenz-Screenshot).
+
 ## [0.14.33] — 2026-02-19 (Sidebar-Pille: Central-App-Parität)
 
 ### Operator-Report (2026-02-19, mit Vergleichs-Screenshots)

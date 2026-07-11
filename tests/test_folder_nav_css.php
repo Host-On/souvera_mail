@@ -122,20 +122,29 @@ assertTrue((bool) preg_match(
 ), "selected row uses --color-primary-element-light as background",
     $passes, $failures);
 
-// v0.14.33: NO 4-px accent bar on the selected row (regression guard
-// against reintroducing the old asymmetric look).
+// v0.14.34: NO 4-px `border-left` accent bar on the selected row
+// (would kill the rounded left corner). The bar is now painted via
+// `box-shadow: inset 4px 0 0 …` which respects the pill's radius.
 assertTrue(
     !(bool) preg_match(
-        '#\.b-folders li a(?:\.selectable)?\.selected[\s\S]{0,200}\{[^}]*border-left\s*:\s*4px\s+solid#s',
+        '#\.b-folders li a(?:\.selectable)?\.selected[\s\S]{0,300}\{[^}]*border-left\s*:\s*4px\s+solid#s',
         $css
     ),
-    "selected row does NOT paint a 4-px vertical accent bar (v0.14.33 removed it)",
+    "selected row does NOT paint a border-left 4-px accent bar (v0.14.33 removed it)",
+    $passes, $failures);
+
+// v0.14.34: the vertical bar IS painted, but as an inset box-shadow
+// so it follows the pill's rounded corners.
+assertTrue((bool) preg_match(
+    '#\.b-folders li a(?:\.selectable)?\.selected[\s\S]{0,300}\{[^}]*box-shadow\s*:\s*inset\s+4px\s+0\s+0\s+0?\s*var\(--color-primary-element#s',
+    $css
+), "selected row paints a 4-px NC-primary bar via `box-shadow: inset 4px 0 …` (follows the pill radius)",
     $passes, $failures);
 
 // v0.14.33: selected label + icon paint in NC-primary blue so the
 // pill has clear focus for colour-blind users too.
 assertTrue((bool) preg_match(
-    '#\.b-folders li a(?:\.selectable)?\.selected[\s\S]{0,200}\{[^}]*color\s*:\s*var\(--color-primary-element#s',
+    '#\.b-folders li a(?:\.selectable)?\.selected[\s\S]{0,300}\{[^}]*color\s*:\s*var\(--color-primary-element#s',
     $css
 ), "selected row label paints in --color-primary-element (v0.14.33 pill accent)",
     $passes, $failures);
