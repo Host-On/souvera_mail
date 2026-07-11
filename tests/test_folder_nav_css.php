@@ -108,9 +108,13 @@ assertTrue(empty($noFallback),
     $passes, $failures);
 
 // ---------------------------------------------------------------
-// 5. The money selectors — selected state = blue bar + light-blue tint
-// (v0.14.29 combined the `.selectable.selected` and plain `.selected`
-// rules into one comma-list — regex tolerates both shapes.)
+// 5. The money selectors — selected state = fully-rounded blue pill
+// (v0.14.33: NO left accent bar; pill is fully rounded on BOTH sides.
+// Earlier iterations (0.14.20 → 0.14.29) used a 4-px left border +
+// right-only rounded corners; the operator asked to match the Central
+// admin sidebar which uses the fully-rounded floating pill without a
+// bar. Regex tolerates the combined `.selectable.selected, .selected`
+// comma-list shipped since 0.14.29.)
 // ---------------------------------------------------------------
 assertTrue((bool) preg_match(
     '#\.b-folders li a\.selectable\.selected[\s\S]{0,200}\{[^}]*background-color\s*:\s*var\(--color-primary-element-light#s',
@@ -118,24 +122,52 @@ assertTrue((bool) preg_match(
 ), "selected row uses --color-primary-element-light as background",
     $passes, $failures);
 
-assertTrue((bool) preg_match(
-    '#\.b-folders li a\.selectable\.selected[\s\S]{0,200}\{[^}]*border-left(?:-color)?\s*:\s*(?:4px solid )?var\(--color-primary-element#s',
-    $css
-), "selected row uses --color-primary-element as border-left accent colour",
+// v0.14.33: NO 4-px accent bar on the selected row (regression guard
+// against reintroducing the old asymmetric look).
+assertTrue(
+    !(bool) preg_match(
+        '#\.b-folders li a(?:\.selectable)?\.selected[\s\S]{0,200}\{[^}]*border-left\s*:\s*4px\s+solid#s',
+        $css
+    ),
+    "selected row does NOT paint a 4-px vertical accent bar (v0.14.33 removed it)",
     $passes, $failures);
 
-// Base row must reserve 4 px on the left so the accent bar has room
+// v0.14.33: selected label + icon paint in NC-primary blue so the
+// pill has clear focus for colour-blind users too.
 assertTrue((bool) preg_match(
-    '#\.b-folders li a\s*\{[^}]*border-left\s*:\s*4px solid transparent#s',
+    '#\.b-folders li a(?:\.selectable)?\.selected[\s\S]{0,200}\{[^}]*color\s*:\s*var\(--color-primary-element#s',
     $css
-), "base .b-folders li a reserves 4px transparent border-left (accent bar slot)",
+), "selected row label paints in --color-primary-element (v0.14.33 pill accent)",
     $passes, $failures);
 
-// Rounded right corners on rows — the NC pill hugs the sidebar wall
+// v0.14.33: base row zeros the left border (no phantom bar breaking
+// the rounded left corner) and gives the pill 44 px line-height + 2/8
+// margin on BOTH sides.
 assertTrue((bool) preg_match(
-    '#\.b-folders li a\s*\{[^}]*border-radius\s*:\s*0 var\(--border-radius-large#s',
+    '#\.b-folders li a\s*\{[^}]*border-left\s*:\s*0#s',
     $css
-), "base row has 0 on the left, --border-radius-large on the right (NC pill shape)",
+), "base .b-folders li a zeroes border-left (v0.14.33 pill baseline)",
+    $passes, $failures);
+
+assertTrue((bool) preg_match(
+    '#\.b-folders li a\s*\{[^}]*line-height\s*:\s*44px#s',
+    $css
+), "base row uses 44px line-height (NC Files sidebar baseline)",
+    $passes, $failures);
+
+assertTrue((bool) preg_match(
+    '#\.b-folders li a\s*\{[^}]*margin\s*:\s*2px\s+8px\s*;#s',
+    $css
+), "base row margin is 2px 8px on BOTH sides (pill floats inside sidebar)",
+    $passes, $failures);
+
+// Fully-rounded pill on both sides — the money look. Regex accepts
+// either the shorthand `var(--border-radius-large)` or a 4-value form
+// where all four corners share the same radius.
+assertTrue((bool) preg_match(
+    '#\.b-folders li a\s*\{[^}]*border-radius\s*:\s*var\(--border-radius-large#s',
+    $css
+), "base row is fully-rounded (single radius, both sides — Central-App parity)",
     $passes, $failures);
 
 // Hover pill background — NC grey, not the engine's dark default

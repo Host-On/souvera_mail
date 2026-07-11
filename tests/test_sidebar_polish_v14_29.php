@@ -34,16 +34,36 @@ $cssPath = '/app/app/smail/v/current/app/plugins/nextcloud/css/folder-nav.css';
 $css = (string) file_get_contents($cssPath);
 
 // ---------------------------------------------------------------
-// 1. Selected row: `border-left: 4px solid <primary> !important`
+// 1. Selected row: v0.14.33 replaced the 4-px `border-left` accent
+//    with a fully-rounded blue pill (Central-App parity — operator
+//    screenshot 2026-02-19: "das sieht anders aus als bei den
+//    anderen apps"). Regression guard: the OLD 4-px bar must be
+//    GONE (would produce a phantom vertical line breaking the
+//    rounded left corner). The NEW selected style must paint the
+//    label in primary-blue so the pill has focus without a bar.
 // ---------------------------------------------------------------
+ok(
+    !(bool) preg_match(
+        '~\.b-folders li a\.selectable\.selected,?\s*\.b-folders li a\.selected\s*\{[\s\S]{0,400}border-left\s*:\s*4px solid var\(--color-primary-element~',
+        $css
+    ),
+    "Selected folder row NO LONGER paints a 4-px left accent bar (v0.14.33 removed it)",
+    $passes, $failures);
+
 ok((bool) preg_match(
-    '~\.b-folders li a\.selectable\.selected,?\s*\.b-folders li a\.selected\s*\{[\s\S]{0,400}border-left\s*:\s*4px solid var\(--color-primary-element[^)]*\)\s*!important~',
+    '~\.b-folders li a\.selectable\.selected,?\s*\.b-folders li a\.selected\s*\{[\s\S]{0,400}background-color\s*:\s*var\(--color-primary-element-light~',
     $css
-), "Selected folder row uses `border-left: 4px solid …primary… !important` (blaue Balken robust)",
+), "Selected folder row paints `background-color: var(--color-primary-element-light)` (Central-Pille)",
+    $passes, $failures);
+
+ok((bool) preg_match(
+    '~\.b-folders li a\.selectable\.selected,?\s*\.b-folders li a\.selected\s*\{[\s\S]{0,400}color\s*:\s*var\(--color-primary-element[^-]~',
+    $css
+), "Selected folder row paints label + icon in `var(--color-primary-element)` (v0.14.33)",
     $passes, $failures);
 
 ok(str_contains($css, '.b-folders li a.selected'),
-    "Selector now covers plain `.selected` (not only `.selectable.selected`) so user-sub-folders match",
+    "Selector still covers plain `.selected` (user-sub-folders match)",
     $passes, $failures);
 
 // ---------------------------------------------------------------

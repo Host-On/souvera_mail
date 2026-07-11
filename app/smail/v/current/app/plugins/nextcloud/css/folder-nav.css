@@ -5,38 +5,35 @@
  * ~~~
  * Snappymail's default sidebar renders the active folder with a dark
  * background (`--folders-selected-bg-color` default `#333`) and no
- * accent bar. That's completely off-brand next to native Nextcloud
- * apps (Mail, Files, Shield, Contacts) which universally use:
+ * accent. Native Nextcloud apps (Files, Central, Shield, Contacts) all
+ * use the SAME visual grammar for the active navigation entry:
  *
- *   • A vibrant blue vertical bar (4 px) on the left edge of the
- *     active menu item
  *   • A soft light-blue background tint on the active item
- *   • Rounded right corners so the pill hugs the sidebar wall
+ *   • A **fully rounded pill** — margin on BOTH sides so the pill
+ *     floats inside the sidebar (NOT flush against either wall)
+ *   • **NO left accent bar** — the pill itself is the marker
+ *   • Comfortable row height (44 px) so the sidebar breathes the way
+ *     NC's `NcAppNavigationItem` component does
  *   • Grey hover state as a discovery affordance
  *
- * Applying that same visual grammar to Snappymail's folder list makes
- * Souvera Mail feel like a native NC app instead of an embedded webmail
- * client. All colours come from Nextcloud's CSS custom-properties with
- * sensible off-brand fallbacks so the sidebar still looks right even if
- * the theme is Snappymail-only (e.g. when the plugin is used outside
- * NC in future).
+ * v0.14.33 (operator screenshot 2026-02-19, "das sieht anders aus als
+ * bei den anderen apps"): earlier iterations shipped a thin 4-px blue
+ * left border + right-only rounded corners + 36 px line-height. The
+ * operator compared side-by-side to the Central-Admin sidebar which
+ * uses the fully-rounded pill without a left bar and 44 px line-height
+ * — same as native NC Files. We now match that exactly.
  *
  * SCOPE
  * ~~~~~
  * Selectors are scoped to `.b-folders` so we can't accidentally repaint
  * the message-list `.selected` state (which uses the same class name).
- * Specificity climbs one notch above the engine's own rule
- * (`.b-folders li a.selectable.selected` → we match at the same
- * specificity but ship last, so cascade wins).
  *
  * SPACING NOTE
  * ~~~~~~~~~~~~
  * The engine's default `padding: 0 2em 0 7px` collides with the
- * left-border we want (we'd be painting the border underneath the
- * text). We reset `padding-left` to `12px` to leave visual air, and
- * increase `line-height` to `36px` so the rows breathe the way NC
- * sidebar rows do (Files uses 44 px, but 36 keeps parity with the
- * unread-badge alignment further down in this file).
+ * horizontal padding we want. We reset `padding: 0 12px` (both sides
+ * balanced now that no border-left steals space) and increase
+ * `line-height` to `44px` (NC Files sidebar baseline).
  * -----------------------------------------------------------------------
  */
 
@@ -45,15 +42,17 @@
         background: var(--color-main-background, transparent);
 }
 
-/* Base row — reset the dark defaults and give NC-style breathing room. */
+/* Base row — reset the dark defaults and give NC-style breathing room.
+   v0.14.33: fully rounded pill on BOTH sides, no left border, 44 px
+   line-height (NC Files baseline). */
 .b-folders li a {
-        border-left: 4px solid transparent;
-        border-radius: 0 var(--border-radius-large, 12px) var(--border-radius-large, 12px) 0;
+        border-left: 0 !important;
+        border-radius: var(--border-radius-large, 12px);
         color: var(--color-main-text, #222);
-        line-height: 36px;
-        margin: 2px 8px 2px 0;
-        padding: 0 12px 0 12px;
-        transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+        line-height: 44px;
+        margin: 2px 8px;
+        padding: 0 12px;
+        transition: background-color 120ms ease, color 120ms ease;
 }
 
 /* Hover — soft grey NC pill. Keep text colour stable (don't blank it). */
@@ -69,18 +68,20 @@
         color: var(--color-main-text, #222);
 }
 
-/* SELECTED — the money selector. Left accent bar + light-blue tint.
-   v0.14.29: `!important` on `border-left` because the engine's own
+/* SELECTED — the money selector. Fully rounded light-blue pill.
+   v0.14.33: `!important` on `border-left: 0` because the engine's own
    rule (`.b-folders li a { border-left: 3px solid transparent }` in
    static/css/app.css:1780) matches with equal specificity and the
    engine ships later depending on CSS-load order in a subset of NC
-   themes (operator screenshot 2026-02-19: hellblaue Pill sichtbar
-   aber KEIN Balken). Using the shorthand + !important pins it. */
+   themes. Zeroing the border-left keeps the pill visually symmetric
+   (no phantom vertical bar breaking the rounded left corner). Active
+   label + icon paint in NC-primary so the pill has clear focus even
+   for colour-blind users who can't spot the background tint change. */
 .b-folders li a.selectable.selected,
 .b-folders li a.selected {
         background-color: var(--color-primary-element-light, #e7f1fa) !important;
-        border-left: 4px solid var(--color-primary-element, #0693e3) !important;
-        color: var(--color-main-text, #222) !important;
+        border-left: 0 !important;
+        color: var(--color-primary-element, #0693e3) !important;
         font-weight: 600;
 }
 
@@ -183,11 +184,12 @@
         border: 1px solid var(--color-border, #ededed);
 }
 
-/* "Only unread" checkbox row — align with the folder rows above. */
+/* "Only unread" checkbox row — align with the folder rows above.
+   v0.14.33: fully-rounded pill (both sides) matching the folder-row style. */
 .b-folders .e-checkbox {
-        border-radius: 0 var(--border-radius-large, 12px) var(--border-radius-large, 12px) 0;
-        margin: 2px 8px 2px 0;
-        padding: 4px 12px;
+        border-radius: var(--border-radius-large, 12px);
+        margin: 2px 8px;
+        padding: 8px 12px;
 }
 .b-folders .e-checkbox:hover {
         background-color: var(--color-background-hover, #ebebeb);

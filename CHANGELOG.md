@@ -6,6 +6,68 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.33] — 2026-02-19 (Sidebar-Pille: Central-App-Parität)
+
+### Operator-Report (2026-02-19, mit Vergleichs-Screenshots)
+
+> „Ich bin noch nicht zufrieden mit dem Submenu … das sieht anders aus
+> als bei den anderen apps. 1. die blaue Markierung die den aktiven Tab
+> zeigt ist völlig anders. 2. die Höhe der Zeilen ist auch völlig anders"
+
+Zwei Side-by-Side-Screenshots geschickt: Souvera Mail Sidebar (dünner
+blauer Balken links + eng gestapelte 36-px-Zeilen + rechts-gerundete
+Pille) vs. Central-Admin Sidebar (voll-gerundete blaue Pille beidseitig
++ 44-px-Zeilen + ohne Linksbalken + Label + Icon in NC-Primary-Blau).
+
+### Fix (`app/smail/v/current/app/plugins/nextcloud/css/folder-nav.css`)
+
+Kompletter Umbau der aktiven-Row-Optik:
+
+| Was | Vorher (0.14.20 → 0.14.32) | Jetzt (0.14.33 = Central-Parität) |
+|---|---|---|
+| Aktiver Marker | 4 px `border-left` blau | keine Linie — Pille selbst ist der Marker |
+| Pille-Radius | rechts gerundet (`0 12px 12px 0`) | rundum gerundet (`12px`) |
+| Row-Margin | `2px 8px 2px 0` (nur rechts) | `2px 8px` (beide Seiten — Pille floatet) |
+| Line-Height | 36 px | **44 px** (NC-Files-Baseline) |
+| Aktives Label | `--color-main-text` (Schwarz) | `--color-primary-element` (NC-Blau) |
+| Icon auf aktiver Row | `opacity: 0.85` (folgt Textfarbe) | `opacity: 1` (leuchtet in Blau) |
+| „Ungelesen"-Checkbox-Row | rechts-gerundet + 4px padding-vertikal | rundum gerundet + 8px padding-vertikal (matcht Folder-Rows) |
+
+Der schmale blaue Balken wird ersatzlos entfernt. Der Kontrast des
+aktiven Eintrags bleibt für Farbenblinde erhalten, weil Label + Icon
+jetzt in NC-Primary-Blau statt Schwarz gemalt werden (Doppel-Cue:
+Background + Label-Farbe wechseln).
+
+### Regression-Tests (aktualisiert)
+
+**`tests/test_folder_nav_css.php`** (34/34) — die alten Assertions auf
+`border-left: 4px` und `border-radius: 0 var(...)` durch neue
+Assertions ersetzt:
+1. **negative Guard**: KEIN 4-px Balken auf `.selected`
+2. Base-Row hat `border-left: 0` (kein Phantom-Bar zerstört Rundung)
+3. Base-Row hat `line-height: 44px` (NC-Files-Baseline)
+4. Base-Row hat `margin: 2px 8px` (beide Seiten symmetrisch)
+5. Base-Row hat einzelnen `border-radius: var(--border-radius-large)` (voll gerundet)
+6. Selected-Row hat `color: var(--color-primary-element)` (Blau-Label)
+
+**`tests/test_sidebar_polish_v14_29.php`** (14/14) — Assertion 1
+umgedreht (negative Guard gegen alten 4-px Balken) + 2 neue Assertions
+auf Background-Pille + Blau-Label.
+
+### Verifikation
+- `tests/test_folder_nav_css.php`: **34/34 PASS**
+- `tests/test_sidebar_polish_v14_29.php`: **14/14 PASS**
+- `tests/test_folder_type_icons_v14_31.php`: **35/35 PASS** (unverändert)
+- Volle lokale Suite: **46 Suites / 1690 Assertions PASS** (war 46/1684 in 0.14.32)
+
+### Live-Verifikation
+- Rsync `app/smail/v/current/app/plugins/nextcloud/css/folder-nav.css`
+  + `info.xml` + `package.json` nach `/mnt/nc-shared/custom_apps/souvera_mail/`
+- `sudo -u www-data php occ upgrade` (oder Cache-Backend leeren)
+- Hard-Reload im Browser (`Ctrl+Shift+R`)
+- Erwartet: aktiver Ordner ist eine voll-gerundete hellblaue Pille mit
+  fettem blauen Label — **kein** dünner Linksbalken, **44 px** Zeilenhöhe.
+
 ## [0.14.32] — 2026-02-19 (PHP 8.5 `curl_close()`-Deprecation entfernt)
 
 ### Operator-Report (2026-02-19)
