@@ -111,7 +111,7 @@ $routes = require '/app/appinfo/routes.php';
 assertTrue(isset($routes['routes']) && is_array($routes['routes']),
     "routes.php returns ['routes' => [...]] structure", $passes, $failures);
 $count = count($routes['routes']);
-assertTrue($count === 22, "routes.php registers exactly 22 routes (got: $count)", $passes, $failures);
+assertTrue($count === 24, "routes.php registers exactly 24 routes (got: $count) — v0.14.37 added sieveApply#folders + sieveApply#apply", $passes, $failures);
 
 $byName = [];
 foreach ($routes['routes'] as $r) { $byName[$r['name']] = $r; }

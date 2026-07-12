@@ -6,6 +6,148 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.37] — 2026-02-19 (NEU: Filter nachträglich auf bestehende Nachrichten anwenden)
+
+### Operator-Wunsch (2026-02-19)
+
+> „Es scheint zu funktionieren. Aber es fehlt ein Button um die Filter
+> nachträglich anzuwenden."
+
+Sieve ist by design ein Inbound-Filter — Stalwart lässt das Skript nur
+laufen, wenn eine neue Nachricht ankommt. Alte Nachrichten, die schon
+in der Mailbox sind, bleiben unberührt. Neuer Button schließt genau
+diese Lücke.
+
+### Scope-Entscheidungen des Operators
+
+- **1b** — Alle Aktionen inkl. `redirect` (echtes Weiterleiten via SMTP)
+- **2c** — Ordner-Auswahl per Dropdown im Modal
+- **3a** — Direkt anwenden, kein Dry-Run
+- **Defaults**: 2000 letzte Nachrichten pro Lauf, cap bei 5000
+
+### Was gebaut wurde
+
+**1. Mini-Interpreter** (`lib/Sieve/MiniInterpreter.php` + `Types.php`, ~600 LOC)
+
+Ein bewusst kleiner PHP-Sieve-Interpreter für den Subset, den
+Snappymail's `sieve.js` tatsächlich generiert. Kann:
+- `require [...]` (ignoriert)
+- `if / elsif / else` mit `allof`, `anyof`, `not`
+- Tests: `header`, `address`, `envelope`, `size`, `exists`
+- Match-Types: `:contains`, `:is`, `:matches` (Glob), `:regex`
+- Aktionen: `fileinto`, `redirect`, `keep`, `discard`, `stop`,
+  `addflag`, `removeflag`, `setflag`
+- Kommentare (`#` und `/* */`), Sieve-String-Escapes (`\\`, `\"`)
+
+Unbekannte Konstrukte werten `false` — safe under-apply statt
+Fehlalarm.
+
+**2. Service** (`lib/Service/SieveApplyService.php`, ~500 LOC)
+
+- `listFolders($userId)` — Mailbox/get für den Dropdown
+- `apply($userId, $folderId, $limit, $includeRedirect)`:
+  1. Aktives Sieve-Skript holen (aus `SieveScriptService::listScriptsWithBodies`)
+  2. Parsen mit `MiniInterpreter`
+  3. Mailbox-IDs via `Mailbox/get` cachen
+  4. Nachrichten-IDs via `Email/query filter=inMailbox sort=receivedAt desc`
+  5. Fakten via `Email/get properties=[id,mailboxIds,size,headers,from,to]`
+  6. Regeln evaluieren
+  7. Aktionen ausführen:
+     - `fileinto` → `Email/set update mailboxIds` (MOVE, nicht Copy)
+     - `discard` → **Move-to-Trash** (nicht destroy — Undo möglich)
+     - `addflag` → `Email/set update keywords/*` (RFC 8621 §4.1.1
+       normalised: `\Seen` → `$seen`)
+     - `redirect` → `EmailSubmission/set create` mit
+       `urn:ietf:params:jmap:submission` — Stalwart holt das SMTP-Envelope
+       aus der ersten Identity/get-Response
+  8. Zähler + Fehler zurückgeben
+
+**3. Controller + Routes** (`lib/Controller/SieveApplyController.php`)
+
+- `GET  /apps/souvera_mail/sieve/apply/folders` → Ordnerliste
+- `POST /apps/souvera_mail/sieve/apply` → Ausführung mit
+  `{ folderId, limit, includeRedirect }` body
+- `NoAdminRequired` (Filter sind Per-User)
+- Audit-Log-Zeile für jeden erfolgreichen Lauf ins `nextcloud.log`
+
+**4. UI-Enricher** (`js/sieve-apply.js`, ~280 LOC)
+
+- MutationObserver wartet auf Snappymail's Sieve-Popup
+  (`.b-popups-sieve-script`), injiziert Button „Auf Ordner anwenden…"
+  in die Footer-Toolbar
+- Klick öffnet Native-Modal (kein Knockout-Popup-Framework — pure DOM),
+  Dropdown wird via `SmailSieveApplyFoldersUrl` befüllt
+- Submit postet an `SmailSieveApplyUrl`, zeigt Zusammenfassung im
+  Modal-Status ("12 geprüft, 5 verschoben, 2 weitergeleitet, 1 verworfen")
+- Nach Erfolg: Snappymail-Refresh der Folder-Counts via
+  `rl.app.folderInformationMultiplyList([folderId])`
+- Explizite Warnung im Modal: „Weitergeleitete Nachrichten gehen
+  ERNEUT per SMTP an die im Skript hinterlegten Empfänger."
+- Alle interaktiven Elemente mit `data-testid="sieve-apply-*"` für
+  spätere e2e-Tests
+
+**5. Endpoints in `rl.settings.Nextcloud`**
+
+- `SmailSieveApplyFoldersUrl` — GET
+- `SmailSieveApplyUrl` — POST
+
+### Sicherheits-Guardrails
+
+- **Move-to-Trash statt destroy** bei `discard` (User kann wiederherstellen)
+- **Cap bei 5000 Nachrichten pro Lauf** (verhindert Runaway-Loops)
+- **Bearer wird pro Request neu geholt** (kein Session-Sharing)
+- **Audit-Log** aller Läufe mit Zählern
+- **Rate-Limiting NICHT implementiert** — bewusst offen als P2-Task
+
+### Tests
+
+**`tests/test_sieve_mini_interpreter.php`** (NEU, 24/24) — pinnt
+Interpreter-Verhalten gegen den echten Snappymail-Output:
+- Real-World-Skript aus dem Operator-Screenshot (Emergent → redirect)
+- `stop;` short-circuit funktioniert
+- Match-Types `:is`, `:matches` (Glob), `:regex`
+- `envelope` vs. `header` Trennung (fällt NICHT auf From-Header zurück)
+- `size :over 100K` mit K/M/G-Suffixen
+- `allof + not` Kombination
+- `address :contains` extrahiert Email aus `Name <a@b>`-Form
+- Kommentar-Stripping ignoriert Braces INNERHALB von Kommentaren
+
+**`tests/test_sieve_apply_wiring.php`** (NEU, 41/41) — verifiziert:
+- Beide Routes registriert mit korrektem Verb/URL
+- Controller ist `NoAdminRequired`, gibt JSON, loggt Audit-Zeile
+- Service verwendet erwartete JMAP-Methoden inkl. `submission`-Capability
+- Service verwendet `MAX_LIMIT=5000` + `DEFAULT_LIMIT=2000`
+- `discard` mappt auf Trash-Move (regex prüft die exakte Struktur)
+- Plugin registriert JS + exponiert URLs via `linkToRoute()`
+- JS liest URLs aus rl.settings.Nextcloud, hat alle `data-testid`s
+- Alle neuen PHP-Dateien `php -l` clean
+
+**`tests/test_connected_devices.php` + `test_souvera_mail_rename.php`**:
+Route-Count-Assertions von 22 auf 24 aktualisiert.
+
+### Verifikation
+
+- Volle Suite: **49 Suites / 1772 Assertions PASS** (war 47/1707 in 0.14.36)
+- `mcp_lint_javascript`: sauber
+- `mcp_lint_python` auf `lib/`: keine Warnings
+
+### Live-Deploy
+
+Rsync:
+- `lib/Sieve/MiniInterpreter.php`
+- `lib/Sieve/Types.php`
+- `lib/Service/SieveApplyService.php`
+- `lib/Controller/SieveApplyController.php`
+- `appinfo/routes.php`
+- `appinfo/info.xml`
+- `package.json`
+- `app/smail/v/current/app/plugins/nextcloud/index.php`
+- `app/smail/v/current/app/plugins/nextcloud/js/sieve-apply.js`
+
+Dann `sudo -u www-data php occ upgrade` und Sieve-Editor im Webmail
+öffnen — Button „Auf Ordner anwenden…" erscheint links in der Footer-
+Toolbar. Klick → Modal → Ordner wählen → Anwenden.
+
 ## [0.14.36] — 2026-02-19 (Sieve `CantSaveFilters[351]` — JMAP-Upload-Fix)
 
 ### Partner-Agent-Diagnose (2026-02-19, read-only forensics)

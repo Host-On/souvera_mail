@@ -122,5 +122,20 @@ return [
             'url' => '/stalwart/resync',
             'verb' => 'POST',
         ],
+        [
+            // v0.14.37 — "Filter nachträglich anwenden" — pop the
+            // folder list for the picker dropdown.
+            'name' => 'sieveApply#folders',
+            'url' => '/sieve/apply/folders',
+            'verb' => 'GET',
+        ],
+        [
+            // v0.14.37 — run the active Sieve script against
+            // messages already in a target folder. Body:
+            // { folderId, limit?, includeRedirect? }
+            'name' => 'sieveApply#apply',
+            'url' => '/sieve/apply',
+            'verb' => 'POST',
+        ],
     ]
 ];

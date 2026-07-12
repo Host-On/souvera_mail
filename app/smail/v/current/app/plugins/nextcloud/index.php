@@ -38,6 +38,11 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			$this->addJs('js/help-modal.js');
 			$this->addJs('js/dropdown-menu.js');
 			$this->addJs('js/folder-names.js');
+			// v0.14.37 — "Filter nachträglich anwenden" button in the
+			// Sieve editor toolbar. Pure DOM injection + fetch, no
+			// Knockout ViewModel — matches the pattern used by
+			// dropdown-menu.js and folder-names.js.
+			$this->addJs('js/sieve-apply.js');
 
 			$this->addCss('css/help-modal.css');
 			$this->addCss('css/folder-nav.css');
@@ -305,6 +310,13 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 				'SmailConnectedDevicesListUrl' => $oUrlGen->linkToRoute('souvera_mail.connectedDevices.index'),
 				'SmailConnectedDevicesDestroyUrlTemplate' => $oUrlGen->linkToRoute('souvera_mail.connectedDevices.index') . '/__ID__',
 				'SmailConnectedDevicesSignOutOthersUrl' => $oUrlGen->linkToRoute('souvera_mail.connectedDevices.signOutOthers'),
+				// v0.14.37 — endpoints for the "Filter nachträglich anwenden"
+				// button injected into Snappymail's Sieve editor toolbar. The
+				// JS enricher (js/sieve-apply.js) pops a modal with a folder
+				// dropdown and posts to `SmailSieveApplyUrl` with the JSON
+				// body { folderId, limit, includeRedirect }.
+				'SmailSieveApplyFoldersUrl' => $oUrlGen->linkToRoute('souvera_mail.sieveApply.folders'),
+				'SmailSieveApplyUrl' => $oUrlGen->linkToRoute('souvera_mail.sieveApply.apply'),
 				// Legacy entry-point retained for browser bookmarks pointing at
 				// /apps/souvera_mail/settings — the controller now redirects to
 				// the engine-internal hash route #/settings/souvera-account.
