@@ -1,82 +1,80 @@
+/* global rl */
+
 /*
- * Souvera Mail — "Filter nachträglich anwenden" (v0.14.37)
+ * Souvera Mail — Menu-Item „Filter auf Ordner anwenden…" im Snappymail
+ * SystemDropDown (Top-Right User-Dropdown).
+ * ----------------------------------------------------------------
+ * Why THIS injection point (v0.14.39 rewrite)
+ * -------------------------------------------
+ * v0.14.37 tried to inject the button into the <footer> of the
+ * <dialog id="V-SieveScript"> popup. That approach was fragile
+ * because:
+ *   1. The dialog is created lazily by Snappymail's buildViewModel
+ *      on first `showModal()` — timing races with our observer
+ *   2. On mobile browsers the dialog's DOM structure has extra
+ *      wrapping <div>s that broke our querySelector('footer')
+ *   3. Even when injection succeeded, the button was cut off by
+ *      the popup's `max-height + overflow: hidden` on small screens
  *
- * ─────────────────────────────────────────────────────────────
- * WHY
- *   Sieve is an inbound-delivery filter: it only runs when a NEW
- *   message arrives at the MDA. After the operator has added a
- *   forwarding rule to their Sieve script, older messages that
- *   are already in the mailbox stay untouched — an obvious UX
- *   gap that Snappymail's stock UI does not close.
+ * The dropdown-menu injection (already used by
+ * `js/dropdown-menu.js` for „Alte Mails importieren") is a proven
+ * pattern that works across every screen size and popup state.
+ * The operator finds the entry in the top-right ⋮ menu, next to
+ * „Alte Mails importieren" — same neighbourhood, same UX.
  *
- *   This enricher injects a button "Auf Ordner anwenden…" into
- *   the Sieve script editor's toolbar. Clicking it opens a modal
- *   with a folder dropdown; on submit, POSTs to
- *   `SmailSieveApplyUrl`. The backend parses the active script
- *   with a small PHP interpreter and executes the resulting
- *   actions via JMAP Email/set (moves), EmailSubmission/set
- *   (redirects), and keyword updates.
- *
- * WHERE THE BUTTON LIVES
- *   Snappymail's Sieve editor is the `PopupsSieveScript` view
- *   (see `app/templates/Views/User/PopupsSieveScript.html`).
- *   Its footer contains `.buttons` with `Speichern`/`Schließen`.
- *   We watch for that footer to appear and prepend our own
- *   button. When the popup closes, our button is removed with
- *   the DOM.
- *
- * DEFENSIVE NOTES
- *   • We only render if BOTH `SmailSieveApplyFoldersUrl` and
- *     `SmailSieveApplyUrl` are present in `rl.settings.Nextcloud`.
- *     Old backends without those endpoints just skip the feature.
- *   • The button is disabled while a request is in flight and
- *     shows an inline spinner so the operator can't fire it
- *     twice by accident (redirect actions have real-world
- *     side-effects — resent emails).
- *   • On success, a toast summarises the counters:
- *     "12 verschoben, 3 weitergeleitet, 1 verworfen".
- *   • On failure, the backend's error message is surfaced
- *     verbatim into the toast — no silent swallowing.
- * ─────────────────────────────────────────────────────────────
+ * Order in the menu (after this file loads):
+ *   Konten
+ *   Konto hinzufügen
+ *   Kontakte
+ *   Einstellungen ⚙
+ *   🔄 Postfach neu synchronisieren
+ *   📥 Alte Mails importieren
+ *   🔎 Filter auf Ordner anwenden…     ← NEW
+ *   🛈 Hilfe
+ *   ⏻ Ausloggen
+ * ----------------------------------------------------------------
  */
-(rl => {
+(function () {
     'use strict';
 
-    const cfg = rl && rl.settings && rl.settings.get && rl.settings.get('Nextcloud');
+    if (!window.rl) { return; }
+
+    const cfg = rl.settings && rl.settings.get && rl.settings.get('Nextcloud');
     if (!cfg || !cfg.SmailSieveApplyFoldersUrl || !cfg.SmailSieveApplyUrl) {
         return;
     }
 
     const FOLDERS_URL = cfg.SmailSieveApplyFoldersUrl;
     const APPLY_URL = cfg.SmailSieveApplyUrl;
+    const MARKER = 'sv-sieve-apply-menu';
+    const MENU_SEL = 'menu[aria-labelledby="top-system-dropdown-id"]';
+    // Anchor: place the item RIGHT BEFORE the migration entry so the
+    // order reads „🔄 Sync → 📥 Import → 🔎 Filter → 🛈 Hilfe".
+    const MIG_ANCHOR_SEL = '[data-sv-mig-menu]';
+    const HELP_SEL = 'a[data-i18n="GLOBAL/HELP"]';
 
-    // v0.14.38: diagnostic breadcrumb — if you don't see the button on
-    // the live app, open the browser DevTools console and look for
-    // this line. Its presence proves that (a) the plugin was loaded
-    // by Snappymail and (b) the two endpoint URLs made it through
-    // rl.settings.Nextcloud. Absence means the plugin registration
-    // (`app/plugins/nextcloud/index.php`) or the URL-injection
-    // (`SmailSieveApplyUrl`) didn't reach the browser — usually a
-    // stale opcode cache; run `sudo -u www-data php occ maintenance:
-    // repair` or restart php-fpm.
+    // Diagnostic breadcrumb — appears once per page-load in the browser
+    // console. If you don't see this, the plugin didn't reach the JS
+    // layer (usually stale opcode cache or plugin config not loaded).
     if (window.console && window.console.info) {
-        window.console.info('[Souvera Mail] sieve-apply.js loaded, endpoints:', {
-            foldersUrl: FOLDERS_URL, applyUrl: APPLY_URL
+        window.console.info('[Souvera Mail] sieve-apply.js loaded; endpoints:', {
+            foldersUrl: FOLDERS_URL,
+            applyUrl: APPLY_URL
         });
     }
 
-    // -----------------------------------------------------------
-    // CSRF token — mounted at `document.head.dataset.oc-requesttoken`
-    // by Nextcloud; some builds also expose it on window.
-    // -----------------------------------------------------------
+    // ---------------------------------------------------------------
+    // CSRF token — mounted at `document.head.dataset.requesttoken` by
+    // Nextcloud; some builds also expose it on window.
+    // ---------------------------------------------------------------
     const csrfToken = () =>
         (document.head && document.head.dataset && document.head.dataset.requesttoken)
         || (window.OC && window.OC.requestToken)
         || '';
 
-    // -----------------------------------------------------------
-    // Small DOM helper — avoids pulling in a whole framework.
-    // -----------------------------------------------------------
+    // ---------------------------------------------------------------
+    // Small DOM helper.
+    // ---------------------------------------------------------------
     const el = (tag, attrs, children) => {
         const node = document.createElement(tag);
         if (attrs) {
@@ -95,19 +93,24 @@
         return node;
     };
 
-    // -----------------------------------------------------------
-    // Modal — plain absolute overlay, no dependency on Snappymail's
-    // popup framework (which is Knockout-based and hard to piggyback
-    // without a compile step).
-    // -----------------------------------------------------------
+    // ---------------------------------------------------------------
+    // The modal — same UX as v0.14.37 but self-contained (no popup-
+    // context assumption). Called both from the dropdown menu entry
+    // and from the custom event `souvera-mail:open-sieve-apply`
+    // (so the Vue overlay can also open it).
+    // ---------------------------------------------------------------
+    let modalOpen = false;
     const openModal = () => {
+        if (modalOpen) { return; }
+        modalOpen = true;
+
         const overlay = el('div', {
             className: 'souvera-sieve-apply-overlay',
             'data-testid': 'sieve-apply-modal',
             style: [
                 'position:fixed', 'inset:0',
                 'background:rgba(0,0,0,0.45)',
-                'z-index:10000',
+                'z-index:100000',
                 'display:flex', 'align-items:center', 'justify-content:center'
             ].join(';')
         });
@@ -120,6 +123,7 @@
                 'border-radius:var(--border-radius,8px)',
                 'padding:24px 28px',
                 'width:min(480px, 90vw)',
+                'max-height:90vh', 'overflow-y:auto',
                 'box-shadow:0 10px 30px rgba(0,0,0,0.25)',
                 'font-family:var(--font-face, system-ui)'
             ].join(';')
@@ -198,6 +202,7 @@
 
         const closeModal = () => {
             if (overlay.parentNode) { overlay.parentNode.removeChild(overlay); }
+            modalOpen = false;
         };
         cancelBtn.addEventListener('click', closeModal);
         overlay.addEventListener('click', ev => {
@@ -231,7 +236,7 @@
         });
 
         applyBtn.addEventListener('click', () => {
-            if (applyBtn.disabled) return;
+            if (applyBtn.disabled) { return; }
             applyBtn.disabled = true;
             cancelBtn.disabled = true;
             select.disabled = true;
@@ -246,11 +251,7 @@
                     Accept: 'application/json',
                     requesttoken: csrfToken()
                 },
-                body: JSON.stringify({
-                    folderId: folderId,
-                    limit: 2000,
-                    includeRedirect: true
-                })
+                body: JSON.stringify({ folderId: folderId, limit: 2000, includeRedirect: true })
             }).then(r => r.json()).then(data => {
                 if (!data || data.status !== 'ok') {
                     status.textContent = 'Fehler: ' + ((data && data.message) || 'unbekannt');
@@ -266,7 +267,7 @@
                     (data.flagged || 0) + ' markiert'
                 ].join(', ');
                 status.innerHTML =
-                    '<span style="color:var(--color-success,#3a7))">✓ Fertig — ' + summary + '</span>';
+                    '<span style="color:var(--color-success,#3a7);">✓ Fertig — ' + summary + '</span>';
                 if (data.errors && data.errors.length) {
                     status.innerHTML +=
                         '<div style="margin-top:8px;color:var(--color-warning,#c60);">'
@@ -278,7 +279,9 @@
                 // Nudge Snappymail to re-read the mailbox counts so the
                 // folder tree shows the new state without an F5.
                 if (rl.app && rl.app.folderInformationMultiplyList) {
-                    try { rl.app.folderInformationMultiplyList([folderId]); } catch (_) { /* Snappymail rejected the refresh — non-fatal */ }
+                    try {
+                        rl.app.folderInformationMultiplyList([folderId]);
+                    } catch (_) { /* Snappymail rejected the refresh — non-fatal */ }
                 }
             }).catch(err => {
                 status.textContent = 'Netzwerkfehler: ' + err;
@@ -288,66 +291,84 @@
         });
     };
 
-    // -----------------------------------------------------------
-    // Toolbar injection.
-    //
-    // Snappymail renders every popup as `<dialog id="V-<Name>">` (see
-    // app.js buildViewModel: `createElement('dialog',{id:'V-'+id})`).
-    // The Sieve editor's `viewModelTemplateID` is literally
-    // `SieveScript`, so we look for `#V-SieveScript`.
-    //
-    // Inside the dialog the template contributes a `<footer>` element
-    // (see `app/templates/Views/User/PopupsSieveScript.html:72`) that
-    // holds the Save button. We prepend our own `<a class="btn">` so
-    // it appears LEFT of the save action — matching Snappymail's own
-    // convention (raw-script-toggle also sits on the left).
-    //
-    // The dialog is created ONCE on first-use and reused afterwards
-    // (Knockout `open`/`close` toggles the attribute, not the element),
-    // so a single injection is enough. If the dialog doesn't exist
-    // yet at plugin-load time we watch for it via MutationObserver.
-    // -----------------------------------------------------------
-    const BUTTON_ID = 'souvera-sieve-apply-toolbar-btn';
+    // Publish the opener under a custom event so the Vue overlay can
+    // trigger the modal without touching Snappymail internals.
+    window.addEventListener('souvera-mail:open-sieve-apply', openModal);
 
-    const injectButtonInto = (dialog) => {
-        if (!dialog || dialog.querySelector('#' + BUTTON_ID)) { return true; }
-        const footer = dialog.querySelector('footer') || dialog.querySelector('.buttons');
-        if (!footer) { return false; }
-        const btn = el('a', {
-            id: BUTTON_ID,
-            'data-testid': 'sieve-apply-toolbar-btn',
-            href: '#',
-            className: 'btn',
-            title: 'Aktives Filter-Skript auf einen bereits vorhandenen Ordner anwenden.',
-            style: 'margin-right:auto;'
-        }, ['Auf Ordner anwenden…']);
-        btn.addEventListener('click', ev => {
+    // ---------------------------------------------------------------
+    // Menu injection (proven pattern from dropdown-menu.js).
+    // ---------------------------------------------------------------
+    const closeDropdown = () => {
+        const toggle = document.getElementById('top-system-dropdown-id');
+        if (toggle && toggle.getAttribute('aria-expanded') === 'true') {
+            try { toggle.click(); } catch (_e) { /* silent */ }
+        }
+    };
+
+    const buildMenuItem = () => {
+        const li = document.createElement('li');
+        li.setAttribute('role', 'presentation');
+        li.setAttribute('data-' + MARKER, '1');
+        const a = document.createElement('a');
+        a.setAttribute('href', '#');
+        a.setAttribute('tabindex', '-1');
+        a.setAttribute('data-icon', '🔎');
+        a.setAttribute('data-testid', 'sieve-apply-toolbar-btn');
+        a.textContent = 'Filter auf Ordner anwenden…';
+        a.addEventListener('click', ev => {
             ev.preventDefault();
-            ev.stopPropagation();
+            closeDropdown();
             openModal();
         });
-        footer.insertBefore(btn, footer.firstChild);
-        return true;
+        li.appendChild(a);
+        return li;
     };
 
-    const tryInject = () => {
-        const dialog = document.querySelector('#V-SieveScript');
-        return dialog ? injectButtonInto(dialog) : false;
+    const injectInto = menu => {
+        if (!menu || menu.querySelector('[data-' + MARKER + ']')) { return; }
+        const li = buildMenuItem();
+        // Place BEFORE the migration entry (📥) if present, so order
+        // reads „…Sync 🔄 · Import 📥 · Filter 🔎 · Hilfe 🛈…".
+        // Wait — we want it AFTER migration so the visual flow reads:
+        //   Sync 🔄 → Import 📥 → then the new post-import step:
+        //   apply filters to the just-imported messages 🔎.
+        const migAnchor = menu.querySelector(MIG_ANCHOR_SEL);
+        const helpLink = menu.querySelector(HELP_SEL);
+        const helpLi = helpLink ? helpLink.closest('li') : null;
+        if (migAnchor && migAnchor.nextSibling) {
+            menu.insertBefore(li, migAnchor.nextSibling);
+        } else if (helpLi && helpLi.parentNode === menu) {
+            menu.insertBefore(li, helpLi);
+        } else {
+            menu.appendChild(li);
+        }
     };
 
-    const observer = new MutationObserver(() => tryInject());
-    const start = () => {
-        if (!document.body) { return; }
-        // Try once immediately — the dialog may already be in the DOM
-        // when we load (Snappymail bootstraps popups on-demand, but
-        // some builds pre-create them).
-        if (tryInject()) { return; }
-        // Otherwise watch for the dialog to appear.
-        observer.observe(document.body, { childList: true, subtree: true });
+    const scanOnce = () => {
+        document.querySelectorAll(MENU_SEL).forEach(injectInto);
     };
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', start);
+        document.addEventListener('DOMContentLoaded', scanOnce, { once: true });
     } else {
-        start();
+        scanOnce();
     }
-})(window.rl || {});
+
+    const observer = new MutationObserver(records => {
+        for (const rec of records) {
+            for (const n of rec.addedNodes) {
+                if (n && n.nodeType === 1) {
+                    if (n.matches && n.matches(MENU_SEL)) {
+                        injectInto(n);
+                    } else if (n.querySelector) {
+                        const m = n.querySelector(MENU_SEL);
+                        if (m) { injectInto(m); }
+                    }
+                }
+            }
+        }
+    });
+    if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+})();

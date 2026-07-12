@@ -114,14 +114,15 @@ $check(\str_contains($jsSrc, 'SmailSieveApplyFoldersUrl')
     && \str_contains($jsSrc, 'SmailSieveApplyUrl'),
     "sieve-apply.js reads the endpoint URLs from rl.settings.Nextcloud");
 foreach ([
-    'sieve-apply-toolbar-btn',
     'sieve-apply-modal',
     'sieve-apply-folder-select',
     'sieve-apply-run',
     'sieve-apply-cancel',
+    'sieve-apply-toolbar-btn',
 ] as $tid) {
     $check(\str_contains($jsSrc, "'data-testid': '{$tid}'")
-        || \str_contains($jsSrc, "data-testid=\"{$tid}\"") ,
+        || \str_contains($jsSrc, "data-testid=\"{$tid}\"")
+        || \str_contains($jsSrc, "'data-testid', '{$tid}'"),
         "sieve-apply.js has data-testid=\"{$tid}\" for automation hooks");
 }
 $check(\str_contains($jsSrc, 'includeRedirect'),
@@ -130,15 +131,26 @@ $check(\str_contains($jsSrc, 'folderInformationMultiplyList'),
     "sieve-apply.js pings Snappymail to re-read the folder counts after success");
 $check(\str_contains($jsSrc, 'ERNEUT per SMTP'),
     "sieve-apply.js warns the operator that redirect resends via SMTP (avoids surprise)");
-// v0.14.37b: after operator reported "Find keinen Button" — verify the
-// selector actually matches Snappymail's real popup DOM. The dialog is
-// created by buildViewModel() as `<dialog id="V-<TemplateId>">`, and
-// the SieveScript popup's template id is `SieveScript` (see
-// static/js/sieve.js SieveScriptPopupView → super('SieveScript')).
-$check(\str_contains($jsSrc, '#V-SieveScript'),
-    "sieve-apply.js targets the correct dialog id `#V-SieveScript` (v0.14.37b fix — was `.b-popups-sieve-script` which does not exist)");
-$check(\str_contains($jsSrc, "querySelector('footer')"),
-    "sieve-apply.js looks up the plain <footer> element inside the dialog (PopupsSieveScript.html renders a bare `<footer>`, not a class)");
+
+// v0.14.39: injection point switched from the Sieve-popup footer (too
+// fragile — DOM structure varies by Snappymail build + screen size)
+// to the proven top-right dropdown menu pattern (same as
+// dropdown-menu.js which injects „Alte Mails importieren" reliably).
+$check(\str_contains($jsSrc, 'top-system-dropdown-id'),
+    "sieve-apply.js targets the top-right dropdown menu (proven pattern from dropdown-menu.js — v0.14.39 fix after operator couldn't find the popup-footer button)");
+$check(\str_contains($jsSrc, "'data-icon', '🔎'"),
+    "sieve-apply.js uses 🔎 as menu icon (matches Souvera Mail's emoji-icon convention: 🔄 sync, 📥 import, 🔎 apply)");
+$check(\str_contains($jsSrc, 'sv-sieve-apply-menu'),
+    "sieve-apply.js tags the injected <li> with data-sv-sieve-apply-menu for idempotency");
+$check(\str_contains($jsSrc, "souvera-mail:open-sieve-apply"),
+    "sieve-apply.js exposes a `souvera-mail:open-sieve-apply` custom event so other UI layers (Vue overlay) can open the modal too");
+// Negative guard: the old fragile popup-footer approach must not sneak
+// back — v0.14.37 (`.b-popups-sieve-script`) and v0.14.38
+// (`#V-SieveScript` footer injection) both failed in the field.
+$check(!\str_contains($jsSrc, '.b-popups-sieve-script'),
+    "sieve-apply.js does NOT target the non-existent `.b-popups-sieve-script` class (v0.14.37 mistake)");
+$check(!\str_contains($jsSrc, "#V-SieveScript"),
+    "sieve-apply.js does NOT depend on the `#V-SieveScript` dialog id (v0.14.38 attempt — dropdown menu is more portable)");
 
 // -------------------------------------------------------------------
 // 6. `php -l` clean on the new PHP files.

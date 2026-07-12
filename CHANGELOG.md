@@ -6,6 +6,102 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.39] — 2026-02-19 (Sieve-Apply-Button auf Dropdown-Menü umgezogen)
+
+### Operator-Report (2026-02-19)
+
+> „Find keinen Button…." — mit Screenshots aus mobile Chrome.
+
+Trotz `#V-SieveScript`-Selektor-Fix in 0.14.38 fand der Operator den
+Button in der Sieve-Editor-Toolbar nicht. Analyse der Screenshots:
+
+1. Sieve-Editor-Dialog ist offen (Titel „Skript bearbeiten: smail.user")
+2. Footer zeigt nur `<>` (Rohansicht) + `💾 Speichern` — mein Button
+   fehlt
+3. Auf Mobile ist der Dialog kompakt → Footer hat `max-height +
+   overflow` → selbst ein injizierter Button wäre potenziell abgeschnitten
+
+**Root Cause:** DOM-Injection in Snappymail-Popups ist inhärent
+fragil — Timing-Race (Dialog wird lazily via `buildViewModel` erzeugt),
+Footer-Layout variiert auf Mobile, Bundle-Cache versteckt neue JS.
+
+### Fix (`js/sieve-apply.js`) — Injection-Punkt gewechselt
+
+**Statt** in den Sieve-Popup-Footer → **in das Top-Right-Dropdown-Menü**
+(dieselbe Injection-Route wie `dropdown-menu.js` für „📥 Alte Mails
+importieren" und „🔄 Postfach neu synchronisieren" — bewährt, funktioniert
+zuverlässig auf allen Screens).
+
+Neuer Menü-Eintrag (im ⋮-Menü rechts oben):
+```
+Konten
+Konto hinzufügen
+Kontakte
+Einstellungen ⚙
+🔄 Postfach neu synchronisieren
+📥 Alte Mails importieren
+🔎 Filter auf Ordner anwenden…     ← NEU
+🛈 Hilfe
+⏻ Ausloggen
+```
+
+Klick auf den Eintrag öffnet dasselbe Modal wie bisher (Ordner-Dropdown
+→ Anwenden → Zähler-Zusammenfassung).
+
+Der frühere `#V-SieveScript` + `querySelector('footer')`-Code wurde
+komplett entfernt — nicht als Fallback belassen, weil auf Mobile der
+teilweise-injizierte Button die Nutzer noch mehr verwirren würde.
+
+### Zusätzlich (Bonus)
+
+- Custom-Event `souvera-mail:open-sieve-apply` — die Vue-Overlay-App
+  kann das Modal via `window.dispatchEvent(...)` auch von außen öffnen,
+  ohne Snappymail-Interna anzufassen
+- Diagnostic `console.info('[Souvera Mail] sieve-apply.js loaded, …')`
+  bleibt für Debugging
+
+### Regression-Tests
+
+`tests/test_sieve_apply_wiring.php`:
+- **Positive Guards** neu:
+  - `top-system-dropdown-id` MUSS im JS stehen
+  - `data-icon: 🔎` MUSS als Icon-Marker gesetzt sein
+  - `sv-sieve-apply-menu` MUSS als Idempotency-Tag stehen
+  - `souvera-mail:open-sieve-apply` MUSS als Custom-Event
+    registriert sein
+- **Negative Guards** — die alten Injection-Points dürfen NIE zurückkommen:
+  - `.b-popups-sieve-script` (v0.14.37-Mistake) — verboten
+  - `#V-SieveScript` (v0.14.38-Attempt) — verboten
+- data-testid-Checks toleriert jetzt beide Attribut-Setter-Formen
+  (`.setAttribute('data-testid', …)` vs. `.dataset.testid = …`)
+
+### Verifikation
+
+- Volle lokale Suite: **49 Suites / 1778 Assertions PASS** (war 49/1774)
+- `mcp_lint_javascript`: clean
+
+### Live-Verifikation nach Deploy
+
+1. Rsync `js/sieve-apply.js` + `info.xml` + `package.json`
+2. `sudo -u www-data php occ upgrade`
+3. **Hard-Reload** im Browser (`Ctrl+Shift+R` oder mobile: „Cache leeren
+   & neu laden") — sonst wird das alte JS aus dem Browser-Cache geladen
+4. DevTools-Konsole öffnen → erwartete Zeile:
+   `[Souvera Mail] sieve-apply.js loaded; endpoints: {…}`
+5. Rechts oben auf ⋮ / User-Icon klicken → im Dropdown-Menü muss
+   „🔎 Filter auf Ordner anwenden…" zwischen „📥 Alte Mails importieren"
+   und „🛈 Hilfe" stehen
+6. Klick → Modal → Ordner wählen → Anwenden → Zähler-Toast
+
+### Bekannte offene Punkte
+
+- **„Erweitert"-Modus geht nicht** — Screenshot 2 zeigt den Filter-
+  Settings-Radio-Button „Erweitert" bold aber nicht selected. Das ist
+  Snappymail's eigene UI; Ursache noch nicht identifiziert. Der
+  Operator sollte dazu die Browser-DevTools-Konsole öffnen und nach
+  einem JS-Fehler beim Klick auf „Erweitert" suchen — dann können wir
+  das gezielt debuggen.
+
 ## [0.14.38] — 2026-02-19 (Hotfix: Button-Selector auf `#V-SieveScript` — 0.14.37 hatte falschen Selector)
 
 ### Operator-Report (2026-02-19)
