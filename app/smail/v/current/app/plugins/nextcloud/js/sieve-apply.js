@@ -296,7 +296,66 @@
     window.addEventListener('souvera-mail:open-sieve-apply', openModal);
 
     // ---------------------------------------------------------------
-    // Menu injection (proven pattern from dropdown-menu.js).
+    // Popup-footer injection (v0.14.40 return to A after user request)
+    //
+    // The Sieve popup template `templates/Views/User/PopupsSieveScript.html`
+    // is wrapped in `<!-- ko with: script -->` — meaning the `<footer>`
+    // element ONLY exists in the DOM after the user has clicked either
+    // an existing script name or "Skript hinzufügen". A one-shot
+    // querySelector on load misses it every single time. We instead
+    // watch every subtree mutation and inject whenever we spot a
+    // `#V-SieveScript` dialog that ALSO has a `<footer>` inside.
+    //
+    // Snappymail's own toolbar buttons use `<a class="btn">…</a>` with
+    // an inner `<i class="fontastic">EMOJI</i>` — we mirror that shape
+    // so the button looks native (not glaringly custom-styled).
+    // ---------------------------------------------------------------
+    const POPUP_BTN_ID = 'souvera-sieve-apply-popup-btn';
+
+    const buildFooterButton = () => {
+        const a = document.createElement('a');
+        a.id = POPUP_BTN_ID;
+        a.className = 'btn';
+        a.href = '#';
+        a.title = 'Aktives Filter-Skript auf einen bereits vorhandenen Ordner anwenden.';
+        a.setAttribute('data-testid', 'sieve-apply-toolbar-btn');
+        const i = document.createElement('i');
+        i.className = 'fontastic';
+        i.textContent = '🔎';
+        a.appendChild(i);
+        const s = document.createElement('span');
+        s.textContent = ' Auf Ordner anwenden…';
+        a.appendChild(s);
+        a.addEventListener('click', ev => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            openModal();
+        });
+        return a;
+    };
+
+    const injectPopupFooter = () => {
+        // Snappymail may create <dialog id="V-SieveScript"> lazily; we
+        // therefore look everywhere for a matching dialog. Once the
+        // dialog exists AND has a `<footer>`, inject.
+        const dialogs = document.querySelectorAll('dialog#V-SieveScript, #V-SieveScript');
+        dialogs.forEach(dlg => {
+            if (dlg.querySelector('#' + POPUP_BTN_ID)) { return; }
+            const footer = dlg.querySelector('footer');
+            if (!footer) { return; }
+            // Insert as FIRST child so it sits LEFT of the raw-toggle
+            // and Save buttons — matching Snappymail's own conventions
+            // (leading actions on the left, primary Save on the right).
+            footer.insertBefore(buildFooterButton(), footer.firstChild);
+            if (window.console && window.console.info) {
+                window.console.info('[Souvera Mail] sieve-apply popup-footer button injected');
+            }
+        });
+    };
+
+    // ---------------------------------------------------------------
+    // Dropdown-menu injection (v0.14.39, kept as second entry point —
+    // proven pattern from dropdown-menu.js).
     // ---------------------------------------------------------------
     const closeDropdown = () => {
         const toggle = document.getElementById('top-system-dropdown-id');
@@ -313,7 +372,7 @@
         a.setAttribute('href', '#');
         a.setAttribute('tabindex', '-1');
         a.setAttribute('data-icon', '🔎');
-        a.setAttribute('data-testid', 'sieve-apply-toolbar-btn');
+        a.setAttribute('data-testid', 'sieve-apply-toolbar-btn-menu');
         a.textContent = 'Filter auf Ordner anwenden…';
         a.addEventListener('click', ev => {
             ev.preventDefault();
@@ -324,14 +383,9 @@
         return li;
     };
 
-    const injectInto = menu => {
+    const injectMenuInto = menu => {
         if (!menu || menu.querySelector('[data-' + MARKER + ']')) { return; }
         const li = buildMenuItem();
-        // Place BEFORE the migration entry (📥) if present, so order
-        // reads „…Sync 🔄 · Import 📥 · Filter 🔎 · Hilfe 🛈…".
-        // Wait — we want it AFTER migration so the visual flow reads:
-        //   Sync 🔄 → Import 📥 → then the new post-import step:
-        //   apply filters to the just-imported messages 🔎.
         const migAnchor = menu.querySelector(MIG_ANCHOR_SEL);
         const helpLink = menu.querySelector(HELP_SEL);
         const helpLi = helpLink ? helpLink.closest('li') : null;
@@ -344,31 +398,29 @@
         }
     };
 
-    const scanOnce = () => {
-        document.querySelectorAll(MENU_SEL).forEach(injectInto);
+    // ---------------------------------------------------------------
+    // Unified scan — runs once on load AND on every DOM mutation.
+    // Cheap enough (querySelector short-circuits) to be idempotent-safe.
+    // ---------------------------------------------------------------
+    const scan = () => {
+        injectPopupFooter();
+        document.querySelectorAll(MENU_SEL).forEach(injectMenuInto);
     };
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', scanOnce, { once: true });
+        document.addEventListener('DOMContentLoaded', scan, { once: true });
     } else {
-        scanOnce();
+        scan();
     }
 
-    const observer = new MutationObserver(records => {
-        for (const rec of records) {
-            for (const n of rec.addedNodes) {
-                if (n && n.nodeType === 1) {
-                    if (n.matches && n.matches(MENU_SEL)) {
-                        injectInto(n);
-                    } else if (n.querySelector) {
-                        const m = n.querySelector(MENU_SEL);
-                        if (m) { injectInto(m); }
-                    }
-                }
-            }
-        }
-    });
+    const observer = new MutationObserver(() => scan());
     if (document.body) {
         observer.observe(document.body, { childList: true, subtree: true });
+    } else {
+        // <body> not there yet — retry when DOM is ready.
+        document.addEventListener('DOMContentLoaded', () => {
+            observer.observe(document.body, { childList: true, subtree: true });
+            scan();
+        }, { once: true });
     }
 })();

@@ -6,6 +6,100 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.40] — 2026-02-19 (Sieve-Apply-Button in den Popup-Footer zurück — Option A)
+
+### Operator-Wahl
+
+> „A!" — Button gehört in den Sieve-Editor-Popup.
+
+### Was in 0.14.37/0.14.38 falsch war
+
+Beim Blick ins echte Template `templates/Views/User/PopupsSieveScript.html`
+zeigt sich: die gesamte Struktur (`<header>`, `<form>`, `<footer>`) ist
+in `<!-- ko with: script -->` gewrappt. Das bedeutet **das Popup ist
+komplett leer** bis der User entweder einen bestehenden Skriptnamen
+oder „Skript hinzufügen" anklickt — erst DANN rendert Snappymail das
+Innere inklusive `<footer>`.
+
+Meine früheren Versuche machten One-Shot-Querys, die den Footer nicht
+finden konnten weil er zu dem Zeitpunkt einfach noch nicht existierte.
+
+### Fix (`js/sieve-apply.js`, v0.14.40)
+
+- MutationObserver läuft auf `document.body` und triggert `scan()` bei
+  jeder Änderung
+- `scan()` sucht `dialog#V-SieveScript` UND einen `<footer>` darin;
+  wenn beide da sind → Button injizieren (idempotent via
+  `#souvera-sieve-apply-popup-btn`)
+- Button ist als `<a class="btn"><i class="fontastic">🔎</i><span>
+  Auf Ordner anwenden…</span></a>` gebaut — matcht exakt die native
+  Snappymail-Toolbar-Button-Struktur (siehe `PopupsSieveScript.html`
+  Zeile 73)
+- Insertion als `firstChild` des Footers → Button sitzt LINKS neben
+  Rohansicht (`<>`) und Speichern
+
+### Bonus: Zweiter Entry-Point bleibt
+
+Die Dropdown-Menü-Injection aus 0.14.39 bleibt drin (Belt-and-Suspenders).
+Zwei getrennte `data-testid`s:
+- `sieve-apply-toolbar-btn` — Button im Popup-Footer
+- `sieve-apply-toolbar-btn-menu` — Menü-Eintrag im Dropdown
+
+Wenn eins der beiden bei irgendeinem Setup nicht rendert, hat der User
+immer noch den anderen Weg. Fällt in Zukunft eine Snappymail-Version
+den Popup-Footer weg oder benennt sie das Dialog-ID um, funktioniert
+das Menü weiter — und umgekehrt.
+
+### Diagnostic-Log
+
+`console.info('[Souvera Mail] sieve-apply popup-footer button injected')`
+läuft **jedes Mal**, wenn die Injection erfolgreich war. Damit kann
+der Operator im DevTools-Log lückenlos verfolgen:
+
+1. Load-Zeitpunkt: `[Souvera Mail] sieve-apply.js loaded; endpoints: {…}`
+2. Popup-öffnen-Zeitpunkt: `[Souvera Mail] sieve-apply popup-footer button injected`
+3. Wenn Zeile 2 nie kommt → footer wird nicht gefunden → HTML-Struktur
+   auf dem Live-Server weicht vom Template ab → dann kann der Operator
+   im Elements-Panel das Innere von `#V-SieveScript` durchsuchen und
+   mir den echten Aufbau posten.
+
+### Regression-Tests
+
+`tests/test_sieve_apply_wiring.php` (angepasst):
+- Positive Guards für beide Entry-Points:
+  - `dialog#V-SieveScript, #V-SieveScript` — Popup-Selector
+  - `querySelector('footer')` — Footer-Lookup
+  - `souvera-sieve-apply-popup-btn` — Idempotency-ID
+  - Diagnostic-Log-String `popup-footer button injected`
+  - `top-system-dropdown-id` — Dropdown-Menü-Selector bleibt
+- Negative Guard: `.b-popups-sieve-script` weiterhin verboten
+
+### Verifikation
+
+- Volle Suite: **49 Suites / 1781 Assertions PASS**
+- `mcp_lint_javascript`: clean
+
+### Live-Verifikation nach Deploy — bitte in dieser Reihenfolge
+
+1. Rsync `js/sieve-apply.js` + `info.xml` + `package.json`
+2. `sudo -u www-data php occ upgrade`
+3. **Hard-Reload** (`Ctrl+Shift+R`)
+4. DevTools öffnen (Desktop: F12; Mobile: `chrome://inspect` vom
+   Desktop aus)
+5. Konsole beobachten:
+   - Muss zeigen: `[Souvera Mail] sieve-apply.js loaded; endpoints:
+     {…}` — sonst JS nicht geladen (Cache!) → PHP-FPM reload
+6. Zu Einstellungen → Filter → auf **`smail.user`** klicken (nicht nur
+   „Erweitert" — der Popup rendert seinen Content erst mit dem Skript)
+7. Konsole muss zeigen: `[Souvera Mail] sieve-apply popup-footer
+   button injected`
+8. Im Popup-Footer LINKS neben `<>` und Speichern muss stehen:
+   `🔎 Auf Ordner anwenden…`
+
+Wenn Schritt 7 nie kommt: bitte im DevTools-Elements-Panel auf
+`#V-SieveScript` navigieren und Screenshot der Kinder posten — dann
+sehe ich, welche Elemente Snappymail bei dir tatsächlich rendert.
+
 ## [0.14.39] — 2026-02-19 (Sieve-Apply-Button auf Dropdown-Menü umgezogen)
 
 ### Operator-Report (2026-02-19)
