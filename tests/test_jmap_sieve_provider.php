@@ -69,8 +69,13 @@ assertTrue(str_contains($svc, "'Blob/get'"),
 assertTrue(str_contains($svc, "'#ids'") && str_contains($svc, "'resultOf' => 'c0'"),
     "SieveScriptService chains SieveScript/get → Blob/get via JMAP back-reference (1 round-trip)",
     $passes, $failures);
-assertTrue(str_contains($svc, "'/jmap/upload?account='"),
-    "SieveScriptService uploads blobs via JMAP-standard /jmap/upload endpoint", $passes, $failures);
+assertTrue(str_contains($svc, "'/jmap/upload/'") && str_contains($svc, "\\rawurlencode(\$accountId)"),
+    "SieveScriptService uploads blobs via JMAP path-style URL /jmap/upload/{accountId}/ (v0.14.36 fix: was ?account= before, which Stalwart 0.16 404s)",
+    $passes, $failures);
+// Negative guard against the broken query-param form ever coming back.
+assertTrue(!str_contains($svc, "'/jmap/upload?account='"),
+    "SieveScriptService MUST NOT use the query-param form '?account=' (partner-agent diagnosis 2026-02-19)",
+    $passes, $failures);
 
 // ---------------------------------------------------------------
 // 2. JmapSieveStorage — engine-side provider

@@ -56,15 +56,23 @@ $ctx = file_get_contents('/app/lib/Service/StalwartUserContext.php');
 assertTrue(preg_match('#public function resolveEmail\(string \$userId\)\s*:\s*string#', $ctx) === 1,
     "StalwartUserContext has resolveEmail(string \$userId): string", $passes, $failures);
 
-// resolveAccountId() must delegate to resolveEmail() — single source of truth
+// resolveAccountId() — v0.14.36 rewrite: source of truth moved to the
+// JMAP session (`/jmap/session` → `primaryAccounts`) after the partner-
+// agent diagnosis 2026-02-19 showed souvera_central::findAccountId was
+// truncating account ids to a single character. The old delegation to
+// resolveEmail() is retained only in resolveCentralAccountId(); the
+// primary path no longer depends on the mail-address lookup at all.
 $ridStart = strpos($ctx, 'resolveAccountId(string $userId)');
 $ridEnd = strpos($ctx, "\n    }", $ridStart);
 $rid = substr($ctx, $ridStart, $ridEnd - $ridStart);
-assertTrue(str_contains($rid, '$this->resolveEmail($userId)'),
-    "resolveAccountId() delegates to resolveEmail() (no duplicate mailFor() lookups)",
+assertTrue(str_contains($rid, 'stalwartAdmin->fetchSessionAsUser'),
+    "resolveAccountId() reads the accountId from Stalwart's own /jmap/session response (JMAP RFC 8620 §2)",
     $passes, $failures);
 assertTrue(!str_contains($rid, '$stalwartService->mailFor('),
-    "resolveAccountId() no longer calls mailFor() directly — resolveEmail() owns it",
+    "resolveAccountId() does not call mailFor() (JMAP session is authoritative — no email→id lookup)",
+    $passes, $failures);
+assertTrue(!str_contains($rid, 'findAccountId'),
+    "resolveAccountId() does not call the broken souvera_central::findAccountId (returned truncated 'd' — root cause of CantSaveFilters[351])",
     $passes, $failures);
 
 // ---------------------------------------------------------------

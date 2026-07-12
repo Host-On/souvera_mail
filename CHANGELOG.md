@@ -6,6 +6,151 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.36] — 2026-02-19 (Sieve `CantSaveFilters[351]` — JMAP-Upload-Fix)
+
+### Partner-Agent-Diagnose (2026-02-19, read-only forensics)
+
+Der Shield/Sieve-UI-Fehler `CantSaveFilters[351]` beim „Speichern"
+eines Sieve-Filters entstand aus **zwei kaskadierenden Defekten** im
+souvera_mail-Code — Stalwart 0.16 selbst ist gesund (ManageSieve
+`OK "Success."` bei direktem `PUTSCRIPT`; alle Sieve-Extensions
+advertised; OAuth-Auth grün).
+
+**Log-Zeile aus dem NC-Log (User „Philip"):**
+```
+JmapSieveStorage::Save failed: Stalwart JMAP blob upload failed:
+POST http://10.20.0.187:8080/jmap/upload?account=d  →  404 Not Found
+```
+
+### Root-Cause #1 — Falsche Upload-URL-Form
+
+`SieveScriptService::uploadBlob()` baute `<api>/jmap/upload?account=<id>`
+(Query-Parameter). Diese Form gibt es in Stalwart 0.16 **nicht**. Die
+korrekte, RFC-8620-§6.1-konforme JMAP-`uploadUrl` ist **path-style**:
+`<api>/jmap/upload/{accountId}/`. Der Docblock der Methode („Stalwart
+exposes it as POST <api>/jmap/upload?account=<accountId>") war schlicht
+falsch — vermutlich ein RainLoop-Era-Copy-Paste, der nie gegen echtes
+Stalwart lief.
+
+### Root-Cause #2 — accountId auf `'d'` verstümmelt
+
+`StalwartUserContext::resolveAccountId()` delegierte an
+`souvera_central::StalwartService::findAccountId($email, 'User')` —
+diese Funktion lieferte auf Stalwart 0.16 nur das **erste Zeichen** der
+accountId (`'d'` statt `'d333333'`). Damit war selbst nach dem URL-Fix
+jede JMAP-Anfrage 404, weil Stalwart „account does not exist" meldete.
+
+`souvera_central` ist ein Nachbar-Projekt — wir können den Bug dort
+nicht direkt fixen. Also **Bypass**: die JMAP-Spec (RFC 8620 §2) sagt
+selbst, wo die accountId steht — `/jmap/session` →
+`primaryAccounts["urn:ietf:params:jmap:mail"]`. Stalwart antwortet
+autoritativ mit dem korrekten Wert. Das machen wir jetzt zur Source
+of Truth.
+
+### Fix 1 — Path-style Upload-URL (`lib/Service/SieveScriptService.php`)
+
+```diff
+- $url = $apiUrl . '/jmap/upload?account=' . \rawurlencode($accountId);
++ $url = \rtrim($apiUrl, '/')
++      . '/jmap/upload/'
++      . \rawurlencode($accountId)
++      . '/';
+```
+
+Der trailing `/` ist bei Stalwart 0.16 zwingend (Router hat strict
+trailing-slash). File-Header-Docblock analog auf die RFC-konforme
+Form korrigiert.
+
+### Fix 2 — Session-basierte accountId (`lib/Service/StalwartUserContext.php`)
+
+Komplett-Rewrite von `resolveAccountId()`:
+
+```php
+public function resolveAccountId(string $userId): string
+{
+    if (isset($this->accountIdCache[$userId])) {
+        return $this->accountIdCache[$userId];   // per-request cache
+    }
+
+    $bearer  = $this->resolveBearer($userId);
+    $session = $this->stalwartAdmin->fetchSessionAsUser($bearer);
+    if ($session['status'] !== 200) {
+        throw new \RuntimeException("… run `occ souvera_mail:warmup-oidc` …");
+    }
+    $primary = $session['body']['primaryAccounts'] ?? [];
+    foreach ([self::JMAP_CAP_MAIL, self::JMAP_CAP_SIEVE] as $cap) {
+        if (\is_string($primary[$cap] ?? null) && $primary[$cap] !== '') {
+            return $this->accountIdCache[$userId] = $primary[$cap];
+        }
+    }
+    // Last-resort fallback: first key of accounts-map (+ warning log).
+    …
+}
+```
+
+Neuer Konstruktor-Parameter `StalwartAdminService $stalwartAdmin` —
+kein Zirkelbezug, weil `StalwartAdminService` nur `IClientService`
+und `IConfig` benutzt.
+
+Die alte souvera_central-Route wurde nach `resolveCentralAccountId()`
+umbenannt und `@internal` markiert — sie bleibt für Konsumenten
+verfügbar, die die zentrale Account-Row-ID (nicht die JMAP-accountId)
+brauchen, aber keine JMAP-Route delegiert mehr dorthin.
+
+### Kollateral-Nutzen (heilt mit einem Schlag)
+
+Alle Services teilen `resolveAccountId()`, also profitieren mit:
+- `SieveScriptService`  (List/Save/Activate/Delete) — Hauptbetroffener
+- `AppPasswordService`  (Create/List/Destroy)
+- `QuotaService`
+- `SharedIdentitySyncService`
+- `MailboxAccessGuard`
+
+Es ist wahrscheinlich, dass App-Passwort-Anlage und Quota-Anzeige auf
+demselben Stalwart-Deploy vorher ebenfalls stumm gescheitert sind
+(HTTP 404 auf JMAP, aber die UI hatte Fallback-Pfade zu leeren
+Listen). Kann der Operator jetzt nachprüfen.
+
+### Regression-Tests
+
+**`tests/test_jmap_session_account_id.php`** (NEU, 14/14):
+1. `StalwartAdminService` wird injiziert
+2. `resolveAccountId()` ruft `fetchSessionAsUser($bearer)`
+3. `primaryAccounts` wird gelesen; `mail`-Capability preferred,
+   `sieve`-Fallback
+4. Ergebnis wird per-request memoisiert
+5. Legacy-Path umbenannt zu `resolveCentralAccountId()` + `@internal`
+6. **Negative Guard**: `findAccountId(` erscheint NICHT im Body von
+   `resolveAccountId()` (balanced-brace-Extraktion pro Funktion)
+7. Fehlermeldung nennt `occ souvera_mail:warmup-oidc` als Fix-Pfad
+8. `SieveScriptService::uploadBlob` verwendet `/jmap/upload/{id}/`
+9. `?account=` erscheint NICHT im gesamten Service
+
+**`tests/test_jmap_sieve_provider.php`**: Alte Assertion auf
+`'/jmap/upload?account='` invertiert → jetzt positiver Guard auf
+`/jmap/upload/` + `\rawurlencode($accountId)` + negativer Guard gegen
+die Query-Param-Form.
+
+**`tests/test_app_password_username_surface.php`**: alte Assertion
+„resolveAccountId delegiert an resolveEmail" ersetzt durch drei neue:
+liest aus `/jmap/session`, ruft NICHT `mailFor()`, ruft NICHT
+`findAccountId()`.
+
+### Verifikation
+- Volle lokale Suite: **47 Suites / 1707 Assertions PASS** (war 46/1691)
+- `php -l` clean auf allen geänderten Dateien
+- Der neue Test-Path war ohne die Fixes rot (verifiziert durch
+  Reverse-Application beim Schreiben)
+
+### Live-Verifikation nach Deploy
+1. Rsync `lib/Service/StalwartUserContext.php`,
+   `lib/Service/SieveScriptService.php`,
+   `appinfo/info.xml`, `package.json` → `/mnt/nc-shared/custom_apps/souvera_mail/`
+2. `sudo -u www-data php occ upgrade`
+3. Sieve-Filter im Webmail speichern → sollte `OK` liefern
+4. `tail -f /var/www/html/data/nextcloud.log | grep souvera_mail` — es
+   sollten keine 404s auf `/jmap/upload...` mehr auftauchen
+
 ## [0.14.35] — 2026-02-19 (Balken jetzt über volle Pillen-Höhe sichtbar)
 
 ### Operator-Report (2026-02-19)

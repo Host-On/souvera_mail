@@ -36,9 +36,15 @@ use Psr\Log\LoggerInterface;
  *   - `SieveScript/validate`→ syntax check (no persist); returns null on
  *                              success or an `invalidSieve` error object.
  *
- * Script body uploads use the standard JMAP blob endpoint (POST to
- * `<api>/jmap/upload?account=<accountId>`) — Stalwart returns `blobId` which
- * we then reference from `SieveScript/set.create`.
+ * Script body uploads use the standard JMAP blob endpoint. Per JMAP
+ * RFC 8620 §6.1 the `uploadUrl` template is **path-style** —
+ * `<api>/jmap/upload/{accountId}/`, NOT a `?account=<id>` query string.
+ * Stalwart returns `blobId` which we then reference from
+ * `SieveScript/set.create`.
+ * (v0.14.36 fix: earlier the docblock claimed `?account=` — that was a
+ *  RainLoop-era copy-paste that never worked against real Stalwart. The
+ *  partner-agent diagnosis 2026-02-19 caught the resulting 404 in
+ *  production.)
  *
  * Script body downloads use `Blob/get` with `properties: ["data:asText"]`,
  * keeping everything on the same JMAP envelope.
@@ -155,9 +161,16 @@ class SieveScriptService
 
     /**
      * Upload script content as a JMAP blob and return the new `blobId`.
-     * Mirrors the JMAP `Blob/upload` path-style endpoint (Stalwart 0.16
-     * exposes it as `POST <api>/jmap/upload?account=<accountId>` with the
-     * raw body as octet-stream).
+     * Uses the path-style JMAP `uploadUrl` per RFC 8620 §6.1:
+     * `POST <api>/jmap/upload/<accountId>/` with `Content-Type:
+     * application/octet-stream` and the raw script bytes as the body.
+     *
+     * v0.14.36 (partner-agent diagnosis 2026-02-19): earlier this method
+     * built `?account=<id>` — Stalwart 0.16 does NOT expose that syntax
+     * and returns 404 Not Found. The URL is now the RFC-conformant
+     * path-style, and the accountId comes from the JMAP session
+     * (`primaryAccounts`) rather than from the truncated
+     * souvera_central lookup that was the root cause of the 404.
      */
     public function uploadBlob(string $accountId, string $bearer, string $body): string
     {
@@ -165,7 +178,13 @@ class SieveScriptService
         if ($apiUrl === null) {
             throw new \RuntimeException('Stalwart API URL not configured (souvera_central.stalwart_api_url)');
         }
-        $url = $apiUrl . '/jmap/upload?account=' . \rawurlencode($accountId);
+        // Path-style upload URL per JMAP RFC 8620 §6.1 — the `/` after
+        // the accountId is REQUIRED by Stalwart (trailing-slash-strict
+        // routing in the JMAP handler).
+        $url = \rtrim($apiUrl, '/')
+             . '/jmap/upload/'
+             . \rawurlencode($accountId)
+             . '/';
 
         try {
             $client = $this->clientService->newClient();
