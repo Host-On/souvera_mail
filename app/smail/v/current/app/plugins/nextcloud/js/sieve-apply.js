@@ -50,6 +50,21 @@
     const FOLDERS_URL = cfg.SmailSieveApplyFoldersUrl;
     const APPLY_URL = cfg.SmailSieveApplyUrl;
 
+    // v0.14.38: diagnostic breadcrumb — if you don't see the button on
+    // the live app, open the browser DevTools console and look for
+    // this line. Its presence proves that (a) the plugin was loaded
+    // by Snappymail and (b) the two endpoint URLs made it through
+    // rl.settings.Nextcloud. Absence means the plugin registration
+    // (`app/plugins/nextcloud/index.php`) or the URL-injection
+    // (`SmailSieveApplyUrl`) didn't reach the browser — usually a
+    // stale opcode cache; run `sudo -u www-data php occ maintenance:
+    // repair` or restart php-fpm.
+    if (window.console && window.console.info) {
+        window.console.info('[Souvera Mail] sieve-apply.js loaded, endpoints:', {
+            foldersUrl: FOLDERS_URL, applyUrl: APPLY_URL
+        });
+    }
+
     // -----------------------------------------------------------
     // CSRF token — mounted at `document.head.dataset.oc-requesttoken`
     // by Nextcloud; some builds also expose it on window.
@@ -274,34 +289,35 @@
     };
 
     // -----------------------------------------------------------
-    // Toolbar injection — watches for the Sieve popup to appear
-    // in the DOM. Snappymail rebuilds the popup fresh every time,
-    // so we can't add the button once and forget.
+    // Toolbar injection.
+    //
+    // Snappymail renders every popup as `<dialog id="V-<Name>">` (see
+    // app.js buildViewModel: `createElement('dialog',{id:'V-'+id})`).
+    // The Sieve editor's `viewModelTemplateID` is literally
+    // `SieveScript`, so we look for `#V-SieveScript`.
+    //
+    // Inside the dialog the template contributes a `<footer>` element
+    // (see `app/templates/Views/User/PopupsSieveScript.html:72`) that
+    // holds the Save button. We prepend our own `<a class="btn">` so
+    // it appears LEFT of the save action — matching Snappymail's own
+    // convention (raw-script-toggle also sits on the left).
+    //
+    // The dialog is created ONCE on first-use and reused afterwards
+    // (Knockout `open`/`close` toggles the attribute, not the element),
+    // so a single injection is enough. If the dialog doesn't exist
+    // yet at plugin-load time we watch for it via MutationObserver.
     // -----------------------------------------------------------
     const BUTTON_ID = 'souvera-sieve-apply-toolbar-btn';
 
-    const injectButton = () => {
-        // Snappymail's PopupsSieveScript.html has a `.b-content` div
-        // and a `.b-buttons` footer. We insert the button as the
-        // first child of `.b-buttons` so it sits before the built-in
-        // Save/Cancel buttons.
-        const popup = document.querySelector('.b-popups-sieve-script, .popup-sieve-script, [data-view="popups/sievescript"]');
-        if (!popup) { return; }
-        if (popup.querySelector('#' + BUTTON_ID)) { return; }
-
-        // Try known footer selectors — Snappymail vendors have varied.
-        const footer =
-            popup.querySelector('.b-buttons') ||
-            popup.querySelector('.buttons') ||
-            popup.querySelector('footer') ||
-            popup.querySelector('.popup-footer');
-        if (!footer) { return; }
-
-        const btn = el('button', {
+    const injectButtonInto = (dialog) => {
+        if (!dialog || dialog.querySelector('#' + BUTTON_ID)) { return true; }
+        const footer = dialog.querySelector('footer') || dialog.querySelector('.buttons');
+        if (!footer) { return false; }
+        const btn = el('a', {
             id: BUTTON_ID,
             'data-testid': 'sieve-apply-toolbar-btn',
-            type: 'button',
-            className: 'button',
+            href: '#',
+            className: 'btn',
             title: 'Aktives Filter-Skript auf einen bereits vorhandenen Ordner anwenden.',
             style: 'margin-right:auto;'
         }, ['Auf Ordner anwenden…']);
@@ -311,14 +327,23 @@
             openModal();
         });
         footer.insertBefore(btn, footer.firstChild);
+        return true;
     };
 
-    // MutationObserver — watch document for the popup appearing.
-    const observer = new MutationObserver(() => injectButton());
+    const tryInject = () => {
+        const dialog = document.querySelector('#V-SieveScript');
+        return dialog ? injectButtonInto(dialog) : false;
+    };
+
+    const observer = new MutationObserver(() => tryInject());
     const start = () => {
         if (!document.body) { return; }
+        // Try once immediately — the dialog may already be in the DOM
+        // when we load (Snappymail bootstraps popups on-demand, but
+        // some builds pre-create them).
+        if (tryInject()) { return; }
+        // Otherwise watch for the dialog to appear.
         observer.observe(document.body, { childList: true, subtree: true });
-        injectButton();
     };
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', start);

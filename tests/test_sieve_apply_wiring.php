@@ -130,6 +130,15 @@ $check(\str_contains($jsSrc, 'folderInformationMultiplyList'),
     "sieve-apply.js pings Snappymail to re-read the folder counts after success");
 $check(\str_contains($jsSrc, 'ERNEUT per SMTP'),
     "sieve-apply.js warns the operator that redirect resends via SMTP (avoids surprise)");
+// v0.14.37b: after operator reported "Find keinen Button" — verify the
+// selector actually matches Snappymail's real popup DOM. The dialog is
+// created by buildViewModel() as `<dialog id="V-<TemplateId>">`, and
+// the SieveScript popup's template id is `SieveScript` (see
+// static/js/sieve.js SieveScriptPopupView → super('SieveScript')).
+$check(\str_contains($jsSrc, '#V-SieveScript'),
+    "sieve-apply.js targets the correct dialog id `#V-SieveScript` (v0.14.37b fix — was `.b-popups-sieve-script` which does not exist)");
+$check(\str_contains($jsSrc, "querySelector('footer')"),
+    "sieve-apply.js looks up the plain <footer> element inside the dialog (PopupsSieveScript.html renders a bare `<footer>`, not a class)");
 
 // -------------------------------------------------------------------
 // 6. `php -l` clean on the new PHP files.

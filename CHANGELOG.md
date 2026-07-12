@@ -6,6 +6,63 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.38] — 2026-02-19 (Hotfix: Button-Selector auf `#V-SieveScript` — 0.14.37 hatte falschen Selector)
+
+### Operator-Report (2026-02-19)
+
+> „Find keinen Button…."
+
+Der 0.14.37-Enricher suchte nach `.b-popups-sieve-script` — diese
+Klasse gibt es in unserer Snappymail-Version nicht. Beim Blick in
+`app/smail/v/current/static/js/app.js:4074` (die Popup-Fabrik) zeigt
+sich, dass Snappymail Popups einheitlich als `<dialog id="V-<Name>">`
+rendert, wobei `<Name>` = `viewModelTemplateID`. Der Sieve-Editor ist
+`SieveScript` (siehe `static/js/sieve.js` — `super('SieveScript')`),
+also lautet die reale ID **`#V-SieveScript`**.
+
+### Fix (`app/smail/v/current/app/plugins/nextcloud/js/sieve-apply.js`)
+
+```diff
+- const popup = document.querySelector('.b-popups-sieve-script, ...');
++ const dialog = document.querySelector('#V-SieveScript');
+```
+
+Zusätzlich:
+- **Vereinfacht**: Es gibt genau EIN Dialog-Element (Snappymail baut es
+  einmal per `buildViewModel`, danach togglt nur `open`) — wir müssen
+  daher nur einmal injizieren
+- **Footer-Selector korrigiert**: PopupsSieveScript.html hat ein reines
+  `<footer>` (keine `.buttons`-Klasse) — jetzt `querySelector('footer')`
+  primär, `.buttons` nur als Fallback
+- **Diagnostic-Log**: `console.info('[Souvera Mail] sieve-apply.js
+  loaded, endpoints: {...}')` beim Boot, damit der Operator via DevTools
+  sofort sehen kann, ob das Plugin überhaupt geladen wurde (Absenz →
+  Stale-Cache oder Plugin-Config-Fehler)
+
+### Neuer Regression-Guard
+
+`tests/test_sieve_apply_wiring.php` hat jetzt eine explizite
+Assertion, dass **`#V-SieveScript`** im JS auftaucht und **`.b-popups-
+sieve-script`** NICHT — damit der falsche Selector nie wieder
+zurückkommt.
+
+### Verifikation
+- Volle Suite: **49 Suites / 1774 Assertions PASS** (war 49/1772)
+- `mcp_lint_javascript`: clean
+
+### Live-Verifikation nach Deploy
+1. Rsync `app/smail/v/current/app/plugins/nextcloud/js/sieve-apply.js`
+   + `info.xml` + `package.json` nach `custom_apps/souvera_mail/`
+2. `sudo -u www-data php occ upgrade`  (oder Cache-Backend leeren,
+   falls der Webmail-Bundle noch die alte JS-Datei serviert)
+3. **Hard-Reload im Browser** (`Ctrl+Shift+R`) — der Snappymail-
+   Engine-Bundle wird sonst aus dem Browser-Cache geladen
+4. DevTools-Konsole öffnen; erwartete Zeile:
+   `[Souvera Mail] sieve-apply.js loaded, endpoints: {…}`
+5. In Snappymail: `⚙️ Einstellungen → Filter → Skript öffnen` — der
+   Button „Auf Ordner anwenden…" muss LINKS im Footer sichtbar sein
+   (neben dem Rohansicht-`</>`-Icon und dem `Speichern`-Button)
+
 ## [0.14.37] — 2026-02-19 (NEU: Filter nachträglich auf bestehende Nachrichten anwenden)
 
 ### Operator-Wunsch (2026-02-19)
