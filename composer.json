@@ -17,7 +17,8 @@
         },
         "classmap": [
             "app/smail/v/current/app/libraries/Smail/",
-            "lib-bridge/"
+            "lib-bridge/",
+            "lib/Sieve/Types.php"
         ],
         "files": [
             "lib-bridge/namespace-bridge.php"

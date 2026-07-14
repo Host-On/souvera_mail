@@ -6,6 +6,119 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.43] — 2026-02-19 (Sieve-Apply: PSR-4-Autoload-Fix für Types.php — behebt `SyntaxError: JSON.parse`)
+
+### Operator-Report (2026-02-19)
+
+> „beim nachträglichen Anwenden der Filter: Netzwerkfehler:
+> SyntaxError: JSON.parse: unexpected character at line 1
+> column 1 of the JSON data"
+
+Direkt nach dem 0.14.42-Fix (JMAP-Capability). Sobald der User auf
+„Anwenden" geklickt hat, kam KEIN JSON vom Endpoint zurück, sondern
+etwas, das der Browser nicht als JSON parsen konnte (HTML-Fehlerseite
+/ leerer Body / PHP-Fatal-Notice-Output).
+
+### Root-Cause
+
+`lib/Sieve/Types.php` enthält **fünf** Value-Object-Klassen (`Rule`,
+`TestNode`, `ActionNode`, `MessageFacts`, `EvaluatedActions`) in
+**einer** Datei. PSR-4-Autoloading mappt aber 1 Klasse → 1 Datei —
+`use OCA\SouveraMail\Sieve\Rule` sucht nach `lib/Sieve/Rule.php`,
+findet nichts, PHP wirft `Error: Class "OCA\SouveraMail\Sieve\Rule"
+not found` **innerhalb** von `MiniInterpreter::parseIfBlock()`.
+
+Der Controller's `catch (\Throwable $e)` fängt das ab und würde JSON
+zurückgeben — ABER in älteren NC-Deployments/Middleware-Chains landet
+der `\Error` schon vorher im globalen ExceptionHandler, der HTML
+statt JSON ausliefert. Genau das hat der Operator gesehen.
+
+### Fix (defence in depth, zwei Ebenen)
+
+1. **`composer.json`**: `autoload.classmap` verweist jetzt zusätzlich
+   auf `lib/Sieve/Types.php`. `composer dump-autoload -o` erzeugt
+   Classmap-Einträge für alle fünf Klassen.
+2. **`lib/Sieve/MiniInterpreter.php`**: expliziter
+   `require_once __DIR__ . '/Types.php';` am Dateianfang. Falls im
+   Live-System der Operator vergessen hat, `composer dump-autoload`
+   nach dem Deploy laufen zu lassen (typisch bei manuellen tar-
+   Deployments), sind die Klassen trotzdem geladen, sobald PSR-4 die
+   `MiniInterpreter.php`-Datei einliest.
+
+### Regenerierte Composer-Artefakte
+
+- `vendor/composer/autoload_classmap.php`: +6 Einträge
+  (`Rule`, `TestNode`, `ActionNode`, `MessageFacts`,
+  `EvaluatedActions`, `MiniInterpreter`).
+- `vendor/composer/autoload_static.php`: identische +6 Einträge.
+
+### Test-Suite
+
+- **`tests/test_sieve_apply_json_error_handling.php`: 46/46 PASS
+  (NEU)** — deckt ab:
+  - Classmap-Artefakte in `composer.json`, `autoload_classmap.php`,
+    `autoload_static.php` (14 Assertions)
+  - Defensive `require_once` in `MiniInterpreter.php` inkl.
+    Reihenfolge relativ zur `class`-Deklaration (2 Assertions)
+  - **Regression:** `class_exists()` gegen den echten
+    Composer-Autoloader — deckt den originalen Bug direkt ab
+    (6 Assertions)
+  - End-to-End-Sim: parst ein realistisches Snappymail-Sieve-Skript
+    (Newsletter, Billing, Archiv), evaluiert vier `MessageFacts`,
+    verifiziert `fileintoTarget`/`addedFlags`/`isEmpty`
+    (11 Assertions)
+  - Controller-Kontrakt: `catch (\Throwable)`, `DataResponse`,
+    strukturierte Fehler-JSON, `'exception' => $e`-Kontext im Logger
+    (4 Assertions)
+  - Service-Fehler-Kontrakt: alle 7 deutschen Fehler-Surfaces
+    präsent, `apply()` wrapt jeden JMAP-Call in `try/catch`
+    (8 Assertions)
+  - `php -l` auf allen 4 modifizierten Dateien (4 Assertions)
+- **Voller Regressions-Lauf: alle 50 Test-Suites grün.**
+
+### Files (this iteration)
+
+| File | Change |
+|---|---|
+| `composer.json` | +1 classmap Eintrag `lib/Sieve/Types.php` |
+| `vendor/composer/autoload_classmap.php` | +6 Sieve-Class-Einträge |
+| `vendor/composer/autoload_static.php` | +6 Sieve-Class-Einträge |
+| `lib/Sieve/MiniInterpreter.php` | `require_once __DIR__ . '/Types.php';` als Belt-and-Suspenders |
+| `tests/test_sieve_apply_json_error_handling.php` | NEU (46 Assertions) |
+| `appinfo/info.xml` | Version `0.14.42 → 0.14.43` |
+| `CHANGELOG.md` | Dieser Eintrag |
+
+### Operator-Aktion nach Deploy
+
+1. Deploy 0.14.43 auf `/mnt/nc-shared/custom_apps/souvera_mail`.
+2. **Optional aber empfohlen:** `sudo -u www-data composer
+   dump-autoload -o --working-dir=/mnt/nc-shared/custom_apps/souvera_mail`
+   — regeneriert die Classmap auf dem Live-System. (Wenn nicht
+   verfügbar: das `require_once` in `MiniInterpreter.php` fängt den
+   Fall ab, aber die Classmap-Version ist ein Micro-Tick schneller.)
+3. **PHP-OpCache resetten:** `sudo systemctl reload php8.3-fpm` (oder
+   `nginx -s reload` je nach Setup) — sonst hält OpCache die alte
+   `MiniInterpreter.php` ohne `require_once` in-memory.
+4. Filter erneut anwenden — statt „Netzwerkfehler: SyntaxError" jetzt
+   entweder eine Erfolgs-Meldung („X geprüft, Y verschoben, …") oder
+   eine strukturierte deutsche Fehler-Meldung.
+
+### HTTP 404 „Seite nicht gefunden" — Reminder (keine Code-Änderung)
+
+Falls beim Aufruf von `/apps/souvera_mail/` weiterhin ein 404 kommt,
+liegt es an der `EnforceGroupRestriction` (v0.13.0): die App ist an
+die Nextcloud-Gruppe `souvera-users` gebunden.
+
+Fix (einmalig, pro User):
+
+```bash
+sudo -u www-data php /var/www/html/occ group:adduser souvera-users <deine-UID>
+```
+
+Danach ist die App wieder sichtbar. (Der `EnforceGroupRestriction`-
+Repair-Step läuft bei jedem `occ upgrade` — Standard-User müssen
+einmalig in die Gruppe hinzugefügt werden.)
+
 ## [0.14.42] — 2026-02-19 (Sieve-Apply: `unknownMethod` JMAP-Capability-Fix + 5000-Default)
 
 ### Operator-Report (2026-02-19)
