@@ -6,6 +6,96 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.42] — 2026-02-19 (Sieve-Apply: `unknownMethod` JMAP-Capability-Fix + 5000-Default)
+
+### Operator-Report (2026-02-19)
+
+> „Ordnerliste konnte nicht geladen werden: Stalwart JMAP error:
+> {"type":"unknownMethod","description":"Method Mailbox/get requires
+> capability urn:ietf:params:jmap:mail which is not present in the
+> \"using\" property."}"
+
+Plus die Frage: warum 2000 statt 5000 Nachrichten? Und ob Server- oder
+Client-seitig?
+
+### Antwort auf die Frage
+
+Der Sieve-Apply-Lauf ist **komplett Server-seitig** — PHP-Backend
+macht alle JMAP-Calls (Mailbox/get, Email/query, Email/get, Email/set,
+EmailSubmission/set), lokal auf dem Nextcloud-Host. Der Client fetcht
+nur einmalig die Ordnerliste und postet dann den Auftrag; danach
+wartet er auf die einzige finale JSON-Response mit den Zählern. Daher:
+5000 ist auf jeden Fall drin.
+
+### Root-Cause `unknownMethod`
+
+Unsere `StalwartAdminService::jmapCall()`-Helper setzt per Default nur
+`urn:ietf:params:jmap:core` + Stalwarts eigene Capability in die
+top-level `using`-Property. Alle Mailbox/*- und Email/*-Methoden
+brauchen aber zusätzlich **`urn:ietf:params:jmap:mail`** (RFC 8621
+§1). Ohne diese Capability antwortet Stalwart 0.16 mit dem
+gemeldeten `unknownMethod`-Fehler.
+
+### Fix (`lib/Service/SieveApplyService.php`)
+
+- Neue Konstanten `CAP_MAIL = 'urn:ietf:params:jmap:mail'` und
+  `CAP_SUBMISSION = 'urn:ietf:params:jmap:submission'` deklariert
+- **Jedem** JMAP-Call die passende Capability als drittes Argument
+  mitgegeben:
+  - `listFolders()` → Mailbox/get → `[CAP_MAIL]`
+  - `fetchMailboxes()` → Mailbox/get → `[CAP_MAIL]`
+  - `queryMessageIds()` → Email/query → `[CAP_MAIL]`
+  - `fetchMessageFacts()` → Email/get → `[CAP_MAIL]`
+  - `executeMoves()` → Email/set → `[CAP_MAIL]`
+  - `executeFlagAdds()` → Email/set → `[CAP_MAIL]`
+  - `executeRedirects()` → Identity/get → `[CAP_SUBMISSION]`
+  - `executeRedirects()` → EmailSubmission/set → `[CAP_SUBMISSION, CAP_MAIL]`
+    (EmailSubmission-Objekte referenzieren Email-Objekte, deswegen
+    braucht der Server beide Caps um die Kette aufzulösen)
+
+Insgesamt 6 `[self::CAP_MAIL]`-Verwendungen + 2 `[self::CAP_SUBMISSION,
+…]`-Verwendungen — vorher hatte nur EmailSubmission/set irgendeine
+Extra-Cap überhaupt.
+
+### Limit auf 5000 hochgesetzt
+
+- `SieveApplyService::DEFAULT_LIMIT`: **2000 → 5000**
+- `SieveApplyController::apply()`: Default-Wert **2000 → 5000**
+- `js/sieve-apply.js`: Modal-Text „letzten 5000 Nachrichten" +
+  POST-Body `limit: 5000`
+
+`MAX_LIMIT = 5000` bleibt unverändert; wer explizit was Größeres
+möchte, muss die Konstante hochsetzen (bewusst konservativer Guard —
+5000 Emails × JMAP-Payload sind bei großen Mails schnell mal 50 MB
+Response).
+
+### Regression-Tests
+
+`tests/test_sieve_apply_wiring.php`:
+- Neue Positive Guards:
+  - `CAP_MAIL = 'urn:ietf:params:jmap:mail'` MUSS deklariert sein
+  - `[self::CAP_MAIL]` MUSS ≥5-mal im Service auftauchen (jeder
+    Call, der es braucht — Zähler statt Einzel-Assertions, damit
+    der Test auch bei künftigen Refactors robust bleibt)
+  - `DEFAULT_LIMIT = 5000` und `MAX_LIMIT = 5000` gepinnt
+
+### Verifikation
+- Volle Suite: **49 Suites / 1784 Assertions PASS** (war 49/1782)
+- `php -l` clean
+
+### Live-Deploy
+
+Rsync-Liste (was sich seit 0.14.41 geändert hat):
+- `lib/Service/SieveApplyService.php` (Haupt-Fix)
+- `lib/Controller/SieveApplyController.php` (Default-Limit)
+- `app/smail/v/current/app/plugins/nextcloud/js/sieve-apply.js`
+  (Modal-Text + POST-Body)
+- `appinfo/info.xml` + `package.json`
+
+Dann `occ upgrade` + Hard-Reload. Der Ordnerliste-Fetch beim Öffnen
+des Modals sollte jetzt sofort mit den echten Postfächern
+antworten, statt mit `unknownMethod`.
+
 ## [0.14.41] — 2026-02-19 (Sieve-Apply auf Filter-Seite, Pill weg, Sync-Icon normalisiert)
 
 ### Operator-Report (2026-02-19, mit Screenshot)

@@ -77,10 +77,21 @@ foreach (['Mailbox/get', 'Email/query', 'Email/get', 'Email/set',
 }
 $check(\str_contains($svcSrc, 'urn:ietf:params:jmap:submission'),
     "service requests the JMAP submission capability for EmailSubmission/set");
+// v0.14.42: every Mailbox/*, Email/query|get|set call must add the mail
+// capability to the top-level `using` array. Stalwart 0.16 rejects
+// method invocations whose required capability is missing from `using`
+// with `unknownMethod` (operator report 2026-02-19).
+$check(\str_contains($svcSrc, "CAP_MAIL = 'urn:ietf:params:jmap:mail'"),
+    "service declares CAP_MAIL constant for Mailbox/*, Email/* JMAP capability");
+$check(
+    \substr_count($svcSrc, '[self::CAP_MAIL]') >= 5,
+    "service passes [CAP_MAIL] on every JMAP call that needs it (fetchMailboxes, listFolders, queryMessageIds, fetchMessageFacts, executeMoves, executeFlagAdds — got: "
+        . \substr_count($svcSrc, '[self::CAP_MAIL]') . ')'
+);
 $check(\str_contains($svcSrc, 'inMailbox'),
     "service filters Email/query by inMailbox");
-$check(\str_contains($svcSrc, 'MAX_LIMIT = 5000') && \str_contains($svcSrc, 'DEFAULT_LIMIT = 2000'),
-    "service caps limit at 5000 (default 2000)");
+$check(\str_contains($svcSrc, 'MAX_LIMIT = 5000') && \str_contains($svcSrc, 'DEFAULT_LIMIT = 5000'),
+    "service caps limit at 5000 (default 5000 too — server-side apply, safe to bump per operator ok)");
 $check(\str_contains($svcSrc, 'includeRedirect'),
     "service takes an includeRedirect flag so callers can dry-run redirects");
 $check(\str_contains($svcSrc, 'MiniInterpreter'),

@@ -136,7 +136,7 @@
         const explain = el('p', {
             style: 'margin:0 0 20px 0;font-size:13px;line-height:1.5;color:var(--color-text-maxcontrast,#666);'
         }, [
-            'Das aktive Sieve-Skript wird auf die letzten 2000 Nachrichten des ',
+            'Das aktive Sieve-Skript wird auf die letzten 5000 Nachrichten des ',
             'gewählten Ordners angewendet — Verschieben, Weiterleiten und ',
             'Löschen werden ausgeführt. Weitergeleitete Nachrichten gehen ',
             'ERNEUT per SMTP an die im Skript hinterlegten Empfänger.'
@@ -251,7 +251,7 @@
                     Accept: 'application/json',
                     requesttoken: csrfToken()
                 },
-                body: JSON.stringify({ folderId: folderId, limit: 2000, includeRedirect: true })
+                body: JSON.stringify({ folderId: folderId, limit: 5000, includeRedirect: true })
             }).then(r => r.json()).then(data => {
                 if (!data || data.status !== 'ok') {
                     status.textContent = 'Fehler: ' + ((data && data.message) || 'unbekannt');

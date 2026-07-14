@@ -44,7 +44,18 @@ use Psr\Log\LoggerInterface;
 class SieveApplyService
 {
     private const MAX_LIMIT = 5000;
-    private const DEFAULT_LIMIT = 2000;
+    private const DEFAULT_LIMIT = 5000;
+
+    /** JMAP capability required by every Mailbox/* and Email/* method
+     *  we issue (RFC 8621 §1). Our `StalwartAdminService::jmapCall`
+     *  only puts `urn:ietf:params:jmap:core` + Stalwart's own capability
+     *  in the top-level `using` array by default — we MUST add
+     *  `urn:ietf:params:jmap:mail` here, otherwise Stalwart 0.16 rejects
+     *  the call with `unknownMethod: Method X/… requires capability
+     *  urn:ietf:params:jmap:mail which is not present in the "using"
+     *  property.` (operator report 2026-02-19). */
+    private const CAP_MAIL = 'urn:ietf:params:jmap:mail';
+    private const CAP_SUBMISSION = 'urn:ietf:params:jmap:submission';
 
     /** JMAP standard-role names Stalwart returns for well-known folders. */
     private const ROLE_INBOX = 'inbox';
@@ -81,7 +92,8 @@ class SieveApplyService
                     'Mailbox/get',
                     ['accountId' => $accountId, 'properties' => ['id', 'name', 'role']],
                     'c0',
-                ]]
+                ]],
+                [self::CAP_MAIL]
             );
             $list = (array) ($this->stalwart->extractMethodResponse($response, 'Mailbox/get')['list'] ?? []);
         } catch (\Throwable $e) {
@@ -276,7 +288,8 @@ class SieveApplyService
                 'Mailbox/get',
                 ['accountId' => $accountId, 'properties' => ['id', 'name', 'role']],
                 'c0',
-            ]]
+            ]],
+            [self::CAP_MAIL]
         );
         $list = (array) ($this->stalwart->extractMethodResponse($response, 'Mailbox/get')['list'] ?? []);
         $out = [];
@@ -357,7 +370,8 @@ class SieveApplyService
                     'calculateTotal' => false,
                 ],
                 'c0',
-            ]]
+            ]],
+            [self::CAP_MAIL]
         );
         $body = $this->stalwart->extractMethodResponse($response, 'Email/query');
         $ids = (array) ($body['ids'] ?? []);
@@ -391,7 +405,8 @@ class SieveApplyService
                         'properties' => ['id', 'mailboxIds', 'size', 'headers', 'from', 'to', 'cc', 'subject'],
                     ],
                     'c0',
-                ]]
+                ]],
+                [self::CAP_MAIL]
             );
             $list = (array) ($this->stalwart->extractMethodResponse($response, 'Email/get')['list'] ?? []);
             foreach ($list as $entry) {
@@ -463,7 +478,8 @@ class SieveApplyService
                     'Email/set',
                     ['accountId' => $accountId, 'update' => $update],
                     'c0',
-                ]]
+                ]],
+                [self::CAP_MAIL]
             );
             $body = $this->stalwart->extractMethodResponse($response, 'Email/set');
             $updated = (array) ($body['updated'] ?? []);
@@ -500,7 +516,8 @@ class SieveApplyService
                     'Email/set',
                     ['accountId' => $accountId, 'update' => $update],
                     'c0',
-                ]]
+                ]],
+                [self::CAP_MAIL]
             );
             $body = $this->stalwart->extractMethodResponse($response, 'Email/set');
             return \count((array) ($body['updated'] ?? []));
@@ -528,7 +545,7 @@ class SieveApplyService
             $iResp = $this->stalwart->jmapCall(
                 $bearer,
                 [['Identity/get', ['accountId' => $accountId], 'c0']],
-                ['urn:ietf:params:jmap:submission']
+                [self::CAP_SUBMISSION]
             );
             $iList = (array) ($this->stalwart->extractMethodResponse($iResp, 'Identity/get')['list'] ?? []);
             foreach ($iList as $iden) {
@@ -573,7 +590,7 @@ class SieveApplyService
                     ['accountId' => $accountId, 'create' => $create],
                     'c0',
                 ]],
-                ['urn:ietf:params:jmap:submission']
+                [self::CAP_SUBMISSION, self::CAP_MAIL]
             );
             $body = $this->stalwart->extractMethodResponse($response, 'EmailSubmission/set');
             $created = (array) ($body['created'] ?? []);

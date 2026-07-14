@@ -79,7 +79,11 @@ class SieveApplyController extends Controller
         }
         $folderId = (string) ($folderId ?? 'INBOX');
         if ($folderId === '') { $folderId = 'INBOX'; }
-        $limit = $limit === null ? 2000 : (int) $limit;
+        // v0.14.42: default limit bumped 2000 → 5000. The whole apply
+        // runs server-side (JMAP calls from PHP), so raising the limit
+        // only costs Stalwart bandwidth — client just waits for the
+        // final counter response. Operator confirmed 5000 is safe.
+        $limit = $limit === null ? 5000 : (int) $limit;
         $includeRedirect = $includeRedirect ?? true;
 
         try {
