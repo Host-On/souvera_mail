@@ -373,19 +373,32 @@ ok(str_contains($src['welcome'], "from '@nextcloud/vue/components/NcButton'"),
     $passes, $failures);
 
 // ==============================================================
-// I — Persistent floating pill (from user directive v0.14.10 kept)
+// I — Persistent floating pill REMOVED in v0.14.41
+//     Operator asked to remove the floating "Alte Mails importieren"
+//     button because the same entry point already exists in the
+//     top-right dropdown menu (`📥 Alte Mails importieren`). Two
+//     CTAs for the same wizard was redundant. The MigrationPill.vue
+//     source file is retained but no longer mounted in App.vue.
 // ==============================================================
-ok(str_contains($src['app'], 'MigrationPill'),
-    'App.vue mounts the persistent MigrationPill component', $passes, $failures);
-ok(str_contains($src['pill'], "data-state=\"idle\"")
-    || str_contains($src['pill'], ':data-state="state"'),
-    'MigrationPill exposes data-state for pulse/color styling', $passes, $failures);
-ok(str_contains($src['pill'], "souvera-migration-pill--running"),
-    'MigrationPill applies the "running" state class during a live migration',
+// The removal check must ignore the comment mentioning why MigrationPill
+// was removed. Look for the actual import/component reference — not the
+// human-readable string.
+ok(!str_contains($src['app'], "import MigrationPill"),
+    'App.vue no longer imports MigrationPill (v0.14.41 removed the floating CTA — dropdown menu is the sole entry point)',
     $passes, $failures);
-ok(str_contains($src['pill'], "var(--color-primary-element)")
-    && str_contains($src['pill'], "var(--color-success)"),
-    'MigrationPill colours come from NC theme variables (never hardcoded hex)',
+ok(!str_contains($src['app'], "<MigrationPill"),
+    'App.vue template contains no <MigrationPill> element',
+    $passes, $failures);
+// The dropdown menu (dropdown-menu.js) must still dispatch the event
+// App.vue listens on — this is now the ONLY entry point.
+$dropdownJs = (string) @file_get_contents(
+    '/app/app/smail/v/current/app/plugins/nextcloud/js/dropdown-menu.js'
+);
+ok(str_contains($dropdownJs, 'souvera-mail:open-migration'),
+    'dropdown-menu.js still dispatches souvera-mail:open-migration (sole wizard trigger post-v0.14.41)',
+    $passes, $failures);
+ok(str_contains($src['app'], "'souvera-mail:open-migration'"),
+    'App.vue listens for souvera-mail:open-migration (dropdown-menu.js dispatches it)',
     $passes, $failures);
 
 // ==============================================================

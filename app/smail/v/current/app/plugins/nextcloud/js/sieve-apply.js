@@ -296,36 +296,32 @@
     window.addEventListener('souvera-mail:open-sieve-apply', openModal);
 
     // ---------------------------------------------------------------
-    // Popup-footer injection (v0.14.40 return to A after user request)
+    // Filter-settings-page injection (v0.14.41 — operator asked for
+    // the button directly beside "Skript hinzufügen" on the settings
+    // page, not just in the popup that opens after clicking a script).
     //
-    // The Sieve popup template `templates/Views/User/PopupsSieveScript.html`
-    // is wrapped in `<!-- ko with: script -->` — meaning the `<footer>`
-    // element ONLY exists in the DOM after the user has clicked either
-    // an existing script name or "Skript hinzufügen". A one-shot
-    // querySelector on load misses it every single time. We instead
-    // watch every subtree mutation and inject whenever we spot a
-    // `#V-SieveScript` dialog that ALSO has a `<footer>` inside.
+    // Template `templates/Views/User/SettingsFilters.html` line 49:
+    //   <a class="btn" data-bind="click: addScript" data-icon="✚"
+    //      data-i18n="SETTINGS_FILTERS/BUTTON_ADD_SCRIPT"></a>
     //
-    // Snappymail's own toolbar buttons use `<a class="btn">…</a>` with
-    // an inner `<i class="fontastic">EMOJI</i>` — we mirror that shape
-    // so the button looks native (not glaringly custom-styled).
+    // We insert a sibling `<a class="btn">` right after it. Idempotent
+    // via `#souvera-sieve-apply-page-btn`.
     // ---------------------------------------------------------------
-    const POPUP_BTN_ID = 'souvera-sieve-apply-popup-btn';
+    const PAGE_BTN_ID = 'souvera-sieve-apply-page-btn';
+    const PAGE_ANCHOR_SEL = 'a.btn[data-i18n="SETTINGS_FILTERS/BUTTON_ADD_SCRIPT"]';
 
-    const buildFooterButton = () => {
+    const buildPageButton = () => {
         const a = document.createElement('a');
-        a.id = POPUP_BTN_ID;
+        a.id = PAGE_BTN_ID;
         a.className = 'btn';
         a.href = '#';
         a.title = 'Aktives Filter-Skript auf einen bereits vorhandenen Ordner anwenden.';
-        a.setAttribute('data-testid', 'sieve-apply-toolbar-btn');
-        const i = document.createElement('i');
-        i.className = 'fontastic';
-        i.textContent = '🔎';
-        a.appendChild(i);
-        const s = document.createElement('span');
-        s.textContent = ' Auf Ordner anwenden…';
-        a.appendChild(s);
+        a.setAttribute('data-testid', 'sieve-apply-page-btn');
+        a.setAttribute('data-icon', '🔎');
+        // Small margin-left so it visually separates from the "Skript
+        // hinzufügen" button next to it.
+        a.style.marginLeft = '8px';
+        a.textContent = 'Filter anwenden…';
         a.addEventListener('click', ev => {
             ev.preventDefault();
             ev.stopPropagation();
@@ -334,23 +330,14 @@
         return a;
     };
 
-    const injectPopupFooter = () => {
-        // Snappymail may create <dialog id="V-SieveScript"> lazily; we
-        // therefore look everywhere for a matching dialog. Once the
-        // dialog exists AND has a `<footer>`, inject.
-        const dialogs = document.querySelectorAll('dialog#V-SieveScript, #V-SieveScript');
-        dialogs.forEach(dlg => {
-            if (dlg.querySelector('#' + POPUP_BTN_ID)) { return; }
-            const footer = dlg.querySelector('footer');
-            if (!footer) { return; }
-            // Insert as FIRST child so it sits LEFT of the raw-toggle
-            // and Save buttons — matching Snappymail's own conventions
-            // (leading actions on the left, primary Save on the right).
-            footer.insertBefore(buildFooterButton(), footer.firstChild);
-            if (window.console && window.console.info) {
-                window.console.info('[Souvera Mail] sieve-apply popup-footer button injected');
-            }
-        });
+    const injectFilterSettingsPage = () => {
+        const anchor = document.querySelector(PAGE_ANCHOR_SEL);
+        if (!anchor) { return; }
+        if (document.getElementById(PAGE_BTN_ID)) { return; }
+        anchor.parentNode.insertBefore(buildPageButton(), anchor.nextSibling);
+        if (window.console && window.console.info) {
+            window.console.info('[Souvera Mail] sieve-apply filter-settings-page button injected');
+        }
     };
 
     // ---------------------------------------------------------------
@@ -403,7 +390,7 @@
     // Cheap enough (querySelector short-circuits) to be idempotent-safe.
     // ---------------------------------------------------------------
     const scan = () => {
-        injectPopupFooter();
+        injectFilterSettingsPage();
         document.querySelectorAll(MENU_SEL).forEach(injectMenuInto);
     };
 

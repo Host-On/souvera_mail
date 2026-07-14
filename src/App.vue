@@ -1,11 +1,15 @@
 <template>
 	<div class="souvera-mail-migration" data-testid="souvera-mail-migration-root">
-		<MigrationPill
-			v-if="showPill"
-			:label="migration.pillLabel.value"
-			:state="migration.pillState.value"
-			data-testid="migration-pill"
-			@click="openWizard" />
+		<!--
+		v0.14.41: MigrationPill (floating „Alte Mails importieren"
+		CTA) removed at operator request — the same entry point
+		already lives in Snappymail's top-right dropdown menu
+		(see `js/dropdown-menu.js` 📥 entry). Two CTAs for the
+		same wizard was redundant. The wizard itself is still
+		reachable via the dropdown menu (which dispatches
+		`souvera-mail:open-migration`) or the `?openMigration=1`
+		URL parameter.
+		-->
 
 		<MigrationWizard
 			v-if="isOpen"
@@ -23,22 +27,19 @@
 </template>
 
 <script>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useMigration } from './composables/useMigration.js'
-import MigrationPill from './components/MigrationPill.vue'
 import MigrationWizard from './components/MigrationWizard.vue'
 import ResyncDialog from './components/ResyncDialog.vue'
 
 export default {
 	name: 'App',
-	components: { MigrationPill, MigrationWizard, ResyncDialog },
+	components: { MigrationWizard, ResyncDialog },
 	setup() {
 		const migration = useMigration()
 		const isOpen = ref(false)
 		const isResyncOpen = ref(false)
 		const initialStep = ref('welcome')
-
-		const showPill = computed(() => migration.available.value)
 
 		function openWizard(step) {
 			// If a job is already running, jump straight to progress.
@@ -104,7 +105,7 @@ export default {
 					})
 			})
 
-			// v0.14.19 — Snappymail dropdown injects a "🔄 Postfach neu
+			// v0.14.19 — Snappymail dropdown injects a "↻ Postfach neu
 			// synchronisieren" entry that dispatches this event.
 			window.addEventListener('souvera-mail:open-resync', () => {
 				isResyncOpen.value = true
@@ -125,7 +126,9 @@ export default {
 				return
 			}
 			// First-time welcome — open the wizard automatically unless
-			// the user has previously dismissed it.
+			// the user has previously dismissed it. v0.14.41: the pill
+			// is gone, so this auto-open is the ONLY entry point that
+			// first-time users see. Kept intentionally.
 			if (!migration.dismissed.value && !migration.lastJob.value) {
 				initialStep.value = 'welcome'
 				isOpen.value = true
@@ -141,7 +144,6 @@ export default {
 			isOpen,
 			isResyncOpen,
 			initialStep,
-			showPill,
 			openWizard,
 			closeWizard,
 			onDismissForever,

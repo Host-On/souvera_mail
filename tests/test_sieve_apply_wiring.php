@@ -118,7 +118,8 @@ foreach ([
     'sieve-apply-folder-select',
     'sieve-apply-run',
     'sieve-apply-cancel',
-    'sieve-apply-toolbar-btn',
+    'sieve-apply-page-btn',           // v0.14.41 new: settings-page button
+    'sieve-apply-toolbar-btn-menu',   // v0.14.41 new: dropdown menu entry
 ] as $tid) {
     $check(\str_contains($jsSrc, "'data-testid': '{$tid}'")
         || \str_contains($jsSrc, "data-testid=\"{$tid}\"")
@@ -132,36 +133,32 @@ $check(\str_contains($jsSrc, 'folderInformationMultiplyList'),
 $check(\str_contains($jsSrc, 'ERNEUT per SMTP'),
     "sieve-apply.js warns the operator that redirect resends via SMTP (avoids surprise)");
 
-// v0.14.40: after operator confirmed choice A (Sieve-editor popup),
-// injection targets the popup footer AGAIN — but with two lessons
-// baked into the code:
-//   1. Watch for the footer via MutationObserver (the Sieve popup
-//      is wrapped in `<!-- ko with: script -->` so the footer only
-//      exists AFTER the user clicks an existing script or the
-//      "Skript hinzufügen" button)
-//   2. Keep the dropdown-menu injection as a *second* entry point
-//      (belt-and-suspenders) — that way even if the popup footer
-//      injection ever regresses, users still have a way in.
-$check(\str_contains($jsSrc, 'dialog#V-SieveScript, #V-SieveScript'),
-    "sieve-apply.js targets the Sieve popup dialog (dialog#V-SieveScript OR #V-SieveScript — v0.14.40 restored A after operator preferred it)");
-$check(\str_contains($jsSrc, "querySelector('footer')"),
-    "sieve-apply.js reads the plain <footer> element inside the dialog (PopupsSieveScript.html has a bare <footer>)");
-$check(\str_contains($jsSrc, 'souvera-sieve-apply-popup-btn'),
-    "sieve-apply.js gives the popup button a stable id (idempotent injection under MutationObserver)");
-$check(\str_contains($jsSrc, 'popup-footer button injected'),
-    "sieve-apply.js logs a diagnostic breadcrumb when the popup button is successfully injected");
+// v0.14.41: primary injection point is the Filter SETTINGS PAGE
+// (not the popup) — operator asked for the button next to
+// "Skript hinzufügen". Popup-footer injection was removed because
+// it required clicking on the script name first — extra step the
+// operator dislikes.
+$check(\str_contains($jsSrc, 'PAGE_ANCHOR_SEL')
+    && \str_contains($jsSrc, "SETTINGS_FILTERS/BUTTON_ADD_SCRIPT"),
+    "sieve-apply.js targets the 'Skript hinzufügen' button on the filter settings page (v0.14.41 — moved from popup to page)");
+$check(\str_contains($jsSrc, 'souvera-sieve-apply-page-btn'),
+    "sieve-apply.js gives the page button a stable id (idempotent injection under MutationObserver)");
+$check(\str_contains($jsSrc, 'filter-settings-page button injected'),
+    "sieve-apply.js logs a diagnostic breadcrumb when the page button is successfully injected");
 // v0.14.39 kept: dropdown-menu injection still present as backup entry point.
 $check(\str_contains($jsSrc, 'top-system-dropdown-id'),
-    "sieve-apply.js keeps the top-right dropdown menu entry too (belt-and-suspenders — v0.14.40 has BOTH entry points)");
+    "sieve-apply.js keeps the top-right dropdown menu entry too (belt-and-suspenders — v0.14.41 has BOTH entry points)");
 $check(\str_contains($jsSrc, "'data-icon', '🔎'"),
     "sieve-apply.js uses 🔎 as menu icon");
 $check(\str_contains($jsSrc, 'sv-sieve-apply-menu'),
     "sieve-apply.js tags the injected menu <li> with data-sv-sieve-apply-menu for idempotency");
 $check(\str_contains($jsSrc, "souvera-mail:open-sieve-apply"),
     "sieve-apply.js exposes a `souvera-mail:open-sieve-apply` custom event");
-// Negative guard: `.b-popups-sieve-script` never worked, must not sneak back.
+// Negative guards: old fragile selectors must not sneak back.
 $check(!\str_contains($jsSrc, '.b-popups-sieve-script'),
     "sieve-apply.js does NOT target the non-existent `.b-popups-sieve-script` class (v0.14.37 mistake)");
+$check(!\str_contains($jsSrc, 'souvera-sieve-apply-popup-btn'),
+    "sieve-apply.js no longer injects into the popup footer (v0.14.40 approach — operator preferred settings-page placement)");
 
 // -------------------------------------------------------------------
 // 6. `php -l` clean on the new PHP files.

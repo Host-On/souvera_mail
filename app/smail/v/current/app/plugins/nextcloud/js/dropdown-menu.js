@@ -107,11 +107,16 @@
 		}
 
 		// v0.14.19 — resync entry (idempotent), sits above the migration
-		// entry so the order is: Einstellungen ⚙ · 🔄 Postfach sync ·
+		// entry so the order is: Einstellungen ⚙ · ↻ Postfach sync ·
 		// 📥 Import · 🛈 Hilfe · ⏻ Ausloggen.
+		//
+		// v0.14.41 (operator screenshot 2026-02-19): the color-emoji 🔄
+		// stood out against Snappymail's native icons (⚙ 🛈 ⏻). Switched
+		// to ↻ (U+21BB CLOCKWISE OPEN CIRCLE ARROW) which renders as a
+		// plain text glyph everywhere and matches the vanilla entries.
 		if (!menu.querySelector('[data-' + RESYNC_MARKER + ']')) {
 			var resyncLi = buildItem(
-				RESYNC_MARKER, '🔄', 'Postfach neu synchronisieren',
+				RESYNC_MARKER, '↻', 'Postfach neu synchronisieren',
 				'souvera-mail-menu-resync', openResync
 			);
 			var migAnchor = menu.querySelector('[data-' + MARKER + ']');

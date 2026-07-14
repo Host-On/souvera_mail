@@ -6,6 +6,117 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.41] — 2026-02-19 (Sieve-Apply auf Filter-Seite, Pill weg, Sync-Icon normalisiert)
+
+### Operator-Report (2026-02-19, mit Screenshot)
+
+Vier Punkte in einer Nachricht:
+1. Der Menü-Eintrag „Filter auf Ordner anwenden…" ist auf einem
+   Workspace sichtbar, auf einem anderen nicht — obwohl beide auf
+   0.14.40 sind
+2. Der Button gehört auf die **Filter-Settings-Seite** direkt neben
+   „Skript hinzufügen", nicht in den Popup
+3. Die floating „Alte Mails importieren"-Pille soll weg, weil das
+   dieselbe Aktion wie der Dropdown-Menü-Eintrag ist (Redundanz)
+4. Das 🔄-Icon vor „Postfach neu synchronisieren" passt nicht zu den
+   monochromen Snappymail-Icons (⚙ 🛈 ⏻) — bunt / uneinheitlich
+
+### Fix 1 — Button auf der Filter-Settings-Seite (`js/sieve-apply.js`)
+
+Popup-Footer-Injection aus 0.14.40 komplett entfernt. Statt dessen
+injizieren wir jetzt direkt in die Filter-Settings-**Seite**:
+
+Anker im Template `templates/Views/User/SettingsFilters.html:49`:
+```html
+<a class="btn" data-bind="click: addScript" data-icon="✚"
+   data-i18n="SETTINGS_FILTERS/BUTTON_ADD_SCRIPT"></a>
+```
+
+Neues Sibling-Element:
+```html
+<a id="souvera-sieve-apply-page-btn" class="btn" data-icon="🔎"
+   data-testid="sieve-apply-page-btn">Filter anwenden…</a>
+```
+
+Idempotent (ID-Guard) und via MutationObserver — die Filter-Settings-
+Seite rendert erst wenn der User in Snappymail's Einstellungs-Navigation
+auf „Filter" klickt, deswegen braucht es den Observer.
+
+Diagnostic-Log: `[Souvera Mail] sieve-apply filter-settings-page button
+injected` — läuft jedes Mal wenn die Injection erfolgreich war.
+
+Dropdown-Menü-Eintrag bleibt als zweiter Entry-Point (Belt-and-
+Suspenders).
+
+### Fix 2 — MigrationPill entfernt (`src/App.vue` + rebuild)
+
+`<MigrationPill v-if="showPill">` aus App.vue entfernt. Datei
+`components/MigrationPill.vue` bleibt liegen (falls wir sie später
+als Status-Anzeige wollen), wird aber nicht mehr gemountet.
+
+**Vue-Bundle neu gebaut**: `yarn build` regenerierte
+`js/souvera_mail-migration-wizard.js` (401 KiB). Wizard bleibt
+funktional; einziger Entry-Point ist jetzt der Dropdown-Menü-Eintrag
+„📥 Alte Mails importieren".
+
+App.vue behält den Event-Listener `souvera-mail:open-migration` (den
+`dropdown-menu.js` dispatched) und den `?openMigration=1` URL-Deep-Link.
+
+### Fix 3 — Sync-Icon normalisiert (`js/dropdown-menu.js`)
+
+Icon-Character für „Postfach neu synchronisieren":
+- Vorher: `🔄` (U+1F504) — Emoji, rendert farbig auf den meisten OSes
+- Jetzt: `↻` (U+21BB CLOCKWISE OPEN CIRCLE ARROW) — Text-Symbol,
+  monochrom, matcht ⚙ / 🛈 / ⏻ visuell
+
+Kommentar-Header in dropdown-menu.js entsprechend aktualisiert.
+
+### Fix 4 — Cache-Inkonsistenz zwischen Workspaces
+
+Kein Code-Fix — die zwei Workspaces sehen unterschiedliche JS weil
+einer aus dem Browser-/Snappymail-Bundle-Cache serviert wird, der
+andere neu. Nach dem 0.14.41-Deploy sollte beim Hard-Reload
+(`Ctrl+Shift+R`) auf beiden Seiten die neue Version laufen. Wenn
+nicht: PHP-FPM reload + Redis flush.
+
+### Regression-Tests
+
+**`tests/test_sieve_apply_wiring.php`** (angepasst, 49/50 → 50/50):
+- Positive Guards für Filter-Settings-Page-Injection:
+  - `PAGE_ANCHOR_SEL` + `SETTINGS_FILTERS/BUTTON_ADD_SCRIPT`
+  - `souvera-sieve-apply-page-btn` (ID-Guard)
+  - Log-String `filter-settings-page button injected`
+- Neue `data-testid`-Werte: `sieve-apply-page-btn` und
+  `sieve-apply-toolbar-btn-menu`
+- Negative Guard: `souvera-sieve-apply-popup-btn` darf NIE
+  zurückkommen (0.14.40-Weg wurde bewusst verworfen)
+
+**`tests/test_migration_wizard_frontend.php`** (angepasst):
+- Assertion „App.vue mountet MigrationPill" → inverse Assertion
+  „App.vue importiert `MigrationPill` NICHT mehr" +
+  „`<MigrationPill>` steht NICHT mehr im Template"
+- Positive Assertion: `dropdown-menu.js` dispatched weiterhin
+  `souvera-mail:open-migration` (sole Entry-Point post-v0.14.41)
+
+### Verifikation
+
+- Volle Suite: **49 Suites / 1782 Assertions PASS** (war 49/1781)
+- `yarn build`: erfolgreich, `js/souvera_mail-migration-wizard.js`
+  aktualisiert
+- `mcp_lint_javascript`: clean
+
+### Live-Deploy — Rsync-Liste
+
+Diese Dateien haben sich seit 0.14.40 geändert:
+- `app/smail/v/current/app/plugins/nextcloud/js/sieve-apply.js`
+- `app/smail/v/current/app/plugins/nextcloud/js/dropdown-menu.js`
+- `src/App.vue` *(Quelle)*
+- **`js/souvera_mail-migration-wizard.js` (kompiliertes Vue-Bundle — wichtig!)*
+- `appinfo/info.xml`
+- `package.json`
+
+Nach dem Rsync: `occ upgrade` + **Hard-Reload**.
+
 ## [0.14.40] — 2026-02-19 (Sieve-Apply-Button in den Popup-Footer zurück — Option A)
 
 ### Operator-Wahl
