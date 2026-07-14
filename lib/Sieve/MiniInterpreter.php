@@ -3,23 +3,6 @@ declare(strict_types=1);
 
 namespace OCA\SouveraMail\Sieve;
 
-// PSR-4 defensive load: Types.php holds five value-object classes
-// (Rule / TestNode / ActionNode / MessageFacts / EvaluatedActions)
-// in a single file. PSR-4 autoloading maps 1 class → 1 file, so
-// none of those classes resolve via the standard autoloader. The
-// composer classmap in composer.json points at Types.php as a
-// belt-and-suspenders measure, but in a live NC install where the
-// operator forgot to run `composer dump-autoload` the classmap is
-// stale — hitting `new TestNode()` inside `parseIfBlock()` would
-// throw an uncaught `Error: Class not found`. The require_once
-// below guarantees the classes are loaded whenever MiniInterpreter
-// itself is loaded, regardless of composer state.
-// (Root-cause fix for the "SyntaxError: JSON.parse: unexpected
-// character" bug reported 2026-02-19 — the Error was caught by
-// the controller's Throwable-catch but earlier NC versions rendered
-// 500 responses as HTML, breaking JSON parsing on the client.)
-require_once __DIR__ . '/Types.php';
-
 /**
  * Minimalistic Sieve interpreter for the "Apply filters to existing
  * messages" feature.

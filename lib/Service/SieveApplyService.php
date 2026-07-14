@@ -355,29 +355,59 @@ class SieveApplyService
         return null;
     }
 
-    /** @return string[] JMAP Email ids, newest first, capped at $limit. */
+    /**
+     * Stalwart 0.16 caps `Email/query.limit` at 500 per JMAP call
+     * (`Parameter limit must be between 1 and 500` — verified live
+     * 2026-02-19). To honour our `MAX_LIMIT = 5000` we paginate:
+     * loop with `position` advancing by JMAP_PAGE_LIMIT (500) until
+     * we've collected `$limit` ids OR Stalwart returns fewer than
+     * a full page (= end of mailbox).
+     *
+     * @return string[] JMAP Email ids, newest first, capped at $limit.
+     */
     private function queryMessageIds(string $accountId, string $bearer, string $mailboxId, int $limit): array
     {
-        $response = $this->stalwart->jmapCall(
-            $bearer,
-            [[
-                'Email/query',
-                [
-                    'accountId' => $accountId,
-                    'filter' => ['inMailbox' => $mailboxId],
-                    'sort' => [['property' => 'receivedAt', 'isAscending' => false]],
-                    'limit' => $limit,
-                    'calculateTotal' => false,
-                ],
-                'c0',
-            ]],
-            [self::CAP_MAIL]
-        );
-        $body = $this->stalwart->extractMethodResponse($response, 'Email/query');
-        $ids = (array) ($body['ids'] ?? []);
         $out = [];
-        foreach ($ids as $id) {
-            if (\is_string($id) && $id !== '') { $out[] = $id; }
+        $position = 0;
+        // Stalwart's cap. Keep this in sync with the server's
+        // `mail.parse.limits.query-limit` — 500 is Stalwart 0.16's
+        // built-in default and also the OFFICIAL JMAP-mail draft
+        // recommended maximum.
+        $pageLimit = 500;
+        while (\count($out) < $limit) {
+            $remaining = $limit - \count($out);
+            $requestLimit = \min($pageLimit, $remaining);
+            $response = $this->stalwart->jmapCall(
+                $bearer,
+                [[
+                    'Email/query',
+                    [
+                        'accountId' => $accountId,
+                        'filter' => ['inMailbox' => $mailboxId],
+                        'sort' => [['property' => 'receivedAt', 'isAscending' => false]],
+                        'position' => $position,
+                        'limit' => $requestLimit,
+                        'calculateTotal' => false,
+                    ],
+                    'c0',
+                ]],
+                [self::CAP_MAIL]
+            );
+            $body = $this->stalwart->extractMethodResponse($response, 'Email/query');
+            $ids = (array) ($body['ids'] ?? []);
+            $pageCount = 0;
+            foreach ($ids as $id) {
+                if (\is_string($id) && $id !== '') {
+                    $out[] = $id;
+                    $pageCount++;
+                }
+            }
+            // Reached the end of the mailbox (fewer results than
+            // requested) — stop paginating.
+            if ($pageCount < $requestLimit) {
+                break;
+            }
+            $position += $pageCount;
         }
         return $out;
     }
@@ -471,27 +501,34 @@ class SieveApplyService
                 'mailboxIds/' . $sourceMailboxId => null,
             ];
         }
-        try {
-            $response = $this->stalwart->jmapCall(
-                $bearer,
-                [[
-                    'Email/set',
-                    ['accountId' => $accountId, 'update' => $update],
-                    'c0',
-                ]],
-                [self::CAP_MAIL]
-            );
-            $body = $this->stalwart->extractMethodResponse($response, 'Email/set');
-            $updated = (array) ($body['updated'] ?? []);
-            $notUpdated = (array) ($body['notUpdated'] ?? []);
-            foreach ($notUpdated as $id => $reason) {
-                $errors[] = "Email/set update rejected {$id}: " . \json_encode($reason);
+        // Stalwart 0.16 caps `Email/set.update` at 500 entries per
+        // call (same query-limit constant as Email/query). Chunk to
+        // stay under the ceiling — otherwise Stalwart rejects the
+        // whole batch with "Parameter … must be between 1 and 500".
+        $totalUpdated = 0;
+        foreach (\array_chunk($update, 500, /*preserve_keys*/ true) as $chunk) {
+            try {
+                $response = $this->stalwart->jmapCall(
+                    $bearer,
+                    [[
+                        'Email/set',
+                        ['accountId' => $accountId, 'update' => $chunk],
+                        'c0',
+                    ]],
+                    [self::CAP_MAIL]
+                );
+                $body = $this->stalwart->extractMethodResponse($response, 'Email/set');
+                $updated = (array) ($body['updated'] ?? []);
+                $notUpdated = (array) ($body['notUpdated'] ?? []);
+                foreach ($notUpdated as $id => $reason) {
+                    $errors[] = "Email/set update rejected {$id}: " . \json_encode($reason);
+                }
+                $totalUpdated += \count($updated);
+            } catch (\Throwable $e) {
+                $errors[] = 'Email/set for moves failed: ' . $e->getMessage();
             }
-            return \count($updated);
-        } catch (\Throwable $e) {
-            $errors[] = 'Email/set for moves failed: ' . $e->getMessage();
-            return 0;
         }
+        return $totalUpdated;
     }
 
     /**
@@ -509,22 +546,26 @@ class SieveApplyService
             }
             if ($sub !== []) { $update[$emailId] = $sub; }
         }
-        try {
-            $response = $this->stalwart->jmapCall(
-                $bearer,
-                [[
-                    'Email/set',
-                    ['accountId' => $accountId, 'update' => $update],
-                    'c0',
-                ]],
-                [self::CAP_MAIL]
-            );
-            $body = $this->stalwart->extractMethodResponse($response, 'Email/set');
-            return \count((array) ($body['updated'] ?? []));
-        } catch (\Throwable $e) {
-            $errors[] = 'Email/set for flags failed: ' . $e->getMessage();
-            return 0;
+        // Same 500-entry Stalwart cap as Email/set.update above.
+        $totalFlagged = 0;
+        foreach (\array_chunk($update, 500, /*preserve_keys*/ true) as $chunk) {
+            try {
+                $response = $this->stalwart->jmapCall(
+                    $bearer,
+                    [[
+                        'Email/set',
+                        ['accountId' => $accountId, 'update' => $chunk],
+                        'c0',
+                    ]],
+                    [self::CAP_MAIL]
+                );
+                $body = $this->stalwart->extractMethodResponse($response, 'Email/set');
+                $totalFlagged += \count((array) ($body['updated'] ?? []));
+            } catch (\Throwable $e) {
+                $errors[] = 'Email/set for flags failed: ' . $e->getMessage();
+            }
         }
+        return $totalFlagged;
     }
 
     /**

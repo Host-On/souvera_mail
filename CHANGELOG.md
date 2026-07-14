@@ -6,6 +6,115 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.44] — 2026-02-19 (**ROOT CAUSE**: Stalwart `Email/query.limit` max 500 + PSR-4-Split)
+
+### Operator-Report (2026-02-19, nach 0.14.43-Deploy noch immer)
+
+> „ich find nur ein Fehler ‚Parameter limit must be between 1 and 500'
+> ... das wird der aber nicht sein!?"
+
+**DOCH — DAS ist der Bug.** Stalwart 0.16 limitiert
+`Email/query.limit` hart auf max. 500 pro JMAP-Call. Wir haben aber
+`limit: 5000` gesendet (0.14.42-Bump). Stalwart antwortet mit
+`invalidArguments: "Parameter limit must be between 1 and 500"` — der
+`extractMethodResponse()` wirft das als `\RuntimeException`, im
+Live-System landete das aus irgendeinem Grund NICHT im
+`try/catch`-Wrapper (vermutlich weil der Fehler VOR dem
+Method-Entry im Argument-Resolver oder ähnlich passierte) → HTML-500
+statt strukturierter JSON-Fehler.
+
+### Fix A: Pagination
+
+**`queryMessageIds()`** paginated jetzt in 500er-Chunks:
+```php
+while (\count($out) < $limit) {
+    $requestLimit = \min(500, $limit - \count($out));
+    // Email/query mit position=$position, limit=$requestLimit
+    if ($pageCount < $requestLimit) break;  // Ende der Mailbox
+    $position += $pageCount;
+}
+```
+
+**`executeMoves()` und `executeFlagAdds()`** chunken `Email/set.update`
+via `array_chunk($update, 500, preserve_keys=true)` — dasselbe
+500-Limit gilt auch für `Email/set.update`.
+
+Damit funktioniert `limit=5000` end-to-end: 10 JMAP-Calls à 500
+Nachrichten pro Query, plus 10 Calls à 500 pro `Email/set`-Batch
+für Verschieben/Flaggen. Bleibt komplett Server-seitig.
+
+### Fix B: PSR-4-Split für Sieve-Types
+
+Zusätzlich: `lib/Sieve/Types.php` in einzelne PSR-4-Dateien
+aufgeteilt:
+- `lib/Sieve/Rule.php`
+- `lib/Sieve/TestNode.php`
+- `lib/Sieve/ActionNode.php`
+- `lib/Sieve/MessageFacts.php`
+- `lib/Sieve/EvaluatedActions.php`
+
+`Types.php` bleibt nur noch als BC-Shim (require_once auf die 5
+neuen Dateien) — für den Fall, dass ein alter OpCache-Load-Path
+ihn noch referenziert. Autoloader (classmap + static) zeigen jetzt
+auf die einzelnen Dateien. Kein `require_once`-Hack mehr in
+`MiniInterpreter.php` nötig.
+
+Damit ist die Autoload-Situation absolut wasserdicht — jede Klasse
+folgt PSR-4 strikt, jede Composer-Version findet sie ohne classmap-
+Regeneration.
+
+### Test-Suite
+
+- **`tests/test_sieve_apply_json_error_handling.php`: 64/64 PASS**
+  (war 46/46 in 0.14.43; +18 Assertions):
+  - PSR-4-Split verifiziert (5 einzelne Dateien + BC-Shim)
+  - Types.php enthält KEINE `final class`-Deklaration mehr (Regression-Guard)
+  - MiniInterpreter.php hat KEIN `require_once __DIR__ . '/Types.php';` mehr
+  - Composer classmap + autoload_static mappen jede Klasse auf ihre eigene Datei
+  - **Pagination-Guards**: `while ($out < $limit)`, `$pageLimit = 500`,
+    `min($pageLimit, $remaining)`, `Email/query.position` cursor,
+    end-of-mailbox-break
+  - `executeMoves()` + `executeFlagAdds()` chunken `Email/set.update` bei 500 (`preserve_keys=true`)
+  - `php -l` clean auf allen 9 modifizierten Dateien
+- **Voller Regressions-Lauf: 50/50 Test-Suites grün.**
+
+### Files (this iteration)
+
+| File | Change |
+|---|---|
+| `lib/Service/SieveApplyService.php` | `queryMessageIds()` paginated via while-loop mit `position` + `pageLimit=500`. `executeMoves()` + `executeFlagAdds()` chunken `Email/set.update` bei 500 (`preserve_keys=true`). |
+| `lib/Sieve/Rule.php` | NEU (PSR-4-Split aus Types.php) |
+| `lib/Sieve/TestNode.php` | NEU |
+| `lib/Sieve/ActionNode.php` | NEU |
+| `lib/Sieve/MessageFacts.php` | NEU |
+| `lib/Sieve/EvaluatedActions.php` | NEU |
+| `lib/Sieve/Types.php` | Rewritten als BC-Shim (require_once × 5) — keine Klassen mehr |
+| `lib/Sieve/MiniInterpreter.php` | `require_once` entfernt (nicht mehr nötig) |
+| `composer.json` | `lib/Sieve/Types.php` aus `autoload.classmap` entfernt |
+| `vendor/composer/autoload_classmap.php` | 5 Einträge zeigen auf die neuen einzelnen Dateien |
+| `vendor/composer/autoload_static.php` | Dasselbe |
+| `tests/test_sieve_apply_json_error_handling.php` | +18 Assertions (Pagination + PSR-4-Split-Guards) |
+| `appinfo/info.xml` | Version `0.14.43 → 0.14.44` |
+| `package.json` | Version-Sync |
+| `CHANGELOG.md` | Dieser Eintrag |
+
+### Operator-Aktion nach Deploy
+
+1. Deploy 0.14.44 auf `/mnt/nc-shared/custom_apps/souvera_mail`
+2. `sudo systemctl reload php8.3-fpm` (OpCache reset)
+3. „Filter anwenden" testen — sollte jetzt entweder Erfolgs-Report
+   oder strukturierte deutsche Fehler-Meldung zurückgeben, KEIN
+   `SyntaxError: JSON.parse` mehr.
+
+### Nebenbefund (nicht in diesem Step behandelt)
+
+Warnung `The backtick (\`) operator is deprecated, use shell_exec()
+instead at .../gpg/base.php#489` — Engine-interne Deprecation aus
+dem gebundelten Snappymail-Fork, nur mit PHP 8.5 sichtbar. **Kein
+funktioneller Impact**, nur Log-Rauschen. Kann in einem separaten
+0.14.x-Patch für die Engine-Bibliothek behandelt werden falls
+gewünscht (P3-Backlog).
+
 ## [0.14.43] — 2026-02-19 (Sieve-Apply: PSR-4-Autoload-Fix für Types.php — behebt `SyntaxError: JSON.parse`)
 
 ### Operator-Report (2026-02-19)
