@@ -6,6 +6,53 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.46] — 2026-06 (ECHTE Root Cause: NC-Kontakte-Limit, nicht Stalwart! + Backtick-Fix)
+
+### Operator-Report
+
+> „Wir drehen uns im Kreis …"
+
+```
+ERROR index  Parameter limit must be between 1 and 500
+ERROR PHP    The backtick (`) operator is deprecated, use shell_exec()
+             instead at …/gpg/base.php#489
+```
+
+**Root Cause (endlich):** Der „limit must be between 1 and 500"-Fehler
+kommt **NICHT von Stalwart/JMAP** (falsche Fährte in 0.14.44/0.14.45),
+sondern von **Nextclouds eigener Kontakte-API**. Snappymails
+`plugins/nextcloud/NextcloudAddressBook.php` rief
+`$cm->search(…, ['limit' => 10000])` auf — Nextclouds
+`IAddressBook`-Validator erlaubt nur 1–500 und wirft eine
+`ValidatorException`. Deshalb tauchte der Fehler zusammen mit der
+GPG-Backtick-Warnung auf: beide entstehen im normalen
+Snappymail-Betrieb (Compose/Kontakte-Autocomplete), nicht beim
+Filter-Anwenden.
+
+### Fixes
+
+1. **`NextcloudAddressBook.php`** — neuer paginierter `searchAll()`-Helper:
+   500er-Seiten via `offset`, Sicherheits-Cap 10 000. Ersetzt alle drei
+   `limit => 10000`-Aufrufe (`Export`, `GetContacts`, `GetContactByID`).
+   `GetSuggestions` klemmt `$iLimit` auf 1–500.
+2. **`gpg/base.php` (#489)** — Backtick-Operator durch
+   `\shell_exec('which ' . \escapeshellarg($name))` ersetzt
+   (PHP-8.5-Deprecation).
+3. **`gpg/pgp.php` (#53)** — zweite (bislang unentdeckte) Backtick-Stelle
+   ebenfalls auf `\shell_exec()` umgestellt, mit Guard falls kein
+   gpg-Binary gefunden wurde.
+
+Die JMAP-Chunking-Logik aus 0.14.45 (250er-Batches) bleibt bestehen —
+sie ist harmlos-defensiv, war aber nie die Fehlerquelle.
+
+### Tests
+
+Neue Suite `tests/test_nc_contacts_limit_and_backtick.php`:
+Lint, Backtick-Scan im gpg-Verzeichnis, statische Limit-Prüfung
+(kein Literal > 500), funktionale Simulation von `searchAll()`
+(1200 Kontakte → 3 Seiten, 20 000 → Cap bei 10 000, NC-Validator-Mock
+wirft bei limit > 500).
+
 ## [0.14.45] — 2026-02-19 (Stalwart-Cap sicher unterbieten: 500 → 250 + Diagnostik)
 
 ### Operator-Report (2026-02-19, nach 0.14.44-Deploy)

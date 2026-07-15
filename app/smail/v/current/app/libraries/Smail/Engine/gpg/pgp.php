@@ -50,7 +50,10 @@ class PGP extends Base implements \Smail\Engine\PGP\PGPInterface
 		// How to use gpgme-json ?
 		$this->binary = static::findBinary('gpg');
 
-		$info = \preg_replace('/\R +/', ' ', `$this->binary --with-colons --list-config`);
+		$info = '';
+		if ($this->binary && \function_exists('shell_exec')) {
+			$info = (string) \preg_replace('/\R +/', ' ', (string) \shell_exec($this->binary . ' --with-colons --list-config'));
+		}
 		if (\preg_match('/cfg:version:([0-9]+\\.[0-9]+\\.[0-9]+)/', $info, $match)) {
 			$this->version = $match[1];
 		}

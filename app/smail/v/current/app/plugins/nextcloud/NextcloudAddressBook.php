@@ -8,6 +8,16 @@ class NextcloudAddressBook implements AddressBookInterface
 {
 	use \Smail\Mail\Log\Inherit;
 
+	/**
+	 * Nextcloud's IAddressBook search validator rejects any `limit`
+	 * outside 1..500 with "Parameter limit must be between 1 and 500"
+	 * (nextcloud/server IManager::search). Never pass more than this
+	 * per call — paginate via `offset` instead (see searchAll()).
+	 */
+	private const NC_SEARCH_PAGE = 500;
+	/** Safety cap for full-addressbook scans (20 pages à 500). */
+	private const NC_SEARCH_CAP = 10000;
+
 	private ?\OCP\Contacts\IManager $cm = null;
 	private ?object $cardDavBackend = null;
 	private string $addressBookKey = '';
@@ -52,7 +62,7 @@ class NextcloudAddressBook implements AddressBookInterface
 		}
 
 		$results = $this->filterUserContacts(
-			$cm->search('', ['FN'], ['limit' => 10000])
+			$this->searchAll('', ['FN'])
 		);
 
 		foreach ($results as $contact) {
@@ -167,9 +177,8 @@ class NextcloudAddressBook implements AddressBookInterface
 			return [];
 		}
 
-		// IManager::search doesn't support offset natively, fetch all and slice.
-		// Cap at 10000 as safety bound for large address books.
-		$allResults = $cm->search($sSearch, ['FN', 'EMAIL', 'NICKNAME', 'TEL'], ['limit' => 10000]);
+		// NC caps search `limit` at 500 — paginate, then slice locally.
+		$allResults = $this->searchAll($sSearch, ['FN', 'EMAIL', 'NICKNAME', 'TEL']);
 
 		$iResultCount = \count($allResults);
 		$sliced = \array_slice($allResults, $iOffset, $iLimit);
@@ -215,7 +224,7 @@ class NextcloudAddressBook implements AddressBookInterface
 
 		if (!$results && !$bIsStrID) {
 			// Fallback: search all and filter by NC row id (capped for safety)
-			$allResults = $cm->search('', ['FN'], ['limit' => 10000]);
+			$allResults = $this->searchAll('', ['FN']);
 			$results = \array_filter($allResults, fn($c) => isset($c['id']) && $c['id'] == $mID);
 		}
 
@@ -233,7 +242,9 @@ class NextcloudAddressBook implements AddressBookInterface
 			return [];
 		}
 
-		$results = $cm->search($sSearch, ['FN', 'NICKNAME', 'EMAIL'], ['limit' => $iLimit]);
+		$results = $cm->search($sSearch, ['FN', 'NICKNAME', 'EMAIL'], [
+			'limit' => \max(1, \min(self::NC_SEARCH_PAGE, $iLimit)),
+		]);
 
 		$suggestions = [];
 		foreach ($results as $contact) {
@@ -279,6 +290,41 @@ class NextcloudAddressBook implements AddressBookInterface
 	}
 
 	// --- Private helpers ---
+
+	/**
+	 * Paginated full search — NC rejects `limit` > 500, so we loop with
+	 * `offset` in 500-steps until a short page arrives (= end of books)
+	 * or the NC_SEARCH_CAP safety bound is reached.
+	 */
+	private function searchAll(string $sSearch, array $aProps): array
+	{
+		$cm = $this->getManager();
+		if (!$cm) {
+			return [];
+		}
+		$all = [];
+		$offset = 0;
+		while (\count($all) < self::NC_SEARCH_CAP) {
+			try {
+				$page = $cm->search($sSearch, $aProps, [
+					'limit' => self::NC_SEARCH_PAGE,
+					'offset' => $offset,
+				]);
+			} catch (\Throwable $e) {
+				$this->logException($e);
+				break;
+			}
+			if (!$page) {
+				break;
+			}
+			$all = \array_merge($all, $page);
+			if (\count($page) < self::NC_SEARCH_PAGE) {
+				break;
+			}
+			$offset += \count($page);
+		}
+		return $all;
+	}
 
 	/**
 	 * Find a card by vCard UID when the CardDAV URI doesn't match UID.vcf.

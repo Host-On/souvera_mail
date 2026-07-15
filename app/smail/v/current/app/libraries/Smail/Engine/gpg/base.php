@@ -432,8 +432,7 @@ abstract class Base
 
 	public function agent()
 	{
-//		$home = \escapeshellarg($this->options['homedir']);
-//		echo `gpg-agent --daemon --homedir $home 2>&1`;
+		// disabled: gpg-agent is spawned on demand by gpg itself
 	}
 
 	protected function getPassphrase($key)
@@ -486,7 +485,7 @@ abstract class Base
 
 	protected static function findBinary($name) : ?string
 	{
-		$binary = \function_exists('shell_exec') ? \trim((string) `which $name`) : '';
+		$binary = \function_exists('shell_exec') ? \trim((string) \shell_exec('which ' . \escapeshellarg($name))) : '';
 		if ($binary && \Smail\Engine\Utils::inOpenBasedir($binary) && \is_executable($binary)) {
 			return $binary;
 		}
