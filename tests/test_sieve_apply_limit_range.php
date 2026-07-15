@@ -95,12 +95,15 @@ $check(\substr_count($jsSrc, '.then(safeJson)') >= 2,
     'both fetches (folders + apply) route through safeJson');
 
 // -------------------------------------------------------------------
-// 4. Version sync 0.14.47.
+// 4. Version sync (agnostic — info.xml and package.json must agree).
 // -------------------------------------------------------------------
 $info = (string) \file_get_contents($repo . '/appinfo/info.xml');
 $pkg = \json_decode((string) \file_get_contents($repo . '/package.json'), true);
-$check(\str_contains($info, '<version>0.14.47</version>'), 'info.xml bumped to 0.14.47');
-$check(($pkg['version'] ?? '') === '0.14.47', 'package.json bumped to 0.14.47');
+\preg_match('/<version>([^<]+)<\/version>/', $info, $vm);
+$check(($vm[1] ?? '') !== '' && ($pkg['version'] ?? '') === ($vm[1] ?? ''),
+    'info.xml and package.json versions are in sync');
+$check(\version_compare(($vm[1] ?? '0'), '0.14.47', '>='),
+    'version is at least 0.14.47 (the dispatcher fix release)');
 
 // -------------------------------------------------------------------
 if ($failures) {

@@ -388,32 +388,23 @@ final class MiniInterpreter
             }
             return new TestNode($kind, $children);
         }
-        // header :contains "X" "Y"    /  address :is "from" "..."   /  envelope :matches "from" "*@*"
+        // header/address/envelope — each argument is either a quoted
+        // string OR a ["a","b"] list. Snappymail's filter UI emits the
+        // MIXED form `header :contains ["From"] "emergent"` (list header,
+        // single-string needle), which the two previous separate regexes
+        // (both-quoted / both-list) silently failed to parse — the test
+        // degraded to `false` and NO rule ever matched (v0.14.48 fix,
+        // operator report "meine Filter werden völlig ignoriert").
+        $strOrList = '(?:"(?:[^"\\\\]|\\\\.)*"|\[[^\]]*\])';
         if (\preg_match(
-            '/^(header|address|envelope)\b\s*((?::\w+\s*(?:"[^"]*"\s*)?)*)"([^"]*)"\s*"([^"]*)"\s*$/is',
+            '/^(header|address|envelope)\b\s*((?::\w+\s*(?:"[^"]*"\s*)?)*?)(' . $strOrList . ')\s*(' . $strOrList . ')\s*$/is',
             $expr,
             $m
         )) {
-            $kind = $m[1];
+            $kind = \strtolower($m[1]);
             $modifiers = $m[2];
-            $headerName = $this->unescapeSieveString($m[3]);
-            $needle = $this->unescapeSieveString($m[4]);
-            $match = 'contains';
-            if (\preg_match('/:is\b/', $modifiers)) { $match = 'is'; }
-            elseif (\preg_match('/:matches\b/', $modifiers)) { $match = 'matches'; }
-            elseif (\preg_match('/:regex\b/', $modifiers)) { $match = 'regex'; }
-            return new TestNode($kind, ['header' => $headerName, 'needle' => $needle, 'match' => $match]);
-        }
-        // header etc. with header-list ["a","b"] and needle-list
-        if (\preg_match(
-            '/^(header|address|envelope)\b\s*((?::\w+\s*(?:"[^"]*"\s*)?)*)\[([^\]]*)\]\s*\[([^\]]*)\]\s*$/is',
-            $expr,
-            $m
-        )) {
-            $kind = $m[1];
-            $modifiers = $m[2];
-            $headers = $this->parseStringList($m[3]);
-            $needles = $this->parseStringList($m[4]);
+            $headers = $this->parseStringOrList($m[3]);
+            $needles = $this->parseStringOrList($m[4]);
             $match = 'contains';
             if (\preg_match('/:is\b/', $modifiers)) { $match = 'is'; }
             elseif (\preg_match('/:matches\b/', $modifiers)) { $match = 'matches'; }
@@ -441,13 +432,18 @@ final class MiniInterpreter
     }
 
     /**
-     * Undo the Sieve string escapes that our regex-based extractor
-     * captured verbatim. Sieve strings escape only `\"` and `\\`
-     * (RFC 5228 §2.4.2); everything else is literal.
+     * Parse a single Sieve argument that is either `"quoted"` or a
+     * `["a","b"]` list — always returned as a list of strings.
+     * @return string[]
      */
-    private function unescapeSieveString(string $s): string
+    private function parseStringOrList(string $s): array
     {
-        return \str_replace(['\\\\', '\\"'], ['\\', '"'], $s);
+        $s = \trim($s);
+        if ($s !== '' && $s[0] === '[') {
+            return $this->parseStringList(\substr($s, 1, -1));
+        }
+        $i = 0;
+        return [$this->readQuotedString($s, $i)];
     }
 
     /**

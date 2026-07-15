@@ -486,7 +486,7 @@ class SieveApplyService
         foreach ((array) ($entry['headers'] ?? []) as $h) {
             if (!\is_array($h) || !isset($h['name'])) { continue; }
             $name = (string) $h['name'];
-            $value = (string) ($h['value'] ?? '');
+            $value = MessageFacts::normaliseHeaderValue((string) ($h['value'] ?? ''));
             if (isset($headers[$name])) {
                 if (\is_array($headers[$name])) {
                     $headers[$name][] = $value;

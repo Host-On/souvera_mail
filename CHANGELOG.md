@@ -6,6 +6,56 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.48] — 2026-07 (Sieve-Apply matcht 0 von 4836: Snappymails Misch-Argumentform + Raw-Header)
+
+### Operator-Report
+
+> „✓ Fertig — 4836 geprüft, 0 verschoben … aber meine Filter werden
+> völlig ignoriert!"
+
+### Root Cause (per Live-Skript-Abruf von Stalwart VM 287 bewiesen)
+
+Das aktive Skript (`smail.user`, Account philip) nutzt Snappymails
+generierte **Mischform**:
+
+```
+if header :contains ["From"] "emergent"
+```
+
+— Header als `["..."]`-Liste, Needle als einzelner Quoted-String.
+`MiniInterpreter::parseTestExpression()` hatte nur zwei Regexes:
+beide-quoted (`"X" "Y"`) und beide-Liste (`[X] [Y]`). Die Mischform
+fiel durch → `TestNode('false')` → **keine Regel matchte je** →
+exakt „4836 geprüft, 0 verschoben".
+
+**Sekundär:** JMAP `headers` liefert RAW-Werte (führendes Leerzeichen,
+`\r\n`+WSP-Folding, MIME encoded-words). `header :is` hätte selbst bei
+korrektem Parsing nie gematcht (` support@x.com` ≠ `support@x.com`).
+
+### Fixes
+
+- `MiniInterpreter`: EINE vereinheitlichte Regex — jedes der beiden
+  Argumente darf unabhängig `"String"` ODER `["Liste"]` sein
+  (alle 4 Kombinationen). Neuer Helper `parseStringOrList()`;
+  `unescapeSieveString()` entfällt (readQuotedString übernimmt).
+- `MessageFacts::normaliseHeaderValue()`: Unfold (RFC 5322 Folding),
+  Trim, MIME-encoded-word-Decode (RFC 5228 §5.7-Vergleichsform).
+  `SieveApplyService::buildFacts()` normalisiert jetzt jeden Header.
+
+### Verifiziert gegen Live-Daten
+
+- Philips Mailboxen: `Emergent` (Kind der Inbox) und `Deleted Items`
+  (role=trash) existieren → beide `fileinto`-Ziele auflösbar
+  (`INBOX/`-Prefix-Strip + Name-Lookup greifen).
+- `:is`-Semantik bleibt RFC-konform (voller Header-Wert) — identisch
+  zu Stalwarts Delivery-Verhalten, kein Über-Matchen.
+
+### Test
+
+- Neu: `tests/test_sieve_apply_real_script.php` — Fixture ist die
+  ECHTE Skript-Struktur des Operators; deckt alle 4 Argumentformen,
+  Header-Normalisierung und `:is`/`:contains`-Verhalten ab.
+
 ## [0.14.47] — 2026-07 (limit-500 ENDGÜLTIG: NC-Dispatcher-Hard-Cap auf Controller-Param `limit`)
 
 ### Operator-Report

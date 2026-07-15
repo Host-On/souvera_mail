@@ -106,6 +106,25 @@ final class MessageFacts
         public readonly array $envelopeTo,
         public readonly int $size
     ) {}
+
+    /**
+     * JMAP's `headers` property returns RAW RFC 5322 values: leading
+     * space after the colon, `\r\n`+WSP folding, MIME encoded-words.
+     * RFC 5228 §5.7 requires header tests to compare against the
+     * UNFOLDED, decoded value — without this, `:is` never matches
+     * (raw ` support@x.com` !== `support@x.com`) and `:contains` misses
+     * encoded-word subjects (v0.14.48 fix).
+     */
+    public static function normaliseHeaderValue(string $v): string
+    {
+        $v = \preg_replace('/\r?\n[ \t]+/', ' ', $v) ?? $v;
+        $v = \trim($v);
+        if (\str_contains($v, '=?')) {
+            $dec = @\iconv_mime_decode($v, \ICONV_MIME_DECODE_CONTINUE_ON_ERROR, 'UTF-8');
+            if (\is_string($dec) && $dec !== '') { $v = \trim($dec); }
+        }
+        return $v;
+    }
 }
 
 /** Result of evaluating one message against a full rule set. */
