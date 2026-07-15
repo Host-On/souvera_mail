@@ -63,15 +63,22 @@ $check = static function (bool $cond, string $msg) use (&$passes, &$failures): v
 };
 
 // -------------------------------------------------------------------
-// A. Composer artefacts — v0.14.44: Types.php split into individual
-//    PSR-4-conformant files. The classmap must map each class to its
-//    OWN file (not the old shared Types.php).
+// A. Composer artefacts — v0.14.44+ inverted design: Types.php holds
+//    the 5 value-object classes (as it always has), and 5 THIN
+//    shim files (`Rule.php`, `TestNode.php` etc.) each just do
+//    `require_once __DIR__ . '/Types.php';`. The classmap points at
+//    the shim files — PSR-4 autoloading finds them, they load
+//    Types.php, all 5 classes are declared. Redeploy-safe because
+//    `require_once` is idempotent; partial deploys (CloudManager
+//    ships some files but not others) still work: even if only
+//    Types.php was uploaded, the classes are declared; even if only
+//    the shims arrived, they gracefully load Types.php.
 // -------------------------------------------------------------------
 $composerJson = \json_decode((string) \file_get_contents($repo . '/composer.json'), true);
 $classmap = $composerJson['autoload']['classmap'] ?? [];
 $check(
     !\in_array('lib/Sieve/Types.php', $classmap, true),
-    'composer.json:autoload.classmap NO LONGER references Types.php (each class in its own PSR-4 file)'
+    'composer.json:autoload.classmap does NOT list Types.php (each class handled via its own PSR-4 shim file)'
 );
 
 $classmapPhp = (string) \file_get_contents($repo . '/vendor/composer/autoload_classmap.php');
@@ -95,43 +102,50 @@ foreach ([
         "vendor/composer/autoload_static.php maps {$cls} → {$expectedPath}"
     );
 }
-// MiniInterpreter must also be in the classmap even though it's PSR-4
-// resolvable — the classmap is faster, and every live install with
-// `optimize-autoloader: true` picks the classmap over PSR-4 lookup.
 $check(
     \str_contains($classmapPhp, "'OCA\\\\SouveraMail\\\\Sieve\\\\MiniInterpreter'"),
     'MiniInterpreter is present in autoload_classmap.php'
 );
 
 // -------------------------------------------------------------------
-// B. Types.php is now only a backwards-compatibility shim — it MUST
-//    NOT declare classes directly (that would break PSR-4 loading if
-//    an old .opcache accidentally reloads it in the wrong order).
+// B. Sieve types file layout: Types.php declares the classes;
+//    the 5 shim files each `require_once __DIR__ . '/Types.php';`.
+//    This is redeploy-safe and OpCache-safe (idempotent require).
 // -------------------------------------------------------------------
-$typesShim = (string) \file_get_contents($repo . '/lib/Sieve/Types.php');
-$check(
-    !\preg_match('/\\bfinal\\s+class\\s+(Rule|TestNode|ActionNode|MessageFacts|EvaluatedActions)\\b/', $typesShim),
-    'lib/Sieve/Types.php NO LONGER declares any classes (shim only — split into PSR-4 files v0.14.44)'
-);
+$typesSrc = (string) \file_get_contents($repo . '/lib/Sieve/Types.php');
+foreach (['Rule', 'TestNode', 'ActionNode', 'MessageFacts', 'EvaluatedActions'] as $cls) {
+    $check(
+        \preg_match('/\\bfinal\\s+class\\s+' . $cls . '\\b/', $typesSrc) === 1,
+        "lib/Sieve/Types.php declares final class {$cls}"
+    );
+}
 foreach ([
     'Rule.php',
     'TestNode.php',
     'ActionNode.php',
     'MessageFacts.php',
     'EvaluatedActions.php',
-] as $needed) {
+] as $shim) {
+    $shimPath = $repo . '/lib/Sieve/' . $shim;
+    $shimSrc = \is_file($shimPath) ? (string) \file_get_contents($shimPath) : '';
     $check(
-        \str_contains($typesShim, "require_once __DIR__ . '/{$needed}';"),
-        "lib/Sieve/Types.php shim require_once's {$needed} (BC compatibility)"
+        $shimSrc !== '' && \str_contains($shimSrc, "require_once __DIR__ . '/Types.php';"),
+        "lib/Sieve/{$shim} is a PSR-4 shim that require_once's Types.php"
+    );
+    // Shim files must NOT declare a class themselves — that would
+    // double-declare with Types.php's declaration and fatal on load.
+    $check(
+        !\preg_match('/\\bclass\\s+\\w+\\b/', $shimSrc),
+        "lib/Sieve/{$shim} does NOT declare a class (would conflict with Types.php)"
     );
 }
 
-// MiniInterpreter.php no longer needs a defensive require_once now
-// that each class lives in its own PSR-4 file.
+// MiniInterpreter.php no longer needs a defensive require_once —
+// PSR-4 finds the shim files which load Types.php.
 $miniSrc = (string) \file_get_contents($repo . '/lib/Sieve/MiniInterpreter.php');
 $check(
     !\str_contains($miniSrc, "require_once __DIR__ . '/Types.php';"),
-    'MiniInterpreter.php NO LONGER has defensive require_once (each Sieve type is a proper PSR-4 file now)'
+    'MiniInterpreter.php has no defensive require_once (PSR-4 shims handle it)'
 );
 
 // -------------------------------------------------------------------
@@ -342,8 +356,8 @@ $check(
     'queryMessageIds() uses a while-loop for pagination (Stalwart caps limit=500 per call)'
 );
 $check(
-    \str_contains($svcSrc, '$pageLimit = 500'),
-    'queryMessageIds() page-limit constant is 500 (Stalwart 0.16 mail.parse.limits.query-limit default)'
+    \str_contains($svcSrc, 'JMAP_PAGE_LIMIT = 250'),
+    'queryMessageIds() page-limit constant is 250 (safely below Stalwart 0.16 cap of ~500; v0.14.45 tightened from 500 → 250 after operator report that limit=500 still hit "must be between 1 and 500")'
 );
 $check(
     \preg_match(
@@ -368,18 +382,28 @@ $check(
 );
 
 // executeMoves() and executeFlagAdds() must ALSO chunk their `update`
-// map at 500 entries — Stalwart applies the same 500-cap to
-// Email/set.update. Without chunking, a 5000-message apply that ends
-// up moving 501+ messages would fail the whole batch with the same
-// "Parameter … must be between 1 and 500" JMAP error.
+// map at JMAP_PAGE_LIMIT (250) entries — Stalwart applies the same
+// per-call cap to Email/set.update. Without chunking, a 5000-message
+// apply that ends up moving 251+ messages would fail the whole batch
+// with the same "Parameter … must be between 1 and 500" JMAP error.
 $check(
-    \substr_count($svcSrc, 'array_chunk($update, 500') >= 2,
-    'executeMoves() AND executeFlagAdds() chunk their Email/set.update at 500 entries (Stalwart cap)'
+    \substr_count($svcSrc, 'array_chunk($update, self::JMAP_PAGE_LIMIT') >= 2,
+    'executeMoves() AND executeFlagAdds() chunk their Email/set.update at JMAP_PAGE_LIMIT (Stalwart cap-safe)'
 );
 // preserve_keys must be true — Email/set.update uses email-id keys.
 $check(
-    \substr_count($svcSrc, 'array_chunk($update, 500, /*preserve_keys*/ true)') >= 2,
+    \substr_count($svcSrc, 'array_chunk($update, self::JMAP_PAGE_LIMIT, /*preserve_keys*/ true)') >= 2,
     'array_chunk() preserves email-id keys (preserve_keys=true) — required for JMAP Email/set.update semantics'
+);
+// Email/get.ids also chunked via the same JMAP_PAGE_LIMIT constant.
+$check(
+    \str_contains($svcSrc, 'array_chunk($ids, self::JMAP_PAGE_LIMIT)'),
+    'fetchMessageFacts() chunks Email/get.ids at JMAP_PAGE_LIMIT (250)'
+);
+// Diagnostic breadcrumb helps distinguish stale-OpCache from real-fix runs.
+$check(
+    \str_contains($svcSrc, 'queryMessageIds start'),
+    'queryMessageIds() emits an info-level breadcrumb so operators can verify the paginated code path is live (vs stale OpCache)'
 );
 
 // -------------------------------------------------------------------

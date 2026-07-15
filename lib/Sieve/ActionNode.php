@@ -1,16 +1,6 @@
 <?php
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\Sieve;
-
-/**
- * A single terminal Sieve action. `arg` is null for
- * `keep`/`discard`/`stop`.
- */
-final class ActionNode
-{
-    public function __construct(
-        public readonly string $kind,
-        public readonly ?string $arg
-    ) {}
-}
+// PSR-4 shim — declares `OCA\SouveraMail\Sieve\ActionNode` by loading
+// Types.php. See Types.php docblock for rationale.
+require_once __DIR__ . '/Types.php';

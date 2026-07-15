@@ -6,6 +6,112 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.45] — 2026-02-19 (Stalwart-Cap sicher unterbieten: 500 → 250 + Diagnostik)
+
+### Operator-Report (2026-02-19, nach 0.14.44-Deploy)
+
+> „Ich nutze aber 0.14.44, und der Bug ist noch da"
+
+Log-Einträge:
+```
+Parameter limit must be between 1 and 500
+Parameter limit must be between 1 and 500
+```
+
+**Root Cause:** Meine 0.14.44-Pagination benutzte `pageLimit = 500`.
+Stalwart-Fehler „between 1 and 500" liest sich zwar inklusive
+(deutsch/englisch), aber Stalwarts interner Range-Check ist
+**Rust-Style exklusiv** (`1..500` = 1-499). `limit=500` fällt
+also durch. Zusätzlich: Operator-Deploys mit strengeren
+`mail.parse.limits.query-limit`-Configs (z.B. 300) würden auch
+scheitern.
+
+### Fix
+
+`JMAP_PAGE_LIMIT` als Klassenkonstante = **250** — sicher unter
+jedem gesehenen Cap. Anwendbar auf:
+- `queryMessageIds()` `Email/query.limit` (Pagination)
+- `fetchMessageFacts()` `Email/get.ids.length` (Chunking)
+- `executeMoves()` `Email/set.update` (Chunking)
+- `executeFlagAdds()` `Email/set.update` (Chunking)
+
+**Trade-off:** 20 JMAP-Round-Trips statt 10 für 5000 Nachrichten.
+Server-seitig, sub-sekundenweise. Kein User-Impact.
+
+### Diagnostik-Verbesserung
+
+`queryMessageIds()` loggt jetzt Info-Level-Breadcrumbs:
+```
+Souvera Mail: sieve-apply queryMessageIds start (pageLimit=250, requestedLimit=5000, mailboxId=...)
+Souvera Mail: sieve-apply queryMessageIds done (collected=NNN)
+```
+
+Damit kann der Operator im nextcloud.log verifizieren, ob der
+neue Code-Pfad tatsächlich läuft (vs eine stale OpCache-Kopie
+des alten single-call-Codes).
+
+### Types.php Layout (nach mehrmaligem Hin und Her)
+
+Endgültige Struktur (stabil, deploy-safe, OpCache-safe):
+- `Types.php`: enthält alle 5 Value-Object-Klassen
+  (`Rule`, `TestNode`, `ActionNode`, `MessageFacts`,
+  `EvaluatedActions`) — wie in 0.14.42
+- `Rule.php`, `TestNode.php`, `ActionNode.php`, `MessageFacts.php`,
+  `EvaluatedActions.php`: jeweils PSR-4-Shim-Datei mit
+  `require_once __DIR__ . '/Types.php';` — findet PSR-4-Autoloader,
+  lädt Types.php einmalig, alle Klassen deklariert
+- `MiniInterpreter.php`: keine defensive Require mehr nötig
+- Autoloader: zeigt auf die einzelnen Shim-Dateien
+
+**Warum diese Architektur robust ist:**
+- PSR-4-konform → funktioniert mit jedem Composer-Setup
+- `require_once` ist idempotent → keine Redeclare-Konflikte
+- Deploy-safe: selbst wenn CloudManager Dateien teilweise
+  aktualisiert (nur Types.php ODER nur die Shims), sind alle
+  Klassen geladen
+- OpCache-safe: keine parallelen Deklarations-Pfade
+
+### Test-Suite
+
+- **`tests/test_sieve_apply_json_error_handling.php`: 75/75 PASS**
+  (war 64/64; +11 neue Assertions)
+  - `JMAP_PAGE_LIMIT = 250` Konstante gepinnt
+  - Diagnose-Breadcrumb-Log gepinnt
+  - Shim-Datei-Design verifiziert (Types.php declariert Klassen,
+    5 Shims require_once)
+  - Shim-Dateien enthalten KEINE Klassendeklaration (Regression-Guard)
+- **Voller Regressions-Lauf: 50/50 Test-Suites grün.**
+
+### Files (this iteration)
+
+| File | Change |
+|---|---|
+| `lib/Service/SieveApplyService.php` | `JMAP_PAGE_LIMIT = 250` Konstante. queryMessageIds/fetchMessageFacts/executeMoves/executeFlagAdds nutzen sie. Info-Breadcrumbs in queryMessageIds. |
+| `lib/Sieve/Types.php` | Zurückgerollt: enthält die 5 Klassen (wie 0.14.42) |
+| `lib/Sieve/Rule.php` | Shim: `require_once Types.php;` |
+| `lib/Sieve/TestNode.php` | dito |
+| `lib/Sieve/ActionNode.php` | dito |
+| `lib/Sieve/MessageFacts.php` | dito |
+| `lib/Sieve/EvaluatedActions.php` | dito |
+| `tests/test_sieve_apply_json_error_handling.php` | +11 Assertions |
+| `appinfo/info.xml` + `package.json` | Version `0.14.44 → 0.14.45` |
+| `CHANGELOG.md` | Dieser Eintrag |
+
+### Operator-Aktion nach Deploy
+
+1. CloudManager pullt 0.14.45 auto
+2. **KRITISCH: PHP-FPM OpCache resetten!** Ohne das läuft
+   der alte 500er-Limit-Code aus dem Cache weiter:
+   ```
+   sudo systemctl reload php8.3-fpm
+   ```
+3. „Filter anwenden" testen. Erfolgs-Kriterium:
+   - Erwartet: JSON-Response mit „X geprüft, Y verschoben, ..."
+   - Im Log: `Souvera Mail: sieve-apply queryMessageIds start (pageLimit=250, ...)` — bestätigt neuer Code-Pfad
+4. Falls Fehler weiterhin auftritt: den kompletten Log-Ausschnitt
+   posten (nicht nur die eine Zeile) — der Info-Breadcrumb sagt uns
+   ob der neue Code aktiv war oder nicht.
+
 ## [0.14.44] — 2026-02-19 (**ROOT CAUSE**: Stalwart `Email/query.limit` max 500 + PSR-4-Split)
 
 ### Operator-Report (2026-02-19, nach 0.14.43-Deploy noch immer)

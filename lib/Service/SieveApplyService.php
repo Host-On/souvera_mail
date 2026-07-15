@@ -46,6 +46,26 @@ class SieveApplyService
     private const MAX_LIMIT = 5000;
     private const DEFAULT_LIMIT = 5000;
 
+    /**
+     * JMAP-per-call chunk size for Email/query.limit, Email/get.ids and
+     * Email/set.update. Stalwart 0.16 reports `Parameter limit must be
+     * between 1 and 500` when we breach its per-call cap.
+     *
+     * The message reads inclusive ("between 1 AND 500") but Stalwart's
+     * Rust range check `1..500` is EXCLUSIVE on the upper bound —
+     * limit=500 gets rejected too (operator report 2026-02-19: even
+     * limit=500 fails). To eliminate any borderline behaviour across
+     * Stalwart minor versions and future config changes, we pick a
+     * conservative value well below every observed cap. 250 is
+     * empirically safe: it works against Stalwart's default
+     * `mail.parse.limits.query-limit = 500` AND against operator
+     * setups that lower the cap (e.g. a shared-Stalwart tenant policy
+     * of 300). Doubling the round-trip count is not a concern — the
+     * whole apply-flow is server-side; the browser waits for one
+     * final JSON.
+     */
+    private const JMAP_PAGE_LIMIT = 250;
+
     /** JMAP capability required by every Mailbox/* and Email/* method
      *  we issue (RFC 8621 §1). Our `StalwartAdminService::jmapCall`
      *  only puts `urn:ietf:params:jmap:core` + Stalwart's own capability
@@ -356,12 +376,14 @@ class SieveApplyService
     }
 
     /**
-     * Stalwart 0.16 caps `Email/query.limit` at 500 per JMAP call
-     * (`Parameter limit must be between 1 and 500` — verified live
-     * 2026-02-19). To honour our `MAX_LIMIT = 5000` we paginate:
-     * loop with `position` advancing by JMAP_PAGE_LIMIT (500) until
-     * we've collected `$limit` ids OR Stalwart returns fewer than
-     * a full page (= end of mailbox).
+     * Stalwart 0.16 caps `Email/query.limit` per JMAP call. The exact
+     * cap depends on server config but our observed error was
+     * "Parameter limit must be between 1 and 500". We chunk at
+     * {@see self::JMAP_PAGE_LIMIT} = 250 to be safely below any
+     * observed cap. To honour our `MAX_LIMIT = 5000` we paginate:
+     * loop with `position` advancing by JMAP_PAGE_LIMIT until we've
+     * collected `$limit` ids OR Stalwart returns fewer than a full
+     * page (= end of mailbox).
      *
      * @return string[] JMAP Email ids, newest first, capped at $limit.
      */
@@ -369,11 +391,15 @@ class SieveApplyService
     {
         $out = [];
         $position = 0;
-        // Stalwart's cap. Keep this in sync with the server's
-        // `mail.parse.limits.query-limit` — 500 is Stalwart 0.16's
-        // built-in default and also the OFFICIAL JMAP-mail draft
-        // recommended maximum.
-        $pageLimit = 500;
+        $pageLimit = self::JMAP_PAGE_LIMIT;
+        // Diagnostic: emit a version breadcrumb so operators can
+        // confirm the paginated code path is actually running (vs a
+        // stale OpCache copy of the old single-call implementation).
+        $this->logger->info(
+            'Souvera Mail: sieve-apply queryMessageIds start '
+            . "(pageLimit={$pageLimit}, requestedLimit={$limit}, mailboxId={$mailboxId})",
+            ['app' => 'souvera_mail']
+        );
         while (\count($out) < $limit) {
             $remaining = $limit - \count($out);
             $requestLimit = \min($pageLimit, $remaining);
@@ -409,6 +435,11 @@ class SieveApplyService
             }
             $position += $pageCount;
         }
+        $this->logger->info(
+            'Souvera Mail: sieve-apply queryMessageIds done '
+            . '(collected=' . \count($out) . ')',
+            ['app' => 'souvera_mail']
+        );
         return $out;
     }
 
@@ -418,9 +449,10 @@ class SieveApplyService
      */
     private function fetchMessageFacts(string $accountId, string $bearer, array $ids): array
     {
-        // JMAP has no hard limit on Email/get ids, but keeping payload
-        // manageable is nice — chunk at 500 per call.
-        $chunks = \array_chunk($ids, 500);
+        // Stalwart 0.16 applies the same 500-item cap to Email/get.ids
+        // as to Email/query.limit. Use JMAP_PAGE_LIMIT (250) to stay
+        // well below every observed cap.
+        $chunks = \array_chunk($ids, self::JMAP_PAGE_LIMIT);
         $facts = [];
         foreach ($chunks as $chunk) {
             $response = $this->stalwart->jmapCall(
@@ -501,12 +533,12 @@ class SieveApplyService
                 'mailboxIds/' . $sourceMailboxId => null,
             ];
         }
-        // Stalwart 0.16 caps `Email/set.update` at 500 entries per
-        // call (same query-limit constant as Email/query). Chunk to
-        // stay under the ceiling — otherwise Stalwart rejects the
-        // whole batch with "Parameter … must be between 1 and 500".
+        // Stalwart 0.16 caps `Email/set.update` at the same
+        // JMAP_PAGE_LIMIT (250) as query/get. Chunking prevents a
+        // 5000-message apply-run from failing the whole batch with
+        // "Parameter … must be between 1 and 500".
         $totalUpdated = 0;
-        foreach (\array_chunk($update, 500, /*preserve_keys*/ true) as $chunk) {
+        foreach (\array_chunk($update, self::JMAP_PAGE_LIMIT, /*preserve_keys*/ true) as $chunk) {
             try {
                 $response = $this->stalwart->jmapCall(
                     $bearer,
@@ -546,9 +578,9 @@ class SieveApplyService
             }
             if ($sub !== []) { $update[$emailId] = $sub; }
         }
-        // Same 500-entry Stalwart cap as Email/set.update above.
+        // Same JMAP_PAGE_LIMIT (250) cap as Email/set.update above.
         $totalFlagged = 0;
-        foreach (\array_chunk($update, 500, /*preserve_keys*/ true) as $chunk) {
+        foreach (\array_chunk($update, self::JMAP_PAGE_LIMIT, /*preserve_keys*/ true) as $chunk) {
             try {
                 $response = $this->stalwart->jmapCall(
                     $bearer,
