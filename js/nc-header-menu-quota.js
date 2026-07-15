@@ -1,7 +1,9 @@
+/* global t */
+
 /*
  * Souvera Mail — Nextcloud Header-Dropdown Quota entry.
  *
- * Injects a line "Mail-Speicher: 12 MB / 5 GB" into the Nextcloud
+ * Injects a line "Mail storage: 12 MB / 5 GB" into the Nextcloud
  * user menu (the popover that opens when the user clicks their avatar
  * in the top-right corner of every NC page). Loaded by NC on every
  * request via BeforeTemplateRenderedEvent → Util::addScript, so the
@@ -75,8 +77,8 @@
         li.setAttribute('role', 'presentation');
 
         const label = data.unlimited
-            ? `Mail-Speicher: ${data.formatted.used} verwendet`
-            : `Mail-Speicher: ${data.formatted.used} / ${data.formatted.total}`;
+            ? t('souvera_mail', 'Mail storage: {used} used', { used: data.formatted.used })
+            : t('souvera_mail', 'Mail storage: {used} / {total}', { used: data.formatted.used, total: data.formatted.total });
 
         li.innerHTML = `
             <div class="header-menu__link" style="

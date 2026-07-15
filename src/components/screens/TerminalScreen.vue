@@ -8,15 +8,15 @@
 
 		<dl v-if="hasStats" class="souvera-terminal__stats">
 			<div v-if="messagesDone">
-				<dt>{{ t('souvera_mail', 'Übertragene Nachrichten') }}</dt>
+				<dt>{{ t('souvera_mail', 'Transferred messages') }}</dt>
 				<dd>{{ messagesDone.toLocaleString() }}</dd>
 			</div>
 			<div v-if="foldersDone">
-				<dt>{{ t('souvera_mail', 'Ordner') }}</dt>
+				<dt>{{ t('souvera_mail', 'Folders') }}</dt>
 				<dd>{{ foldersDone.toLocaleString() }}</dd>
 			</div>
 			<div v-if="duration">
-				<dt>{{ t('souvera_mail', 'Dauer') }}</dt>
+				<dt>{{ t('souvera_mail', 'Duration') }}</dt>
 				<dd>{{ duration }}</dd>
 			</div>
 		</dl>
@@ -24,7 +24,7 @@
 		<NcNoteCard
 			v-if="isFail && errorDetail"
 			type="error"
-			:heading="t('souvera_mail', 'Fehler-Details für den Support')"
+			:heading="t('souvera_mail', 'Error details for support')"
 			data-testid="wizard-terminal-error-detail">
 			<pre class="souvera-terminal__error">{{ errorDetail }}</pre>
 		</NcNoteCard>
@@ -35,7 +35,7 @@
 				data-testid="wizard-terminal-close"
 				@click="$emit('close')">
 				<template #icon><Check :size="20" /></template>
-				{{ t('souvera_mail', 'Fertig') }}
+				{{ t('souvera_mail', 'Done') }}
 			</NcButton>
 		</div>
 	</div>
@@ -70,13 +70,13 @@ export default {
 		const stateIcon = computed(() => (isSuccess.value ? CheckCircle : AlertCircle))
 
 		const title = computed(() => {
-			if (isSuccess.value) return t('souvera_mail', 'Import erfolgreich!')
-			if (state.value === 'cancelled') return t('souvera_mail', 'Import abgebrochen')
-			return t('souvera_mail', 'Import fehlgeschlagen')
+			if (isSuccess.value) return t('souvera_mail', 'Import successful!')
+			if (state.value === 'cancelled') return t('souvera_mail', 'Import cancelled')
+			return t('souvera_mail', 'Import failed')
 		})
 		const subtitle = computed(() => {
-			if (isSuccess.value) return t('souvera_mail', 'Deine alten Mails sind jetzt in Souvera Mail verfügbar.')
-			return t('souvera_mail', 'Es gab ein Problem beim Übertragen der Mails. Bitte kontaktiere den Support mit den Fehler-Details unten.')
+			if (isSuccess.value) return t('souvera_mail', 'Your old mail is now available in Souvera Mail.')
+			return t('souvera_mail', 'There was a problem transferring the mail. Please contact support with the error details below.')
 		})
 
 		const progressBlock = computed(() => s.value.progress?.progress || {})

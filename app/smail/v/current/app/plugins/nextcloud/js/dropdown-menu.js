@@ -39,6 +39,18 @@
 
 	if (!window.rl) return;
 
+	// Safe i18n lookup — falls back to English default when the key or
+	// engine is not present (early boot, missing plugin lang).
+	var i18n = function (key, fallback) {
+		try {
+			if (rl && typeof rl.i18n === 'function') {
+				var v = rl.i18n(key);
+				if (v && v !== key) return v;
+			}
+		} catch (e) { /* silent */ }
+		return fallback;
+	};
+
 	var MARKER = 'sv-mig-menu';
 	var RESYNC_MARKER = 'sv-resync-menu';
 	var MENU_SEL = 'menu[aria-labelledby="top-system-dropdown-id"]';
@@ -96,7 +108,7 @@
 		// v0.14.17 — migration entry (idempotent)
 		if (!menu.querySelector('[data-' + MARKER + ']')) {
 			var migLi = buildItem(
-				MARKER, '📥', 'Alte Mails importieren',
+				MARKER, '📥', i18n('MENU/IMPORT_OLD_MAIL', 'Import old mail'),
 				'souvera-mail-menu-migration', openMigration
 			);
 			if (helpLi && helpLi.parentNode === menu) {
@@ -116,7 +128,7 @@
 		// plain text glyph everywhere and matches the vanilla entries.
 		if (!menu.querySelector('[data-' + RESYNC_MARKER + ']')) {
 			var resyncLi = buildItem(
-				RESYNC_MARKER, '↻', 'Postfach neu synchronisieren',
+				RESYNC_MARKER, '↻', i18n('MENU/RESYNC_MAILBOX', 'Resync mailbox'),
 				'souvera-mail-menu-resync', openResync
 			);
 			var migAnchor = menu.querySelector('[data-' + MARKER + ']');

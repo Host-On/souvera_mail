@@ -1,3 +1,5 @@
+/* global t */
+
 /*
  * Souvera Mail — /settings/user/security hijack script.
  *
@@ -38,18 +40,16 @@
 
         var notice = document.createElement('div');
         notice.className = NOTICE_CLASS;
+        var HEADING = t('souvera_mail', 'App passwords are managed via Souvera Mail');
+        var BODY = t('souvera_mail', 'So that an app password works for both mail (Thunderbird, K-9, Apple Mail) and calendar & contacts (DAVx⁵, Apple Calendar), please create it directly in Souvera Mail. There the single password is automatically made valid for both sides.');
+        var BTN = t('souvera_mail', 'Create app password for Mail & Nextcloud');
         notice.innerHTML = ''
-            + '<div class="icon" aria-hidden="true">✉️</div>'
+            + '<div class="icon" aria-hidden="true">✉</div>'
             + '<div class="body">'
-            +   '<h3>App-Passwörter werden über Souvera Mail verwaltet</h3>'
-            +   '<p>'
-            +     'Damit ein App-Passwort sowohl für <strong>E-Mail</strong> (Thunderbird, K-9, Apple Mail) '
-            +     'als auch für <strong>Kalender &amp; Kontakte</strong> (DAVx⁵, Apple Kalender) funktioniert, '
-            +     'erstellen Sie es bitte direkt in Souvera Mail. Dort wird das eine Passwort automatisch '
-            +     'für beide Seiten gültig gemacht.'
-            +   '</p>'
+            +   '<h3>' + HEADING + '</h3>'
+            +   '<p>' + BODY + '</p>'
             +   '<div class="actions">'
-            +     '<a class="button primary" href="' + SOUVERA_URL + '">App-Passwort für Mail &amp; Nextcloud erstellen</a>'
+            +     '<a class="button primary" href="' + SOUVERA_URL + '">' + BTN + '</a>'
             +   '</div>'
             + '</div>';
 

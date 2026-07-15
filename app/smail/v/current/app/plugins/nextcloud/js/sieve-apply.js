@@ -44,6 +44,18 @@
         return;
     }
 
+    // Safe i18n lookup — falls back to English default when the key or
+    // engine is not present (early boot, missing plugin lang).
+    const i18n = (key, fallback) => {
+        try {
+            if (rl && typeof rl.i18n === 'function') {
+                const v = rl.i18n(key);
+                if (v && v !== key) return v;
+            }
+        } catch (e) { /* silent */ }
+        return fallback;
+    };
+
     const FOLDERS_URL = cfg.SmailSieveApplyFoldersUrl;
     const APPLY_URL = cfg.SmailSieveApplyUrl;
     const MARKER = 'sv-sieve-apply-menu';
@@ -82,8 +94,8 @@
         try {
             return JSON.parse(txt);
         } catch (_) {
-            throw new Error('Server antwortete nicht mit JSON (HTTP '
-                + r.status + ') — Details siehe nextcloud.log');
+            throw new Error(i18n('SIEVE_APPLY/NON_JSON', 'Server did not return JSON (HTTP ') + r.status
+                + i18n('SIEVE_APPLY/NON_JSON_TAIL', ') — see nextcloud.log for details'));
         }
     });
 
@@ -146,20 +158,15 @@
 
         const title = el('h3', {
             style: 'margin:0 0 8px 0;font-size:18px;font-weight:600;'
-        }, ['Filter nachträglich anwenden']);
+        }, [i18n('SIEVE_APPLY/TITLE', 'Apply filter afterwards')]);
 
         const explain = el('p', {
             style: 'margin:0 0 20px 0;font-size:13px;line-height:1.5;color:var(--color-text-maxcontrast,#666);'
-        }, [
-            'Das aktive Sieve-Skript wird auf die letzten 5000 Nachrichten des ',
-            'gewählten Ordners angewendet — Verschieben, Weiterleiten und ',
-            'Löschen werden ausgeführt. Weitergeleitete Nachrichten gehen ',
-            'ERNEUT per SMTP an die im Skript hinterlegten Empfänger.'
-        ]);
+        }, [i18n('SIEVE_APPLY/EXPLAIN', 'The active Sieve script is applied to the last 5000 messages of the selected folder — Move, Forward and Delete are executed. Forwarded messages are re-sent via SMTP to the recipients listed in the script.')]);
 
         const label = el('label', {
             style: 'display:block;font-size:13px;font-weight:600;margin-bottom:6px;'
-        }, ['Ordner']);
+        }, [i18n('SIEVE_APPLY/FOLDER_LABEL', 'Folder')]);
         const select = el('select', {
             'data-testid': 'sieve-apply-folder-select',
             style: [
@@ -172,7 +179,7 @@
                 'font-size:14px',
                 'margin-bottom:18px'
             ].join(';')
-        }, [el('option', { value: '' }, ['— Lade Ordner … —'])]);
+        }, [el('option', { value: '' }, [i18n('SIEVE_APPLY/FOLDER_LOADING', '— Loading folders … —')])]);
         select.disabled = true;
 
         const status = el('div', {
@@ -185,7 +192,7 @@
             'data-testid': 'sieve-apply-cancel',
             className: 'button',
             style: 'margin-right:8px;'
-        }, ['Abbrechen']);
+        }, [i18n('SIEVE_APPLY/CANCEL', 'Cancel')]);
         const applyBtn = el('button', {
             type: 'button',
             'data-testid': 'sieve-apply-run',
@@ -199,7 +206,7 @@
                 'font-weight:600',
                 'cursor:pointer'
             ].join(';')
-        }, ['Anwenden']);
+        }, [i18n('SIEVE_APPLY/APPLY', 'Apply')]);
         applyBtn.disabled = true;
 
         const footer = el('div', {
@@ -232,14 +239,14 @@
         }).then(safeJson).then(data => {
             if (!data || data.status !== 'ok' || !Array.isArray(data.folders)) {
                 status.textContent = data && data.message
-                    ? 'Ordnerliste: ' + data.message
-                    : 'Ordnerliste konnte nicht geladen werden.';
+                    ? i18n('SIEVE_APPLY/FOLDER_LIST_PREFIX', 'Folder list: ') + data.message
+                    : i18n('SIEVE_APPLY/FOLDER_LOAD_FAIL', 'Folder list could not be loaded.');
                 return;
             }
             select.innerHTML = '';
             data.folders.forEach(f => {
                 const opt = el('option', { value: f.id }, [
-                    f.name + (f.role === 'inbox' ? '  (Posteingang)' : '')
+                    f.name + (f.role === 'inbox' ? '  (' + i18n('SIEVE_APPLY/INBOX_LABEL', 'Inbox') + ')' : '')
                 ]);
                 if (f.role === 'inbox') { opt.selected = true; }
                 select.appendChild(opt);
@@ -247,7 +254,7 @@
             select.disabled = false;
             applyBtn.disabled = false;
         }).catch(err => {
-            status.textContent = 'Netzwerkfehler beim Laden der Ordnerliste: ' + err;
+            status.textContent = i18n('SIEVE_APPLY/NET_FOLDER_ERROR', 'Network error while loading folder list: ') + err;
         });
 
         applyBtn.addEventListener('click', () => {
@@ -255,7 +262,7 @@
             applyBtn.disabled = true;
             cancelBtn.disabled = true;
             select.disabled = true;
-            status.textContent = 'Wende Filter an — bitte warten …';
+            status.textContent = i18n('SIEVE_APPLY/APPLYING', 'Applying filter — please wait …');
 
             const folderId = select.value;
             fetch(APPLY_URL, {
@@ -269,27 +276,27 @@
                 body: JSON.stringify({ folderId: folderId, limit: 5000, includeRedirect: true })
             }).then(safeJson).then(data => {
                 if (!data || data.status !== 'ok') {
-                    status.textContent = 'Fehler: ' + ((data && data.message) || 'unbekannt');
+                    status.textContent = i18n('SIEVE_APPLY/ERROR_PREFIX', 'Error: ') + ((data && data.message) || i18n('SIEVE_APPLY/UNKNOWN', 'unknown'));
                     applyBtn.disabled = false;
                     cancelBtn.disabled = false;
                     return;
                 }
                 const summary = [
-                    (data.scanned || 0) + ' geprüft',
-                    (data.moved || 0) + ' verschoben',
-                    (data.redirected || 0) + ' weitergeleitet',
-                    (data.discarded || 0) + ' verworfen',
-                    (data.flagged || 0) + ' markiert'
+                    (data.scanned || 0) + ' ' + i18n('SIEVE_APPLY/SCANNED', 'checked'),
+                    (data.moved || 0) + ' ' + i18n('SIEVE_APPLY/MOVED', 'moved'),
+                    (data.redirected || 0) + ' ' + i18n('SIEVE_APPLY/REDIRECTED', 'forwarded'),
+                    (data.discarded || 0) + ' ' + i18n('SIEVE_APPLY/DISCARDED', 'discarded'),
+                    (data.flagged || 0) + ' ' + i18n('SIEVE_APPLY/FLAGGED', 'flagged')
                 ].join(', ');
                 status.innerHTML =
-                    '<span style="color:var(--color-success,#3a7);">✓ Fertig — ' + summary + '</span>';
+                    '<span style="color:var(--color-success,#3a7);">' + i18n('SIEVE_APPLY/DONE_PREFIX', '✓ Done — ') + summary + '</span>';
                 if (data.errors && data.errors.length) {
                     status.innerHTML +=
                         '<div style="margin-top:8px;color:var(--color-warning,#c60);">'
-                        + data.errors.length + ' Warnung(en) — siehe nextcloud.log'
+                        + data.errors.length + ' ' + i18n('SIEVE_APPLY/WARNINGS_TAIL', 'warning(s) — see nextcloud.log')
                         + '</div>';
                 }
-                cancelBtn.textContent = 'Schließen';
+                cancelBtn.textContent = i18n('SIEVE_APPLY/CLOSE', 'Close');
                 cancelBtn.disabled = false;
                 // Nudge Snappymail to re-read the mailbox counts so the
                 // folder tree shows the new state without an F5.
@@ -299,7 +306,7 @@
                     } catch (_) { /* Snappymail rejected the refresh — non-fatal */ }
                 }
             }).catch(err => {
-                status.textContent = 'Netzwerkfehler: ' + err;
+                status.textContent = i18n('SIEVE_APPLY/NET_ERROR', 'Network error: ') + err;
                 applyBtn.disabled = false;
                 cancelBtn.disabled = false;
             });
@@ -330,13 +337,13 @@
         a.id = PAGE_BTN_ID;
         a.className = 'btn';
         a.href = '#';
-        a.title = 'Aktives Filter-Skript auf einen bereits vorhandenen Ordner anwenden.';
+        a.title = i18n('SIEVE_APPLY/PAGE_BUTTON_TITLE', 'Apply the active filter script to an existing folder.');
         a.setAttribute('data-testid', 'sieve-apply-page-btn');
         a.setAttribute('data-icon', '🔎');
         // Small margin-left so it visually separates from the "Skript
         // hinzufügen" button next to it.
         a.style.marginLeft = '8px';
-        a.textContent = 'Filter anwenden…';
+        a.textContent = i18n('SIEVE_APPLY/PAGE_BUTTON', 'Apply filter…');
         a.addEventListener('click', ev => {
             ev.preventDefault();
             ev.stopPropagation();
@@ -375,7 +382,7 @@
         a.setAttribute('tabindex', '-1');
         a.setAttribute('data-icon', '🔎');
         a.setAttribute('data-testid', 'sieve-apply-toolbar-btn-menu');
-        a.textContent = 'Filter auf Ordner anwenden…';
+        a.textContent = i18n('MENU/APPLY_FILTER_FOLDER', 'Apply filter to folder…');
         a.addEventListener('click', ev => {
             ev.preventDefault();
             closeDropdown();

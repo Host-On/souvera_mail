@@ -2,24 +2,24 @@
 	<div class="souvera-welcome" data-testid="wizard-screen-welcome">
 		<div class="souvera-welcome__hero">
 			<EmailArrowRight :size="56" class="souvera-welcome__hero-icon" />
-			<h1 class="souvera-welcome__title">{{ t('souvera_mail', 'Willkommen bei Souvera Mail') }}</h1>
+			<h1 class="souvera-welcome__title">{{ t('souvera_mail', 'Welcome to Souvera Mail') }}</h1>
 			<p class="souvera-welcome__lead">
-				{{ t('souvera_mail', 'Wir können deine Mails vom alten Anbieter automatisch übertragen — sicher, im Hintergrund und ohne dass du irgendwo Software installieren musst.') }}
+				{{ t('souvera_mail', 'We can automatically transfer your mail from your old provider — securely, in the background, and without you having to install any software.') }}
 			</p>
 		</div>
 
 		<ul class="souvera-welcome__usp">
 			<li>
 				<CheckCircleOutline :size="18" />
-				<span>{{ t('souvera_mail', 'Ordnerstruktur bleibt exakt erhalten.') }}</span>
+				<span>{{ t('souvera_mail', 'Your folder structure is preserved exactly.') }}</span>
 			</li>
 			<li>
 				<CheckCircleOutline :size="18" />
-				<span>{{ t('souvera_mail', 'Anhänge, Kalendereinladungen und Flags werden mitgenommen.') }}</span>
+				<span>{{ t('souvera_mail', 'Attachments, calendar invitations and flags are carried over.') }}</span>
 			</li>
 			<li>
 				<CheckCircleOutline :size="18" />
-				<span>{{ t('souvera_mail', 'Läuft im Hintergrund. Du kannst schon Mails schreiben, während der Import läuft.') }}</span>
+				<span>{{ t('souvera_mail', 'Runs in the background. You can start writing mail while the import is running.') }}</span>
 			</li>
 		</ul>
 
@@ -28,14 +28,14 @@
 				type="tertiary"
 				data-testid="wizard-welcome-dismiss"
 				@click="$emit('dismiss-forever')">
-				{{ t('souvera_mail', 'Nicht mehr zeigen') }}
+				{{ t('souvera_mail', "Don't show again") }}
 			</NcButton>
 			<div class="souvera-actions__right">
 				<NcButton
 					type="secondary"
 					data-testid="wizard-welcome-later"
 					@click="$emit('close')">
-					{{ t('souvera_mail', 'Später') }}
+					{{ t('souvera_mail', 'Later') }}
 				</NcButton>
 				<NcButton
 					type="primary"
@@ -44,7 +44,7 @@
 					<template #icon>
 						<ArrowRight :size="20" />
 					</template>
-					{{ t('souvera_mail', 'Jetzt starten') }}
+					{{ t('souvera_mail', 'Start now') }}
 				</NcButton>
 			</div>
 		</div>

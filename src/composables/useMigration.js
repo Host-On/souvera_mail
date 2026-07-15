@@ -64,7 +64,7 @@ async function jsonFetch(url, init = {}) {
 	try {
 		body = await response.json()
 	} catch (e) {
-		body = { message: 'Ungültige Antwort vom Server.' }
+		body = { message: 'Invalid response from server.' }
 	}
 	if (!response.ok) {
 		const err = new Error(body?.message || `HTTP ${response.status}`)
@@ -114,10 +114,10 @@ export function useMigration() {
 	})
 	const pillLabel = computed(() => {
 		switch (pillState.value) {
-			case 'running': return t('souvera_mail', 'Import läuft …')
-			case 'done':    return t('souvera_mail', 'Import fertig')
-			case 'fail':    return t('souvera_mail', 'Import fehlgeschlagen')
-			default:        return t('souvera_mail', 'Alte Mails importieren')
+			case 'running': return t('souvera_mail', 'Import running …')
+			case 'done':    return t('souvera_mail', 'Import done')
+			case 'fail':    return t('souvera_mail', 'Import failed')
+			default:        return t('souvera_mail', 'Import old mail')
 		}
 	})
 

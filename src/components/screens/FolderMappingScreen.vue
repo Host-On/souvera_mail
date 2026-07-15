@@ -1,12 +1,12 @@
 <template>
 	<div class="souvera-mapping" data-testid="wizard-screen-mapping">
 		<p class="souvera-mapping__lead">
-			{{ t('souvera_mail', 'Wir haben {n} Ordner in deinem alten Postfach gefunden. Wähle aus, welche importiert werden sollen. Die Ordnernamen werden 1:1 übernommen — Standard-Ordner wie INBOX oder Sent landen direkt im richtigen Souvera-Ordner.', { n: folders.length }) }}
+			{{ t('souvera_mail', 'We found {n} folders in your old mailbox. Choose which ones to import. Folder names are kept 1:1 — standard folders like INBOX or Sent go directly into the matching Souvera folder.', { n: folders.length }) }}
 		</p>
 
 		<div class="souvera-mapping__toolbar">
 			<span class="souvera-mapping__counter" data-testid="wizard-mapping-counter">
-				{{ n('souvera_mail', '%n Ordner ausgewählt', '%n Ordner ausgewählt', selectedCount) }}
+				{{ n('souvera_mail', '%n folder selected', '%n folders selected', selectedCount) }}
 				<span class="souvera-mapping__counter-total"> / {{ folders.length }}</span>
 			</span>
 			<div class="souvera-mapping__toolbar-actions">
@@ -15,21 +15,21 @@
 					data-testid="wizard-mapping-recommended"
 					@click="selectRecommended">
 					<template #icon><StarOutline :size="18" /></template>
-					{{ t('souvera_mail', 'Empfohlene') }}
+					{{ t('souvera_mail', 'Recommended') }}
 				</NcButton>
 				<NcButton
 					type="tertiary"
 					data-testid="wizard-mapping-all"
 					@click="selectAll">
 					<template #icon><CheckAll :size="18" /></template>
-					{{ t('souvera_mail', 'Alle') }}
+					{{ t('souvera_mail', 'All') }}
 				</NcButton>
 				<NcButton
 					type="tertiary"
 					data-testid="wizard-mapping-none"
 					@click="selectNone">
 					<template #icon><CloseBoxOutline :size="18" /></template>
-					{{ t('souvera_mail', 'Keine') }}
+					{{ t('souvera_mail', 'None') }}
 				</NcButton>
 			</div>
 		</div>
@@ -45,14 +45,14 @@
 				<span class="souvera-mapping__row-check">
 					<NcCheckboxRadioSwitch
 						:model-value="selected.has(f.path)"
-						:aria-label="t('souvera_mail', 'Ordner {p} importieren', { p: f.path })"
+						:aria-label="t('souvera_mail', 'Import folder {p}', { p: f.path })"
 						@update:model-value="v => toggle(f.path, v)" />
 				</span>
 				<span class="souvera-mapping__row-source">
 					<component :is="f.icon" :size="18" class="souvera-mapping__row-icon" />
 					<span class="souvera-mapping__row-name">{{ f.displayName }}</span>
 					<span v-if="f.messages > 0" class="souvera-mapping__row-count">
-						{{ n('souvera_mail', '%n Mail', '%n Mails', f.messages) }}
+						{{ n('souvera_mail', '%n mail', '%n mails', f.messages) }}
 					</span>
 				</span>
 				<ArrowRight :size="16" class="souvera-mapping__row-arrow" />
@@ -64,7 +64,7 @@
 		</div>
 
 		<NcNoteCard v-if="selectedCount === 0" type="warning" data-testid="wizard-mapping-empty-warning">
-			{{ t('souvera_mail', 'Bitte wähle mindestens einen Ordner zum Importieren aus.') }}
+			{{ t('souvera_mail', 'Please select at least one folder to import.') }}
 		</NcNoteCard>
 
 		<div class="souvera-actions souvera-actions--split">
@@ -73,7 +73,7 @@
 				data-testid="wizard-mapping-back"
 				@click="$emit('back')">
 				<template #icon><ArrowLeft :size="20" /></template>
-				{{ t('souvera_mail', 'Zurück') }}
+				{{ t('souvera_mail', 'Back') }}
 			</NcButton>
 			<NcButton
 				type="primary"
@@ -81,7 +81,7 @@
 				data-testid="wizard-mapping-next"
 				@click="onNext">
 				<template #icon><ArrowRight :size="20" /></template>
-				{{ t('souvera_mail', 'Weiter') }}
+				{{ t('souvera_mail', 'Next') }}
 			</NcButton>
 		</div>
 	</div>

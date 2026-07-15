@@ -33,6 +33,17 @@
         return;
     }
 
+    // Safe i18n lookup — falls back to English default.
+    const i18n = (key, fallback) => {
+        try {
+            if (rl && typeof rl.i18n === 'function') {
+                const v = rl.i18n(key);
+                if (v && v !== key) return v;
+            }
+        } catch (e) { /* silent */ }
+        return fallback;
+    };
+
     const BAR_ID       = 'souvera-mail-quota-bar';
     const REFRESH_MS   = 5 * 60 * 1000;       // 5 minutes
     const WARN_THRESHOLD  = 80;
@@ -97,8 +108,8 @@
             // (operator spec 2026-02-19 → option a).
             el.setAttribute('data-quota-mode', 'unlimited');
             fill.style.width = '0%';
-            numEl.textContent = `${data.formatted.used} verwendet`;
-            el.title = 'Kein Speicherlimit konfiguriert';
+            numEl.textContent = i18n('QUOTA/USED_LABEL', '{used} used').replace('{used}', data.formatted.used);
+            el.title = i18n('QUOTA/UNLIMITED_TITLE', 'No storage limit configured');
             return;
         }
 
@@ -112,8 +123,8 @@
         else if (data.percentage >= WARN_THRESHOLD) tier = 'warn';
         el.setAttribute('data-quota-tier', tier);
 
-        el.title = `${data.percentage}% belegt`
-            + (settingsUrl ? ' · Klicken für Einstellungen' : '');
+        el.title = i18n('QUOTA/PERCENT_TITLE', '{p}% used').replace('{p}', data.percentage)
+            + (settingsUrl ? ' · ' + i18n('QUOTA/CLICK_FOR_SETTINGS', 'Click for settings') : '');
 
         // Toast escalation at ≥95 % — once per session.
         if (tier === 'alert' && !alertShown) {
@@ -127,10 +138,13 @@
         // rl.Notification is provided by the engine and hooks into its
         // localisation + accessibility. Falls back to a lightweight
         // inline toast when the engine hasn't booted it yet.
-        const msg = `Ihr Postfach ist zu ${data.percentage}% belegt `
-            + `(${data.formatted.used} / ${data.formatted.total}). `
-            + `Bitte alte E-Mails oder Anhänge löschen, damit neue Nachrichten `
-            + `weiterhin angenommen werden können.`;
+        const msg = i18n(
+            'QUOTA/ALERT_TOAST',
+            'Your mailbox is {p}% full ({u} / {t}). Please delete old mail or attachments so new messages can still be accepted.'
+        )
+            .replace('{p}', data.percentage)
+            .replace('{u}', data.formatted.used)
+            .replace('{t}', data.formatted.total);
 
         try {
             if (rl && rl.Notification && typeof rl.Notification.showI18n === 'function') {
@@ -194,7 +208,7 @@
             const el = ensureBar();
             if (!el) return;
             const title = el.querySelector('.quota-title');
-            if (title) title.textContent = 'Mail-Speicher';
+            if (title) title.textContent = i18n('QUOTA/MAIL_STORAGE', 'Mail storage');
             applyState(el, body);
         })
         .catch(() => removeBar());

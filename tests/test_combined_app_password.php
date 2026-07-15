@@ -246,8 +246,9 @@ $js = (string) file_get_contents('/app/js/security-page-hijack.js');
 ok(str_contains($js, 'souvera-mail-security-notice'),
     "Hijack JS injects the notice DIV",
     $passes, $failures);
-ok(str_contains($js, 'App-Passwort für Mail'),
-    "Hijack JS shows the German notice text 'App-Passwort für Mail'",
+ok(str_contains($js, "t('souvera_mail', 'Create app password for Mail & Nextcloud')")
+    || str_contains($js, "Create app password for Mail & Nextcloud"),
+    "Hijack JS builds the notice text via t('souvera_mail', 'Create app password …') so it's translatable (source is English; German shipped in l10n/de.js)",
     $passes, $failures);
 ok(str_contains($js, 'OC.generateUrl'),
     "Hijack JS uses OC.generateUrl() to build the Souvera Mail link (respects webroot)",

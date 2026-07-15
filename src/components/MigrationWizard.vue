@@ -99,13 +99,13 @@ export default {
 
 		const dialogTitle = computed(() => {
 			switch (step.value) {
-				case 'welcome':  return t('souvera_mail', 'Alte Mails importieren')
-				case 'form':     return t('souvera_mail', 'Verbindung zum alten Postfach')
-				case 'mapping':  return t('souvera_mail', 'Ordner auswählen')
-				case 'confirm':  return t('souvera_mail', 'Import bestätigen')
-				case 'progress': return t('souvera_mail', 'Import läuft')
-				case 'terminal': return t('souvera_mail', 'Import abgeschlossen')
-				default:         return t('souvera_mail', 'Import-Assistent')
+				case 'welcome':  return t('souvera_mail', 'Import old mail')
+				case 'form':     return t('souvera_mail', 'Connection to old mailbox')
+				case 'mapping':  return t('souvera_mail', 'Select folders')
+				case 'confirm':  return t('souvera_mail', 'Confirm import')
+				case 'progress': return t('souvera_mail', 'Import running')
+				case 'terminal': return t('souvera_mail', 'Import complete')
+				default:         return t('souvera_mail', 'Import wizard')
 			}
 		})
 
@@ -142,11 +142,11 @@ export default {
 					try {
 						t1 = await props.migration.testConnection(conn)
 					} catch (e) {
-						testResult.value = { ok: false, error: e?.message || t('souvera_mail', 'Verbindung fehlgeschlagen.') }
+						testResult.value = { ok: false, error: e?.message || t('souvera_mail', 'Connection failed.') }
 						return
 					}
 					if (!t1?.ok) {
-						testResult.value = { ok: false, error: t1?.message || t('souvera_mail', 'Verbindung fehlgeschlagen.') }
+						testResult.value = { ok: false, error: t1?.message || t('souvera_mail', 'Connection failed.') }
 						return
 					}
 					testResult.value = { ok: true }
@@ -161,11 +161,11 @@ export default {
 							messages: fp?.message_count ?? 0,
 						}
 					} catch (e) {
-						testResult.value = { ok: false, error: e?.message || t('souvera_mail', 'Ordnerliste konnte nicht abgerufen werden.') }
+						testResult.value = { ok: false, error: e?.message || t('souvera_mail', 'Could not fetch the folder list.') }
 						return
 					}
 					if (folderList.value.length === 0) {
-						testResult.value = { ok: false, error: t('souvera_mail', 'Im alten Postfach wurden keine Ordner gefunden.') }
+						testResult.value = { ok: false, error: t('souvera_mail', 'No folders were found in the old mailbox.') }
 						return
 					}
 					// Auto-preselect all NON-system folders.
@@ -190,7 +190,7 @@ export default {
 					try {
 						await props.migration.startMigration(conn, folders)
 					} catch (e) {
-						startError.value = e?.message || t('souvera_mail', 'Import konnte nicht gestartet werden.')
+						startError.value = e?.message || t('souvera_mail', 'Could not start the import.')
 						return
 					}
 					form.password = ''

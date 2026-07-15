@@ -94,9 +94,13 @@ assertTrue(str_contains($js, "dataset.smailHelpWired"),
     "help-modal.js is idempotent — buttons only wired once (marker attribute)",
     $passes, $failures);
 
-// Copy-feedback: user sees "✓ Kopiert" flash
-assertTrue(str_contains($js, 'Kopiert'),
-    "help-modal.js flashes 'Kopiert' feedback on successful copy",
+// Copy-feedback: user sees "✓ Copied" (English source) — German translation
+// lives in the plugin lang file de.json (HELP_MODAL/COPIED).
+$deLang = @file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/langs/de.json');
+assertTrue(
+    str_contains($js, "HELP_MODAL/COPIED")
+    && ($deLang !== false && str_contains($deLang, 'Kopiert')),
+    "help-modal.js flashes 'Kopiert' feedback on successful copy (via HELP_MODAL/COPIED i18n key + de.json translation)",
     $passes, $failures);
 
 // ---------------------------------------------------------------
@@ -207,23 +211,29 @@ $tplPath = '/app/app/smail/v/current/app/templates/Views/User/PopupsKeyboardShor
 $tpl = (string) file_get_contents($tplPath);
 
 // Title is now generic "Hilfe" (no longer i18n-bound to SHORTCUTS_HELP)
-assertTrue(str_contains($tpl, '<h3>Hilfe</h3>'),
-    "template header title changed to '<h3>Hilfe</h3>' (general help modal)",
+assertTrue(str_contains($tpl, 'data-smail-help-i18n="HELP_MODAL/HEADING"'),
+    "template header title uses HELP_MODAL/HEADING i18n key (was '<h3>Hilfe</h3>')",
     $passes, $failures);
 assertTrue(!str_contains($tpl, 'SHORTCUTS_HELP/LEGEND_SHORTCUTS_HELP'),
     "old i18n title key SHORTCUTS_HELP/LEGEND_SHORTCUTS_HELP is removed",
     $passes, $failures);
 
-// New Souvera tabs
+// New Souvera tabs — English defaults are rendered directly in the template
+// with `data-smail-help-i18n` attributes for translation into DE/NL at runtime.
 foreach ([
-    'tab-help-mailclient' => 'Mail-Client',
-    'tab-help-caldav' => 'Kalender &amp; Kontakte',
-    'tab-help-shieldapps' => 'Shield &amp; Apps',
-] as $id => $label) {
+    'tab-help-mailclient' => ['HELP_MODAL/TAB_MAILCLIENT', 'Mail-Client', 'Mail client'],
+    'tab-help-caldav' => ['HELP_MODAL/TAB_CALDAV', 'Kalender & Kontakte', 'Calendar &amp; Contacts'],
+    'tab-help-shieldapps' => ['HELP_MODAL/TAB_SHIELDAPPS', 'Shield & Apps', 'Shield &amp; Apps'],
+] as $id => $meta) {
     assertTrue(str_contains($tpl, 'id="' . $id . '"'),
         "template has new radio input '$id'", $passes, $failures);
-    assertTrue(str_contains($tpl, $label),
-        "template has label text '$label'", $passes, $failures);
+    [$i18nKey, $deExpect, $enExpect] = $meta;
+    assertTrue(str_contains($tpl, 'data-smail-help-i18n="' . $i18nKey . '"'),
+        "template exposes '$i18nKey' i18n attribute for tab label", $passes, $failures);
+    assertTrue(str_contains($tpl, $enExpect),
+        "template ships English default label '$enExpect' for '$id'", $passes, $failures);
+    assertTrue($deLang !== false && str_contains($deLang, $deExpect),
+        "plugin de.json contains German label '$deExpect' for '$i18nKey'", $passes, $failures);
 }
 
 // Existing shortcut tabs are now CONSOLIDATED into a single "Tastenkürzel" tab
@@ -332,28 +342,33 @@ assertTrue(str_contains($tpl, 'sv-help-callout'),
 assertTrue(str_contains($tpl, 'sv-help-steps'),
     "template numbers the App-Passwort creation steps in a <ol class='sv-help-steps'>",
     $passes, $failures);
-assertTrue(str_contains($tpl, '<strong>Einstellungen</strong>'),
-    "template hints the user to click their profile → 'Einstellungen'",
+assertTrue($deLang !== false && str_contains($deLang, '<strong>Einstellungen</strong>'),
+    "plugin de.json step points to 'Einstellungen' in bold (CALLOUT_STEP_1)",
     $passes, $failures);
-assertTrue(str_contains($tpl, '<strong>Sicherheit &amp; Geräte</strong>'),
-    "template names the target settings tab 'Sicherheit & Geräte' in bold",
+assertTrue($deLang !== false && str_contains($deLang, '<strong>Sicherheit &amp; Geräte</strong>'),
+    "plugin de.json step names 'Sicherheit & Geräte' in bold (CALLOUT_STEP_2)",
     $passes, $failures);
-assertTrue((bool) preg_match('#pro\s+Gerät#i', $tpl),
-    "template stresses one App-Passwort PER device for revocability",
+assertTrue($deLang !== false && (bool) preg_match('#pro\s+Gerät#iu', $deLang),
+    "plugin de.json stresses one App-Passwort PER device for revocability (CALLOUT_HINT)",
     $passes, $failures);
-assertTrue(str_contains($tpl, 'einmalig'),
-    "template warns the App-Passwort is only shown ONCE ('einmalig')",
+assertTrue($deLang !== false && str_contains($deLang, 'einmalig'),
+    "plugin de.json warns the App-Passwort is only shown ONCE ('einmalig')",
     $passes, $failures);
 assertTrue(!str_contains($tpl, 'unter „Sicherheit & Geräte"')
     && !str_contains($tpl, 'unter „Sicherheit &amp; Geräte"'),
     "template no longer uses the misleading 'unter „Sicherheit & Geräte\"' phrasing",
     $passes, $failures);
 
-// Passwort row in the config table cross-references the explainer
-assertTrue((bool) preg_match(
-    '#<td>Passwort</td>\s*<td>[^<]*<strong>App-Passwort</strong>#s',
-    $tpl
-), "config table has a 'Passwort' row that reinforces: use the App-Passwort, not the login one",
+// Passwort row in the config table cross-references the explainer.
+// English source: "Password" row body -> "Your personal <strong>app password</strong>…".
+// German shipped via HELP_MODAL/PASSWORD_DETAIL in plugin de.json.
+assertTrue(str_contains($tpl, 'data-smail-help-i18n-html="HELP_MODAL/PASSWORD_DETAIL"'),
+    "template Password row uses HELP_MODAL/PASSWORD_DETAIL i18n key",
+    $passes, $failures);
+assertTrue(
+    $deLang !== false
+    && (bool) preg_match('#<strong>App-Passwort</strong>#', $deLang),
+    "plugin de.json PASSWORD_DETAIL translation reinforces: use the App-Passwort, not the login one",
     $passes, $failures);
 
 // ---------------------------------------------------------------

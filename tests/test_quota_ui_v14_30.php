@@ -62,8 +62,11 @@ ok(str_contains($qjs, 'alertShown = false')
 ok(str_contains($qjs, "rl.Notification"),
     "quota.js prefers Snappymail's rl.Notification pipeline before DOM toast",
     $passes, $failures);
-ok(str_contains($qjs, "data.formatted.used} verwendet"),
-    "quota.js shows 'X verwendet' (no bar) for unlimited accounts (operator spec option a)",
+$qDeLang = @file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/langs/de.json');
+ok(
+    (str_contains($qjs, "QUOTA/USED_LABEL") || str_contains($qjs, "USED_LABEL"))
+    && $qDeLang !== false && str_contains($qDeLang, 'verwendet'),
+    "quota.js shows 'X verwendet' (no bar) for unlimited accounts — via QUOTA/USED_LABEL i18n key + de.json translation",
     $passes, $failures);
 // Regression pin: no top-right pill anymore
 ok(!str_contains($qjs, "top:8px"),
@@ -125,6 +128,7 @@ ok(str_contains($listener, "Util::addScript(Application::APP_ID, 'nc-header-menu
 
 // JS loader
 $hjs = (string) file_get_contents('/app/js/nc-header-menu-quota.js');
+$de_js = (string) @file_get_contents('/app/l10n/de.js');
 ok(str_contains($hjs, "'souvera-mail-quota-config'"),
     "nc-header-menu-quota.js reads endpoint from #souvera-mail-quota-config inline JSON",
     $passes, $failures);
@@ -137,8 +141,9 @@ ok(str_contains($hjs, "ENTRY_ID = 'souvera-mail-quota-menu-entry'"),
 ok(str_contains($hjs, "cursor:default"),
     "nc-header-menu-quota.js renders the entry as non-clickable (info only)",
     $passes, $failures);
-ok(str_contains($hjs, "Mail-Speicher"),
-    "nc-header-menu-quota.js labels the entry 'Mail-Speicher: …'",
+ok(str_contains($hjs, "'Mail storage")
+    && str_contains($de_js ?? '', 'Mail-Speicher'),
+    "nc-header-menu-quota.js labels the entry 'Mail storage: …' (English source; German shipped via l10n/de.js as 'Mail-Speicher')",
     $passes, $failures);
 
 // Application.php wires it up

@@ -6,6 +6,109 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.49] — 2026-02 (Full EN + NL translations · English as source language)
+
+### Operator-Report
+
+> „Leider scheint alles noch nicht auf EN und NL übersetzt zu sein…
+>  Postfach neu synchronisieren, Hilfe, einige Menu-Einträge im
+>  Dropdown-Menu. Bitte einmal intensiv drüber schauen und
+>  vervollständigen. Fallback-Sprache sollte immer Englisch sein!"
+
+### Root Cause
+
+Souvera Mail was a partially-translated app with a mix of source
+languages:
+
+* Vue components (`MigrationWizard`, `ResyncDialog`, `WelcomeScreen`,
+  `FolderMappingScreen`, `ImapFormScreen`, `ConfirmScreen`,
+  `ProgressScreen`, `TerminalScreen`) shipped **German source strings**
+  as their i18n keys — meaning any locale without an explicit
+  translation fell back to **German**, not English.
+* The Snappymail plugin JS enrichers (`dropdown-menu.js`,
+  `sieve-apply.js`, `help-modal.js`, `quota.js`) had **hardcoded
+  German literals** for menu labels, modal buttons, "Kopiert" feedback,
+  "Mail-Speicher" sidebar heading, and every sieve-apply modal string —
+  bypassing the i18n system entirely.
+* The Help template `PopupsKeyboardShortcutsHelp.html` was a
+  600-line block of German prose (mail-client setup, CalDAV
+  instructions, app recommendations) with no i18n hooks at all.
+* Standalone JS files `js/nc-header-menu-quota.js` and
+  `js/security-page-hijack.js` had German HTML strings baked in.
+* `l10n/nl.js` shipped **14 keys**, `l10n/en_GB.js` **4 keys**, and
+  `l10n/de.js` **90 keys** out of the ~220 real keys needed.
+
+### Changes
+
+* **English is now the source language**. Every `t('souvera_mail',
+  'Text')` in the Vue tree uses an English string as the key.
+* Rebuilt `l10n/de.js`, `l10n/de_DE.js`, `l10n/nl.js`, `l10n/en_GB.js`,
+  `l10n/en.js` (+ their `.json` twins) from a single master table
+  with **224 translation keys** each, covering:
+  * All Vue-Wizard screens (Welcome, IMAP form, folder mapping,
+    confirm, progress, terminal, resync dialog)
+  * All Admin-Panel + dashboard-widget strings
+  * All `templates/admin-local.php` / `templates/not_configured.php` /
+    `templates/auth_error.php` labels
+* Snappymail plugin lang files (`plugins/nextcloud/langs/{en,de,nl}.json`)
+  gained **four new sections**:
+  * `MENU/*` — dropdown menu labels (IMPORT_OLD_MAIL, RESYNC_MAILBOX,
+    APPLY_FILTER_FOLDER)
+  * `SIEVE_APPLY/*` — 24 keys for the sieve-apply modal
+  * `HELP_MODAL/*` — 60 keys covering headings, callout steps, table
+    labels, mobile-app descriptions, tips
+  * `QUOTA/*` — sidebar/header/toast labels
+* Dutch translation file (`nl.json`) is **new** in the plugin — all
+  four sections plus the existing FOLDERS / CONTACTS / NEXTCLOUD
+  sections translated end-to-end.
+* JS enrichers refactored to `i18n(key, fallback)` helper that reads
+  from `rl.i18n()` when the engine is booted and falls back to the
+  English default otherwise (no white-screen on early paint).
+* `PopupsKeyboardShortcutsHelp.html` rewritten with
+  `data-smail-help-i18n` / `data-smail-help-i18n-html` attributes on
+  every translatable block; `help-modal.js` walks those and replaces
+  content at popup-open time.
+* `js/nc-header-menu-quota.js` and `js/security-page-hijack.js` use
+  the Nextcloud `t('souvera_mail', …)` global instead of hardcoded
+  German literals.
+* New regression pin `tests/test_i18n_english_source_v0_14_49.php`
+  (375 assertions) catches any future regressions: it flags Vue
+  components with German source keys, missing translations in de/nl,
+  hardcoded German literals in JS files, and missing `data-smail-help-i18n`
+  attributes on the help template.
+
+### Files touched
+
+* `/app/src/**/*.vue` — 8 Vue files switched to English source keys
+* `/app/src/composables/useMigration.js` — pill labels English source
+* `/app/l10n/de.js`, `de.json`, `de_DE.js`, `de_DE.json`,
+  `nl.js`, `nl.json`, `en_GB.js`, `en_GB.json`, `en.js`, `en.json`
+* `/app/app/smail/v/current/app/plugins/nextcloud/js/dropdown-menu.js`
+* `/app/app/smail/v/current/app/plugins/nextcloud/js/sieve-apply.js`
+* `/app/app/smail/v/current/app/plugins/nextcloud/js/help-modal.js`
+* `/app/app/smail/v/current/app/plugins/nextcloud/js/quota.js`
+* `/app/app/smail/v/current/app/plugins/nextcloud/langs/{en,de,nl}.json`
+* `/app/app/smail/v/current/app/templates/Views/User/PopupsKeyboardShortcutsHelp.html`
+* `/app/js/nc-header-menu-quota.js`, `/app/js/security-page-hijack.js`
+* `/app/tests/test_i18n_english_source_v0_14_49.php` (**new**)
+* `/app/tests/test_help_modal_integration.php`,
+  `/app/tests/test_combined_app_password.php`,
+  `/app/tests/test_dashboard_widget_polish.php`,
+  `/app/tests/test_migration_wizard_frontend.php`,
+  `/app/tests/test_quota_ui_v14_30.php`,
+  `/app/tests/test_sieve_apply_wiring.php` — updated to check the new
+  i18n indirection instead of hardcoded German literals
+
+### Verification
+
+* All 54 PHP test suites pass locally (was 53 before the addition of
+  `test_i18n_english_source_v0_14_49.php`).
+* Webpack rebuilds `souvera_mail-migration-wizard.js` cleanly.
+* Fallback chain: `de` shows German, `nl` shows Dutch, every other
+  locale (`fr`, `es`, `it`, …) transparently falls back to the
+  English source key — no more German bleed-through on unknown
+  locales.
+
 ## [0.14.48] — 2026-07 (Sieve-Apply matcht 0 von 4836: Snappymails Misch-Argumentform + Raw-Header)
 
 ### Operator-Report

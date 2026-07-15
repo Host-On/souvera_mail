@@ -414,9 +414,14 @@ foreach (['imap.gmail.com', 'imap.gmx.net', 'imap.web.de'] as $badPreset) {
 
 // ==============================================================
 // K — Confirm-screen tells the user the import cannot be cancelled
+// (English source; German shipped via l10n/de.js)
 // ==============================================================
-ok(stripos($src['confirm'], 'nicht abgebrochen') !== false,
-    'ConfirmScreen tells users the import cannot be cancelled',
+$deL10n = @file_get_contents('/app/l10n/de.js');
+ok(stripos($src['confirm'], 'cannot be cancelled') !== false,
+    'ConfirmScreen tells users (in English source) the import cannot be cancelled',
+    $passes, $failures);
+ok($deL10n !== false && stripos($deL10n, 'nicht abgebrochen') !== false,
+    'l10n/de.js contains the German translation "nicht abgebrochen werden"',
     $passes, $failures);
 
 // ==============================================================

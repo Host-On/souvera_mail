@@ -1,6 +1,6 @@
 <template>
 	<NcDialog
-		:name="t('souvera_mail', 'Postfach neu synchronisieren')"
+		:name="t('souvera_mail', 'Resync mailbox')"
 		size="normal"
 		:no-close="isBusy"
 		out-transition
@@ -12,30 +12,30 @@
 
 			<div v-if="stage === 'intro'">
 				<p class="souvera-resync__lead">
-					{{ t('souvera_mail', 'Damit wird der lokale Cache in deinem Browser geleert und Souvera Mail lädt den aktuellen Postfach-Zustand komplett neu vom Server. Das hilft, wenn:') }}
+					{{ t('souvera_mail', 'This clears the local cache in your browser and Souvera Mail reloads the current mailbox state completely from the server. This helps when:') }}
 				</p>
 				<ul class="souvera-resync__list">
 					<li>
 						<CheckCircleOutline :size="18" />
-						<span>{{ t('souvera_mail', 'Ordner fehlen oder Zähler stimmen nicht') }}</span>
+						<span>{{ t('souvera_mail', 'Folders are missing or counters are wrong') }}</span>
 					</li>
 					<li>
 						<CheckCircleOutline :size="18" />
-						<span>{{ t('souvera_mail', 'Nach einer Migration Nachrichten noch nicht sichtbar sind') }}</span>
+						<span>{{ t('souvera_mail', 'Messages are not yet visible after a migration') }}</span>
 					</li>
 					<li>
 						<CheckCircleOutline :size="18" />
-						<span>{{ t('souvera_mail', 'Ein Entwurf hängen bleibt oder eine Aktion nicht durchgeht') }}</span>
+						<span>{{ t('souvera_mail', 'A draft gets stuck or an action does not go through') }}</span>
 					</li>
 				</ul>
 
 				<NcNoteCard type="warning">
-					{{ t('souvera_mail', 'Ungespeicherte Entwürfe im Verfassen-Fenster gehen verloren. Bitte vorher speichern.') }}
+					{{ t('souvera_mail', 'Unsaved drafts in the compose window will be lost. Please save first.') }}
 				</NcNoteCard>
 
 				<NcNoteCard type="success">
-					<strong>{{ t('souvera_mail', 'Volltextsuche (FTS):') }}</strong>
-					{{ t('souvera_mail', 'Der Suchindex im Server wird von Stalwart automatisch im Hintergrund gepflegt und braucht keinen manuellen Anstoß. Diese Aktion synchronisiert den Client — nicht den serverseitigen FTS-Index.') }}
+					<strong>{{ t('souvera_mail', 'Full-text search (FTS):') }}</strong>
+					{{ t('souvera_mail', 'The search index on the server is maintained automatically by Stalwart in the background and does not need a manual trigger. This action synchronizes the client — not the server-side FTS index.') }}
 				</NcNoteCard>
 
 				<div class="souvera-actions souvera-actions--split">
@@ -43,41 +43,41 @@
 						type="tertiary"
 						data-testid="resync-cancel"
 						@click="$emit('close')">
-						{{ t('souvera_mail', 'Abbrechen') }}
+						{{ t('souvera_mail', 'Cancel') }}
 					</NcButton>
 					<NcButton
 						type="primary"
 						data-testid="resync-start"
 						@click="onStart">
 						<template #icon><Refresh :size="20" /></template>
-						{{ t('souvera_mail', 'Jetzt neu synchronisieren') }}
+						{{ t('souvera_mail', 'Resync now') }}
 					</NcButton>
 				</div>
 			</div>
 
 			<div v-else-if="stage === 'busy'" class="souvera-resync__stage">
 				<NcLoadingIcon :size="44" />
-				<h2>{{ t('souvera_mail', 'Synchronisiere …') }}</h2>
+				<h2>{{ t('souvera_mail', 'Synchronizing …') }}</h2>
 				<p>{{ progressText }}</p>
 			</div>
 
 			<div v-else-if="stage === 'error'" class="souvera-resync__stage">
 				<AlertCircle :size="56" class="souvera-resync__error-icon" />
-				<h2>{{ t('souvera_mail', 'Sync fehlgeschlagen') }}</h2>
+				<h2>{{ t('souvera_mail', 'Sync failed') }}</h2>
 				<p>{{ errorMessage }}</p>
 				<div class="souvera-actions souvera-actions--split">
 					<NcButton
 						type="tertiary"
 						data-testid="resync-error-close"
 						@click="$emit('close')">
-						{{ t('souvera_mail', 'Schließen') }}
+						{{ t('souvera_mail', 'Close') }}
 					</NcButton>
 					<NcButton
 						type="primary"
 						data-testid="resync-error-retry"
 						@click="onStart">
 						<template #icon><Refresh :size="20" /></template>
-						{{ t('souvera_mail', 'Erneut versuchen') }}
+						{{ t('souvera_mail', 'Retry') }}
 					</NcButton>
 				</div>
 			</div>
@@ -141,7 +141,7 @@ async function jsonFetch(url, init = {}) {
 		},
 	})
 	let body = null
-	try { body = await response.json() } catch (e) { body = { message: 'Ungültige Antwort vom Server.' } }
+	try { body = await response.json() } catch (e) { body = { message: t('souvera_mail', 'Invalid response from server.') } }
 	if (!response.ok) {
 		const err = new Error(body?.message || `HTTP ${response.status}`)
 		err.status = response.status
@@ -166,7 +166,7 @@ export default {
 		async function onStart() {
 			stage.value = 'busy'
 			errorMessage.value = ''
-			progressText.value = t('souvera_mail', 'Sende Anfrage an den Server …')
+			progressText.value = t('souvera_mail', 'Sending request to the server …')
 			try {
 				await jsonFetch(
 					generateUrl('/apps/souvera_mail/stalwart/resync'),
@@ -175,12 +175,12 @@ export default {
 			} catch (e) {
 				stage.value = 'error'
 				errorMessage.value = e?.message
-					|| t('souvera_mail', 'Der Server konnte nicht erreicht werden.')
+					|| t('souvera_mail', 'The server could not be reached.')
 				return
 			}
-			progressText.value = t('souvera_mail', 'Lösche lokalen Cache …')
+			progressText.value = t('souvera_mail', 'Clearing local cache …')
 			const removed = clearSnappymailLocalStorage()
-			progressText.value = t('souvera_mail', 'Lade Souvera Mail neu … ({n} Cache-Einträge geleert)', { n: removed })
+			progressText.value = t('souvera_mail', 'Reloading Souvera Mail … ({n} cache entries cleared)', { n: removed })
 			// Give the user 400ms to see the last progress line, then reload.
 			window.setTimeout(() => {
 				try {

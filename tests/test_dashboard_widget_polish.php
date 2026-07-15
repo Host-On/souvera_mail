@@ -86,7 +86,7 @@ ok(str_contains($de, '"Your mailbox is currently empty": "Ihre Mailbox ist derze
     "l10n/de.json translates 'Your mailbox is currently empty' → 'Ihre Mailbox ist derzeit leer'",
     $passes, $failures);
 $deJs = (string) file_get_contents('/app/l10n/de.js');
-ok(str_contains($deJs, '"Your mailbox is currently empty" : "Ihre Mailbox ist derzeit leer"'),
+ok(str_contains($deJs, '"Your mailbox is currently empty": "Ihre Mailbox ist derzeit leer"'),
     "l10n/de.js has the same translation (client-side)",
     $passes, $failures);
 

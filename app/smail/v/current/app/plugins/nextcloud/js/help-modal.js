@@ -29,6 +29,16 @@
 		return;
 	}
 
+	var i18n = function (key, fallback) {
+		try {
+			if (rl && typeof rl.i18n === 'function') {
+				var v = rl.i18n(key);
+				if (v && v !== key) return v;
+			}
+		} catch (e) { /* silent */ }
+		return fallback;
+	};
+
 	var POPUP_ID = 'V-PopupsKeyboardShortcutsHelp';
 	var enriched = false;
 
@@ -61,7 +71,7 @@
 	function flashCopied(btn) {
 		if (!btn) { return; }
 		var original = btn.textContent;
-		btn.textContent = '✓ Kopiert';
+		btn.textContent = i18n('HELP_MODAL/COPIED', '✓ Copied');
 		btn.classList.add('sv-help-copy-done');
 		setTimeout(function () {
 			btn.textContent = original;
@@ -72,6 +82,27 @@
 	function enrichPopup(popupEl) {
 		if (!popupEl) { return; }
 		var c = cfg();
+
+		// 1a. Fill every element carrying `data-smail-help-i18n="KEY"` with
+		// the translated string (used by the static help template for
+		// section headings, table headers, tips, etc.). Kept idempotent
+		// via `__svI18n` sentinel so we don't re-translate on each open.
+		var i18nEls = popupEl.querySelectorAll('[data-smail-help-i18n]');
+		Array.prototype.forEach.call(i18nEls, function (el) {
+			var key = el.getAttribute('data-smail-help-i18n');
+			if (!key) { return; }
+			var v = i18n(key, el.getAttribute('data-smail-help-default') || el.textContent);
+			if (v && v !== el.textContent) { el.textContent = v; }
+		});
+		// 1b. Same for elements whose HTML (with markup) is translated —
+		// used for paragraphs that mix strong/em/kbd tags.
+		var i18nHtmlEls = popupEl.querySelectorAll('[data-smail-help-i18n-html]');
+		Array.prototype.forEach.call(i18nHtmlEls, function (el) {
+			var key = el.getAttribute('data-smail-help-i18n-html');
+			if (!key) { return; }
+			var v = i18n(key, null);
+			if (v) { el.innerHTML = v; }
+		});
 
 		// 1. Fill every <span/code data-smail-help="KEY"> placeholder
 		var slots = popupEl.querySelectorAll('[data-smail-help]');

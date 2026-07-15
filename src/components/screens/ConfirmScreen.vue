@@ -1,7 +1,7 @@
 <template>
 	<div class="souvera-confirm" data-testid="wizard-screen-confirm">
-		<NcNoteCard type="success" :heading="t('souvera_mail', 'Verbindung erfolgreich')">
-			{{ t('souvera_mail', 'Wir konnten uns mit deinem alten Postfach verbinden.') }}
+		<NcNoteCard type="success" :heading="t('souvera_mail', 'Connection successful')">
+			{{ t('souvera_mail', 'We could connect to your old mailbox.') }}
 		</NcNoteCard>
 
 		<dl class="souvera-confirm__summary">
@@ -10,32 +10,32 @@
 				<dd><code>{{ form.host }}:{{ form.port }}</code></dd>
 			</div>
 			<div>
-				<dt>{{ t('souvera_mail', 'Konto') }}</dt>
+				<dt>{{ t('souvera_mail', 'Account') }}</dt>
 				<dd><code>{{ form.username }}</code></dd>
 			</div>
 			<div v-if="folderPreview">
-				<dt>{{ t('souvera_mail', 'Vorschau') }}</dt>
+				<dt>{{ t('souvera_mail', 'Preview') }}</dt>
 				<dd>
-					{{ n('souvera_mail', '%n Ordner', '%n Ordner', folderPreview.folders) }}
-					<span v-if="folderPreview.messages > 0"> · {{ n('souvera_mail', '%n Nachricht', '%n Nachrichten', folderPreview.messages) }}</span>
+					{{ n('souvera_mail', '%n folder', '%n folders', folderPreview.folders) }}
+					<span v-if="folderPreview.messages > 0"> · {{ n('souvera_mail', '%n message', '%n messages', folderPreview.messages) }}</span>
 				</dd>
 			</div>
 			<div v-if="selectedCount > 0" data-testid="wizard-confirm-selected-count">
-				<dt>{{ t('souvera_mail', 'Zu importieren') }}</dt>
+				<dt>{{ t('souvera_mail', 'To import') }}</dt>
 				<dd>
-					<strong>{{ n('souvera_mail', '%n Ordner ausgewählt', '%n Ordner ausgewählt', selectedCount) }}</strong>
+					<strong>{{ n('souvera_mail', '%n folder selected', '%n folders selected', selectedCount) }}</strong>
 				</dd>
 			</div>
 		</dl>
 
-		<NcNoteCard type="warning" :heading="t('souvera_mail', 'Wichtig')">
-			{{ t('souvera_mail', 'Ein gestarteter Import kann nicht abgebrochen werden. Läuft aber komplett im Hintergrund — du kannst währenddessen weiterarbeiten.') }}
+		<NcNoteCard type="warning" :heading="t('souvera_mail', 'Important')">
+			{{ t('souvera_mail', 'A started import cannot be cancelled. It runs entirely in the background — you can keep working while it runs.') }}
 		</NcNoteCard>
 
 		<NcNoteCard
 			v-if="startError"
 			type="error"
-			:heading="t('souvera_mail', 'Import konnte nicht gestartet werden')"
+			:heading="t('souvera_mail', 'Could not start import')"
 			data-testid="wizard-confirm-error">
 			{{ startError }}
 		</NcNoteCard>
@@ -46,7 +46,7 @@
 				data-testid="wizard-confirm-back"
 				@click="$emit('back')">
 				<template #icon><ArrowLeft :size="20" /></template>
-				{{ t('souvera_mail', 'Zurück') }}
+				{{ t('souvera_mail', 'Back') }}
 			</NcButton>
 			<NcButton
 				type="primary"
@@ -57,7 +57,7 @@
 					<NcLoadingIcon v-if="isBusy" :size="20" />
 					<PlayCircleOutline v-else :size="20" />
 				</template>
-				{{ isBusy ? t('souvera_mail', 'Import wird gestartet …') : t('souvera_mail', 'Import jetzt starten') }}
+				{{ isBusy ? t('souvera_mail', 'Starting import …') : t('souvera_mail', 'Start import now') }}
 			</NcButton>
 		</div>
 	</div>

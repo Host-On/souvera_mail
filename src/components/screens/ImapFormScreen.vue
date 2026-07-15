@@ -1,15 +1,15 @@
 <template>
 	<div class="souvera-form" data-testid="wizard-screen-form">
 		<p class="souvera-form__lead">
-			{{ t('souvera_mail', 'Gib die IMAP-Zugangsdaten deines alten Anbieters ein. Wir prüfen die Verbindung, bevor der Import startet.') }}
+			{{ t('souvera_mail', 'Enter the IMAP credentials from your old provider. We will test the connection before starting the import.') }}
 		</p>
 
 		<div class="souvera-form__grid">
 			<div class="souvera-form__field">
 				<NcTextField
 					:model-value="form.host"
-					:label="t('souvera_mail', 'IMAP-Server')"
-					placeholder="imap.beispiel.de"
+					:label="t('souvera_mail', 'IMAP server')"
+					placeholder="imap.example.com"
 					name="host"
 					autocomplete="off"
 					data-testid="wizard-form-host"
@@ -28,8 +28,8 @@
 			<div class="souvera-form__field souvera-form__field--full">
 				<NcTextField
 					:model-value="form.username"
-					:label="t('souvera_mail', 'Benutzername (meist die E-Mail-Adresse)')"
-					placeholder="ich@beispiel.de"
+					:label="t('souvera_mail', 'Username (usually your email address)')"
+					placeholder="me@example.com"
 					name="username"
 					autocomplete="off"
 					data-testid="wizard-form-username"
@@ -38,7 +38,7 @@
 			<div class="souvera-form__field souvera-form__field--full">
 				<NcTextField
 					:model-value="form.password"
-					:label="t('souvera_mail', 'Passwort')"
+					:label="t('souvera_mail', 'Password')"
 					name="password"
 					type="password"
 					autocomplete="new-password"
@@ -50,7 +50,7 @@
 					:model-value="form.tls"
 					data-testid="wizard-form-tls"
 					@update:model-value="v => update('tls', v)">
-					{{ t('souvera_mail', 'Verschlüsselte Verbindung (TLS/SSL) — empfohlen') }}
+					{{ t('souvera_mail', 'Encrypted connection (TLS/SSL) — recommended') }}
 				</NcCheckboxRadioSwitch>
 			</div>
 		</div>
@@ -58,7 +58,7 @@
 		<NcNoteCard
 			v-if="hasTestError"
 			type="error"
-			:heading="t('souvera_mail', 'Verbindung fehlgeschlagen')"
+			:heading="t('souvera_mail', 'Connection failed')"
 			data-testid="wizard-form-error">
 			{{ testResult && testResult.error }}
 		</NcNoteCard>
@@ -71,7 +71,7 @@
 				<template #icon>
 					<ArrowLeft :size="20" />
 				</template>
-				{{ t('souvera_mail', 'Zurück') }}
+				{{ t('souvera_mail', 'Back') }}
 			</NcButton>
 			<NcButton
 				type="primary"
@@ -82,7 +82,7 @@
 					<NcLoadingIcon v-if="isBusy" :size="20" />
 					<ArrowRight v-else :size="20" />
 				</template>
-				{{ isBusy ? t('souvera_mail', 'Prüfe Verbindung …') : t('souvera_mail', 'Verbindung prüfen') }}
+				{{ isBusy ? t('souvera_mail', 'Testing connection …') : t('souvera_mail', 'Test connection') }}
 			</NcButton>
 		</div>
 	</div>

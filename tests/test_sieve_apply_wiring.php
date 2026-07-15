@@ -141,8 +141,16 @@ $check(\str_contains($jsSrc, 'includeRedirect'),
     "sieve-apply.js posts includeRedirect (defaults true — operator chose 1b)");
 $check(\str_contains($jsSrc, 'folderInformationMultiplyList'),
     "sieve-apply.js pings Snappymail to re-read the folder counts after success");
-$check(\str_contains($jsSrc, 'ERNEUT per SMTP'),
-    "sieve-apply.js warns the operator that redirect resends via SMTP (avoids surprise)");
+// v0.14.49: SMTP resend warning moved out of hardcoded JS into the
+// SIEVE_APPLY/EXPLAIN i18n key. English source lives in plugin en.json
+// (mentions "re-sent via SMTP"); German translation in de.json still
+// says "ERNEUT per SMTP".
+$sieveEn = @\file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/langs/en.json');
+$sieveDe = @\file_get_contents('/app/app/smail/v/current/app/plugins/nextcloud/langs/de.json');
+$check(\str_contains($jsSrc, "SIEVE_APPLY/EXPLAIN")
+    && $sieveEn !== false && \stripos($sieveEn, 're-sent via SMTP') !== false
+    && $sieveDe !== false && \str_contains($sieveDe, 'ERNEUT per SMTP'),
+    "sieve-apply modal warns the operator that redirect resends via SMTP (via SIEVE_APPLY/EXPLAIN i18n key; DE keeps 'ERNEUT per SMTP')");
 
 // v0.14.41: primary injection point is the Filter SETTINGS PAGE
 // (not the popup) — operator asked for the button next to

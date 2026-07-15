@@ -12,24 +12,24 @@
 		<div class="souvera-progress__stats">
 			<span data-testid="wizard-progress-percent">{{ percent }} %</span>
 			<span v-if="messagesTotal > 0" data-testid="wizard-progress-messages">
-				{{ n('souvera_mail', '%n Nachricht übertragen', '%n Nachrichten übertragen', messagesDone) }}
+				{{ n('souvera_mail', '%n message transferred', '%n messages transferred', messagesDone) }}
 				<span v-if="messagesTotal > 0"> / {{ messagesTotal.toLocaleString() }}</span>
 			</span>
 		</div>
 
 		<dl v-if="foldersTotal > 0" class="souvera-progress__meta" data-testid="wizard-progress-folders">
 			<div>
-				<dt>{{ t('souvera_mail', 'Ordner') }}</dt>
+				<dt>{{ t('souvera_mail', 'Folders') }}</dt>
 				<dd>{{ foldersDone.toLocaleString() }} / {{ foldersTotal.toLocaleString() }}</dd>
 			</div>
 			<div v-if="currentFolder">
-				<dt>{{ t('souvera_mail', 'Aktueller Ordner') }}</dt>
+				<dt>{{ t('souvera_mail', 'Current folder') }}</dt>
 				<dd><code>{{ currentFolder }}</code></dd>
 			</div>
 		</dl>
 
 		<NcNoteCard type="success">
-			{{ t('souvera_mail', 'Der Import läuft im Hintergrund. Du kannst dieses Fenster jederzeit schließen — beim nächsten Öffnen von Souvera Mail siehst du den aktuellen Stand automatisch.') }}
+			{{ t('souvera_mail', 'The import runs in the background. You can close this window at any time — the next time you open Souvera Mail you will see the current status automatically.') }}
 		</NcNoteCard>
 
 		<NcNoteCard v-if="cancelError" type="error" data-testid="wizard-progress-cancel-error">
@@ -47,20 +47,20 @@
 					<NcLoadingIcon v-if="isCancelling" :size="20" />
 					<CancelIcon v-else :size="20" />
 				</template>
-				{{ isCancelling ? t('souvera_mail', 'Wird abgebrochen …') : t('souvera_mail', 'Import abbrechen') }}
+				{{ isCancelling ? t('souvera_mail', 'Cancelling …') : t('souvera_mail', 'Cancel import') }}
 			</NcButton>
 			<NcButton
 				type="secondary"
 				data-testid="wizard-progress-close"
 				@click="$emit('close')">
 				<template #icon><Close :size="20" /></template>
-				{{ t('souvera_mail', 'Im Hintergrund weiterlaufen lassen') }}
+				{{ t('souvera_mail', 'Keep running in the background') }}
 			</NcButton>
 		</div>
 
 		<NcDialog
 			v-if="showConfirm"
-			:name="t('souvera_mail', 'Import wirklich abbrechen?')"
+			:name="t('souvera_mail', 'Really cancel the import?')"
 			size="small"
 			container="body"
 			data-testid="wizard-progress-cancel-confirm"
@@ -68,19 +68,19 @@
 			@update:open="v => { if (!v) showConfirm = false }">
 			<div class="souvera-progress__confirm">
 				<p>
-					{{ t('souvera_mail', 'Dein Job wartet aktuell in der Warteschlange bei provider.tools. Beim Abbruch:') }}
+					{{ t('souvera_mail', 'Your job is currently queued at provider.tools. On cancel:') }}
 				</p>
 				<ul>
-					<li>{{ t('souvera_mail', 'Das temporäre Ziel-App-Passwort wird sofort widerrufen.') }}</li>
-					<li>{{ t('souvera_mail', 'Sobald ein Worker den Job aufgreifen würde, scheitert er am Login und der Import läuft nicht.') }}</li>
-					<li>{{ t('souvera_mail', 'Es wurden noch keine Mails übertragen — nichts geht verloren.') }}</li>
+					<li>{{ t('souvera_mail', 'The temporary target app password is revoked immediately.') }}</li>
+					<li>{{ t('souvera_mail', 'When a worker would pick up the job, it will fail to log in and the import will not run.') }}</li>
+					<li>{{ t('souvera_mail', 'No mail has been transferred yet — nothing is lost.') }}</li>
 				</ul>
 				<div class="souvera-actions souvera-actions--split">
 					<NcButton
 						type="tertiary"
 						data-testid="wizard-progress-cancel-cancel"
 						@click="showConfirm = false">
-						{{ t('souvera_mail', 'Zurück') }}
+						{{ t('souvera_mail', 'Back') }}
 					</NcButton>
 					<NcButton
 						type="error"
@@ -91,7 +91,7 @@
 							<NcLoadingIcon v-if="isCancelling" :size="20" />
 							<CancelIcon v-else :size="20" />
 						</template>
-						{{ t('souvera_mail', 'Ja, jetzt abbrechen') }}
+						{{ t('souvera_mail', 'Yes, cancel now') }}
 					</NcButton>
 				</div>
 			</div>
@@ -155,26 +155,26 @@ export default {
 		})
 
 		const progressTitle = computed(() => {
-			if (state.value === 'pending') return t('souvera_mail', 'Warteschlange …')
-			if (state.value === 'running') return t('souvera_mail', 'Import läuft …')
-			return t('souvera_mail', 'Import wird verarbeitet …')
+			if (state.value === 'pending') return t('souvera_mail', 'Queued …')
+			if (state.value === 'running') return t('souvera_mail', 'Import running …')
+			return t('souvera_mail', 'Processing import …')
 		})
 		const progressSubtitle = computed(() => {
 			if (state.value === 'pending') {
 				const pos = Number(queueBlock.value.position) || 0
 				const total = Number(queueBlock.value.totalInQueue) || 0
 				if (pos > 0 && total > 0) {
-					return t('souvera_mail', 'Warteschlangen-Position: {n} von {t}', { n: pos, t: total })
+					return t('souvera_mail', 'Queue position: {n} of {t}', { n: pos, t: total })
 				}
 				if (pos > 0) {
-					return t('souvera_mail', 'Warteschlangen-Position: {n}', { n: pos })
+					return t('souvera_mail', 'Queue position: {n}', { n: pos })
 				}
-				return t('souvera_mail', 'Dein Job wartet auf einen freien Worker bei provider.tools.')
+				return t('souvera_mail', 'Your job is waiting for a free worker at provider.tools.')
 			}
 			if (currentFolder.value) {
-				return t('souvera_mail', 'Aktueller Ordner: {folder}', { folder: currentFolder.value })
+				return t('souvera_mail', 'Current folder: {folder}', { folder: currentFolder.value })
 			}
-			return t('souvera_mail', 'Mails werden nach Souvera Mail übertragen.')
+			return t('souvera_mail', 'Mail is being transferred to Souvera Mail.')
 		})
 
 		// v0.14.16 — cancel path (queue only).
@@ -195,7 +195,7 @@ export default {
 				showConfirm.value = false
 				// Wizard watches jobState → auto-transitions to Terminal.
 			} catch (e) {
-				cancelError.value = e?.message || t('souvera_mail', 'Der Import konnte nicht abgebrochen werden.')
+				cancelError.value = e?.message || t('souvera_mail', 'The import could not be cancelled.')
 				showConfirm.value = false
 			} finally {
 				isCancelling.value = false
