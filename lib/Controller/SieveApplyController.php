@@ -65,6 +65,16 @@ class SieveApplyController extends Controller
         return new DataResponse($data);
     }
 
+    /**
+     * NC's Dispatcher hard-caps ANY controller parameter literally named
+     * `limit` at 1..500 (Dispatcher::DEFAULT_MIN/MAX) BEFORE the method
+     * runs — unless the docblock carries an explicit psalm int range.
+     * The annotation below IS the fix for the operator-reported
+     * "Parameter limit must be between 1 and 500" on POST /sieve/apply
+     * (the JS sends limit=5000). Do not remove it.
+     *
+     * @psalm-param ?int<1, 5000> $limit
+     */
     #[NoAdminRequired]
     public function apply(
         ?string $folderId = null,

@@ -73,6 +73,21 @@
         || '';
 
     // ---------------------------------------------------------------
+    // Robust JSON parsing — when NC throws before our controller runs
+    // (e.g. ParameterOutOfRangeException) it answers with an HTML error
+    // page. Naive r.json() then surfaces the cryptic
+    // "SyntaxError: JSON.parse: unexpected character…" to the user.
+    // ---------------------------------------------------------------
+    const safeJson = r => r.text().then(txt => {
+        try {
+            return JSON.parse(txt);
+        } catch (_) {
+            throw new Error('Server antwortete nicht mit JSON (HTTP '
+                + r.status + ') — Details siehe nextcloud.log');
+        }
+    });
+
+    // ---------------------------------------------------------------
     // Small DOM helper.
     // ---------------------------------------------------------------
     const el = (tag, attrs, children) => {
@@ -214,7 +229,7 @@
             method: 'GET',
             credentials: 'same-origin',
             headers: { Accept: 'application/json', requesttoken: csrfToken() }
-        }).then(r => r.json()).then(data => {
+        }).then(safeJson).then(data => {
             if (!data || data.status !== 'ok' || !Array.isArray(data.folders)) {
                 status.textContent = data && data.message
                     ? 'Ordnerliste: ' + data.message
@@ -252,7 +267,7 @@
                     requesttoken: csrfToken()
                 },
                 body: JSON.stringify({ folderId: folderId, limit: 5000, includeRedirect: true })
-            }).then(r => r.json()).then(data => {
+            }).then(safeJson).then(data => {
                 if (!data || data.status !== 'ok') {
                     status.textContent = 'Fehler: ' + ((data && data.message) || 'unbekannt');
                     applyBtn.disabled = false;

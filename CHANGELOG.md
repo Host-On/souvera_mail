@@ -6,6 +6,51 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.14.47] — 2026-07 (limit-500 ENDGÜLTIG: NC-Dispatcher-Hard-Cap auf Controller-Param `limit`)
+
+### Operator-Report
+
+> „nein, der Fehler wurde nicht behoben" + Frontend:
+> `Netzwerkfehler: SyntaxError: JSON.parse: unexpected character…`
+
+### Root Cause (diesmal per Live-Stacktrace auf VM 292 verifiziert)
+
+Der Stacktrace in `nextcloud.log` zeigt eindeutig
+`POST /apps/souvera_mail/sieve/apply` →
+`OC\AppFramework\Http\Dispatcher::ensureParameterValueSatisfiesRange()`.
+**NC34 hard-codet:** jeder Controller-Parameter, der wörtlich `limit`
+heißt, muss zwischen `DEFAULT_MIN=1` und `DEFAULT_MAX=500` liegen —
+geprüft **bevor** unser Controller überhaupt läuft. `sieve-apply.js`
+sendet `limit: 5000` → `ParameterOutOfRangeException` → HTML-Fehlerseite
+→ deshalb der `JSON.parse`-Fehler im Frontend.
+
+Der 0.14.46-Fix (Kontakte-API-Paginierung) war korrekt, adressierte aber
+einen ANDEREN Codepfad — der Sieve-Apply-Pfad blieb betroffen.
+
+### Fixes
+
+- `SieveApplyController::apply()`: `@psalm-param ?int<1, 5000> $limit`
+  Docblock-Annotation — NCs `ControllerMethodReflector` parst genau
+  dieses Format und ersetzt damit den 1..500-Hard-Cap durch 1..5000.
+- `sieve-apply.js`: `safeJson()`-Helper statt nacktem `r.json()` —
+  HTML-Fehlerseiten erzeugen jetzt eine lesbare deutsche Meldung
+  (`Server antwortete nicht mit JSON (HTTP xxx)…`) statt
+  `SyntaxError: JSON.parse…`.
+
+### Nicht-Fehler (zur Einordnung der Operator-Logs)
+
+`PageController does not exist` + `L10N json_decode(false)` traten
+ausschließlich 07:19:54–59 auf — exakt im rsync-Deploy-Fenster von
+0.14.46 (Dateien um 07:15–07:19 geschrieben) — und danach nie wieder.
+Transienter Deploy-Timing-Effekt, kein Code-Bug.
+`SouveraShield\Command\SetCredentialsCommand` gehört zur App
+`souvera_shield`, nicht zu Souvera Mail.
+
+### Test
+
+- Neu: `tests/test_sieve_apply_limit_range.php` — replayt NCs exakte
+  Reflector-Regex + Dispatcher-Logik gegen den Controller-Quelltext.
+
 ## [0.14.46] — 2026-06 (ECHTE Root Cause: NC-Kontakte-Limit, nicht Stalwart! + Backtick-Fix)
 
 ### Operator-Report
