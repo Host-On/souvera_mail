@@ -6,6 +6,80 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.16.2] — 2026-02 (P0-Hotfix: SORT-Capability nach Auth refetchen)
+
+### Operator-Report zum v0.16.1
+
+Nach v0.16.1 Deploy: `philip@uelzen.email` connectet, aber im
+Mailinterface bekommt der User die Info „Ihr Mailserver
+unterstützt das Sortieren von Nachrichten nicht". Dovecot auf
+uelzen.email unterstützt SORT sehr wohl.
+
+### Root Cause
+
+`ImapClient::Login()` ruft `setCapabilities($oResponse)` mit der
+AUTHENTICATE-OK-Antwort auf. RFC 3501 §6.2 erlaubt Servern, im
+OK-Reply optional `[CAPABILITY …]` mitzuschicken — Stalwart tut
+das, viele Dovecot-Konfigs NICHT. Ohne diesen Block bleibt der
+Cache `$aCapaRaw` auf den pre-auth Capabilities stehen. Und
+Dovecot mit `imap_capability` (Hardening) versteckt SORT / THREAD
+/ MULTISEARCH pre-auth aus Sicherheitsgründen.
+
+Folge: Frontend fragt `FolderUserStore.hasCapability('SORT')` →
+false → `sortSupported()` = false → das `<div id="no-sort-list">
+✖⬇</div>` mit dem Tooltip „NO_SORT" wird gerendert statt der
+Sort-Dropdown.
+
+### Fix
+
+- **`ImapClient::Login()`** — nach `setCapabilities($oResponse)`
+  prüft der Code jetzt `$oResponse->getCapabilityResult()`:
+  - Wenn der Server im OK-Reply Capabilities mitgeliefert hat
+    (Stalwart, moderne Dovecots) → nichts weiter tun, keine
+    zusätzliche Roundtrip.
+  - Wenn nicht (klassisches Dovecot, Cyrus, custom Setups) →
+    beide Caches (`aCapa`, `aCapaRaw`) invalidieren und
+    `Capability()` explizit aufrufen. Das schickt `CAPABILITY`
+    als post-auth Command und der Server antwortet mit der
+    vollen Feature-Liste inkl. SORT / THREAD / MULTISEARCH.
+- Existierendes STARTTLS-Invalidations-Verhalten (Zeile 88-89)
+  bleibt unverändert — Pre-Auth-Refresh nach STARTTLS greift
+  weiterhin.
+
+### Neuer Test
+
+- **`tests/test_v0_16_2.php`** — 9 Assertions:
+  - setCapabilities($oResponse) läuft weiterhin
+  - Der `!$oResponse->getCapabilityResult()`-Branch existiert und
+    steht AFTER setCapabilities (Reihenfolge kritisch!)
+  - beide Caches werden invalidiert bevor Capability() aufgerufen wird
+  - Capability() re-issued weiterhin bei null-Cache
+  - STARTTLS-Verhalten unangetastet
+  - Version-Regex-Pin.
+
+### Verifikation
+
+- `php -l` clean.
+- **Volle Regressions-Suite: 59/59 PASS** (58 + `test_v0_16_2.php`).
+
+### Files touched
+
+```
+new: /app/tests/test_v0_16_2.php
+mod: /app/app/smail/v/current/app/libraries/Smail/Mail/Imap/ImapClient.php
+mod: /app/appinfo/info.xml, /app/package.json  (0.16.1 → 0.16.2)
+```
+
+### Operator-Aktion nach Deploy
+
+1. Rsync 0.16.2.
+2. `sudo systemctl reload php8.3-fpm` (OpCache).
+3. `philip@uelzen.email` neu öffnen — Sort-Dropdown sollte jetzt
+   erscheinen (Sortieren nach Datum ↓↑, Absender ↓↑, Betreff, …).
+4. Auch alle anderen post-auth-only Features (THREAD-View,
+   MULTISEARCH) sollten bei Dovecot-basierten externen Konten
+   jetzt funktionieren.
+
 ## [0.16.1] — 2026-02 (P0-Hotfix: SASL PLAIN + LOGIN Support + .alert-Layout)
 
 ### Operator-Report zum v0.16.0

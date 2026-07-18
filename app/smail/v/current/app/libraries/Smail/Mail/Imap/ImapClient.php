@@ -213,6 +213,33 @@ class ImapClient extends \Smail\Mail\Net\NetClient
 
 			$this->setCapabilities($oResponse);
 
+			// v0.16.2 — Force-refresh CAPABILITY after successful auth.
+			//
+			// RFC 3501 §6.2 explicitly allows servers to advertise
+			// different capabilities pre-auth vs post-auth. Many Dovecot
+			// installations (including the operator-reported case for
+			// `philip@uelzen.email`) hide SORT / THREAD=REFERENCES /
+			// MULTISEARCH / ACL from unauthenticated clients as a
+			// hardening measure and only expose them AFTER a successful
+			// AUTHENTICATE — but they don't always echo the new
+			// CAPABILITY back with the OK reply.
+			//
+			// Result: the frontend receives the pre-auth capability
+			// list, `sortSupported()` returns false, and the sort
+			// dropdown collapses into a lonely `✖⬇` icon with the
+			// "Ihr Mailserver unterstützt das Sortieren von Nachrichten
+			// nicht" tooltip. Even though the server DOES support SORT.
+			//
+			// If the AUTHENTICATE OK reply did NOT contain a
+			// `[CAPABILITY …]` block, refetch. Servers that DO include
+			// it (Stalwart, modern Dovecot with `imap_capability`
+			// tweaks, …) short-circuit here and save the roundtrip.
+			if (!$oResponse->getCapabilityResult()) {
+				$this->aCapa = null;
+				$this->aCapaRaw = null;
+				$this->Capability();
+			}
+
 			// RFC 9051: native rev2 path — UNSEEN via STATUS/ESEARCH, not ENABLE IMAP4rev1
 			// (ENABLE IMAP4rev1 is for clients that want deprecated rev1 SELECT semantics)
 
