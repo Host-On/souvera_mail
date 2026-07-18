@@ -1,6 +1,6 @@
 {
   "name": "souvera_mail",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "description": "Souvera Mail — Nextcloud-native webmail with H2CK/oidc as OIDC provider. Frontend built on Vue 3 + @nextcloud/vue v9 (Souvera Design System).",
   "private": true,
   "license": "AGPL-3.0-or-later",

@@ -6,6 +6,74 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.15.1] — 2026-02 (Bugfix: "Unbekannter Fehler" beim Anlegen + Modal-Zentrierung)
+
+### Operator report
+
+> „Siehe Anhang, ausserdem ist das Modal nicht vertikal in der Mitte?!"
+> — Screenshot showed the native "Konto hinzufügen" popup returning
+> a persistent yellow "Unbekannter Fehler" banner every time
+> „Hinzufügen" was clicked, plus the dialog itself clinging to the
+> top of the viewport instead of sitting vertically centred.
+
+### Bug 1 — "Unbekannter Fehler" (root cause + fix)
+
+**Root cause:** `UserAuth::LoginProcess` was hard-wired to reject
+every password that did not start with the `oidc_login|` sentinel.
+This was a hard SSO-only rule from Souvera Mail's early days
+where Stalwart mailboxes were the only supported target. In
+v0.15.0 we opened the app to password-based EXTERNAL mailboxes
+(web.de, Gmail, Outlook, …), but the SSO sentinel check still
+ran for those additions — every real password triggered
+`AuthError`, and because the frontend didn't recognise the error
+context inside a modal it fell back to `Notifications::UnknownError`
+(code 999) → "Unbekannter Fehler".
+
+`LoginProcess` already carried a `bool $bMainAccount = true` flag,
+and `DoAccountSetup` calls it with `false`. The fix gates the
+sentinel-only rule on `$bMainAccount === true`, restoring the
+password path for AdditionalAccount setups only. The main-account
+login flow remains SSO-only and rejects raw passwords as before.
+
+**Hardening:** As a second line of defence the whole
+`FilterAdditionalAccountAction` hook body is now wrapped in
+try/catch(\Throwable). Only `ClientException` bubbles up; every
+other error (missing IUserSession API, IGroupManager type
+mismatches, IAppConfig read errors, …) is logged as an ERROR to
+nextcloud.log and the request continues. This prevents any
+future hook bug from turning into a mysterious "Unbekannter
+Fehler" for the end user.
+
+### Bug 2 — dialog vertical centring (root cause + fix)
+
+**Root cause:** Snappymail's upstream `dialog { top: 0; margin: 10px auto; }`
+anchors every popup at the top of the viewport. This is
+particularly ugly for long forms like PopupsAccount, which have
+a lot of empty screen below them.
+
+**Fix:** `plugins/nextcloud/css/external-accounts.css` overrides
+`dialog[open]` with `top: 50%; transform: translateY(-50%)` on
+viewports ≥ 800 px, and keeps upstream's full-screen mobile
+branch untouched by resetting the override under
+`@media (max-width: 799px)`. The fix lifts every future popup
+(Import wizard, Sieve editor, F1 help, …) at zero cost.
+
+### Regression suite
+
+`tests/test_external_accounts_v0_15_1_bugfix.php` — 16 assertions
+pinning both root causes and their exact resolutions. All 56 PHP
+test suites pass locally.
+
+### Files touched
+
+```
+mod: /app/app/smail/v/current/app/libraries/Smail/Engine/Actions/UserAuth.php
+mod: /app/app/smail/v/current/app/plugins/nextcloud/index.php  (fail-open hook)
+mod: /app/app/smail/v/current/app/plugins/nextcloud/css/external-accounts.css
+new: /app/tests/test_external_accounts_v0_15_1_bugfix.php
+mod: /app/appinfo/info.xml, /app/package.json  (0.15.0 → 0.15.1)
+```
+
 ## [0.15.0] — 2026-02 (External POP3/IMAP/SMTP mailboxes)
 
 ### Operator Request

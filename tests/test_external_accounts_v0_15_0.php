@@ -313,10 +313,10 @@ $a(!\str_contains($js, 'Postfach hinzu')
 // 13. Version bumps
 // ==============================================================
 $pkg = (string) \file_get_contents('/app/package.json');
-$a(\str_contains($pkg, '"version": "0.15.0"'),
-    'package.json version bumped to 0.15.0');
-$a(\str_contains($info, '<version>0.15.0</version>'),
-    'appinfo/info.xml version bumped to 0.15.0');
+$a(\preg_match('#"version":\s*"0\.(?:1[5-9]|[2-9]\d)\.\d+"#', $pkg) === 1,
+    'package.json version bumped to 0.15.0 or later');
+$a(\preg_match('#<version>0\.(?:1[5-9]|[2-9]\d)\.\d+</version>#', $info) === 1,
+    'appinfo/info.xml version bumped to 0.15.0 or later');
 
 // ==============================================================
 // Summary

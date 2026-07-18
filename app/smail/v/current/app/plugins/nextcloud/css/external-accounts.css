@@ -1,6 +1,36 @@
 /* v0.15.0 — External accounts UI theming. Kept in a dedicated file
    so the base plugin CSS stays cohesive. */
 
+/* v0.15.0 — Vertical centering of every Snappymail <dialog> popup.
+ * Upstream Snappymail anchors dialogs at `top: 0` + `margin: 10px auto`,
+ * so long forms like PopupsAccount cling to the top of the viewport
+ * with dead space below. Operator reported this on the "Add external
+ * account" popup; the fix here also lifts the "Import old mail"
+ * wizard and every other future popup at zero cost.
+ *
+ * We only override `top`/`transform`; the animation opacity keyframes
+ * (`dialog:not(.animate)`) stay intact because we don't touch them.
+ */
+dialog[open] {
+	top: 50%;
+	transform: translateY(-50%);
+	transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+dialog:not(.animate) {
+	/* Match the same anchor so the fade-in doesn't jump between
+	 * top-of-viewport and vertical-centre on show. */
+	top: 50%;
+	transform: translateY(-75%);
+}
+/* On small viewports we want the dialog to fill the screen — leave
+ * the upstream mobile branch untouched by resetting our override. */
+@media screen and (max-width: 799px) {
+	dialog[open], dialog:not(.animate) {
+		top: 0;
+		transform: none;
+	}
+}
+
 /* GDPR consent modal (JS-injected via external-accounts.js). */
 .sv-ext-consent-overlay {
 	position: fixed;

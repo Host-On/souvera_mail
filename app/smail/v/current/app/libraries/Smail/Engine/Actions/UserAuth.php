@@ -102,11 +102,17 @@ trait UserAuth
 	 */
 	public function LoginProcess(string $sEmail, SensitiveString $oPassword, bool $bMainAccount = true): Account
 	{
-		// SSO-only: the sole legitimate credential is the OIDC bridge sentinel
-		// (oidc_login|{uid}), which beforeLogin() swaps for the real OAUTHBEARER
-		// token. Reject every password-based entry (manual login form, additional
-		// account, legacy SSO-URL) — Smail has no password authentication.
-		if (!\str_starts_with($oPassword->getValue(), 'oidc_login|')) {
+		// SSO-only for MAIN accounts: the sole legitimate credential is the OIDC
+		// bridge sentinel (oidc_login|{uid}), which beforeLogin() swaps for the real
+		// OAUTHBEARER token. Reject every password-based entry on the main login
+		// form — Smail has no password authentication for its own Stalwart mailboxes.
+		//
+		// v0.15.0 — ADDITIONAL accounts (external POP3/IMAP/SMTP mailboxes attached
+		// by the user, e.g. web.de, GMX, Gmail) MUST allow raw passwords: they log
+		// in to the external provider, not to Stalwart. The `$bMainAccount === false`
+		// path is opened up here on purpose. The engine still enforces per-account
+		// storage isolation via APP_SALT (see AdditionalAccount::setCredentials()).
+		if ($bMainAccount && !\str_starts_with($oPassword->getValue(), 'oidc_login|')) {
 			throw new ClientException(Notifications::AuthError->value);
 		}
 
