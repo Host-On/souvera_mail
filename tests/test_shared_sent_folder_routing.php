@@ -200,7 +200,7 @@ ok(\str_contains($sendBlock, 'foreach ($aSaveCandidates as $sCandidate)'),
 // H — version bump + changelog markers
 // ==============================================================
 $info = (string) file_get_contents('/app/appinfo/info.xml');
-ok((bool) \preg_match('#<version>0\.14\.(7|[8-9]|\d{2,})</version>#', $info),
+ok((bool) \preg_match('#<version>0\.(?:1[4-9]|[2-9]\d)\.\d+</version>#', $info),
     "info.xml version bumped to 0.14.7 (or later)", $passes, $failures);
 
 $changelog = (string) file_get_contents('/app/CHANGELOG.md');

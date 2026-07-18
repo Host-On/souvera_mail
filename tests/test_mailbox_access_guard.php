@@ -278,7 +278,7 @@ ok(\str_contains($guard, '\\strcasecmp($reportedIdentity, $expectedEmail)'),
 // G — info.xml version bumped to 0.14.5
 // ==============================================================
 $info = (string) file_get_contents('/app/appinfo/info.xml');
-ok((bool) \preg_match('#<version>0\.14\.(5|[6-9]|\d{2,})</version>#', $info),
+ok((bool) \preg_match('#<version>0\.(?:1[4-9]|[2-9]\d)\.\d+</version>#', $info),
     "info.xml version bumped to 0.14.5 (or later)", $passes, $failures);
 
 // ==============================================================

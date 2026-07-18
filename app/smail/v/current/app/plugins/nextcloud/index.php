@@ -43,10 +43,12 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			// Knockout ViewModel — matches the pattern used by
 			// dropdown-menu.js and folder-names.js.
 			$this->addJs('js/sieve-apply.js');
+			$this->addJs('js/external-accounts.js');
 
 			$this->addCss('css/help-modal.css');
 			$this->addCss('css/folder-nav.css');
 			$this->addCss('css/quota-bar.css');
+			$this->addCss('css/external-accounts.css');
 
 			$this->addTemplate('templates/PopupsNextcloudFiles.html');
 			$this->addTemplate('templates/PopupsNextcloudCalendars.html');
@@ -55,6 +57,12 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			$this->addHook('imap.before-login', 'beforeLogin');
 			$this->addHook('smtp.before-login', 'beforeLogin');
 			$this->addHook('sieve.before-login', 'beforeLogin');
+
+			// v0.15.0 — External account safeguards (max-per-user +
+			// group restriction + audit-log). Fires for every
+			// Actions/* method call, but only acts on the four
+			// DoAccount* methods.
+			$this->addHook('filter.action-params', 'FilterAdditionalAccountAction');
 		} else {
 			\Smail\Engine\Log::debug('Nextcloud', 'NOT integrated');
 			// \OC::$server->getConfig()->getAppValue('souvera_mail', 'smail-no-embed');
@@ -317,6 +325,13 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 				// body { folderId, limit, includeRedirect }.
 				'SmailSieveApplyFoldersUrl' => $oUrlGen->linkToRoute('souvera_mail.sieveApply.folders'),
 				'SmailSieveApplyUrl' => $oUrlGen->linkToRoute('souvera_mail.sieveApply.apply'),
+				// v0.15.0 — External accounts (POP3/IMAP/SMTP) endpoints
+				// consumed by js/external-accounts.js.
+				'SmailExternalStatusUrl'    => $oUrlGen->linkToRoute('souvera_mail.externalAccounts.status'),
+				'SmailExternalPresetUrl'    => $oUrlGen->linkToRoute('souvera_mail.externalAccounts.preset'),
+				'SmailExternalProvidersUrl' => $oUrlGen->linkToRoute('souvera_mail.externalAccounts.providers'),
+				'SmailExternalConsentUrl'   => $oUrlGen->linkToRoute('souvera_mail.externalAccounts.recordConsent'),
+				'SmailAppBase'              => \rtrim($oUrlGen->linkToRoute('souvera_mail.page.index'), '/'),
 				// Legacy entry-point retained for browser bookmarks pointing at
 				// /apps/souvera_mail/settings — the controller now redirects to
 				// the engine-internal hash route #/settings/souvera-account.
@@ -639,6 +654,7 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 				'SmailHelpSieveHost' => '', 'SmailHelpSievePort' => '', 'SmailHelpSieveSsl' => '',
 				'SmailHelpCalDavUrl' => '', 'SmailHelpCardDavUrl' => '',
 				'SmailHelpShieldUrl' => '',
+				'SmailHelpExtMaxPerUser' => 3,
 			];
 		}
 	}
@@ -807,7 +823,143 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			'SmailHelpCalDavUrl' => $calDavUrl,
 			'SmailHelpCardDavUrl' => $cardDavUrl,
 			'SmailHelpShieldUrl' => $shieldUrl,
+			// v0.15.0 — surface the max-per-user cap for the F1
+			// help modal's External-mailboxes tab.
+			'SmailHelpExtMaxPerUser' => $this->safeExtMaxPerUser(),
 		];
+	}
+
+	/** Read `getMaxAccountsPerUser()` from Central; falls back to 3. */
+	private function safeExtMaxPerUser() : int
+	{
+		try {
+			$cfg = \OCP\Server::get(\OCA\SouveraMail\Service\ExternalAccountsConfig::class);
+			return $cfg->getMaxAccountsPerUser();
+		} catch (\Throwable) {
+			return 3;
+		}
+	}
+
+	/**
+	 * v0.15.0 — Enforce external-account safeguards on every incoming
+	 * Actions/*  call.
+	 *
+	 * We hook `filter.action-params` because it fires uniformly for
+	 * every JSON endpoint before the actual handler runs. When the
+	 * method is one of the DoAccount* additions we:
+	 *
+	 *   1. Re-check group restriction (belt-and-braces on top of the
+	 *      capa override in EngineHelper — a malicious client can't
+	 *      bypass this by re-firing the endpoint out-of-band).
+	 *   2. Enforce max-per-user from Central config.
+	 *   3. Trigger the SMTP-fail guard reset on successful edits.
+	 *   4. Write an audit-log entry (uid + email domain, no password).
+	 *
+	 * Throwing a ClientException here bubbles up to the frontend as a
+	 * regular error message — no engine crash, no white screen.
+	 *
+	 * @param string $sMethodName
+	 * @param array  &$aCurrentActionParams
+	 */
+	public function FilterAdditionalAccountAction(string $sMethodName, array &$aCurrentActionParams) : void
+	{
+		if (!\in_array($sMethodName, [
+			'DoAccountSetup',
+			'DoAccountDelete',
+			'DoAccountSwitch',
+			'DoAccountUnread',
+		], true)) {
+			return;
+		}
+		if (!\class_exists('OC') || !isset(\OC::$server)) {
+			return;
+		}
+
+		try {
+			$externalCfg = \OCP\Server::get(\OCA\SouveraMail\Service\ExternalAccountsConfig::class);
+			$logSvc      = \OCP\Server::get(\OCA\SouveraMail\Service\LogService::class);
+		} catch (\Throwable) {
+			return; // Standalone install; leave engine defaults intact.
+		}
+
+		$user = \OC::$server->getUserSession()->getUser();
+		$uid  = $user ? $user->getUID() : '';
+
+		// (1) Group restriction — belt-and-braces.
+		if ($uid !== '' && !$externalCfg->isAllowedForUser($uid)) {
+			$logSvc->info(\sprintf(
+				'External account: %s denied for uid=%s (not in allowed group)',
+				$sMethodName, $uid
+			), ['category' => 'external_accounts']);
+			throw new \Smail\Engine\Exceptions\ClientException(
+				\Smail\Engine\Notifications::AccessError->value
+			);
+		}
+
+		// (2/3/4) — DoAccountSetup only: capacity + audit + fail-guard reset.
+		if ($sMethodName === 'DoAccountSetup') {
+			$isNew = !empty($aCurrentActionParams['new']);
+			$email = (string) ($aCurrentActionParams['email'] ?? '');
+			$max   = $externalCfg->getMaxAccountsPerUser();
+
+			if ($isNew) {
+				try {
+					$oActions = \Smail\Engine\Api::Actions();
+					$oMain = $oActions->getMainAccountFromToken(false);
+					if ($oMain !== null) {
+						$current = $oActions->GetAccounts($oMain);
+						$existingCount = \is_array($current) ? \count($current) : 0;
+						if ($existingCount >= $max) {
+							$logSvc->info(\sprintf(
+								'External account: cap reached (%d/%d) for uid=%s',
+								$existingCount, $max, $uid
+							), ['category' => 'external_accounts']);
+							throw new \Smail\Engine\Exceptions\ClientException(
+								\Smail\Engine\Notifications::AccountAlreadyExists->value
+							);
+						}
+					}
+				} catch (\Smail\Engine\Exceptions\ClientException $e) {
+					throw $e;
+				} catch (\Throwable $e) {
+					// Non-fatal: log and let the engine try.
+					$logSvc->warning('External account: cap check errored: ' . $e->getMessage(), ['category' => 'external_accounts']);
+				}
+			}
+
+			// Audit trail (no password, only email domain).
+			$domain = ($at = \strrpos($email, '@')) !== false
+				? \strtolower(\substr($email, $at + 1)) : '?';
+			$logSvc->info(\sprintf(
+				'External account: %s uid=%s domain=%s new=%s',
+				$sMethodName, $uid, $domain, $isNew ? 'yes' : 'no'
+			), ['category' => 'external_accounts']);
+
+			// Reset SMTP-fail guard on successful edit (the user just
+			// confirmed the account by re-adding credentials, so we
+			// give the previous auto-deactivation a fresh 24 h window).
+			try {
+				$guard = \OCP\Server::get(\OCA\SouveraMail\Service\ExternalAccountsFailGuard::class);
+				$guard->reset($uid, $email);
+			} catch (\Throwable) {
+				// Safe to ignore.
+			}
+		}
+
+		if ($sMethodName === 'DoAccountDelete') {
+			$email = (string) ($aCurrentActionParams['email'] ?? '');
+			$domain = ($at = \strrpos($email, '@')) !== false
+				? \strtolower(\substr($email, $at + 1)) : '?';
+			$logSvc->info(\sprintf(
+				'External account: delete uid=%s domain=%s',
+				$uid, $domain
+			), ['category' => 'external_accounts']);
+			try {
+				$guard = \OCP\Server::get(\OCA\SouveraMail\Service\ExternalAccountsFailGuard::class);
+				$guard->reset($uid, $email);
+			} catch (\Throwable) {
+			}
+		}
 	}
 
 }

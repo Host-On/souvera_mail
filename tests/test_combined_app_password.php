@@ -272,7 +272,7 @@ ok(str_contains($mirror, 'catch (\Throwable $e)'),
 // Part G — info.xml + surface
 // ==============================================================
 $info = (string) file_get_contents('/app/appinfo/info.xml');
-ok((bool) preg_match('#<version>0\.14\.\d+</version>#', $info),
+ok((bool) preg_match('#<version>0\.(?:1[4-9]|[2-9]\d)\.\d+</version>#', $info),
     "info.xml version bumped to 0.14.x (MINOR — new feature)",
     $passes, $failures);
 

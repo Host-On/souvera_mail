@@ -270,8 +270,8 @@ assertTrue($shortcutBlocks === 4,
 
 // Tab-navigation JS relies on all radios sharing the same name
 $radios = substr_count($tpl, 'name="helptabs"');
-assertTrue($radios === 4,
-    "template has exactly 4 radios with name='helptabs' (3 Souvera + 1 unified Tastenkürzel). got: $radios",
+assertTrue($radios === 5,
+    "template has exactly 5 radios with name='helptabs' (v0.15.0: 4 Souvera tabs + 1 unified Tastenkürzel). got: $radios",
     $passes, $failures);
 
 // Exactly ONE default-checked tab (the very first Souvera tab)

@@ -88,6 +88,26 @@ class EngineHelper
             return;
         }
         require_once $index;
+
+        // v0.15.0: sync the external-accounts feature flag from
+        // souvera_central into the engine's runtime config. This is
+        // the master-switch phase — the group-restriction check
+        // (per-user) runs later in startApp() once we know the UID.
+        //
+        // Setting the config value here rather than at install time
+        // means Central can toggle the feature without any Nextcloud
+        // maintenance cycle: the change takes effect on the next
+        // request.
+        try {
+            $externalCfg = \OCP\Server::get(\OCA\SouveraMail\Service\ExternalAccountsConfig::class);
+            $oConfig = \Smail\Engine\Api::Config();
+            $oConfig->Set('webmail', 'allow_additional_accounts', $externalCfg->isEnabled());
+        } catch (\Throwable $e) {
+            $this->logger->debug(
+                'Souvera Mail: external-accounts flag sync skipped: ' . $e->getMessage(),
+                ['app' => 'souvera_mail']
+            );
+        }
     }
 
     public function startApp(bool $handle = false): void
@@ -163,6 +183,27 @@ class EngineHelper
                 } catch (\Throwable $e) {
                     $this->logger->warning('Souvera Mail engine login error: ' . $e->getMessage());
                 }
+            }
+
+            // v0.15.0: apply the group-restriction override for
+            // external accounts. `loadApp()` already set the master
+            // switch from Central; here we narrow it further to the
+            // specific NC user. When Central says the feature is on
+            // globally but the current user is NOT a member of any
+            // allowed group, we downgrade the engine's capa to false
+            // for THIS request only.
+            try {
+                $externalCfg = \OCP\Server::get(\OCA\SouveraMail\Service\ExternalAccountsConfig::class);
+                if ($ncUid !== '' && $externalCfg->isEnabled()
+                    && !$externalCfg->isAllowedForUser($ncUid)) {
+                    \Smail\Engine\Api::Config()
+                        ->Set('webmail', 'allow_additional_accounts', false);
+                }
+            } catch (\Throwable $e) {
+                $this->logger->debug(
+                    'Souvera Mail: external-accounts group check skipped: ' . $e->getMessage(),
+                    ['app' => 'souvera_mail']
+                );
             }
 
             if ($handle) {

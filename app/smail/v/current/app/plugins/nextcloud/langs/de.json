@@ -128,7 +128,25 @@
 		"APP_FAIRMAIL_DESC": "Alternative zu K-9. Datenschutzfokus, PGP-Support, alle Auth-Modi.",
 		"APP_OUTLOOK_BADGE": "Windows",
 		"APP_OUTLOOK_DESC": "Beim Hinzufügen: <em>Erweitertes Setup → Internet-E-Mail</em>. IMAP/SMTP-Werte oben.",
-		"LEAD_SHORTCUTS": "Alle Kürzel im Überblick. Öffne dieses Modal jederzeit mit <kbd>F1</kbd>."
+		"LEAD_SHORTCUTS": "Alle Kürzel im Überblick. Öffne dieses Modal jederzeit mit <kbd>F1</kbd>.",
+		"TAB_EXTERNAL": "Externe Postfächer",
+		"EXT_LEAD": "Bindet ein bestehendes Postfach eines anderen Anbieters (web.de, GMX, t-online.de, Gmail, …) an, damit du alles direkt aus Souvera Mail lesen und beantworten kannst — ohne Client-Wechsel.",
+		"EXT_HOW_TITLE": "So bindest du ein externes Postfach ein",
+		"EXT_HOW_STEP_1": "Öffne <strong>Einstellungen → Konten</strong> (oben rechts auf dein Profilbild → Zahnrad in Souvera Mail).",
+		"EXT_HOW_STEP_2": "Klicke auf <strong>Konto hinzufügen</strong>.",
+		"EXT_HOW_STEP_3": "Trage die E-Mail-Adresse des externen Postfachs und dessen Passwort ein (siehe Hinweise unten zu Gmail / Outlook).",
+		"EXT_HOW_STEP_4": "Souvera Mail erkennt die richtigen IMAP-/SMTP-Daten automatisch. Prüfen und auf <strong>Hinzufügen</strong> klicken.",
+		"EXT_HOW_STEP_5": "Das Postfach erscheint anschließend im Dropdown oben links; du kannst ohne App-Wechsel zwischen Konten springen.",
+		"EXT_PRIVACY_TITLE": "Wo werden die Zugangsdaten gespeichert?",
+		"EXT_PRIVACY_BODY": "Dein Passwort für den externen Anbieter wird <strong>verschlüsselt auf diesem Souvera-Server</strong> gespeichert (per-User-Schlüssel aus dem internen APP_SALT abgeleitet). Es wird ausschließlich zum Abrufen und Senden von Mail für dieses Postfach verwendet und niemals an Dritte weitergegeben.",
+		"EXT_LIMITS_TITLE": "Grenzen",
+		"EXT_LIMITS_MAX": "Dein Admin hat maximal <strong data-smail-help=\"SmailHelpExtMaxPerUser\">3</strong> externe Postfächer pro Nutzer erlaubt.",
+		"EXT_LIMITS_GUARD": "Wenn Souvera Mail 3× innerhalb 24 Stunden nicht über den externen SMTP-Server senden kann, wird das Konto automatisch deaktiviert. Support fragen (oder <code>occ souvera_mail:external:revoke &lt;uid&gt; &lt;email&gt; --reset</code>), um wieder freizuschalten.",
+		"EXT_PROVIDERS_TITLE": "Bekannte Anbieter",
+		"EXT_GMAIL_NOTE": "<strong>Gmail</strong> — 2FA muss aktiv sein und du brauchst ein „App-Passwort\". Anlegen unter <em>myaccount.google.com/apppasswords</em>.",
+		"EXT_OUTLOOK_NOTE": "<strong>Outlook / Hotmail</strong> — Microsoft hat klassische Basic-Auth im Sept 2024 deaktiviert. Nutze ein Legacy-App-Passwort.",
+		"EXT_WEBDE_NOTE": "<strong>web.de / GMX</strong> — aktiviere zuerst POP3/IMAP im Webinterface des Anbieters, dann hier hinzufügen.",
+		"EXT_TONLINE_NOTE": "<strong>Telekom / t-online.de</strong> — du brauchst das „Passwort für E-Mail-Programme\", nicht dein normales Telekom-Login."
 	},
 	"QUOTA": {
 		"MAIL_STORAGE": "Mail-Speicher",
@@ -137,5 +155,16 @@
 		"PERCENT_TITLE": "{p}% belegt",
 		"CLICK_FOR_SETTINGS": "Klicken für Einstellungen",
 		"ALERT_TOAST": "Ihr Postfach ist zu {p}% belegt ({u} / {t}). Bitte alte E-Mails oder Anhänge löschen, damit neue Nachrichten weiterhin angenommen werden können."
+	},
+	"EXTERNAL_ACCOUNTS": {
+		"CONSENT_TITLE": "Bevor du ein externes Postfach hinzufügst",
+		"CONSENT_BODY": "Deine Zugangsdaten für den externen Anbieter (z.&nbsp;B. web.de, GMX, Gmail) werden <strong>verschlüsselt auf diesem Souvera-Server</strong> gespeichert und ausschließlich zum Abrufen und Senden deiner Mail verwendet. Sie werden <strong>niemals an Dritte weitergegeben</strong>. Fortfahren?",
+		"CONSENT_ACCEPT": "Akzeptieren und fortfahren",
+		"CONSENT_CANCEL": "Abbrechen",
+		"WARN_GMAIL": "Gmail verlangt ein App-Passwort (2-Faktor-Authentifizierung muss aktiv sein). Dein normales Google-Passwort funktioniert NICHT.",
+		"WARN_OUTLOOK": "Outlook.com / Hotmail hat klassische Basic-Auth im September 2024 deaktiviert. Du brauchst ein Legacy-App-Passwort deines Microsoft-Kontos.",
+		"WARN_YAHOO": "Yahoo verlangt ein Drittanbieter-App-Passwort. Dein normales Yahoo-Passwort funktioniert NICHT.",
+		"CAP_REACHED": "Du hast die maximale Anzahl externer Postfächer erreicht, die dein Administrator erlaubt hat.",
+		"FEATURE_DISABLED": "Externe Postfächer sind auf diesem Server nicht aktiviert."
 	}
 }

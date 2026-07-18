@@ -88,8 +88,7 @@
 		<!-- ============================================================ -->
 		<input type="radio" name="helptabs" id="tab-help-caldav">
 		<label for="tab-help-caldav" role="tab" aria-selected="false" aria-controls="panel-caldav" tabindex="0"
-			data-smail-help-i18n="HELP_MODAL/TAB_CALDAV">Calendar &amp; Contacts</label>
-		<div class="tab-content sv-help-tab" role="tabpanel" aria-hidden="true">
+			data-smail-help-i18n="HELP_MODAL/TAB_CALDAV">Calendar &amp; Contacts</label>		<div class="tab-content sv-help-tab" role="tabpanel" aria-hidden="true">
 			<p class="sv-help-lead" data-smail-help-i18n="HELP_MODAL/LEAD_CALDAV">Sync calendars and address books with Apple Mail, Thunderbird, DAVx⁵ (Android) or any other CalDAV/CardDAV client. Sign in with your app password.</p>
 
 			<table class="table table-striped table-bordered sv-help-table">
@@ -159,6 +158,42 @@
 					<p data-smail-help-i18n-html="HELP_MODAL/APP_OUTLOOK_DESC">When adding: <em>Advanced setup → Internet email</em>. IMAP/SMTP values above.</p>
 				</div>
 			</div>
+		</div>
+
+		<!-- ============================================================ -->
+		<!-- Souvera Mail — Externe Postfächer (v0.15.0) -->
+		<!-- ============================================================ -->
+		<input type="radio" name="helptabs" id="tab-help-external">
+		<label for="tab-help-external" role="tab" aria-selected="false" aria-controls="panel-external" tabindex="0"
+			data-smail-help-i18n="HELP_MODAL/TAB_EXTERNAL">External mailboxes</label>
+		<div class="tab-content sv-help-tab" role="tabpanel" aria-hidden="true">
+			<p class="sv-help-lead" data-smail-help-i18n="HELP_MODAL/EXT_LEAD">Attach an existing mailbox from another provider (web.de, GMX, t-online.de, Gmail, …) so you can read and send everything from Souvera Mail without switching apps.</p>
+
+			<h4 data-smail-help-i18n="HELP_MODAL/EXT_HOW_TITLE">How to attach an external mailbox</h4>
+			<ol class="sv-help-steps">
+				<li data-smail-help-i18n-html="HELP_MODAL/EXT_HOW_STEP_1">Open <strong>Settings → Accounts</strong> (top-right avatar → the gear icon inside Souvera Mail).</li>
+				<li data-smail-help-i18n-html="HELP_MODAL/EXT_HOW_STEP_2">Click <strong>Add account</strong>.</li>
+				<li data-smail-help-i18n-html="HELP_MODAL/EXT_HOW_STEP_3">Enter the email address of the external mailbox and its password (see notes below for Gmail / Outlook).</li>
+				<li data-smail-help-i18n-html="HELP_MODAL/EXT_HOW_STEP_4">Souvera Mail auto-detects the correct IMAP/SMTP settings for major providers. Verify and click <strong>Add</strong>.</li>
+				<li data-smail-help-i18n-html="HELP_MODAL/EXT_HOW_STEP_5">The mailbox now appears in the top-left dropdown; switch between accounts without leaving the app.</li>
+			</ol>
+
+			<h4 data-smail-help-i18n="HELP_MODAL/EXT_PRIVACY_TITLE">Where are the credentials stored?</h4>
+			<p data-smail-help-i18n-html="HELP_MODAL/EXT_PRIVACY_BODY">Your external-provider password is stored <strong>encrypted at rest on this Souvera server</strong> (per-user key derived from the internal APP_SALT). It is used exclusively to fetch and send mail for that mailbox and is never transmitted to third parties.</p>
+
+			<h4 data-smail-help-i18n="HELP_MODAL/EXT_LIMITS_TITLE">Limits</h4>
+			<ul>
+				<li data-smail-help-i18n-html="HELP_MODAL/EXT_LIMITS_MAX">Your admin has set a maximum of <strong data-smail-help="SmailHelpExtMaxPerUser">3</strong> external mailboxes per user.</li>
+				<li data-smail-help-i18n-html="HELP_MODAL/EXT_LIMITS_GUARD">If Souvera Mail cannot send through the external SMTP server 3 times in a row within 24 hours, the account is automatically deactivated. Ask support (or run <code>occ souvera_mail:external:revoke &lt;uid&gt; &lt;email&gt; --reset</code>) to re-enable.</li>
+			</ul>
+
+			<h4 data-smail-help-i18n="HELP_MODAL/EXT_PROVIDERS_TITLE">Popular providers</h4>
+			<ul class="sv-help-providers">
+				<li data-smail-help-i18n-html="HELP_MODAL/EXT_WEBDE_NOTE"><strong>web.de / GMX</strong> — enable POP3/IMAP access in the provider's web interface first, then add here.</li>
+				<li data-smail-help-i18n-html="HELP_MODAL/EXT_TONLINE_NOTE"><strong>Telekom / t-online.de</strong> — you need the "Passwort für E-Mail-Programme", not your general Telekom login.</li>
+				<li data-smail-help-i18n-html="HELP_MODAL/EXT_GMAIL_NOTE"><strong>Gmail</strong> — requires 2FA on your Google account plus a per-app "App password". Set it up at <em>myaccount.google.com/apppasswords</em>.</li>
+				<li data-smail-help-i18n-html="HELP_MODAL/EXT_OUTLOOK_NOTE"><strong>Outlook / Hotmail</strong> — Microsoft disabled classic Basic-Auth in Sept 2024. Use a legacy App Password.</li>
+			</ul>
 		</div>
 
 		<!-- ============================================================ -->

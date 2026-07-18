@@ -474,7 +474,7 @@ ok($nsPos !== false && $reqPos !== false && $nsPos < $reqPos,
 // ==============================================================
 // P — version bump + changelog markers
 // ==============================================================
-ok((bool) preg_match('#<version>0\.14\.(19|[2-9]\d|\d{3,})</version>#', $src['info']),
+ok((bool) preg_match('#<version>0\.(?:1[4-9]|[2-9]\d)\.\d+</version>#', $src['info']),
     'info.xml version bumped to 0.14.19 (or later)', $passes, $failures);
 ok(str_contains($src['changelog'], '[0.14.19]'),
     'CHANGELOG.md has a [0.14.19] section', $passes, $failures);

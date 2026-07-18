@@ -128,7 +128,25 @@
 		"APP_FAIRMAIL_DESC": "Alternatief voor K-9. Privacyfocus, PGP-ondersteuning, alle auth-modi.",
 		"APP_OUTLOOK_BADGE": "Windows",
 		"APP_OUTLOOK_DESC": "Bij het toevoegen: <em>Geavanceerde setup → Internet-e-mail</em>. IMAP/SMTP-waarden hierboven.",
-		"LEAD_SHORTCUTS": "Alle sneltoetsen in één overzicht. Open dit venster op elk moment met <kbd>F1</kbd>."
+		"LEAD_SHORTCUTS": "Alle sneltoetsen in één overzicht. Open dit venster op elk moment met <kbd>F1</kbd>.",
+		"TAB_EXTERNAL": "Externe mailboxen",
+		"EXT_LEAD": "Koppel een bestaande mailbox van een andere provider (web.de, GMX, t-online.de, Gmail, …) zodat je alles direct vanuit Souvera Mail kunt lezen en beantwoorden — zonder van app te wisselen.",
+		"EXT_HOW_TITLE": "Zo koppel je een externe mailbox",
+		"EXT_HOW_STEP_1": "Open <strong>Instellingen → Accounts</strong> (rechtsboven op je profielfoto → tandwiel in Souvera Mail).",
+		"EXT_HOW_STEP_2": "Klik op <strong>Account toevoegen</strong>.",
+		"EXT_HOW_STEP_3": "Vul het e-mailadres van de externe mailbox en het wachtwoord in (zie onderstaande opmerkingen voor Gmail / Outlook).",
+		"EXT_HOW_STEP_4": "Souvera Mail detecteert automatisch de juiste IMAP/SMTP-instellingen. Controleer en klik op <strong>Toevoegen</strong>.",
+		"EXT_HOW_STEP_5": "De mailbox verschijnt vervolgens in het uitklapmenu linksboven; wissel zonder van app te wisselen tussen accounts.",
+		"EXT_PRIVACY_TITLE": "Waar worden de inloggegevens opgeslagen?",
+		"EXT_PRIVACY_BODY": "Je wachtwoord voor de externe provider wordt <strong>versleuteld op deze Souvera-server</strong> opgeslagen (per-gebruiker-sleutel afgeleid van de interne APP_SALT). Het wordt uitsluitend gebruikt om e-mail voor deze mailbox op te halen en te verzenden en nooit gedeeld met derden.",
+		"EXT_LIMITS_TITLE": "Limieten",
+		"EXT_LIMITS_MAX": "Je beheerder heeft maximaal <strong data-smail-help=\"SmailHelpExtMaxPerUser\">3</strong> externe mailboxen per gebruiker toegestaan.",
+		"EXT_LIMITS_GUARD": "Als Souvera Mail 3× binnen 24 uur niet via de externe SMTP-server kan verzenden, wordt het account automatisch gedeactiveerd. Vraag support (of voer <code>occ souvera_mail:external:revoke &lt;uid&gt; &lt;email&gt; --reset</code> uit) om te heractiveren.",
+		"EXT_PROVIDERS_TITLE": "Bekende providers",
+		"EXT_GMAIL_NOTE": "<strong>Gmail</strong> — 2FA moet aan staan en je hebt een \"app-wachtwoord\" nodig. Aanmaken via <em>myaccount.google.com/apppasswords</em>.",
+		"EXT_OUTLOOK_NOTE": "<strong>Outlook / Hotmail</strong> — Microsoft heeft klassieke Basic-Auth in sept 2024 uitgeschakeld. Gebruik een legacy app-wachtwoord.",
+		"EXT_WEBDE_NOTE": "<strong>web.de / GMX</strong> — activeer eerst POP3/IMAP in de webomgeving van de provider en voeg dan hier toe.",
+		"EXT_TONLINE_NOTE": "<strong>Telekom / t-online.de</strong> — je hebt het \"Passwort für E-Mail-Programme\" nodig, niet je normale Telekom-login."
 	},
 	"QUOTA": {
 		"MAIL_STORAGE": "Mail-opslag",
@@ -137,5 +155,16 @@
 		"PERCENT_TITLE": "{p}% gebruikt",
 		"CLICK_FOR_SETTINGS": "Klik voor instellingen",
 		"ALERT_TOAST": "Je mailbox is voor {p}% vol ({u} / {t}). Verwijder oude e-mails of bijlagen zodat nieuwe berichten geaccepteerd kunnen blijven worden."
+	},
+	"EXTERNAL_ACCOUNTS": {
+		"CONSENT_TITLE": "Voordat je een externe mailbox toevoegt",
+		"CONSENT_BODY": "Je inloggegevens voor de externe provider (bv. web.de, GMX, Gmail) worden <strong>versleuteld op deze Souvera-server</strong> opgeslagen en uitsluitend gebruikt om je e-mail op te halen en te verzenden. Ze worden <strong>nooit gedeeld met derden</strong>. Doorgaan?",
+		"CONSENT_ACCEPT": "Accepteren en doorgaan",
+		"CONSENT_CANCEL": "Annuleren",
+		"WARN_GMAIL": "Gmail vereist een app-wachtwoord (2-factor-authenticatie moet aan staan). Je normale Google-wachtwoord werkt NIET.",
+		"WARN_OUTLOOK": "Outlook.com / Hotmail heeft klassieke Basic-Auth in september 2024 uitgeschakeld. Je hebt een legacy app-wachtwoord van je Microsoft-account nodig.",
+		"WARN_YAHOO": "Yahoo vereist een app-wachtwoord van derden. Je normale Yahoo-wachtwoord werkt NIET.",
+		"CAP_REACHED": "Je hebt het maximum aantal externe mailboxen bereikt dat door je beheerder is toegestaan.",
+		"FEATURE_DISABLED": "Externe mailboxen zijn niet ingeschakeld op deze server."
 	}
 }

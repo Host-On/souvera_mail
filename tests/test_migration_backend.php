@@ -279,7 +279,7 @@ ok(str_contains($src['cleanup'], 'forceRevokeOrphan('),
 // ==============================================================
 // I — Version bump + changelog markers
 // ==============================================================
-ok((bool) preg_match('#<version>0\.14\.(9|\d{2,})</version>#', $src['info']),
+ok((bool) preg_match('#<version>0\.(?:1[4-9]|[2-9]\d)\.\d+</version>#', $src['info']),
     "info.xml version bumped to 0.14.9 (or later)", $passes, $failures);
 ok((bool) preg_match('#\[0\.14\.9\]#', $src['changelog']),
     "CHANGELOG.md has a [0.14.9] section", $passes, $failures);

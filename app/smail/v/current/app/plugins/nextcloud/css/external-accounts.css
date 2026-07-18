@@ -1,0 +1,56 @@
+/* v0.15.0 — External accounts UI theming. Kept in a dedicated file
+   so the base plugin CSS stays cohesive. */
+
+/* GDPR consent modal (JS-injected via external-accounts.js). */
+.sv-ext-consent-overlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.55);
+	z-index: 10000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 24px;
+}
+.sv-ext-consent-box {
+	background: var(--color-main-background, #fff);
+	color: var(--color-main-text, #222);
+	border-radius: 12px;
+	padding: 28px 32px;
+	max-width: 520px;
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+	line-height: 1.55;
+}
+.sv-ext-consent-box h3 {
+	margin: 0 0 12px;
+	font-size: 20px;
+	font-weight: 600;
+}
+.sv-ext-consent-box p {
+	margin: 0 0 20px;
+}
+.sv-ext-consent-actions {
+	display: flex;
+	gap: 12px;
+	justify-content: flex-end;
+}
+.sv-ext-consent-actions .btn {
+	min-width: 120px;
+}
+
+/* Provider-warning banner inside the native "Add account" popup. */
+.sv-ext-provider-banner {
+	background: var(--color-warning, #fff8e1);
+	color: var(--color-warning-text, #6a5100);
+	border: 1px solid var(--color-warning-border, #f0d476);
+	border-radius: 8px;
+	padding: 10px 14px;
+	margin: 6px 0 12px;
+	font-size: 13px;
+	line-height: 1.4;
+}
+.sv-ext-provider-banner a {
+	color: inherit;
+	text-decoration: underline;
+	margin-left: 4px;
+}

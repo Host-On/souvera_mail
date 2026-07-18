@@ -137,5 +137,39 @@ return [
             'url' => '/sieve/apply',
             'verb' => 'POST',
         ],
+        [
+            // v0.15.0 — External accounts feature-status endpoint.
+            // GET /apps/souvera_mail/external/status → { enabled, allowed_for_me,
+            //   max_per_user, current_count, consent_required, consent_given }
+            'name' => 'externalAccounts#status',
+            'url' => '/external/status',
+            'verb' => 'GET',
+        ],
+        [
+            // v0.15.0 — Provider preset lookup. GET
+            // /apps/souvera_mail/external/preset?email=me@web.de →
+            //   { display, imap:{host,port,ssl}, pop3, smtp, warning, help_url }
+            'name' => 'externalAccounts#preset',
+            'url' => '/external/preset',
+            'verb' => 'GET',
+        ],
+        [
+            // v0.15.0 — Return the full provider directory (used by
+            // the picker in the "Add external account" onboarding
+            // card). GET /apps/souvera_mail/external/providers
+            //   → { "web.de": "WEB.DE", "gmail.com": "Google Mail", … }
+            'name' => 'externalAccounts#providers',
+            'url' => '/external/providers',
+            'verb' => 'GET',
+        ],
+        [
+            // v0.15.0 — Record the user's GDPR consent (called by the
+            // Vue modal on every account add when consent_required is
+            // true). POST /apps/souvera_mail/external/consent
+            //   Body: { email: "…@web.de" }
+            'name' => 'externalAccounts#recordConsent',
+            'url' => '/external/consent',
+            'verb' => 'POST',
+        ],
     ]
 ];

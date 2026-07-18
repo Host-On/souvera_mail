@@ -128,7 +128,25 @@
 		"APP_FAIRMAIL_DESC": "Alternative to K-9. Privacy focus, PGP support, all auth modes.",
 		"APP_OUTLOOK_BADGE": "Windows",
 		"APP_OUTLOOK_DESC": "When adding: <em>Advanced setup → Internet email</em>. IMAP/SMTP values above.",
-		"LEAD_SHORTCUTS": "All shortcuts at a glance. Open this dialog any time with <kbd>F1</kbd>."
+		"LEAD_SHORTCUTS": "All shortcuts at a glance. Open this dialog any time with <kbd>F1</kbd>.",
+		"TAB_EXTERNAL": "External mailboxes",
+		"EXT_LEAD": "Attach an existing mailbox from another provider (web.de, GMX, t-online.de, Gmail, …) so you can read and send everything from Souvera Mail without switching apps.",
+		"EXT_HOW_TITLE": "How to attach an external mailbox",
+		"EXT_HOW_STEP_1": "Open <strong>Settings → Accounts</strong> (top-right avatar → the gear icon inside Souvera Mail).",
+		"EXT_HOW_STEP_2": "Click <strong>Add account</strong>.",
+		"EXT_HOW_STEP_3": "Enter the email address of the external mailbox and its password (see notes below for Gmail / Outlook).",
+		"EXT_HOW_STEP_4": "Souvera Mail auto-detects the correct IMAP/SMTP settings for major providers. Verify and click <strong>Add</strong>.",
+		"EXT_HOW_STEP_5": "The mailbox now appears in the top-left dropdown; switch between accounts without leaving the app.",
+		"EXT_PRIVACY_TITLE": "Where are the credentials stored?",
+		"EXT_PRIVACY_BODY": "Your external-provider password is stored <strong>encrypted at rest on this Souvera server</strong> (per-user key derived from the internal APP_SALT). It is used exclusively to fetch and send mail for that mailbox and is never transmitted to third parties.",
+		"EXT_LIMITS_TITLE": "Limits",
+		"EXT_LIMITS_MAX": "Your admin has set a maximum of <strong data-smail-help=\"SmailHelpExtMaxPerUser\">3</strong> external mailboxes per user.",
+		"EXT_LIMITS_GUARD": "If Souvera Mail cannot send through the external SMTP server 3 times in a row within 24 hours, the account is automatically deactivated. Ask support (or run <code>occ souvera_mail:external:revoke &lt;uid&gt; &lt;email&gt; --reset</code>) to re-enable.",
+		"EXT_PROVIDERS_TITLE": "Popular providers",
+		"EXT_GMAIL_NOTE": "<strong>Gmail</strong> — requires 2FA on your Google account plus a per-app \"App password\". Set it up at <em>myaccount.google.com/apppasswords</em>.",
+		"EXT_OUTLOOK_NOTE": "<strong>Outlook / Hotmail</strong> — Microsoft disabled classic Basic-Auth in Sept 2024. Use a legacy App Password.",
+		"EXT_WEBDE_NOTE": "<strong>web.de / GMX</strong> — enable POP3/IMAP access in the provider's web interface first, then add here.",
+		"EXT_TONLINE_NOTE": "<strong>Telekom / t-online.de</strong> — you need the \"Passwort für E-Mail-Programme\", not your general Telekom login."
 	},
 	"QUOTA": {
 		"MAIL_STORAGE": "Mail storage",
@@ -137,5 +155,16 @@
 		"PERCENT_TITLE": "{p}% used",
 		"CLICK_FOR_SETTINGS": "Click for settings",
 		"ALERT_TOAST": "Your mailbox is {p}% full ({u} / {t}). Please delete old mail or attachments so new messages can still be accepted."
+	},
+	"EXTERNAL_ACCOUNTS": {
+		"CONSENT_TITLE": "Before you add an external mailbox",
+		"CONSENT_BODY": "Your credentials for the external provider (e.g. web.de, GMX, Gmail) will be stored <strong>encrypted on this Souvera server</strong> and used exclusively to fetch and send your mail. They are <strong>never shared with third parties</strong>. Continue?",
+		"CONSENT_ACCEPT": "Accept and continue",
+		"CONSENT_CANCEL": "Cancel",
+		"WARN_GMAIL": "Gmail requires an App Password (2-factor authentication must be on). Your normal Google password will NOT work.",
+		"WARN_OUTLOOK": "Outlook.com / Hotmail disabled classic Basic-Auth in September 2024. You need a legacy App Password from your Microsoft account.",
+		"WARN_YAHOO": "Yahoo requires a third-party App Password. Your normal Yahoo password will NOT work.",
+		"CAP_REACHED": "You have reached the maximum number of external mailboxes allowed by your administrator.",
+		"FEATURE_DISABLED": "External mailboxes are not enabled on this server."
 	}
 }

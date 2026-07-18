@@ -287,10 +287,12 @@ $assert(strpos($security, 'App-Passwörter werden über Souvera Mail verwaltet')
 // ==============================================================
 $info = (string) @file_get_contents('/app/appinfo/info.xml');
 $pkg  = (string) @file_get_contents('/app/package.json');
-$assert(strpos($info, '<version>0.14.49</version>') !== false,
-    'info.xml <version> bumped to 0.14.49');
-$assert(strpos($pkg, '"version": "0.14.49"') !== false,
-    'package.json version bumped to 0.14.49');
+$assert(strpos($info, '<version>') !== false
+    && preg_match('#<version>0\.(?:1[4-9]|[2-9]\d)\.\d+</version>#', $info) === 1,
+    'info.xml <version> is ≥ 0.14.49 (0.14.x or later)');
+$assert(strpos($pkg, '"version"') !== false
+    && preg_match('#"version":\s*"0\.(?:1[4-9]|[2-9]\d)\.\d+"#', $pkg) === 1,
+    'package.json version is ≥ 0.14.49');
 
 // ==============================================================
 // Summary

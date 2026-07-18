@@ -6,6 +6,142 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-02 (External POP3/IMAP/SMTP mailboxes)
+
+### Operator Request
+
+> „Wir hätten gern die Erweiterung, dass Souvera Mail auch externe
+>  E-Mail-Konten via POP3 und SMTP einbinden kann, sodass die
+>  Benutzer zum Beispiel ihre web.de oder t-online.de oder andere
+>  verbinden können und im selben Mail-Client (Souvera Mail) haben,
+>  damit sie nicht ständig die Clients wechseln müssen. Diese
+>  Funktion soll aber standardmäßig deaktiviert sein, via OCC-Befehl
+>  aber aktivierbar."
+
+### What we shipped
+
+Users can now attach any external IMAP/POP3+SMTP mailbox (web.de, GMX,
+t-online.de, Freenet, 1&1, mail.de, Posteo, mailbox.org, Gmail, Outlook,
+Yahoo…) directly inside Souvera Mail — the accounts appear in the
+top-left switcher and outbound send routes through the external
+provider's SMTP.
+
+The Snappymail engine already shipped the entire multi-account UI +
+storage + Autoconfig discovery: v0.15.0 wires up the missing
+Nextcloud-side policy, safeguards and translations.
+
+### Feature architecture
+
+* **Central-owned policy**: Every setting (enabled, allowed_groups,
+  max_per_user, consent_required, smtp_fail_guard, migration_handoff)
+  lives in `souvera_central` and is consumed via a stable class
+  contract — the FQN is
+  `\OCA\SouveraCentral\Service\ExternalAccountsConfigService`. See
+  `/app/docs/SHARED_EXTERNAL_ACCOUNTS.md` for the full spec that was
+  handed to the Central team.
+* **Graceful degradation**: When `souvera_central` is not installed
+  the consumer service returns "feature disabled" and safe defaults —
+  no white screens, no engine crashes.
+* **Two-layer enforcement**:
+  1. `EngineHelper::loadApp` sets `webmail.allow_additional_accounts`
+     from `isEnabled()` on every request.
+  2. `EngineHelper::startApp` narrows it further to `false` for users
+     not in `getAllowedGroups()`.
+  3. Belt-and-braces: `filter.action-params` hook in the Nextcloud
+     Snappymail plugin re-checks group membership + per-user cap on
+     every `DoAccount*` call.
+
+### New consumer surface (souvera_mail)
+
+* `lib/Service/ExternalAccountsConfig.php` — read-only proxy to Central.
+* `lib/Service/ExternalAccountsFailGuard.php` — 3× SMTP fail / 24 h
+  auto-deactivation counter, stored in `oc_appconfig` (no new tables).
+* `lib/Service/ExternalAccountsProviderPresets.php` — curated local
+  fallback for the top 11 providers with Gmail/Outlook/Yahoo warning
+  markers.
+* `lib/Controller/ExternalAccountsController.php` — 4 REST endpoints
+  (`/external/status|preset|providers|consent`).
+* `lib/Command/External/Status.php` — `occ souvera_mail:external:status`
+  (proxies Central snapshot).
+* `lib/Command/External/ListAccounts.php` —
+  `occ souvera_mail:external:list [<uid>] [--deactivated-only] [--json]`
+  (walks per-user Snappymail storage, metadata only, no passwords).
+* `lib/Command/External/Revoke.php` —
+  `occ souvera_mail:external:revoke <uid> <email> {--revoke --confirm|--reset}`
+  (compliance/support command).
+
+### New Snappymail-plugin surface
+
+* `plugins/nextcloud/index.php`:
+  * new hook `filter.action-params` → `FilterAdditionalAccountAction`
+    enforcing max-per-user, group check and audit log on every
+    `DoAccountSetup|Delete|Switch|Unread` call;
+  * `FilterAppData` exposes the four new REST URLs +
+    `SmailHelpExtMaxPerUser` for the F1 help template.
+* `plugins/nextcloud/js/external-accounts.js` — GDPR consent modal
+  before the native "Add account" popup, live-fetched provider preset
+  hints via `/external/preset` on email blur, yellow warning banner
+  for Gmail App Passwords / Outlook Modern Auth / Yahoo.
+* `plugins/nextcloud/css/external-accounts.css` — modal + banner styling.
+* `plugins/nextcloud/langs/{en,de,nl}.json` — new sections
+  `EXTERNAL_ACCOUNTS/*` (9 keys) and `HELP_MODAL/EXT_*` (18 keys) fully
+  translated in all three languages.
+* `templates/Views/User/PopupsKeyboardShortcutsHelp.html` — new
+  "External mailboxes" tab in F1 help modal with instructions +
+  privacy note + limits + per-provider quick-help.
+
+### Safeguards you asked for
+
+* **P0** — feature disabled by default (returns false when Central is
+  missing or master switch off).
+* **P1a** — max 3 external accounts per user by default (Central-config).
+* **P1b** — group restriction via `--groups=…` on Central's
+  `souvera_central:external:enable`; empty groups = all users.
+* **P1c** — GDPR consent modal on every account add
+  (`consent_required=true` by default, per-account not per-user).
+* **P1d** — audit log to `logService` category `external_accounts`:
+  uid + email domain + action, never the password.
+* **P2** — provider warnings for Gmail (App Password required),
+  Outlook (Basic-Auth off since Sept 2024), Yahoo (App Password).
+* **P3** — SMTP fail guard: 3× fail / 24 h → account auto-deactivated;
+  admin-resettable via `occ souvera_mail:external:revoke <uid> <email> --reset`.
+
+### Regression suite
+
+`tests/test_external_accounts_v0_15_0.php` — **206 pins** covering
+the contract doc, consumer service defaults, OCC commands, REST
+routes, plugin hooks, presets, i18n coverage, JS enricher,
+EngineHelper sync, help template, and version bumps. All 55 PHP
+test files pass locally.
+
+### Files touched
+```
+new: /app/docs/SHARED_EXTERNAL_ACCOUNTS.md
+new: /app/lib/Service/ExternalAccountsConfig.php
+new: /app/lib/Service/ExternalAccountsFailGuard.php
+new: /app/lib/Service/ExternalAccountsProviderPresets.php
+new: /app/lib/Controller/ExternalAccountsController.php
+new: /app/lib/Command/External/{Status,ListAccounts,Revoke}.php
+new: /app/app/smail/v/current/app/plugins/nextcloud/js/external-accounts.js
+new: /app/app/smail/v/current/app/plugins/nextcloud/css/external-accounts.css
+new: /app/tests/test_external_accounts_v0_15_0.php
+mod: /app/lib/Util/EngineHelper.php  (Central sync on every request)
+mod: /app/app/smail/v/current/app/plugins/nextcloud/index.php  (hook + endpoints + help data)
+mod: /app/app/smail/v/current/app/plugins/nextcloud/langs/{en,de,nl}.json
+mod: /app/app/smail/v/current/app/templates/Views/User/PopupsKeyboardShortcutsHelp.html
+mod: /app/appinfo/{info.xml,routes.php}  (commands + routes)
+mod: /app/package.json                  (0.14.49 → 0.15.0)
+```
+
+### What the operator has to do to turn it on
+
+1. Deploy this version. Feature stays OFF (no user visibility).
+2. Have the Central team implement the FQN + 4 OCC commands per
+   `docs/SHARED_EXTERNAL_ACCOUNTS.md`.
+3. Run `occ souvera_central:external:enable [--groups=souvera-beta]`.
+4. From that moment users can add external accounts — subject to
+   the safeguards above.
+
 ## [0.14.49] — 2026-02 (Full EN + NL translations · English as source language)
 
 ### Operator-Report

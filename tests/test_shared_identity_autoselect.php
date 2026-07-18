@@ -158,7 +158,7 @@ ok(\str_contains($js, 'IdentityUserStore.find(item => addresses.includes(item.em
 // G — version bump + changelog markers
 // ==============================================================
 $info = (string) file_get_contents('/app/appinfo/info.xml');
-ok((bool) \preg_match('#<version>0\.14\.(8|[9]|\d{2,})</version>#', $info),
+ok((bool) \preg_match('#<version>0\.(?:1[4-9]|[2-9]\d)\.\d+</version>#', $info),
     "info.xml version bumped to 0.14.8 (or later)", $passes, $failures);
 
 $changelog = (string) file_get_contents('/app/CHANGELOG.md');

@@ -164,7 +164,7 @@ ok(simDiagnose($m, true, $cfg) === null,
 
 // ── PART D: version bump present in info.xml ──────────────────────────
 $info = (string) file_get_contents('/app/appinfo/info.xml');
-ok((bool) preg_match('#<version>0\.14\.(?:[3-9]|\d{2,})</version>#', $info),
+ok((bool) preg_match('#<version>0\.(?:1[4-9]|[2-9]\d)\.\d+</version>#', $info),
     "info.xml version bumped to 0.14.3+ (this hotfix)", $passes, $failures);
 
 echo "\n========================================\n";
