@@ -25,6 +25,77 @@
 		<label data-i18n="GLOBAL/NAME"></label>
 		<input name="name" type="text" class="input-xlarge" data-bind="value: name">
 	</div>
+	<!--
+		v0.16.0 — Manual server configuration for external accounts.
+		Snappymail's built-in Autoconfig (Mozilla ISPDB + local presets)
+		covers major providers (web.de, GMX, Gmail, Outlook, …) but fails
+		for custom domains like `philip@uelzen.email`. When that happens
+		the user can open this <details> block and enter IMAP + SMTP
+		host/port/security by hand. All `name` attributes are picked up
+		by Snappymail's submitForm() via FormData and forwarded to
+		AccountSetup — where LoginProcess() (UserAuth.php) builds a
+		synthetic Domain on the fly and skips the DomainProvider gate.
+		Only shown on "Add" (isNew); editing an existing account keeps
+		the server config from the token.
+	-->
+	<details class="souvera-manual-config" data-testid="ext-manual-config"
+		data-bind="visible: isNew">
+		<summary data-i18n="EXTERNAL_ACCOUNTS/MANUAL_CONFIG_TOGGLE">Manual server configuration (advanced)</summary>
+		<div class="souvera-manual-config-body">
+			<p class="souvera-manual-config-hint" data-i18n="EXTERNAL_ACCOUNTS/MANUAL_CONFIG_HINT">Only fill this in if the provider is not detected automatically.</p>
+			<fieldset>
+				<legend data-i18n="EXTERNAL_ACCOUNTS/MANUAL_IMAP_LEGEND">Incoming mail (IMAP)</legend>
+				<div class="control-group">
+					<label data-i18n="EXTERNAL_ACCOUNTS/MANUAL_HOST_LABEL">Server</label>
+					<input name="imapHost" type="text" class="input-xlarge"
+						autocorrect="off" autocapitalize="off" spellcheck="false"
+						placeholder="imap.example.com" data-testid="ext-manual-imap-host">
+				</div>
+				<div class="control-group">
+					<label data-i18n="EXTERNAL_ACCOUNTS/MANUAL_PORT_LABEL">Port</label>
+					<input name="imapPort" type="number" min="1" max="65535" value="993"
+						class="input-mini" data-testid="ext-manual-imap-port">
+				</div>
+				<div class="control-group">
+					<label data-i18n="EXTERNAL_ACCOUNTS/MANUAL_SECURE_LABEL">Encryption</label>
+					<select name="imapSecure" data-testid="ext-manual-imap-secure">
+						<option value="1" selected data-i18n="EXTERNAL_ACCOUNTS/MANUAL_SECURE_SSL">SSL / TLS</option>
+						<option value="2" data-i18n="EXTERNAL_ACCOUNTS/MANUAL_SECURE_STARTTLS">STARTTLS</option>
+						<option value="0" data-i18n="EXTERNAL_ACCOUNTS/MANUAL_SECURE_NONE">None</option>
+					</select>
+				</div>
+			</fieldset>
+			<fieldset>
+				<legend data-i18n="EXTERNAL_ACCOUNTS/MANUAL_SMTP_LEGEND">Outgoing mail (SMTP)</legend>
+				<div class="control-group">
+					<label data-i18n="EXTERNAL_ACCOUNTS/MANUAL_HOST_LABEL">Server</label>
+					<input name="smtpHost" type="text" class="input-xlarge"
+						autocorrect="off" autocapitalize="off" spellcheck="false"
+						placeholder="smtp.example.com" data-testid="ext-manual-smtp-host">
+				</div>
+				<div class="control-group">
+					<label data-i18n="EXTERNAL_ACCOUNTS/MANUAL_PORT_LABEL">Port</label>
+					<input name="smtpPort" type="number" min="1" max="65535" value="465"
+						class="input-mini" data-testid="ext-manual-smtp-port">
+				</div>
+				<div class="control-group">
+					<label data-i18n="EXTERNAL_ACCOUNTS/MANUAL_SECURE_LABEL">Encryption</label>
+					<select name="smtpSecure" data-testid="ext-manual-smtp-secure">
+						<option value="1" selected data-i18n="EXTERNAL_ACCOUNTS/MANUAL_SECURE_SSL">SSL / TLS</option>
+						<option value="2" data-i18n="EXTERNAL_ACCOUNTS/MANUAL_SECURE_STARTTLS">STARTTLS</option>
+						<option value="0" data-i18n="EXTERNAL_ACCOUNTS/MANUAL_SECURE_NONE">None</option>
+					</select>
+				</div>
+				<div class="control-group">
+					<label></label>
+					<label class="souvera-manual-inline">
+						<input name="smtpAuth" type="checkbox" value="1" checked data-testid="ext-manual-smtp-auth">
+						<span data-i18n="EXTERNAL_ACCOUNTS/MANUAL_SMTP_AUTH">Server requires authentication</span>
+					</label>
+				</div>
+			</fieldset>
+		</div>
+	</details>
 </form>
 <footer>
 	<button form="accountform" class="btn buttonAddAccount">

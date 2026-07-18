@@ -210,11 +210,81 @@ export function useMigration() {
 			activeJob.value = body.active
 		} else if (activeJob.value) {
 			// Transitioned from active → terminal.
+			const previouslyActive = activeJob.value
 			lastJob.value = next
 			activeJob.value = null
 			stopPolling()
+			// v0.16.0 — P1: Auto-refresh Snappymail folder tree AND
+			// remember the imported folders so a "NEW" badge can be shown
+			// for 24 h in the mail-app's sidebar (`folder-imported-badge.js`).
+			// We only do this on a successful completion — failed / cancelled
+			// runs stay quiet so the user isn't nagged by badges for folders
+			// that don't actually exist.
+			try {
+				const finishedState = next?.status || previouslyActive?.status
+				if (finishedState === 'completed') {
+					notifyMigrationCompleted(previouslyActive, next)
+				}
+			} catch (_e) { /* silent — the event is a QoL sugar, never fail */ }
 		}
 		return body
+	}
+
+	/**
+	 * v0.16.0 — Broadcast "migration completed" so the mail-app can
+	 *   (a) reload its folder list so the imported folders become visible
+	 *       immediately (no manual F5 required)
+	 *   (b) record the imported folder names in localStorage with a
+	 *       24-h expiry so `folder-imported-badge.js` can render a
+	 *       "NEW" badge next to them in the sidebar.
+	 *
+	 * The event carries the source-side folder names — since imports
+	 * preserve the folder hierarchy 1:1, these are also the names in
+	 * the target INBOX.
+	 */
+	function notifyMigrationCompleted(previouslyActive, latest) {
+		// Snappymail exposes `rl.app` as a top-level global. Its
+		// `foldersReload()` triggers a fresh Folder/get JMAP call and
+		// re-renders the sidebar. Non-fatal if it's absent
+		// (e.g. running before the engine has finished booting).
+		if (typeof window !== 'undefined' && window.rl && window.rl.app) {
+			try {
+				if (typeof window.rl.app.foldersReload === 'function') {
+					window.rl.app.foldersReload()
+				} else if (typeof window.rl.app.reloadFolderList === 'function') {
+					window.rl.app.reloadFolderList()
+				}
+			} catch (_e) { /* silent */ }
+		}
+
+		// Best-effort folder list — the API may hand back `folders`
+		// on the job row (persisted at start time) OR omit it. If we
+		// have none, just refresh without the badge.
+		const rawFolders = latest?.folders || previouslyActive?.folders || []
+		const folderNames = Array.isArray(rawFolders)
+			? rawFolders.filter(f => typeof f === 'string' && f.length > 0)
+			: []
+		if (folderNames.length > 0 && typeof window !== 'undefined' && window.localStorage) {
+			try {
+				const key = 'souvera-mail:imported-folders'
+				const now = Date.now()
+				const ttl = 24 * 60 * 60 * 1000 // 24 h
+				const prior = JSON.parse(window.localStorage.getItem(key) || '{}')
+				const merged = { ...(prior || {}) }
+				folderNames.forEach(name => {
+					merged[name] = now + ttl
+				})
+				window.localStorage.setItem(key, JSON.stringify(merged))
+			} catch (_e) { /* silent — quota / private mode */ }
+		}
+
+		// Broadcast for any plugin JS that wants to react (see
+		// `plugins/nextcloud/js/folder-imported-badge.js`).
+		try {
+			window.dispatchEvent(new CustomEvent('souvera-mail:migration-completed', {
+				detail: { folders: folderNames, jobId: latest?.id || previouslyActive?.id },
+			}))
+		} catch (_e) { /* silent — CustomEvent lack of support is extremely rare */ }
 	}
 
 	async function dismissJob(jobId) {

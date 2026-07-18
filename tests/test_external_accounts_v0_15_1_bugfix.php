@@ -101,13 +101,14 @@ $prevSuite = '/app/tests/test_external_accounts_v0_15_0.php';
 $a(\is_readable($prevSuite),
     'v0.15.0 external-accounts regression suite is still present (54 → 55 grown)');
 
-// Version bump
+// Version bump — accept v0.15.1 or any higher release (regex from the
+// v0.15.0 suite pattern so future minor bumps don't break the pin).
 $info = (string) \file_get_contents('/app/appinfo/info.xml');
 $pkg  = (string) \file_get_contents('/app/package.json');
-$a(\str_contains($info, '<version>0.15.1</version>'),
-    'info.xml bumped to 0.15.1 (PATCH — bugfix release)');
-$a(\str_contains($pkg, '"version": "0.15.1"'),
-    'package.json bumped to 0.15.1');
+$a((bool) \preg_match('#<version>0\.(?:1[5-9]|[2-9]\d)\.\d+</version>#', $info),
+    'info.xml bumped to 0.15.1 or higher (bugfix release baseline)');
+$a((bool) \preg_match('#"version"\s*:\s*"0\.(?:1[5-9]|[2-9]\d)\.\d+"#', $pkg),
+    'package.json bumped to 0.15.1 or higher');
 
 // ==============================================================
 // Summary

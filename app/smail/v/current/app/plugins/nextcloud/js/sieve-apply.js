@@ -409,11 +409,27 @@
 
     // ---------------------------------------------------------------
     // Unified scan — runs once on load AND on every DOM mutation.
-    // Cheap enough (querySelector short-circuits) to be idempotent-safe.
+    // v0.16.0: rAF-throttled so the observer callback merges bursts of
+    // mutations into a single scan per animation frame. This eliminates
+    // any theoretical interference with native click / focus events
+    // (Snappymail's CSS-radio tabs, esp. the "Erweitert" tab in
+    // PopupsIdentity — which was the P0-B recurring bug from v0.14.39
+    // through v0.15.1). scan() itself is idempotent (see #getElementById
+    // guards) so debouncing is safe.
     // ---------------------------------------------------------------
     const scan = () => {
         injectFilterSettingsPage();
         document.querySelectorAll(MENU_SEL).forEach(injectMenuInto);
+    };
+
+    let scanScheduled = false;
+    const requestScan = () => {
+        if (scanScheduled) { return; }
+        scanScheduled = true;
+        (window.requestAnimationFrame || window.setTimeout)(() => {
+            scanScheduled = false;
+            try { scan(); } catch (_e) { /* silent — never block engine */ }
+        });
     };
 
     if (document.readyState === 'loading') {
@@ -422,7 +438,7 @@
         scan();
     }
 
-    const observer = new MutationObserver(() => scan());
+    const observer = new MutationObserver(() => requestScan());
     if (document.body) {
         observer.observe(document.body, { childList: true, subtree: true });
     } else {

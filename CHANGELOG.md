@@ -6,6 +6,167 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.16.0] — 2026-02 (P0 + P1: Manuelle IMAP/SMTP, "Erweitert"-Tab, Ordner-NEU-Badge)
+
+### Operator-Report
+
+> „Diese Domain ist nicht zugelassen / philip@uelzen.email has no
+>  domain configuration". Der User möchte eigene IMAP-/SMTP-Server
+>  manuell eintragen, weil Autodiscover für Custom-Domains scheitert.
+
+Außerdem der seit v0.14.39 (5 Sessions in Folge) ignorierte P0-Bug:
+der „Erweitert"-Tab in der Identity-Popup („Antwort an" / „BCC" /
+„Sent-Ordner") reagiert visuell (Label wird fett), das Radio-Toggle
+greift aber nicht.
+
+### Was in v0.16.0 gefixt / gebaut wurde
+
+**P0-A — Manuelle IMAP/SMTP für externe Konten**
+
+Ausgangspunkt: `Domain::getByEmailAddress()` in
+`libraries/Smail/Engine/Providers/Domain.php` warf hart
+`DomainNotAllowed` für jede Domain, die nicht in Snappymails
+globalem Domain-Registry ODER Mozilla-ISPDB liegt — also praktisch
+für jede Custom-Domain.
+
+- **`UserAuth::LoginProcess()`** — wenn `$bMainAccount === false`
+  UND ActionParams `imapHost` + `smtpHost` gesetzt sind, wird ein
+  synthetischer `Domain` on the fly via
+  `buildManualDomainFromActionParams()` gebaut; die
+  ISP-Registry-Prüfung wird komplett übersprungen. SASL wird hart
+  auf Passwort-Mechanismen `PLAIN / LOGIN / CRAM-MD5` fixiert —
+  externe Anbieter (web.de, uelzen.email, …) akzeptieren kein
+  `OAUTHBEARER`, das ConnectSettings.php Default für die
+  Stalwart-only-Sicherheit vorgibt.
+- **`Account::jsonSerialize()`** — persistiert bei manuell
+  konfigurierten Konten das komplette Domain-Blob (IMAP + SMTP +
+  Sieve + SASL) im per-User-Token-Array. Ohne das würde
+  `NewInstanceFromTokenArray()` beim nächsten Reload wieder
+  `getByEmailAddress()` aufrufen und scheitern.
+- **`Account::NewInstanceFromTokenArray()`** — wenn das Token-Blob
+  ein `domain`-Feld enthält, wird der `Domain` per
+  `Domain::fromArray()` rekonstruiert; die globale
+  Provider-Lookup entfällt komplett.
+- **`PopupsAccount.html`** — neuer `<details>`-Block „Manuelle
+  Server-Konfiguration (Erweitert)". Feldnamen: `imapHost`,
+  `imapPort`, `imapSecure`, `smtpHost`, `smtpPort`, `smtpSecure`,
+  `smtpAuth`. Alle mit `name=`-Attribut, sodass Snappymails
+  `new FormData(form)` sie automatisch in den `AccountSetup`-POST
+  einschließt (kein Knockout-Binding nötig).
+- **`external-accounts.js`** — wenn `fetchPreset(email)` keinen
+  bekannten Provider zurückliefert, klappt der `<details>`-Block
+  automatisch auf und ein gelber Hinweis-Banner
+  (`MANUAL_FALLBACK_HINT`) erklärt dem User, dass die Domain nicht
+  automatisch erkannt wurde.
+- Vollständige EN/DE/NL-Übersetzungen für 12 neue
+  `EXTERNAL_ACCOUNTS/MANUAL_*` i18n-Keys.
+
+**P0-B — „Erweitert"-Tab (endlich!)**
+
+Diagnose: Die CSS-Radio-Tabs in `PopupsIdentity.html` funktionieren
+über native `<input type="radio">` + `<label for="…">` — Klick
+auf das Label toggelt das (via CSS `display: none` versteckte)
+Radio. Native-Browser-Verhalten. **Aber**: mehrere unserer
+plugin-JS enricher (`sieve-apply.js`, `external-accounts.js`) hatten
+unbounded `MutationObserver` auf `document.body` mit
+`{childList: true, subtree: true}`, die auf **jede** DOM-Mutation
+`scan()` triggerten. Bei schnellem Klicken auf Tab-Labels
+(besonders auf Mobile) konnte das theoretisch mit den
+`:checked`-State-Änderungen konkurrieren.
+
+- **Alle `MutationObserver` mit `requestAnimationFrame` gethrottelt**
+  (sieve-apply.js, external-accounts.js × 2, folder-imported-badge.js).
+  Bursts von Mutationen werden zu einem einzelnen Scan pro Frame
+  gemergt — nie wieder mehr Callbacks pro Sekunde als der Browser
+  überhaupt rendern kann.
+- **Defensive CSS**: `dialog .tabs > label`,
+  `dialog[open] .tabs > label` bekommen
+  `pointer-events: auto !important` + `cursor: pointer`. Selbst
+  wenn Ambient-CSS (NC-Overrides, Theme-Anpassungen) `pointer-events:
+  none` setzt — unser `!important` gewinnt.
+
+**P1 — Auto-Refresh Ordnerbaum + „NEU"-Badge (24 h)**
+
+- **`useMigration.js`** — beim Übergang eines Migration-Jobs von
+  `active` → `completed` wird
+  `window.rl.app.foldersReload()` aufgerufen (Snappymail
+  Sidebar-Refresh ohne F5), und die importierten Ordnernamen
+  werden mit 24-h-Expiry unter dem localStorage-Key
+  `souvera-mail:imported-folders` gespeichert. Fehlerfolgen
+  (`failed` / `cancelled`) triggern keinen Badge.
+- **`folder-imported-badge.js` (NEU)** — Plugin-Enricher.
+  MutationObserver (rAF-gethrottelt) scannt Snappymails
+  Folder-Sidebar (`.b-folders__item`, `.b-folder-list li`, …) und
+  hängt an übereinstimmende Ordner ein
+  `<span class="sv-folder-new-badge">NEU</span>`. Alle 5 Minuten
+  wird die localStorage-Map von abgelaufenen Einträgen bereinigt.
+  Beim `souvera-mail:migration-completed`-Event wird sofort
+  neu gescannt.
+- **CSS** (`external-accounts.css`): Kompaktes grünes Pill-Badge
+  (`#22c55e → #16a34a` Gradient), 3 Puls-Animationen zum
+  Aufmerksamkeit-Erregen bei Erst-Render, sonst statisch.
+- **i18n**: `FOLDERS/NEW_BADGE` + `FOLDERS/NEW_BADGE_TITLE` in
+  EN/DE/NL.
+
+### Neues Test-Modul
+
+- **`tests/test_v0_16_0.php`** — 113 Assertions. Deckt ab:
+  - Alle P0-A-Code-Pfade (UserAuth + Account + PopupsAccount +
+    external-accounts.js + i18n-Keys in 3 Sprachen + CSS)
+  - Behavioural-Sim: Extrahiert den `Domain::fromArray()`-Aufruf
+    aus dem Live-Quelltext und verifiziert, dass jedes
+    Pflichtfeld (IMAP/SMTP/Sieve/whiteList/host/port/sasl/useAuth)
+    im Aufruf steht — ohne die Engine im CLI booten zu müssen.
+  - Alle rAF-Throttlings der `MutationObserver`
+  - Alle P1-Pfade (composable + neuer Enricher + CSS + i18n +
+    Plugin-Registration)
+  - Regex-basierte Version-Assertion (`0.(1[6-9]|[2-9]\d)\.\d+`)
+    — bleibt bei künftigen Bumps grün.
+
+### Verifikation
+
+- `php -l` clean auf allen modifizierten PHP-Dateien.
+- `mcp_lint_javascript` clean auf allen modifizierten/neuen JS-Dateien.
+- **Volle Regressions-Suite: 57/57 PASS** (war 56/56 vor diesem Step).
+- `yarn build` regeneriert `js/souvera_mail-migration-wizard.js`
+  (401 KiB, unverändert) — bereits kompiliertes Vue-Bundle enthält
+  jetzt die `notifyMigrationCompleted()`-Logik.
+
+### Files touched
+
+```
+new: /app/app/smail/v/current/app/plugins/nextcloud/js/folder-imported-badge.js
+new: /app/tests/test_v0_16_0.php
+mod: /app/app/smail/v/current/app/libraries/Smail/Engine/Actions/UserAuth.php
+mod: /app/app/smail/v/current/app/libraries/Smail/Engine/Model/Account.php
+mod: /app/app/smail/v/current/app/templates/Views/User/PopupsAccount.html
+mod: /app/app/smail/v/current/app/plugins/nextcloud/js/external-accounts.js
+mod: /app/app/smail/v/current/app/plugins/nextcloud/js/sieve-apply.js
+mod: /app/app/smail/v/current/app/plugins/nextcloud/css/external-accounts.css
+mod: /app/app/smail/v/current/app/plugins/nextcloud/index.php  (addJs folder-imported-badge)
+mod: /app/app/smail/v/current/app/plugins/nextcloud/langs/{de,en,nl}.json
+mod: /app/src/composables/useMigration.js
+mod: /app/js/souvera_mail-migration-wizard.js  (yarn build)
+mod: /app/tests/test_external_accounts_v0_15_1_bugfix.php  (regex version pin)
+mod: /app/appinfo/info.xml, /app/package.json  (0.15.1 → 0.16.0)
+```
+
+### Operator-Aktion nach Deploy
+
+1. Rsync 0.16.0 auf `custom_apps/souvera_mail`.
+2. `sudo systemctl reload php8.3-fpm` (OpCache reset — sonst hält
+   der alte `LoginProcess()`-Code aus dem Cache).
+3. In Souvera Mail: „Konto hinzufügen" → E-Mail eintragen
+   (`philip@uelzen.email`) → wenn die Domain nicht erkannt wird,
+   klappt der neue `<details>`-Block automatisch auf und ein gelber
+   Hinweis erscheint. IMAP/SMTP-Daten eintragen → „Hinzufügen".
+4. Test „Erweitert"-Tab in Identity-Popup: sollte jetzt sauber
+   umschalten (Radio-State wechselt, Panel-Inhalt zeigt Antwort-an
+   / BCC / Sent-Ordner).
+5. Nach einer erfolgreichen Migration ohne F5 in der Sidebar
+   nachschauen — importierte Ordner tragen ein grünes „NEU"-Badge
+   für 24 h.
+
 ## [0.15.1] — 2026-02 (Bugfix: "Unbekannter Fehler" beim Anlegen + Modal-Zentrierung)
 
 ### Operator report

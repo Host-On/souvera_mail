@@ -44,6 +44,11 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			// dropdown-menu.js and folder-names.js.
 			$this->addJs('js/sieve-apply.js');
 			$this->addJs('js/external-accounts.js');
+			// v0.16.0 — "NEW" badge on freshly-imported folders (P1).
+			// Reads localStorage populated by useMigration.js when a
+			// migration completes, decorates matching folder rows for
+			// 24 h. Fully non-fatal; safe to load unconditionally.
+			$this->addJs('js/folder-imported-badge.js');
 
 			$this->addCss('css/help-modal.css');
 			$this->addCss('css/folder-nav.css');

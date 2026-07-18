@@ -18,7 +18,9 @@
 		"JUNK": "Spam",
 		"SPAM": "Spam",
 		"ARCHIVE": "Archiv",
-		"OUTBOX": "Postausgang"
+		"OUTBOX": "Postausgang",
+		"NEW_BADGE": "NEU",
+		"NEW_BADGE_TITLE": "Kürzlich importiert — der Marker verschwindet automatisch nach 24 Stunden."
 	},
 	"NEXTCLOUD": {
 		"SAVE_ATTACHMENTS": "Speichern Sie in Nextcloud",
@@ -165,6 +167,18 @@
 		"WARN_OUTLOOK": "Outlook.com / Hotmail hat klassische Basic-Auth im September 2024 deaktiviert. Du brauchst ein Legacy-App-Passwort deines Microsoft-Kontos.",
 		"WARN_YAHOO": "Yahoo verlangt ein Drittanbieter-App-Passwort. Dein normales Yahoo-Passwort funktioniert NICHT.",
 		"CAP_REACHED": "Du hast die maximale Anzahl externer Postfächer erreicht, die dein Administrator erlaubt hat.",
-		"FEATURE_DISABLED": "Externe Postfächer sind auf diesem Server nicht aktiviert."
+		"FEATURE_DISABLED": "Externe Postfächer sind auf diesem Server nicht aktiviert.",
+		"MANUAL_CONFIG_TOGGLE": "Manuelle Server-Konfiguration (Erweitert)",
+		"MANUAL_CONFIG_HINT": "Nur ausfüllen, wenn dein Anbieter nicht automatisch erkannt wird oder du eine eigene Domain (z.\u00a0B. auf deinem eigenen Server) einbinden möchtest.",
+		"MANUAL_IMAP_LEGEND": "Eingehende Mail (IMAP)",
+		"MANUAL_SMTP_LEGEND": "Ausgehende Mail (SMTP)",
+		"MANUAL_HOST_LABEL": "Server",
+		"MANUAL_PORT_LABEL": "Port",
+		"MANUAL_SECURE_LABEL": "Verschlüsselung",
+		"MANUAL_SECURE_SSL": "SSL / TLS (empfohlen)",
+		"MANUAL_SECURE_STARTTLS": "STARTTLS",
+		"MANUAL_SECURE_NONE": "Keine",
+		"MANUAL_SMTP_AUTH": "SMTP-Server verlangt Authentifizierung",
+		"MANUAL_FALLBACK_HINT": "Der Anbieter dieser Domain konnte nicht automatisch erkannt werden. Bitte trage die IMAP- und SMTP-Serverdaten manuell unten ein."
 	}
 }

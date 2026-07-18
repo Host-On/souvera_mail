@@ -18,7 +18,9 @@
 		"JUNK": "Spam",
 		"SPAM": "Spam",
 		"ARCHIVE": "Archief",
-		"OUTBOX": "Postvak UIT"
+		"OUTBOX": "Postvak UIT",
+		"NEW_BADGE": "NIEUW",
+		"NEW_BADGE_TITLE": "Onlangs geïmporteerd — de markering verdwijnt automatisch na 24 uur."
 	},
 	"NEXTCLOUD": {
 		"SAVE_ATTACHMENTS": "Opslaan in Nextcloud",
@@ -165,6 +167,18 @@
 		"WARN_OUTLOOK": "Outlook.com / Hotmail heeft klassieke Basic-Auth in september 2024 uitgeschakeld. Je hebt een legacy app-wachtwoord van je Microsoft-account nodig.",
 		"WARN_YAHOO": "Yahoo vereist een app-wachtwoord van derden. Je normale Yahoo-wachtwoord werkt NIET.",
 		"CAP_REACHED": "Je hebt het maximum aantal externe mailboxen bereikt dat door je beheerder is toegestaan.",
-		"FEATURE_DISABLED": "Externe mailboxen zijn niet ingeschakeld op deze server."
+		"FEATURE_DISABLED": "Externe mailboxen zijn niet ingeschakeld op deze server.",
+		"MANUAL_CONFIG_TOGGLE": "Handmatige serverconfiguratie (geavanceerd)",
+		"MANUAL_CONFIG_HINT": "Vul dit alleen in als je provider niet automatisch wordt gedetecteerd of als je een eigen domein (bijvoorbeeld op je eigen server) wilt koppelen.",
+		"MANUAL_IMAP_LEGEND": "Inkomende e-mail (IMAP)",
+		"MANUAL_SMTP_LEGEND": "Uitgaande e-mail (SMTP)",
+		"MANUAL_HOST_LABEL": "Server",
+		"MANUAL_PORT_LABEL": "Poort",
+		"MANUAL_SECURE_LABEL": "Versleuteling",
+		"MANUAL_SECURE_SSL": "SSL / TLS (aanbevolen)",
+		"MANUAL_SECURE_STARTTLS": "STARTTLS",
+		"MANUAL_SECURE_NONE": "Geen",
+		"MANUAL_SMTP_AUTH": "SMTP-server vereist authenticatie",
+		"MANUAL_FALLBACK_HINT": "De provider voor dit domein kon niet automatisch worden gedetecteerd. Voer de IMAP- en SMTP-servergegevens hieronder handmatig in."
 	}
 }

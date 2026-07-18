@@ -199,9 +199,28 @@
 			var email = String(emailInput.value || '').trim();
 			banner.style.display = 'none';
 			banner.textContent = '';
+			// v0.16.0 — Auto-open manual config on unknown domains.
+			var manualDetails = popupEl.querySelector('details.souvera-manual-config');
 			if (!email || email.indexOf('@') === -1) return;
 			fetchPreset(email, function (preset) {
-				if (!preset) return;
+				// If NO preset returned OR preset carries no host info, the
+				// domain is unknown to our providers list AND to Autoconfig
+				// probes. Auto-open the manual-config <details> block so the
+				// user is nudged straight to the fields they need to fill in,
+				// and surface a friendly banner explaining why.
+				var isUnknownProvider = !preset
+					|| (!preset.imap_host && !preset.warning && !preset.pre_flight);
+				if (isUnknownProvider) {
+					var hint = i18n('EXTERNAL_ACCOUNTS/MANUAL_FALLBACK_HINT',
+						'The provider for this domain could not be detected automatically. '
+						+ 'Please enter the IMAP and SMTP server details manually below.');
+					banner.textContent = hint;
+					banner.style.display = 'block';
+					if (manualDetails && !manualDetails.open) {
+						manualDetails.open = true;
+					}
+					return;
+				}
 				var msg = null;
 				if (preset.warning === 'GMAIL_APP_PASSWORD') {
 					msg = i18n('EXTERNAL_ACCOUNTS/WARN_GMAIL',
@@ -238,13 +257,25 @@
 	}
 
 	// Wait for the native "Add account" popup and decorate it.
+	// v0.16.0 — rAF-throttled to prevent scan-spam and any theoretical
+	// interference with native click handlers.
 	function watchForPopup() {
-		var observer = new MutationObserver(function () {
+		var popupScanScheduled = false;
+		var scanPopup = function () {
 			var popup = document.querySelector('#PopupsAccount');
 			if (popup && popup.classList.contains('modal-visible')) {
 				decoratePopup(popup);
 			}
-		});
+		};
+		var requestPopupScan = function () {
+			if (popupScanScheduled) return;
+			popupScanScheduled = true;
+			(window.requestAnimationFrame || window.setTimeout)(function () {
+				popupScanScheduled = false;
+				try { scanPopup(); } catch (_e) { /* silent */ }
+			});
+		};
+		var observer = new MutationObserver(requestPopupScan);
 		observer.observe(document.body, { childList: true, subtree: true });
 	}
 
@@ -282,8 +313,21 @@
 			}, true);
 		};
 		attach();
-		// Re-attach if the settings view is re-rendered by Knockout.
-		var obs = new MutationObserver(attach);
+		// v0.16.0 — rAF-throttled MutationObserver. Was firing scan()
+		// on every DOM mutation, which is theoretically fine because
+		// the __svExtWrapped guard is idempotent, but could compete with
+		// native click handlers on Snappymail's CSS-radio tabs (Identity
+		// popup "Erweitert" tab was the recurring P0-B bug).
+		var reattachScheduled = false;
+		var requestAttach = function () {
+			if (reattachScheduled) return;
+			reattachScheduled = true;
+			(window.requestAnimationFrame || window.setTimeout)(function () {
+				reattachScheduled = false;
+				try { attach(); } catch (_e) { /* silent */ }
+			});
+		};
+		var obs = new MutationObserver(requestAttach);
 		obs.observe(document.body, { childList: true, subtree: true });
 	}
 

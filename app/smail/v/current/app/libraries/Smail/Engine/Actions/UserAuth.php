@@ -122,7 +122,34 @@ trait UserAuth
 			throw new ClientException(Notifications::InvalidInputArgument->value);
 		}
 
-		$oDomain = $this->DomainProvider()->getByEmailAddress($aCredentials['email']);
+		// v0.16.0 — Manual IMAP/SMTP configuration for external accounts
+		// (Issue #1 in v0.15.1 backlog: „philip@uelzen.email fails with
+		// has no domain configuration").
+		//
+		// When adding an AdditionalAccount, the popup lets the user open a
+		// "Manual server configuration" details block and supply IMAP host +
+		// port + security + SMTP host + port + security. If those params are
+		// present in the ACCOUNT-SETUP request we build a synthetic Domain
+		// on the fly with password-based SASL (PLAIN/LOGIN/CRAM-MD5) and
+		// skip the DomainProvider registry gate — allowing every custom
+		// domain to connect regardless of ISPDB / admin-domain-registry state.
+		//
+		// The synthetic Domain is persisted inside the per-user token array
+		// (see Account::jsonSerialize()) so subsequent switches / reconnects
+		// reload it without going through the provider.
+		$bManualParams = !$bMainAccount
+			&& '' !== \trim((string) $this->GetActionParam('imapHost', ''))
+			&& '' !== \trim((string) $this->GetActionParam('smtpHost', ''));
+
+		if ($bManualParams) {
+			$aCredentials['domain'] = $this->buildManualDomainFromActionParams($aCredentials['email']);
+		} else {
+			// Existing gate — throws Notifications::DomainNotAllowed for
+			// email addresses whose domain is not configured in Snappymail's
+			// domain registry AND for which no manual server params were
+			// supplied. Preserves the MainAccount contract 1:1.
+			$this->DomainProvider()->getByEmailAddress($aCredentials['email']);
+		}
 
 		$oAccount = null;
 		try {
@@ -135,6 +162,14 @@ trait UserAuth
 				$aCredentials['smtpUser']
 //				,new SensitiveString($oPassword)
 			);
+			if ($bManualParams) {
+				// Flag the account so its Domain config is embedded in the
+				// token (see Account::jsonSerialize()). Without this the
+				// Domain would be lost on the next switch / restart, and
+				// NewInstanceFromTokenArray() would fall back to the
+				// provider lookup which throws for custom domains.
+				$oAccount->setManualDomain(true);
+			}
 			$this->Plugins()->RunHook('filter.account', array($oAccount));
 			if (!$oAccount) {
 				throw new ClientException(Notifications::AccountFilterError->value);
@@ -155,6 +190,69 @@ trait UserAuth
 		}
 
 		return $oAccount;
+	}
+
+	/**
+	 * v0.16.0 — Build a synthetic Domain from the manual IMAP/SMTP action
+	 * params supplied via the "Add account" popup.
+	 *
+	 * SASL is locked to password mechanisms (PLAIN/LOGIN/CRAM-MD5) because
+	 * external providers (web.de, GMX, custom uelzen.email, …) do NOT
+	 * accept OAUTHBEARER — the Stalwart-only mechanism that ConnectSettings
+	 * defaults to for hard-coded security. Sieve is disabled (no external
+	 * ManageSieve endpoint is exposed via this UI path).
+	 *
+	 * Called from LoginProcess() when $bMainAccount === false AND both
+	 * `imapHost` and `smtpHost` action params are non-empty.
+	 *
+	 * @throws \Smail\Engine\Exceptions\ClientException on invalid inputs
+	 */
+	protected function buildManualDomainFromActionParams(string $sEmail): \Smail\Engine\Model\Domain
+	{
+		$sImapHost = \trim((string) $this->GetActionParam('imapHost', ''));
+		$iImapPort = (int) $this->GetActionParam('imapPort', 993);
+		$iImapSecure = (int) $this->GetActionParam('imapSecure', 1); // 1=SSL
+		$sSmtpHost = \trim((string) $this->GetActionParam('smtpHost', ''));
+		$iSmtpPort = (int) $this->GetActionParam('smtpPort', 465);
+		$iSmtpSecure = (int) $this->GetActionParam('smtpSecure', 1); // 1=SSL
+		$bSmtpAuth = !empty($this->GetActionParam('smtpAuth', 1));
+
+		if (!\strlen($sImapHost) || !\strlen($sSmtpHost)) {
+			throw new ClientException(Notifications::InvalidInputArgument->value, null, 'Manual IMAP/SMTP host required');
+		}
+		if ($iImapPort < 1 || $iImapPort > 65535 || $iSmtpPort < 1 || $iSmtpPort > 65535) {
+			throw new ClientException(Notifications::InvalidInputArgument->value, null, 'IMAP/SMTP port out of range');
+		}
+
+		$sDomainName = \Smail\Mail\Base\Utils::getEmailAddressDomain($sEmail) ?: 'external';
+
+		$oDomain = \Smail\Engine\Model\Domain::fromArray($sDomainName, [
+			'IMAP' => [
+				'host' => $sImapHost,
+				'port' => $iImapPort,
+				'type' => $iImapSecure,
+				'sasl' => ['PLAIN', 'LOGIN', 'CRAM-MD5'],
+			],
+			'SMTP' => [
+				'host' => $sSmtpHost,
+				'port' => $iSmtpPort,
+				'type' => $iSmtpSecure,
+				'useAuth' => $bSmtpAuth,
+				'sasl' => ['PLAIN', 'LOGIN', 'CRAM-MD5'],
+			],
+			'Sieve' => [
+				'enabled' => false,
+				'host' => '',
+				'port' => 4190,
+				'type' => 9,
+			],
+			'whiteList' => '',
+		]);
+
+		if (!$oDomain) {
+			throw new ClientException(Notifications::InvalidInputArgument->value, null, 'Failed to build manual Domain');
+		}
+		return $oDomain;
 	}
 
 	/**

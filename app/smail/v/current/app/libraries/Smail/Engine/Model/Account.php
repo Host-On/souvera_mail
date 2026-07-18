@@ -23,6 +23,23 @@ abstract class Account implements \JsonSerializable
 
 	private ?Domain $oDomain = null;
 
+	/**
+	 * v0.16.0 — Manual-server flag for external accounts (Issue #1).
+	 *
+	 * When an AdditionalAccount is created via the popup's "Manual server
+	 * configuration" toggle (custom IMAP/SMTP host + port + security), we
+	 * MUST persist the Domain config inside the per-user token array —
+	 * otherwise NewInstanceFromTokenArray() on every subsequent request
+	 * would fall back to DomainProvider::getByEmailAddress(), which
+	 * throws for custom domains not registered in Snappymail's global
+	 * domain store (nor Mozilla ISPDB).
+	 *
+	 * Setting this to true instructs jsonSerialize() to embed the domain
+	 * config into the token; NewInstanceFromTokenArray() then rebuilds
+	 * the Domain via Domain::fromArray() instead of the provider lookup.
+	 */
+	private bool $bManualDomain = false;
+
 	public function Email() : string
 	{
 		return $this->sEmail;
@@ -52,6 +69,27 @@ abstract class Account implements \JsonSerializable
 	public function Domain() : ?Domain
 	{
 		return $this->oDomain;
+	}
+
+	/**
+	 * v0.16.0 — Marks this account as using a manually-configured Domain
+	 * (custom IMAP/SMTP host+port, not looked up via DomainProvider).
+	 * Called from LoginProcess() right after setCredentials() when the
+	 * user supplied manual server details in the "Add account" popup.
+	 */
+	public function setManualDomain(bool $b) : void
+	{
+		$this->bManualDomain = $b;
+	}
+
+	/**
+	 * v0.16.0 — Returns true if this account's Domain was manually
+	 * configured (i.e. must be persisted in the token, not resolved via
+	 * DomainProvider on load).
+	 */
+	public function isManualDomain() : bool
+	{
+		return $this->bManualDomain;
 	}
 
 	public function Hash() : string
@@ -99,6 +137,38 @@ abstract class Account implements \JsonSerializable
 		}
 		if ($this->oSmtpPass) {
 			$result['smtp']['pass'] = $this->oSmtpPass->getValue();
+		}
+		// v0.16.0 — Persist the manually-configured Domain into the
+		// per-user token array so NewInstanceFromTokenArray() can rebuild
+		// it via Domain::fromArray() on every request (bypassing the
+		// DomainProvider lookup that would otherwise throw "has no
+		// domain configuration" for custom domains).
+		if ($this->bManualDomain && $this->oDomain) {
+			$oImap = $this->oDomain->ImapSettings();
+			$oSmtp = $this->oDomain->SmtpSettings();
+			$oSieve = $this->oDomain->SieveSettings();
+			$result['domain'] = [
+				'IMAP' => [
+					'host' => $oImap->host,
+					'port' => $oImap->port,
+					'type' => $oImap->type,
+					'sasl' => $oImap->SASLMechanisms,
+				],
+				'SMTP' => [
+					'host' => $oSmtp->host,
+					'port' => $oSmtp->port,
+					'type' => $oSmtp->type,
+					'useAuth' => $oSmtp->useAuth,
+					'sasl' => $oSmtp->SASLMechanisms,
+				],
+				'Sieve' => [
+					'enabled' => $oSieve->enabled,
+					'host' => $oSieve->host,
+					'port' => $oSieve->port,
+					'type' => $oSieve->type,
+				],
+				'whiteList' => '',
+			];
 		}
 		return $result;
 	}
@@ -159,7 +229,20 @@ abstract class Account implements \JsonSerializable
 			if (empty($aAccountHash['email']) || empty($aAccountHash['login']) || empty($aAccountHash['pass'])) {
 				throw new \RuntimeException("Invalid TokenArray");
 			}
-			$oDomain = $oActions->DomainProvider()->getByEmailAddress($aAccountHash['email']);
+			// v0.16.0 — If the token carries a persisted manual Domain
+			// configuration (external account added via the popup's
+			// "Manual server configuration" toggle), rebuild the Domain
+			// from that config instead of the global DomainProvider —
+			// which would otherwise throw "has no domain configuration"
+			// for custom domains like `philip@uelzen.email` that never
+			// existed in the ISPDB or the Snappymail domain registry.
+			$bManualDomain = !empty($aAccountHash['domain']) && \is_array($aAccountHash['domain']);
+			if ($bManualDomain) {
+				$sDomainName = \Smail\Mail\Base\Utils::getEmailAddressDomain($aAccountHash['email']) ?: 'external';
+				$oDomain = Domain::fromArray($sDomainName, $aAccountHash['domain']);
+			} else {
+				$oDomain = $oActions->DomainProvider()->getByEmailAddress($aAccountHash['email']);
+			}
 			if ($oDomain) {
 //				$aAccountHash['email'] = $oDomain->ImapSettings()->fixUsername($aAccountHash['email'], false);
 //				$aAccountHash['login'] = $oDomain->ImapSettings()->fixUsername($aAccountHash['login']);
@@ -170,6 +253,7 @@ abstract class Account implements \JsonSerializable
 				$oAccount->sImapUser = $aAccountHash['login'];
 				$oAccount->setImapPass(new SensitiveString($aAccountHash['pass']));
 				$oAccount->oDomain = $oDomain;
+				$oAccount->bManualDomain = $bManualDomain;
 				$oActions->Plugins()->RunHook('filter.account', array($oAccount));
 				if (!$oAccount) {
 					throw new ClientException(Notifications::AccountFilterError->value);

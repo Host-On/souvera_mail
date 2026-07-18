@@ -84,3 +84,147 @@ dialog:not(.animate) {
 	text-decoration: underline;
 	margin-left: 4px;
 }
+
+/* v0.16.0 — Manual server configuration section inside PopupsAccount.
+ * Rendered as a collapsible <details> block so the popup stays compact
+ * for autoconfig users; only visible when the user explicitly clicks
+ * "Manual server configuration (advanced)".
+ *
+ * Palette mirrors the Souvera settings tab (rgba blues + neutral
+ * borders). Fieldsets get a light background so the two groups
+ * (IMAP + SMTP) read as clearly separated blocks. */
+.souvera-manual-config {
+	margin: 10px 0 4px;
+	padding: 0;
+	border: 1px solid var(--color-border, #d5d5d5);
+	border-radius: 6px;
+	background: transparent;
+}
+.souvera-manual-config > summary {
+	padding: 8px 12px;
+	cursor: pointer;
+	font-weight: 600;
+	font-size: 13px;
+	color: var(--color-main-text, #222);
+	background: rgba(59, 130, 246, 0.05);
+	border-radius: 6px;
+	list-style: none;
+	position: relative;
+	user-select: none;
+}
+.souvera-manual-config > summary::before {
+	content: "▸";
+	display: inline-block;
+	margin-right: 6px;
+	transition: transform 0.15s ease;
+	color: var(--color-primary-element, #0693e3);
+}
+.souvera-manual-config[open] > summary::before {
+	transform: rotate(90deg);
+}
+.souvera-manual-config[open] > summary {
+	border-radius: 6px 6px 0 0;
+	border-bottom: 1px solid var(--color-border, #d5d5d5);
+}
+.souvera-manual-config-body {
+	padding: 12px 14px 4px;
+}
+.souvera-manual-config-hint {
+	margin: 0 0 12px;
+	font-size: 12px;
+	color: var(--color-text-maxcontrast, #676767);
+	line-height: 1.45;
+}
+.souvera-manual-config fieldset {
+	border: 1px solid var(--color-border, #d5d5d5);
+	border-radius: 6px;
+	padding: 8px 12px 4px;
+	margin: 0 0 12px;
+	background: transparent;
+}
+.souvera-manual-config fieldset legend {
+	padding: 0 6px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--color-primary-element, #0693e3);
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+.souvera-manual-config .control-group {
+	margin-bottom: 8px;
+}
+.souvera-manual-config .control-group label {
+	display: inline-block;
+	width: 110px;
+	font-size: 12px;
+	color: var(--color-main-text, #222);
+	vertical-align: middle;
+}
+.souvera-manual-config .control-group input[type="text"],
+.souvera-manual-config .control-group input[type="number"],
+.souvera-manual-config .control-group select {
+	padding: 4px 6px;
+	border: 1px solid var(--color-border, #d5d5d5);
+	border-radius: 4px;
+	background: var(--color-main-background, #fff);
+	color: var(--color-main-text, #222);
+	font-size: 13px;
+}
+.souvera-manual-config .input-mini {
+	width: 90px;
+}
+.souvera-manual-config .souvera-manual-inline {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	width: auto;
+	cursor: pointer;
+}
+.souvera-manual-config .souvera-manual-inline input[type="checkbox"] {
+	margin: 0;
+}
+
+/* v0.16.0 — Defensive: Snappymail's CSS-radio tab pattern (used by
+ * PopupsIdentity: General / Signature / Encryption / Erweitert) relies
+ * on `<label for="tab-*">` clicks toggling their associated hidden
+ * radio input. Some browser / third-party CSS combinations reported
+ * as "Erweitert appears bold but doesn't select" (recurring P0-B bug
+ * across v0.14.39 → v0.15.1). Force pointer-events + cursor on every
+ * `.tabs > label` inside a Snappymail dialog to guarantee the click
+ * always reaches the label handler, regardless of ambient CSS. */
+dialog .tabs > label,
+dialog[open] .tabs > label {
+	pointer-events: auto !important;
+	cursor: pointer;
+}
+
+/* v0.16.0 — "NEW" badge for freshly imported folders (P1).
+ * Injected by `plugins/nextcloud/js/folder-imported-badge.js` after a
+ * mailbox migration completes. Auto-expires after 24 h via the
+ * localStorage TTL bookkeeping in that script.
+ *
+ * Bright but subdued green so it reads as "something good happened
+ * here" without competing with the unread-count pill Snappymail
+ * already puts on the same row. */
+.sv-folder-new-badge {
+	display: inline-block;
+	margin-left: 6px;
+	padding: 1px 6px;
+	border-radius: 8px;
+	font-size: 10px;
+	font-weight: 700;
+	line-height: 1.4;
+	letter-spacing: 0.05em;
+	background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+	color: #fff;
+	text-transform: uppercase;
+	box-shadow: 0 1px 2px rgba(22, 163, 74, 0.25);
+	vertical-align: baseline;
+	pointer-events: none;
+	user-select: none;
+	animation: sv-badge-pulse 2.4s ease-in-out 3;
+}
+@keyframes sv-badge-pulse {
+	0%, 100% { transform: scale(1); }
+	50%      { transform: scale(1.08); }
+}

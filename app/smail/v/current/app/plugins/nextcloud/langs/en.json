@@ -18,7 +18,9 @@
 		"JUNK": "Spam",
 		"SPAM": "Spam",
 		"ARCHIVE": "Archive",
-		"OUTBOX": "Outbox"
+		"OUTBOX": "Outbox",
+		"NEW_BADGE": "NEW",
+		"NEW_BADGE_TITLE": "Recently imported — badge disappears automatically after 24 hours."
 	},
 	"NEXTCLOUD": {
 		"SAVE_ATTACHMENTS": "Save in Nextcloud",
@@ -165,6 +167,18 @@
 		"WARN_OUTLOOK": "Outlook.com / Hotmail disabled classic Basic-Auth in September 2024. You need a legacy App Password from your Microsoft account.",
 		"WARN_YAHOO": "Yahoo requires a third-party App Password. Your normal Yahoo password will NOT work.",
 		"CAP_REACHED": "You have reached the maximum number of external mailboxes allowed by your administrator.",
-		"FEATURE_DISABLED": "External mailboxes are not enabled on this server."
+		"FEATURE_DISABLED": "External mailboxes are not enabled on this server.",
+		"MANUAL_CONFIG_TOGGLE": "Manual server configuration (advanced)",
+		"MANUAL_CONFIG_HINT": "Only fill this in if your provider is not detected automatically or if you want to connect a custom domain (e.g. hosted on your own server).",
+		"MANUAL_IMAP_LEGEND": "Incoming mail (IMAP)",
+		"MANUAL_SMTP_LEGEND": "Outgoing mail (SMTP)",
+		"MANUAL_HOST_LABEL": "Server",
+		"MANUAL_PORT_LABEL": "Port",
+		"MANUAL_SECURE_LABEL": "Encryption",
+		"MANUAL_SECURE_SSL": "SSL / TLS (recommended)",
+		"MANUAL_SECURE_STARTTLS": "STARTTLS",
+		"MANUAL_SECURE_NONE": "None",
+		"MANUAL_SMTP_AUTH": "SMTP server requires authentication",
+		"MANUAL_FALLBACK_HINT": "The provider for this domain could not be detected automatically. Please enter the IMAP and SMTP server details manually below."
 	}
 }
