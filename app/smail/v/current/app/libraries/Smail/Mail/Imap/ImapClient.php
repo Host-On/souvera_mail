@@ -155,6 +155,57 @@ class ImapClient extends \Smail\Mail\Net\NetClient
 					$oResponse = $this->getResponse();
 				}
 			}
+			else if ('PLAIN' === $type)
+			{
+				// RFC 4616 SASL PLAIN — restored in v0.16.1 for external
+				// mailboxes (uelzen.email, web.de, GMX, …) whose servers
+				// don't accept the Stalwart-only OAUTHBEARER / XOAUTH2.
+				//
+				// Continuation-based flow (works with servers that DO NOT
+				// advertise SASL-IR / RFC 4959 too):
+				//   C: AUTHENTICATE PLAIN
+				//   S: +               (challenge — always empty for PLAIN)
+				//   C: <b64(\0 user \0 pass)>
+				//   S: OK / NO
+				$this->SendRequest('AUTHENTICATE', array($type));
+				$oResponse = $this->getResponse();
+				$oR = $oResponse->getLast();
+				if ($oR && Enumerations\ResponseType::CONTINUATION->value === $oR->ResponseType) {
+					$sAuth = $SASL->authenticate($sLogin, $sPassword);
+					$this->logMask($sAuth);
+					$this->sendRaw($sAuth);
+					$oResponse = $this->getResponse();
+				}
+			}
+			else if ('LOGIN' === $type)
+			{
+				// SASL LOGIN — two-step challenge/response (username,
+				// then password). Restored in v0.16.1 alongside PLAIN.
+				//
+				//   C: AUTHENTICATE LOGIN
+				//   S: + <b64 "Username:">
+				//   C: <b64 username>
+				//   S: + <b64 "Password:">
+				//   C: <b64 password>
+				//   S: OK / NO
+				$this->SendRequest('AUTHENTICATE', array($type));
+				$oResponse = $this->getResponse();
+				$oR = $oResponse->getLast();
+				if ($oR && Enumerations\ResponseType::CONTINUATION->value === $oR->ResponseType) {
+					$sUsername = $SASL->authenticate($sLogin, $sPassword);
+					$this->sendRaw($sUsername);
+					$oResponse = $this->getResponse();
+					$oR = $oResponse->getLast();
+					if ($oR && Enumerations\ResponseType::CONTINUATION->value === $oR->ResponseType) {
+						$sPass = $SASL->challenge('');
+						if (null !== $sPass) {
+							$this->logMask($sPass);
+							$this->sendRaw($sPass);
+							$oResponse = $this->getResponse();
+						}
+					}
+				}
+			}
 			else
 			{
 				throw new \Smail\Mail\RuntimeException("Unsupported SASL mechanism: {$type}");

@@ -198,6 +198,56 @@ dialog[open] .tabs > label {
 	cursor: pointer;
 }
 
+/* v0.16.1 — Snappymail's `.alert` inside popups (form errors like
+ * "Authentifizierung fehlgeschlagen") relies on `.close { float: right; }`
+ * so the close-X sits inline with the error title. Nextcloud's global
+ * CSS applies `display: flex` / `float: none` variants to `.close` in
+ * some skins, which drops the X onto its own line ABOVE the title —
+ * the operator reported this as "X ist so allein und der Titel dann
+ * darunter". Force absolute positioning + adequate left padding to
+ * guarantee the intended layout regardless of ambient theme. */
+dialog .modal-body .alert {
+	position: relative;
+	padding: 10px 44px 10px 14px !important;
+	min-height: 24px;
+	display: block;
+}
+dialog .modal-body .alert > .close {
+	position: absolute !important;
+	top: 6px;
+	right: 10px;
+	float: none !important;
+	margin: 0;
+	line-height: 1;
+	font-size: 20px;
+	font-weight: 700;
+	padding: 2px 6px;
+	color: inherit;
+	opacity: 0.6;
+	cursor: pointer;
+	background: transparent;
+	border: 0;
+	text-decoration: none;
+	z-index: 1;
+}
+dialog .modal-body .alert > .close:hover,
+dialog .modal-body .alert > .close:focus {
+	opacity: 1;
+}
+dialog .modal-body .alert > span,
+dialog .modal-body .alert > div {
+	display: block;
+}
+dialog .modal-body .alert > span[data-bind*="submitError"] {
+	font-weight: 700;
+}
+dialog .modal-body .alert > div {
+	margin-top: 4px;
+	font-weight: 400;
+	opacity: 0.95;
+	word-break: break-word;
+}
+
 /* v0.16.0 — "NEW" badge for freshly imported folders (P1).
  * Injected by `plugins/nextcloud/js/folder-imported-badge.js` after a
  * mailbox migration completes. Auto-expires after 24 h via the

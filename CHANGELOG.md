@@ -6,6 +6,116 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.16.1] — 2026-02 (P0-Hotfix: SASL PLAIN + LOGIN Support + .alert-Layout)
+
+### Operator-Report zum v0.16.0
+
+Nach v0.16.0 Deploy: External-Account-Popup öffnet manuelle
+Server-Konfiguration korrekt, User trägt IMAP + SMTP ein →
+**„Authentifizierung fehlgeschlagen — No supported SASL mechanism
+found, remote server wants: AUTH=PLAIN, AUTH=LOGIN"**. Und im
+Popup: das rote X liegt DARÜBER statt neben dem Fehler-Titel.
+
+### Root Causes
+
+**Bug #A — SASL-Klassen fehlten:**
+
+Der Souvera-Mail-Fork des Snappymail-Engine hat beim Fork nur zwei
+SASL-Klassen behalten (`OAUTHBEARER`, `XOAUTH2` — für Stalwart-only
+SSO). `PLAIN`, `LOGIN`, `CRAM-*` wurden komplett aus dem Engine
+entfernt. Selbst wenn `Domain->ImapSettings->SASLMechanisms` jetzt
+`['PLAIN', 'LOGIN', 'CRAM-MD5']` enthält (v0.16.0 Fix), scheitert:
+
+1. `SASL::isSupported('PLAIN')` → `class_exists()` = false → Return false
+2. Loop in `ImapClient::Login()` findet keinen Match → wirft
+   "No supported SASL mechanism found".
+
+**Bug #B — .alert Layout:**
+
+Snappymails `.close` nutzt `float: right` in einem `<a>` innerhalb
+`.alert`. Nextcloud's Global-CSS applied `display: block` /
+`float: none` in einigen Skins → X springt auf eine eigene Zeile,
+Titel rutscht drunter.
+
+### Was in v0.16.1 gefixt wurde
+
+**Bug #A — PLAIN + LOGIN SASL wieder eingeführt:**
+
+- **NEU: `app/libraries/Smail/Engine/sasl/plain.php`** — Klasse
+  `\Smail\Engine\SASL\PLAIN` mit `authenticate()` das das
+  RFC-4616-konforme `authzid \0 authcid \0 passwd` base64-codiert
+  zurückgibt.
+- **NEU: `app/libraries/Smail/Engine/sasl/login.php`** — Klasse
+  `\Smail\Engine\SASL\LOGIN` mit `authenticate()` für die
+  Username-Response + `challenge()` für die Password-Response;
+  `hasChallenge()` = true. Interne `$passwordSent`-Guard verhindert
+  doppelte Password-Ausgabe.
+- **`ImapClient::Login()`** — zwei neue `else if`-Branches:
+  - `'PLAIN'` → Continuation-Flow ohne SASL-IR:
+    `AUTHENTICATE PLAIN` → `+` → `<b64 payload>` → `OK`.
+  - `'LOGIN'` → Two-step Continuation:
+    `AUTHENTICATE LOGIN` → `+ VXNlcm5hbWU6` → `<b64 user>` →
+    `+ UGFzc3dvcmQ6` → `<b64 pass>` → `OK`.
+- **`SmtpClient::Login()`** — analog dazu:
+  - `'PLAIN'` → einfache `sendRequestWithCheck($sAuth, 235)`.
+  - `'LOGIN'` → 334 (Username:) → base64(user) → 334
+    (Password:) → base64(pass) → 235.
+- Der bestehende `assertEncryptedForBearerAuth()`-Gate bleibt
+  aktiv — PLAIN/LOGIN werden NIEMALS über unverschlüsselte
+  Verbindungen abgeschickt (außer localhost).
+- Der `throw` für „echte" unbekannte Mechanismen bleibt bestehen —
+  nur PLAIN/LOGIN/OAUTHBEARER/XOAUTH2 werden akzeptiert.
+
+**Bug #B — .alert-Layout-Fix:**
+
+- Neue CSS-Regeln in `external-accounts.css`:
+  - `dialog .modal-body .alert` bekommt
+    `position: relative; padding: 10px 44px 10px 14px;` — reserviert
+    44 px am rechten Rand für die absolute X-Position.
+  - `dialog .modal-body .alert > .close` bekommt
+    `position: absolute; top: 6px; right: 10px; float: none
+    !important;` — X sitzt jetzt IMMER oben rechts.
+  - Titel-`<span>` bekommt `font-weight: 700`, additional-Detail-Div
+    wird darunter mit `margin-top: 4px` gesetzt.
+
+### Neuer Test
+
+- **`tests/test_v0_16_1.php`** — 29 Assertions:
+  - PLAIN/LOGIN-SASL-Klassen existieren auf Disk
+  - FQN + `isSupported` returnt true
+  - ImapClient / SmtpClient handlen PLAIN + LOGIN
+  - .alert CSS-Layout-Fix
+  - Version-Regex-Pin bleibt bei künftigen Bumps grün.
+
+### Verifikation
+
+- `php -l` clean auf allen modifizierten PHP-Dateien (4).
+- **Volle Regressions-Suite: 58/58 PASS** (57 + `test_v0_16_1.php`).
+
+### Files touched
+
+```
+new: /app/app/smail/v/current/app/libraries/Smail/Engine/sasl/plain.php
+new: /app/app/smail/v/current/app/libraries/Smail/Engine/sasl/login.php
+new: /app/tests/test_v0_16_1.php
+mod: /app/app/smail/v/current/app/libraries/Smail/Mail/Imap/ImapClient.php
+mod: /app/app/smail/v/current/app/libraries/Smail/Mail/Smtp/SmtpClient.php
+mod: /app/app/smail/v/current/app/plugins/nextcloud/css/external-accounts.css
+mod: /app/appinfo/info.xml, /app/package.json  (0.16.0 → 0.16.1)
+```
+
+### Operator-Aktion nach Deploy
+
+1. Rsync 0.16.1.
+2. `sudo systemctl reload php8.3-fpm` (OpCache reset — sonst hält
+   der alte ImapClient-Code, der PLAIN/LOGIN nicht kennt).
+3. `philip@uelzen.email` mit manuellem IMAP (`mail.uelzen.email:993 SSL`)
+   + SMTP (`mail.uelzen.email:465 SSL`) → Login sollte durchgehen
+   (PLAIN-Fallback greift auch, wenn der Server nur AUTH=LOGIN
+   anbietet).
+4. Falls in der Zukunft nochmal ein Auth-Fehler kommt: X + Titel
+   liegen jetzt sauber nebeneinander in der roten Fehler-Box.
+
 ## [0.16.0] — 2026-02 (P0 + P1: Manuelle IMAP/SMTP, "Erweitert"-Tab, Ordner-NEU-Badge)
 
 ### Operator-Report

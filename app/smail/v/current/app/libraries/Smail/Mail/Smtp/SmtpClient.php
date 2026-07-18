@@ -179,21 +179,59 @@ class SmtpClient extends \Smail\Mail\Net\NetClient
 
 		try
 		{
-			// OAUTHBEARER / XOAUTH2 only (NC-only SSO)
-			$sRequest = $SASL->authenticate($sLogin, $sPassword);
-			if ($sRequest) {
-				$this->logMask($sRequest);
-				$sResult = $this->sendRequestWithCheck($sRequest, [235, 334]);
-				if (!empty($this->aResults[0]) && \str_starts_with($this->aResults[0], '334')) {
-					// RFC 7628: a rejected bearer token comes back as a 334 base64
-					// JSON error challenge; the client must answer with the dummy
-					// response (single ^A) to receive the final reply.
-					if (\preg_match('/^[a-zA-Z0-9=+\/]+$/', $sResult)) {
-						$this->logWrite(\base64_decode($sResult), \LOG_WARNING);
+			if ('OAUTHBEARER' === $type || 'XOAUTH2' === $type)
+			{
+				// NC-only bearer path — single-shot SASL-IR
+				$sRequest = $SASL->authenticate($sLogin, $sPassword);
+				if ($sRequest) {
+					$this->logMask($sRequest);
+					$sResult = $this->sendRequestWithCheck($sRequest, [235, 334]);
+					if (!empty($this->aResults[0]) && \str_starts_with($this->aResults[0], '334')) {
+						// RFC 7628: a rejected bearer token comes back as a 334 base64
+						// JSON error challenge; the client must answer with the dummy
+						// response (single ^A) to receive the final reply.
+						if (\preg_match('/^[a-zA-Z0-9=+\/]+$/', $sResult)) {
+							$this->logWrite(\base64_decode($sResult), \LOG_WARNING);
+						}
+						$sResult = $this->sendRequestWithCheck('AQ==', 235);
 					}
-					$sResult = $this->sendRequestWithCheck('AQ==', 235);
+					$SASL->verify($sResult);
+				}
+			}
+			else if ('PLAIN' === $type)
+			{
+				// RFC 4954 SMTP AUTH PLAIN — restored in v0.16.1 alongside
+				// the IMAP counterpart. Single-shot: server sent a 334
+				// continuation (usually empty) after the "AUTH PLAIN"
+				// above; we now reply with the base64 auth payload.
+				$sRequest = $SASL->authenticate($sLogin, $sPassword);
+				if ($sRequest) {
+					$this->logMask($sRequest);
+					$sResult = $this->sendRequestWithCheck($sRequest, 235);
+					$SASL->verify($sResult);
+				}
+			}
+			else if ('LOGIN' === $type)
+			{
+				// SMTP AUTH LOGIN — two-step exchange:
+				//   334 "Username:"   -> C: <b64 user>
+				//   334 "Password:"   -> C: <b64 pass>
+				//   235 OK.
+				//
+				// Restored in v0.16.1 for legacy MTAs that only
+				// advertise AUTH LOGIN (not PLAIN).
+				$sUsername = $SASL->authenticate($sLogin, $sPassword);
+				$sResult = $this->sendRequestWithCheck($sUsername, 334);
+				$sPass = $SASL->challenge('');
+				if (null !== $sPass) {
+					$this->logMask($sPass);
+					$sResult = $this->sendRequestWithCheck($sPass, 235);
 				}
 				$SASL->verify($sResult);
+			}
+			else
+			{
+				throw new \Smail\Mail\RuntimeException("Unsupported SASL mechanism: {$type}");
 			}
 		}
 		catch (\Smail\Mail\Smtp\Exceptions\NegativeResponseException $oException)
