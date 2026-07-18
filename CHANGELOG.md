@@ -6,6 +6,123 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.16.3] — 2026-02 (P0-Hotfix: „Seite nicht gefunden" — Composer-Classmap-Repair)
+
+### Operator-Report zum v0.16.2 Deploy
+
+> „WTF nun kommt auf /apps/souvera_mail: Seite nicht gefunden!? HÖH?"
+
+Nach v0.16.2 Deploy war die komplette App über `/apps/souvera_mail`
+nicht mehr erreichbar. Nextcloud gab „Seite nicht gefunden" zurück.
+
+### Root Cause
+
+Der Deploy-Prozess führt bei fresh-tarball / Repo-Checkout einen
+`composer install` (bzw. `composer dump-autoload`) aus. **Composer
+≥ 2.4 hat PSR-4-Enforcement massiv verschärft** und meldet:
+
+    Class OCA\SouveraMail\Sieve\Rule located in ./lib/Sieve/Types.php
+    does not comply with psr-4 autoloading standard. Skipping.
+
+**Das Design seit v0.14.44:**
+- `lib/Sieve/Types.php` enthält 5 Value-Object-Klassen (Rule,
+  TestNode, ActionNode, MessageFacts, EvaluatedActions) in EINER Datei.
+- 5 PSR-4-Shim-Files (`Rule.php`, `TestNode.php`, `ActionNode.php`,
+  `MessageFacts.php`, `EvaluatedActions.php`) tun nur
+  `require_once __DIR__ . '/Types.php';`.
+
+**Composer 2.5+ sieht die Shims als „declares no class" → SKIPPED**,
+und Types.php ebenfalls als „does not comply with PSR-4" →
+gesamt **0 Sieve-Mappings** im generierten classmap!
+
+Erste Anfrage die `\OCA\SouveraMail\Sieve\Rule` benötigt →
+`Class not found` Fatal → Nextcloud markiert die App als „broken"
+→ deaktiviert sie → `/apps/souvera_mail` → 404 „Seite nicht
+gefunden".
+
+### Fix
+
+1. **`scripts/fix-classmap.php` (NEU)** — nach jedem
+   `composer dump-autoload` läuft dieses Script und trägt die
+   5 Sieve → shim-file Mappings nachträglich in
+   `vendor/composer/autoload_classmap.php` UND
+   `vendor/composer/autoload_static.php` ein.
+   - Idempotent (mehrfacher Aufruf ist no-op)
+   - Skipped gracefully wenn `vendor/composer/` nicht existiert
+     (fresh checkout ohne Composer-Install)
+   - Patches BEIDE Loader-Dateien (Standard-Runtime + optimized-Static)
+
+2. **`composer.json` → `scripts.post-autoload-dump`** — hookt das
+   Script auf jedes `dump-autoload` / `install` / `update`:
+   ```json
+   "scripts": {
+       "post-autoload-dump": [
+           "@php scripts/fix-classmap.php"
+       ]
+   }
+   ```
+
+### Warum wurde das erst jetzt bemerkt?
+
+- Die vendor-Files wurden **NICHT im Git-Repository** eingecheckt
+  (bewusste Entscheidung — vendor/ gilt als build artefact).
+- Bisher hatte der Operator vermutlich einen älteren classmap
+  aus Composer 2.3 oder älter (der die Shim-Files noch tolerierte)
+  ODER er hat den classmap händisch generiert.
+- Der frische v0.16.2 Deploy triggerte einen NEUEN
+  `composer install` mit Composer 2.5.5 (Debian 12 default), der
+  die Sieve-Klassen SKIPPED.
+
+### Neuer Test
+
+- **`tests/test_v0_16_3.php`** — 29 Assertions:
+  - fix-classmap.php existiert, ist PHP-syntax-clean
+  - composer.json post-autoload-dump ist wired up
+  - Alle 5 Sieve-Klassen sind im live-classmap richtig gemappt
+  - PLAIN + LOGIN SASL (v0.16.1) sind erhalten geblieben
+  - Idempotenz (2. Skript-Lauf → no mutations)
+  - classmap enthält 300+ Klassen (Sanity check)
+  - Version-Regex-Pin.
+
+### Verifikation
+
+- `composer dump-autoload --optimize` → 309 Klassen generiert →
+  fix-classmap.php trägt 5 Sieve-Mappings nach → **alles OK**.
+- **Volle Regressions-Suite: 60/60 PASS**.
+
+### Files touched
+
+```
+new: /app/scripts/fix-classmap.php
+new: /app/tests/test_v0_16_3.php
+mod: /app/composer.json  (post-autoload-dump hook)
+mod: /app/appinfo/info.xml, /app/package.json  (0.16.2 → 0.16.3)
+mod: /app/vendor/composer/autoload_classmap.php  (regenerated w/ fix)
+mod: /app/vendor/composer/autoload_static.php  (regenerated w/ fix)
+```
+
+### Operator-Aktion nach Deploy
+
+**KRITISCH:** Nach Rsync von 0.16.3:
+
+1. Auf dem Server: `cd /var/www/nextcloud/custom_apps/souvera_mail && composer install --no-dev --optimize-autoloader`
+   → das ruft automatisch `scripts/fix-classmap.php` post-dump auf.
+2. `sudo systemctl reload php8.3-fpm` (OpCache reset — sonst
+   hält der alte broken classmap).
+3. **Ohne** die Möglichkeit composer zu laufen (fresh tarball):
+   die im Repo enthaltene `vendor/composer/autoload_classmap.php`
+   ist bereits korrekt gepatcht — einfach mit-deployen.
+4. `sudo -u www-data ./occ app:enable souvera_mail` — falls
+   Nextcloud die App zwischenzeitlich disable-t hat.
+5. `/apps/souvera_mail` sollte wieder erreichbar sein.
+
+### Prophylaxe
+
+Falls in Zukunft neue Value-Object-Klassen in Types.php reinkommen:
+- Neuen Shim-File `NewClass.php` mit `require_once __DIR__ . '/Types.php';`
+- Neuen Eintrag in `scripts/fix-classmap.php` unter `$SHIMS`
+- Neuen Test-Fall in `test_sieve_apply_json_error_handling.php`.
+
 ## [0.16.2] — 2026-02 (P0-Hotfix: SORT-Capability nach Auth refetchen)
 
 ### Operator-Report zum v0.16.1

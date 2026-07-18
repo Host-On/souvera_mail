@@ -24,6 +24,8 @@
         ]
     },
     "scripts": {
-        "post-autoload-dump": []
+        "post-autoload-dump": [
+            "@php scripts/fix-classmap.php"
+        ]
     }
 }
