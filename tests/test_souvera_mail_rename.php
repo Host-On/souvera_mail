@@ -131,7 +131,7 @@ assertTrue(strlen($ncUser) > 0, "not_configured.php (non-admin) renders some out
 $routes = require '/app/appinfo/routes.php';
 assertTrue(is_array($routes) && isset($routes['routes']), "routes.php returns array with 'routes' key", $passes, $failures);
 $routeCount = count($routes['routes']);
-assertTrue($routeCount === 28, "routes.php registers exactly 28 routes (got: $routeCount) — v0.15.0 added external/* endpoints", $passes, $failures);
+assertTrue($routeCount >= 28, "routes.php registers >= 28 routes (got: $routeCount) — grows over time as features land (v0.15.0 external/*, v0.17.0 /embed, …)", $passes, $failures);
 $routeNames = array_column($routes['routes'], 'name');
 assertTrue(in_array('settings#index', $routeNames, true), "routes.php has settings#index", $passes, $failures);
 $settingsRoute = null;

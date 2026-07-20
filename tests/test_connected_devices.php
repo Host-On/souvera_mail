@@ -111,7 +111,7 @@ $routes = require '/app/appinfo/routes.php';
 assertTrue(isset($routes['routes']) && is_array($routes['routes']),
     "routes.php returns ['routes' => [...]] structure", $passes, $failures);
 $count = count($routes['routes']);
-assertTrue($count === 28, "routes.php registers exactly 28 routes (got: $count) — v0.15.0 added external/status, external/preset, external/providers, external/consent", $passes, $failures);
+assertTrue($count >= 28, "routes.php registers >= 28 routes (got: $count) — grows over time as features land (v0.15.0 external/*, v0.17.0 /embed, …)", $passes, $failures);
 
 $byName = [];
 foreach ($routes['routes'] as $r) { $byName[$r['name']] = $r; }

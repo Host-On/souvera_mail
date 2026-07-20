@@ -34,6 +34,42 @@ class PageController extends Controller
     #[NoCSRFRequired]
     public function index(string $target = '')
     {
+        return $this->renderMailApp(false);
+    }
+
+    /**
+     * v0.17.0 — Dedicated standalone entry point. Same code path as
+     * index(), but ALWAYS renders without the Nextcloud shell (no
+     * header, no app menu, no rounded containers). Used by mobile
+     * WebView wrappers that want the mail UI full-screen.
+     *
+     * Route: GET /apps/souvera_mail/embed
+     *
+     * Auth: NoAdminRequired only — the Nextcloud session middleware
+     * still runs; an unauthenticated visitor gets the usual /login
+     * redirect (NOT a hard 401), so the WebView's cookie jar picks
+     * up the OIDC session cleanly.
+     *
+     * @return TemplateResponse|void
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function embed()
+    {
+        return $this->renderMailApp(true);
+    }
+
+    /**
+     * Shared implementation for `index()` (with `?embedded=1`
+     * detection) and `embed()` (always standalone).
+     *
+     * @param bool $forceStandalone true if the caller was the
+     *   dedicated /embed route; false leaves detection to the
+     *   ?embedded= / ?standalone= query params.
+     * @return TemplateResponse|void
+     */
+    private function renderMailApp(bool $forceStandalone)
+    {
         // No domain configured → show setup hint instead of useless login form
         if (empty($this->domainService->listDomains())) {
             $isAdmin = $this->userId && $this->groupManager->isAdmin($this->userId);
@@ -42,17 +78,53 @@ class PageController extends Controller
             ]);
         }
 
-        $queryString = $this->request->server['QUERY_STRING'] ?? '';
-        if ($queryString !== '') {
+        // v0.17.0 — Detect the standalone / embedded mode.
+        //
+        //   `?embedded=1`   ← WebView wrapper convention
+        //   `?standalone=1` ← alias, some callers prefer that spelling
+        //   /embed route    ← $forceStandalone === true
+        //
+        // The chosen mode drives two things:
+        //   a) `\OCP\Util::addStyle('souvera_mail', 'standalone')`
+        //      instead of 'embed' — the standalone stylesheet expects
+        //      no `#content` wrapper and stretches the SnappyMail root
+        //      to the full viewport.
+        //   b) `TemplateResponse::renderAs('base')` — Nextcloud strips
+        //      the header, app-menu, and #content shell; only the
+        //      SnappyMail HTML + our loaded assets end up in <body>.
+        //
+        // Auth middleware runs unchanged (NoAdminRequired only) —
+        // invalid sessions still get the standard /login redirect.
+        $isStandalone = $forceStandalone
+            || $this->request->getParam('embedded') === '1'
+            || $this->request->getParam('standalone') === '1';
+
+        // Snappymail's own AJAX handler kicks in when the query string
+        // is non-empty (see `/?/Ajax/…` internal URLs). We must NOT
+        // route a bare `?embedded=1` GET through it — that would
+        // return an admin login screen from the engine. Strip our own
+        // params from the check.
+        $rawQuery = $this->request->server['QUERY_STRING'] ?? '';
+        $residualQuery = \preg_replace(
+            '/(?:^|&)(?:embedded|standalone)=[^&]*/',
+            '',
+            $rawQuery
+        );
+        $residualQuery = \ltrim((string) $residualQuery, '&');
+
+        if ($residualQuery !== '') {
             $this->engineHelper->loadApp();
             $this->engineHelper->startApp(true);
-
             return;
         }
 
         $this->navigationManager->setActiveEntry('souvera_mail');
 
-        \OCP\Util::addStyle('souvera_mail', 'embed');
+        if ($isStandalone) {
+            \OCP\Util::addStyle('souvera_mail', 'standalone');
+        } else {
+            \OCP\Util::addStyle('souvera_mail', 'embed');
+        }
         // Souvera Mail v0.14.11: welcome-wizard for the IMAP-import
         // flow, now built on Vue 3 + @nextcloud/vue v9 following the
         // Souvera Design System (shared with Central / Shield). The
@@ -105,6 +177,10 @@ class PageController extends Controller
                 '$1',
                 $oActions->compileCss($oActions->GetTheme(false), false)
             ),
+            // v0.17.0 — surfaced to the template so it can add a
+            // <body>-level class (via inline <script>) that our
+            // standalone.css hangs off for full-viewport layout.
+            'IsStandalone' => $isStandalone,
         ];
 
         \OCP\Util::addHeader('link', [
@@ -116,6 +192,14 @@ class PageController extends Controller
         $response = new TemplateResponse('souvera_mail', 'index_embed', $params);
 
         $response->setContentSecurityPolicy($csp);
+
+        if ($isStandalone) {
+            // Strip the full Nextcloud UI — no header, no app menu,
+            // no #content shell, no rounded containers. NC still
+            // wraps our HTML in a minimal <html><head><body>… and
+            // injects the CSS/JS registered via addStyle/addScript.
+            $response->renderAs('base');
+        }
 
         return $response;
     }

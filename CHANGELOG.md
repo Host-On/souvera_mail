@@ -6,6 +6,146 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-02 (Embedded / Standalone-Modus für Mobile WebView)
+
+### Operator-Anforderung
+
+> Eine URL, die die SnappyMail-Oberfläche ohne jegliche Nextcloud-
+> Shell ausliefert (kein #header, kein App-Menü, keine abgerundeten
+> Container/Ränder) — aber die bestehende Nextcloud-Session /
+> OIDC-Authentifizierung weiter nutzt.
+>
+> Zwei gleichwertige Wege — einer reicht:
+>   (a) `?embedded=1` / `?standalone=1` an bestehender Route
+>   (b) Dedizierte Route `/embed`
+>
+> Auth-Middleware bleibt aktiv → OIDC-Session greift wie gewohnt;
+> fehlende Session redirected zu /login (nicht hart 401).
+
+### Implementation
+
+**Beides umgesetzt (Operator hatte gesagt: einer reicht — Convenience
+für unterschiedliche Aufrufer):**
+
+- **`PageController::embed()`** — neue Action, dedizierte Route.
+- **`PageController::index()`** — erkennt zusätzlich `?embedded=1`
+  oder `?standalone=1` als Alias.
+- Beide teilen sich eine private `renderMailApp(bool $forceStandalone)`
+  Methode — DRY, konsistentes Verhalten.
+
+**Kritischer Detail-Fix — der SnappyMail-AJAX-Gate:**
+Der bestehende Code prüft `$queryString !== ''` und leitet dann
+direkt an die SnappyMail-Engine weiter (ohne NC-Template). Ein
+nacktes `?embedded=1` hätte diesen Pfad getriggert und dem User
+einen Admin-Login-Screen aus der Engine gezeigt. Ich strippe unsere
+eigenen Params vor der AJAX-Gate-Prüfung:
+
+```php
+$residualQuery = \preg_replace(
+    '/(?:^|&)(?:embedded|standalone)=[^&]*/',
+    '', $rawQuery);
+if ($residualQuery !== '') { /* echter AJAX-Call */ }
+```
+
+**Rendering-Modus:**
+```php
+if ($isStandalone) {
+    $response->renderAs('base');
+}
+```
+
+`renderAs('base')` in Nextcloud → nur ein minimales
+`<html><head>{addStyle/addScript}</head><body>{template}</body></html>`
+Wrapper. Kein Header, kein App-Menü, kein `#content`-Shell mit
+abgerundeten Ecken. Aber die `Util::addStyle('souvera_mail',
+'standalone')` und `addScript` calls werden weiterhin verarbeitet —
+CSS/JS laden normal.
+
+**Neue standalone.css** (`css/standalone.css`):
+- Full-Viewport: `html/body { height: 100%; overflow: hidden; }`
+- `#x2m-app { position: fixed; inset: 0; width: 100vw; height: 100vh; border-radius: 0; }`
+- Kein `#content`-Selektor (den es im base-Render gar nicht gibt)
+- Alle SSO-Mode-Regeln aus `embed.css` übernommen (Logout-Buttons
+  hidden etc.), aber ohne `#content`-Scoping
+
+**Body-Padding bereinigt:**
+NC's Base-Layout appliziert `padding-top: 50px` für den Header —
+wir überschreiben mit `padding: 0 !important` weil kein Header
+existiert.
+
+### URLs für die WebView-App
+
+```
+/index.php/apps/souvera_mail/?embedded=1
+/index.php/apps/souvera_mail/?standalone=1
+/index.php/apps/souvera_mail/embed
+```
+
+Alle drei identisches Verhalten. Auth-Middleware unverändert →
+OIDC-Session gilt wie im Full-UI-Modus. Bei fehlender Session:
+Standard-`/login`-Redirect von Nextcloud.
+
+### Zur Frage "läuft SnappyMail intern in einem iframe?"
+
+**Nein.** SnappyMail wird direkt in NC's Template gerendert
+(`templates/index_embed.php` → `<div id="x2m-app">…</div>` inline
+im NC `<body>`). Es gibt keine eigene iframe-src-URL. Daher der
+`renderAs('base')`-Ansatz — cleanster Weg, die NC-Shell serverseitig
+wegzulassen.
+
+### Non-Regression
+
+- Default `/apps/souvera_mail/` (ohne Query-Param, ohne `/embed`)
+  rendert unverändert MIT NC-Shell (kein Verhaltenswandel für
+  Web-Nutzer).
+- SnappyMail-AJAX-Endpunkte funktionieren weiter (der residual-
+  query-Filter ignoriert `embedded`/`standalone`, alle anderen
+  Query-Strings triggern die Engine wie zuvor).
+- Alle existierenden Test-Suiten grün (61/61 nach diesem Step).
+
+### Neuer Test
+
+- **`tests/test_v0_17_0_embedded_mode.php`** — 29 Assertions:
+  - Beide Entry-Points existieren (index() mit Query-Params + embed())
+  - Beide tragen `#[NoAdminRequired]` (Auth-Middleware konsistent)
+  - Residual-Query-Filter strippt embedded/standalone vor AJAX-Gate
+  - `renderAs('base')` wird nur im Standalone-Modus aufgerufen
+  - Standalone lädt `standalone.css`, Default lädt weiterhin `embed.css`
+  - `/embed` Route in routes.php + parseable + GET
+  - standalone.css hat Full-Viewport-Foundation + SSO-Regeln
+  - Version-Regex-Pin.
+- Zwei bestehende Tests (`test_connected_devices.php`,
+  `test_souvera_mail_rename.php`) hatten fixe „exactly 28 routes"
+  Assertions — auf `>= 28` gelockert, da /embed die 29. Route ist.
+
+### Verifikation
+
+- `php -l` clean auf PageController + routes.
+- **Volle Regressions-Suite: 61/61 PASS** (60 + `test_v0_17_0_…`).
+
+### Files touched
+
+```
+new: /app/css/standalone.css
+new: /app/tests/test_v0_17_0_embedded_mode.php
+mod: /app/lib/Controller/PageController.php  (embed() + renderMailApp() refactor)
+mod: /app/appinfo/routes.php  (page#embed registriert)
+mod: /app/tests/test_connected_devices.php  (=== 28 → >= 28)
+mod: /app/tests/test_souvera_mail_rename.php  (=== 28 → >= 28)
+mod: /app/appinfo/info.xml, /app/package.json  (0.16.3 → 0.17.0)
+```
+
+### Operator-Aktion nach Deploy
+
+1. Rsync 0.17.0.
+2. `composer install --no-dev --optimize-autoloader` (post-hook aus
+   v0.16.3 patched den classmap automatisch).
+3. `sudo systemctl reload php8.3-fpm` (OpCache reset).
+4. In der Mobile-App die WebView-URL auf `<NC>/index.php/apps/souvera_mail/embed`
+   umstellen (oder alternativ `?embedded=1` an der bestehenden URL
+   dranhängen).
+5. Kein zweiter Login nötig — die OIDC-Session aus NC gilt.
+
 ## [0.16.3] — 2026-02 (P0-Hotfix: „Seite nicht gefunden" — Composer-Classmap-Repair)
 
 ### Operator-Report zum v0.16.2 Deploy

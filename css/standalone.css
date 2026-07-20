@@ -1,0 +1,158 @@
+/*
+ * Souvera Mail — Standalone / Embedded stylesheet (v0.17.0).
+ *
+ * Loaded when the mail app is rendered with `?embedded=1`,
+ * `?standalone=1`, or via the `/embed` route (see
+ * PageController::renderMailApp()). The Nextcloud shell (header,
+ * app menu, #content wrapper with rounded corners) is intentionally
+ * absent because we called `TemplateResponse::renderAs('base')`.
+ *
+ * This stylesheet:
+ *   - stretches the SnappyMail app root to the full viewport,
+ *   - removes any residual body padding / borders NC's boot CSS
+ *     may have set,
+ *   - kills SnappyMail's SSO-inappropriate logout controls exactly
+ *     like `embed.css` does (users still log out via Nextcloud —
+ *     for the WebView wrapper this means "close the app" or
+ *     "reset the OIDC session").
+ *
+ * Where `embed.css` scopes rules to `#content .app-smail`, this
+ * file scopes to `body` / `#x2m-app` directly — there is no
+ * `#content` in the base render mode.
+ */
+
+/* --- Full-viewport foundation --- */
+html,
+body {
+	margin: 0;
+	padding: 0;
+	height: 100%;
+	min-height: 100%;
+	overflow: hidden;
+	background: var(--color-main-background, #fff);
+}
+
+/* NC's base layout applies `padding-top: 50px` etc. for the missing
+ * header — undo. */
+body {
+	padding: 0 !important;
+	border: 0;
+	box-sizing: border-box;
+}
+
+/* SnappyMail's root — full viewport, no rounded corners, no scroll
+ * chaining to the browser. */
+#x2m-app {
+	position: fixed;
+	inset: 0;
+	width: 100vw;
+	height: 100vh;
+	max-width: none;
+	max-height: none;
+	min-height: 100vh;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 0;
+	background: var(--color-main-background, #fff);
+	overflow: hidden;
+}
+
+/* Loading splash — centred inside the full viewport, not offset
+ * by an absent NC header. */
+#x2m-loading {
+	position: fixed;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	background: var(--color-main-background, #fff);
+	z-index: 9999;
+}
+
+#x2m-content {
+	width: 100%;
+	height: 100%;
+}
+
+/* --- SSO-mode UX (identical to embed.css but without the
+ *     `#content` scoping) --- */
+
+/* Hide SM admin logout — admin panel accessed via NC settings */
+#V-AdminPane .btn-logout {
+	display: none;
+}
+
+/* SSO mode: hide user logout (users log out via Nextcloud, not SM) */
+#x2m-app [data-bind*="logoutClick"] {
+	display: none !important;
+}
+
+/* SSO mode: hide auto-logout setting (NC manages the session) */
+#x2m-app .control-group:has([data-i18n="SETTINGS_SECURITY/LABEL_AUTOLOGOUT"]) {
+	display: none !important;
+}
+
+/* Hide toggleLeftPanel button in settings view — no left panel to toggle */
+#x2m-app .b-toolbar .toggleLeft {
+	display: none !important;
+}
+
+/* Hide redundant folder settings icon in sidebar */
+#x2m-app [data-bind*="configureFolders"] {
+	display: none !important;
+}
+
+/* SnappyMail's global list resets bleed into WebView native controls
+ * — scope them to #x2m-app only (mirrors embed.css's guard, but
+ * against a different target because there is no NC UI to protect). */
+#x2m-app ul,
+#x2m-app ol {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+/* Firefox < 98 dialog polyfill offset — no NC header to clear */
+#x2m-app dialog.polyfill {
+	margin-top: 20px;
+	max-height: calc(100vh - 40px);
+}
+
+/* Match embed.css compact form controls */
+#x2m-app select,
+#x2m-app input {
+	min-height: auto;
+	height: auto;
+	margin: 0;
+	padding: 3px;
+}
+#x2m-app .select,
+#x2m-app select {
+	padding-right: 1.5em !important;
+}
+#x2m-app button.btn:not(.button-vue) {
+	min-height: auto;
+	height: auto;
+	margin: 0;
+	padding: 0 12px;
+	line-height: 2;
+}
+#x2m-app .form-horizontal .control-group > :not(label) {
+	margin-left: 20px;
+}
+#x2m-app .squire-plain,
+#x2m-app .squire-wysiwyg {
+	font-size: 13px;
+	height: 100%;
+	line-height: 16px;
+	min-height: 200px;
+}
+
+/* Small-screen tweak — no NC header so the left panel starts at 0 */
+@media screen and (max-width: 799px) {
+	#x2m-left {
+		top: 0;
+	}
+}

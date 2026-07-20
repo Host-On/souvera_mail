@@ -13,6 +13,17 @@ return [
             'verb' => 'POST'
         ],
         [
+            // v0.17.0 — standalone / embedded entry point for WebView
+            // wrappers. Same auth middleware as page#index, but the
+            // response is rendered with `renderAs('base')` — no
+            // Nextcloud header, no app-menu, no rounded #content
+            // shell. Prefer this over `/?embedded=1` for hard-coded
+            // URLs (no query-string quoting to worry about in shells).
+            'name' => 'page#embed',
+            'url' => '/embed',
+            'verb' => 'GET'
+        ],
+        [
             'name' => 'page#appGet',
             'url' => '/app/',
             'verb' => 'GET'
