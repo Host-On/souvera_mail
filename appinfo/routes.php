@@ -69,6 +69,25 @@ return [
             'verb' => 'DELETE'
         ],
         [
+            // v0.18.0 — Native-client Login-Flow endpoint.
+            //
+            // Bit-compatible JSON with NC's /login/v2/poll (`server`,
+            // `loginName`, `appPassword`) so Souvera-Android/iOS/Desktop
+            // clients can drop-in replace the stock Nextcloud login-flow
+            // with a single POST and get a credential that unlocks BOTH
+            // mail (IMAP/SMTP/Sieve, Stalwart) AND Nextcloud/DAV
+            // (WebDAV/CalDAV/CardDAV, NC auth-token) — because Stalwart
+            // 0.16 refuses caller-supplied secrets, this endpoint is the
+            // ONLY way for a headless client to receive a single paired
+            // credential without going through Souvera Mail's web UI.
+            //
+            // See docs/LOGIN_FLOW_CLIENT_INTEGRATION.txt for the client
+            // integration guide (Android / iOS / Desktop examples).
+            'name' => 'loginFlow#create',
+            'url' => '/app-passwords/login-flow',
+            'verb' => 'POST'
+        ],
+        [
             'name' => 'quota#index',
             'url' => '/quota',
             'verb' => 'GET'

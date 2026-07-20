@@ -112,6 +112,25 @@ class AppPasswordService
     /** Human-readable NC token-name suffix so users spot our tokens. */
     private const NC_TOKEN_NAME_SUFFIX = ' (Souvera Mail + DAV)';
 
+    /**
+     * Re-entrancy guard for the reverse-invalidation path.
+     *
+     * When {@see revokeForUser} calls `ncTokenProvider->invalidateTokenById()`,
+     * Nextcloud fires a `TokenInvalidatedEvent`, which our
+     * `NcTokenInvalidatedListener` picks up and forwards to
+     * {@see revokeByNcTokenId}. Without this flag, that reverse call
+     * would try to destroy the Stalwart password a SECOND time (already
+     * gone → `notDestroyed: id not in destroyed list`) and re-delete the
+     * mapping row.
+     *
+     * Declared here (v0.18.0) so PHP 8.2+ `\Error` on undeclared property
+     * access no longer floods the log with
+     *   `Undefined property: OCA\SouveraMail\Service\AppPasswordService::$inRevoke`.
+     * Previous versions relied on the deprecated implicit-property
+     * behaviour, which was removed in PHP 8.2.
+     */
+    private bool $inRevoke = false;
+
     public function __construct(
         private StalwartAdminService $stalwart,
         private StalwartUserContext $userContext,

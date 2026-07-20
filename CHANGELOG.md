@@ -6,6 +6,156 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-02 (Feature: gepaartes App-Password via Native-Client-Endpoint)
+
+### Operator-Request
+
+> „Aktuell wird via dieser App in Stalwart ein App-Password erstellt.
+>  Aber wenn die Nextcloud-App (Android) beim Login ein NC-Passwort
+>  setzt, wird das NICHT in Stalwart gesetzt. Ich hätte gern dass
+>  IMMER für beide eins gesetzt wird. Können wir nicht einfach die
+>  Nextcloud-Funktion zum App-Password erstellen überschreiben?"
+
+### Technische Beschränkung (warum „NC-Funktion überschreiben" NICHT geht)
+
+- Stalwart 0.16 **weist jedes caller-supplied Klartext-Secret zurück**
+  beim `AppPassword/set` — Stalwart generiert selbst aus seinem CSPRNG
+  und liefert das Klartext genau EINMAL. Deshalb funktioniert der
+  klassische Ansatz „AppPasswordCreatedEvent-Listener + Stalwart mit
+  NC-Klartext füttern" prinzipiell nicht.
+- NC's `AppPasswordCreatedEvent` liefert nur das `IToken`-Objekt,
+  **kein Klartext** — die einzige Stelle in NC wo das Klartext
+  existiert, ist als Argument von `ITokenProvider::generateToken()`,
+  bevor es sofort gehashed wird.
+- `ITokenProvider`-Decorator via DI-Override würde das Klartext sehen,
+  aber der aufrufende NC-Login-Flow-v2 liefert es dem Client
+  unabhängig davon aus (Server-Response mit `appPassword`). Selbst
+  wenn wir den NC-Token intern rewriten würden, würde der Client mit
+  dem ORIGINAL-Klartext ankommen, das dann in der DB nicht mehr steht
+  → LOGIN FAILS.
+
+### Gewählter Weg — neuer App-eigener Endpoint
+
+Da Souvera einen **eigenen Android/iOS/Desktop-Client** hat (User-Agent
+`Souvera-android/1.0.2Souvera` etc.), können wir die Client-Seite auf
+einen **neuen App-Endpoint** umstellen, statt NC's Stock-Login-Flow-v2:
+
+```
+POST /apps/souvera_mail/app-passwords/login-flow
+```
+
+- Auth: Basic-Auth (Erstsetup), Session-Cookie (nach WebView-Login),
+  oder OIDC-Bearer — NC's `AuthMiddleware` löst alle drei zu `$userId`
+  auf.
+- Backend ruft **dieselbe** `AppPasswordService::createForUser()` auf,
+  die die Web-UI benutzt: Stalwart-Password → NC-Token mit
+  demselben Klartext gepaart → Mapping-Row persistiert.
+- Response ist **bit-kompatibel** mit NC's `/login/v2/poll`
+  (`server`, `loginName`, `appPassword`) plus zwei Souvera-Extras
+  (`stalwartId`, `createdAt`) — Client-Parser bleibt derselbe.
+
+Der Client speichert das `appPassword` einmal und benutzt es für
+**BEIDE** Auth-Domains gleichzeitig:
+- Nextcloud (Files, WebDAV, CalDAV, CardDAV) via Basic-Auth
+- Mail (IMAP-Receive, SMTP-Send, Sieve) via SASL LOGIN/PLAIN
+
+### Bundle: Bug-Fix
+
+`AppPasswordService::$inRevoke` als **implizite Property** benutzt, aber
+seit PHP 8.2 wirft das eine Deprecation-Warning bei jedem
+Revoke-Aufruf → Log-Spam. Jetzt sauber deklariert:
+
+```php
+private bool $inRevoke = false;
+```
+
+### Security
+
+- `#[BruteForceProtection(action: 'souvera_mail_login_flow')]` —
+  jeder 401 zählt gegen den IP-Counter, exponentielles Backoff nach
+  ~10 Fails in 12 h.
+- `#[NoCSRFRequired]` — native Clients sprechen kein NC-CSRF-Protokoll;
+  Basic-Auth über TLS deckt die Confused-Deputy-Fläche ab.
+- `#[NoAdminRequired]` — jeder User provisioniert nur für sich selbst;
+  kein `uid`-Parameter, keine Privilege-Escalation-Fläche.
+- Response `appPassword` ist Klartext-**einmal-Zusage** wie in NC's
+  eigenem Flow — Client-Guide dokumentiert Keystore/Keychain/DPAPI.
+
+### Client-Integrations-Guide
+
+Neues Dokument `docs/LOGIN_FLOW_CLIENT_INTEGRATION.txt` — ausführliche
+Anleitung mit Code-Beispielen für:
+- Kotlin/Android (OkHttp) mit EncryptedSharedPreferences
+- Swift/iOS (URLSession) mit Keychain
+- Rust/Desktop (reqwest) mit keyring-crate
+- Bash/cURL (Linux/macOS/WSL) mit libsecret/DPAPI/Keychain
+
+Enthält außerdem: Request/Response-Contract, alle Status-Codes,
+Sekundär-Nutzung (DAV + IMAP/SMTP/Sieve), Revocation-Flow,
+Brute-Force-Reset für Admins.
+
+### Regressions-Pin
+
+`tests/test_v0_18_0_login_flow.php` — 63 Assertions:
+- Controller: Namespace + DI-Signatur + PHP-Attribute
+  (`NoAdminRequired`, `NoCSRFRequired`, `BruteForceProtection`)
+- Response-Shape: bit-Kompatibilität mit NC `/login/v2/poll`
+- Status-Codes: 401/400/502/503/429/200
+- Auto-Description-Ableitung aus User-Agent
+- Delegation an `AppPasswordService::createForUser` (kein Bypass
+  privater Stalwart-Helper, kein direkter `generateToken`-Call)
+- Route-Registrierung in `appinfo/routes.php`
+- `$inRevoke`-Property-Declaration + Regression-Guard auf beide
+  Nutzungsstellen
+- Composer-Classmap-Eintrag für PSR-4-Autoloading
+- Client-Guide: Anwesenheit aller 3 Plattform-Beispiele + Auth-Modi
+  + Secure-Storage-Guidance + Brute-Force-Reset-Doku
+- `php -l` Syntax-Check + kanonische NC-Import-Statements
+
+### Regressions-Suite
+
+Alle 64 lokalen Test-Suites bestehen zu 100 %:
+
+```
+$ for t in tests/test_*.php; do php "$t"; done
+… PASSED: 64 / 64
+```
+
+### Files touched (v0.18.0)
+
+**Neu:**
+- `lib/Controller/LoginFlowController.php`
+- `docs/LOGIN_FLOW_CLIENT_INTEGRATION.txt`
+- `tests/test_v0_18_0_login_flow.php`
+
+**Modifiziert:**
+- `lib/Service/AppPasswordService.php` — `$inRevoke` Property-Deklaration
+- `appinfo/routes.php` — `loginFlow#create` Route
+- `appinfo/info.xml` — Version-Bump `0.17.3 → 0.18.0`
+- `package.json` — Version-Bump `0.17.3 → 0.18.0`
+- `vendor/composer/autoload_classmap.php` — LoginFlowController PSR-4
+
+### Deploy
+
+Beinhaltet neue PHP-Klasse ⇒ **composer classmap MUSS regeneriert werden**:
+
+```bash
+rsync -av /path/to/repo/ /mnt/nc-shared/custom_apps/souvera_mail/ \
+  && cd /mnt/nc-shared/custom_apps/souvera_mail \
+  && composer dump-autoload -o \
+  && systemctl reload php8.5-fpm
+```
+
+`reload` (nicht `restart`) leert opcache ohne Downtime — verhindert die
+Race-Condition, die in v0.17.3 zu „PageController does not exist"-Cache
+führte.
+
+### Client-Umstellung erforderlich
+
+Souvera-Android/iOS/Desktop müssen von NC's `/login/v2/*`-Flow auf
+diesen neuen Endpoint umgestellt werden — siehe
+`docs/LOGIN_FLOW_CLIENT_INTEGRATION.txt` für die exakte Änderung.
+
 ## [0.17.3] — 2026-02 (P0-Hotfix: leerer Streifen oben in `/embed`)
 
 ### Operator-Report zu v0.17.2
