@@ -6,6 +6,105 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.17.2] — 2026-02 (P0-Hotfix: /embed AJAX-URL-Rewrite in boot.js + app.js)
+
+### Operator-Report zu v0.17.1
+
+> „weiterhin leider An error occurred. Please refresh the page and
+>  try again. Error: Network response error: 404"
+
+Der v0.17.1-Fix (POST-Route für `/embed`) hat den Bug NICHT
+behoben — weil der 404 nicht vom POST kommt.
+
+### Wahre Root Cause
+
+SnappyMail baut ALLE HTTP-URLs relativ zur aktuellen Page-URL.
+Zwei Stellen im Client-Code:
+
+1. **`static/js/boot.js` Zeile 4** — initial GET AppData fetch:
+   ```js
+   qUri = path => doc.location.pathname.replace(/\/+$/,'') + '/?/' + path
+   ```
+
+2. **`static/js/app.js` Zeile 222** — `BASE`-Konstante für alle
+   nachfolgenden Requests:
+   ```js
+   BASE = doc.location.pathname.replace(/\/+$/,'') + '/'
+   ```
+
+Bei Aufruf über `/apps/souvera_mail/embed`:
+- Beide berechnen: `/apps/souvera_mail/embed/?/…`
+- Der URL-Path ist `/apps/souvera_mail/embed/` — **mit trailing slash**
+- Symfony-Router (den NC intern nutzt) ist **trailing-slash-strict**
+  für benannte Routen: `/embed` matched nicht `/embed/`.
+
+Result: der ALLERERSTE Fetch vom Client (`GET /apps/…/embed/?/AppData/0/xxx/`)
+liefert 404 → SnappyMail's Client-Code rendert
+„Please refresh the page".
+
+### Fix
+
+Beide URL-Konstruktoren strippen jetzt ein trailing `/embed`
+BEFORE dem Aufbau der Request-URL:
+
+```js
+BASE = doc.location.pathname
+    .replace(/\/embed\/?$/,'')  // strip trailing /embed (with or w/o slash)
+    .replace(/\/+$/,'')          // strip any residual trailing slash
+    + '/'
+```
+
+Downstream: ALLE SnappyMail-HTTP-Requests landen bei
+`/apps/souvera_mail/?/…` — dieselbe URL-Familie wie die
+in-NC-Ansicht. Bestehende Routen (`page#index` GET/POST) matchen
+alles. Keine neuen Routen nötig.
+
+### Behavioural
+
+- `/apps/souvera_mail/embed`     → `/apps/souvera_mail/?/…` ✓
+- `/apps/souvera_mail/embed/`    → `/apps/souvera_mail/?/…` ✓
+- `/apps/souvera_mail/` (normal) → `/apps/souvera_mail/?/…` ✓ (unchanged)
+- `/apps/souvera_mail`           → `/apps/souvera_mail/?/…` ✓
+- `/apps/other-app/embed`        → `/apps/other-app/?/…` ✓ (generic)
+- Partial word `/embed-plus`     → unchanged ✓
+
+### Non-Regression
+
+- v0.17.1 `page#embedPost`-Route bleibt bestehen (Belt-and-Braces
+  Safety-Net für direkt-an-`/embed`-POST-Requests).
+- Alle in-NC-Views (ohne `/embed`) unverändert — der regex ist
+  no-op für sie.
+- Die JS-Änderungen sind statisch (kein Webpack-Rebuild nötig für
+  boot.js/app.js — die werden direkt inline in `index_embed.php`
+  eingelesen via `file_get_contents()`).
+
+### Neuer Test
+
+- **`tests/test_v0_17_2_embed_ajax_fix.php`** — 14 Assertions:
+  - boot.js + app.js beide gepatcht
+  - Behavioural sim gegen 7 URL-Varianten (positive + negative)
+  - v0.17.1 POST-Route bleibt registriert
+  - Version-Regex-Pin.
+- **Volle Regressions-Suite: 62/62 PASS**.
+
+### Files touched
+
+```
+mod: /app/app/smail/v/current/static/js/boot.js  (qUri regex)
+mod: /app/app/smail/v/current/static/js/app.js   (BASE regex)
+new: /app/tests/test_v0_17_2_embed_ajax_fix.php
+mod: /app/appinfo/info.xml, /app/package.json    (0.17.1 → 0.17.2)
+```
+
+### Operator-Aktion nach Deploy
+
+1. Rsync 0.17.2 (nur zwei geänderte JS-Files + info.xml/package.json)
+2. `sudo systemctl reload php8.3-fpm` (Cache reset für PHP;
+   Browser-Cache im WebView evtl. flushen)
+3. WebView-URL `/apps/souvera_mail/embed` → sollte jetzt sauber
+   laden. Bei alten Cache-Einträgen: WebView-App neu starten
+   oder Cache in den App-Settings clearen.
+
 ## [0.17.1] — 2026-02 (P0-Hotfix: /embed POST-Handler für SnappyMail-Ajax)
 
 ### Operator-Report zu v0.17.0

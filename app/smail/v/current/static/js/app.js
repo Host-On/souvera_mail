@@ -219,7 +219,13 @@
 	leftPanelDisabled.subscribe(value => $htmlCL.toggle('x2m-left-panel-disabled', value));
 
 	const
-		BASE = doc.location.pathname.replace(/\/+$/,'') + '/',
+		// v0.17.2 — Strip trailing /embed just like boot.js does.
+		// See boot.js comment for full rationale; TL;DR: the /embed
+		// standalone entry point lives at /apps/{app}/embed but
+		// every SnappyMail HTTP request must land at
+		// /apps/{app}/?/... to hit the same routes as the normal
+		// in-Nextcloud view. Idempotent for non-embed pages.
+		BASE = doc.location.pathname.replace(/\/embed\/?$/,'').replace(/\/+$/,'') + '/',
 		HASH_PREFIX = '#/',
 
 		adminPath = () => rl.adminArea() && !SettingsAdmin('host'),

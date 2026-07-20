@@ -1,7 +1,20 @@
 (doc => {
 
 const
-	qUri = path => doc.location.pathname.replace(/\/+$/,'') + '/?/' + path,
+	// v0.17.2 — Strip any trailing "/embed" segment (with or without
+	// slash) BEFORE the path is used to build the SnappyMail request
+	// URL. The standalone / WebView entry point (see PageController::
+	// embed() + routes.php `page#embed`) lives at /apps/{app}/embed,
+	// but every AJAX call must land at /apps/{app}/?/... — the same
+	// URL space as the normal in-Nextcloud view. Without this strip
+	// the first GET AppData/0/... would go to /apps/{app}/embed/?/...
+	// which NC's Symfony router does NOT match (trailing-slash-strict
+	// for named routes), and SnappyMail's boot loop renders
+	// "An error occurred. Please refresh the page and try again.
+	// Error: Network response error: 404".
+	//
+	// Idempotent: pages loaded outside /embed pass through untouched.
+	qUri = path => doc.location.pathname.replace(/\/embed\/?$/,'').replace(/\/+$/,'') + '/?/' + path,
 	eId = id => doc.getElementById('x2m-'+id),
 	admin = '1' == eId('app').dataset.admin,
 	mimeJSON = 'application/json',
