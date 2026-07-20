@@ -24,6 +24,16 @@ return [
             'verb' => 'GET'
         ],
         [
+            // v0.17.1 — POST twin of page#embed. SnappyMail's client
+            // makes relative AJAX-POSTs against the current page URL,
+            // so `/embed` must accept POST too — otherwise every
+            // SnappyMail JSON call from the standalone view 404s and
+            // the client renders "Please refresh the page".
+            'name' => 'page#embedPost',
+            'url' => '/embed',
+            'verb' => 'POST'
+        ],
+        [
             'name' => 'page#appGet',
             'url' => '/app/',
             'verb' => 'GET'

@@ -6,6 +6,76 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.17.1] — 2026-02 (P0-Hotfix: /embed POST-Handler für SnappyMail-Ajax)
+
+### Operator-Report zu v0.17.0
+
+> `/embed` liefert: „An error occurred. Please refresh the page and
+>  try again. Error: Network response error: 404" — die anderen
+>  zwei (`?embedded=1`, `?standalone=1`) funktionieren.
+
+### Root Cause
+
+SnappyMail's Client-Boot berechnet die AJAX-URL relativ zur aktuellen
+Seite (`static/js/boot.js`, Zeile 4):
+
+```js
+qUri = path => doc.location.pathname.replace(/\/+$/,'') + '/?/' + path
+```
+
+Bei Aufruf über `/apps/souvera_mail/embed`:
+- `doc.location.pathname` = `/apps/souvera_mail/embed`
+- Ajax-POST geht an `/apps/souvera_mail/embed/?/Ajax/…`
+
+v0.17.0 hatte `/embed` **nur als GET** registriert. Der erste
+POST-Roundtrip vom Client → 404 → SnappyMail rendert
+„Please refresh the page".
+
+Bei `?embedded=1` / `?standalone=1` war `doc.location.pathname` =
+`/apps/souvera_mail/` — matchte die bestehende POST-Route
+`page#indexPost` → funktionierte auf Anhieb.
+
+### Fix
+
+Neuer POST-Handler `page#embedPost` an derselben URL:
+
+```php
+'name' => 'page#embedPost',
+'url'  => '/embed',
+'verb' => 'POST'
+```
+
+Delegiert an `$this->engineHelper->startApp(true)` — identisch mit
+`indexPost()` und `appPost()`. Auth-Middleware (NoAdminRequired)
+bleibt aktiv; NoCSRFRequired, damit SnappyMail's eigene
+Session-CSRF-Prüfung greifen kann (die NC-CSRF-Tokens fahren im
+Engine-Client-Code nicht mit).
+
+### Verifikation
+
+- `php -l` clean.
+- Test-Suite erweitert (`test_v0_17_0_embedded_mode.php`): 5 neue
+  Assertions für `page#embedPost` (Existence, `verb === POST`,
+  gleiches URL wie GET-Route, Controller-Action-Body).
+- **Volle Regressions-Suite: 61/61 PASS**.
+
+### Files touched
+
+```
+mod: /app/lib/Controller/PageController.php  (embedPost() action)
+mod: /app/appinfo/routes.php  (page#embedPost route)
+mod: /app/tests/test_v0_17_0_embedded_mode.php  (5 neue POST-Assertions)
+mod: /app/appinfo/info.xml, /app/package.json  (0.17.0 → 0.17.1)
+```
+
+### Operator-Aktion nach Deploy
+
+1. Rsync 0.17.1
+2. `sudo systemctl reload php8.3-fpm` (OpCache reset — kein
+   `composer install` nötig, es kamen keine neuen Klassen dazu)
+3. WebView-URL bleibt `/apps/souvera_mail/embed` (oder alternativ
+   `/?embedded=1`) — sollte jetzt sauber laden
+
 ## [0.17.0] — 2026-02 (Embedded / Standalone-Modus für Mobile WebView)
 
 ### Operator-Anforderung

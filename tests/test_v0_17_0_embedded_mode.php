@@ -75,6 +75,8 @@ $a(\str_contains($ctrl, "'IsStandalone' => \$isStandalone"),
 $routes = (string) \file_get_contents('/app/appinfo/routes.php');
 $a(\str_contains($routes, "'name' => 'page#embed'"),
     'routes.php registers page#embed');
+$a(\str_contains($routes, "'name' => 'page#embedPost'"),
+    'routes.php registers page#embedPost (v0.17.1 POST twin — required by SnappyMail\'s relative-URL AJAX)');
 $a(\str_contains($routes, "'url' => '/embed'"),
     'page#embed is bound to the /embed URL');
 // Route file must remain PHP-parseable.
@@ -82,8 +84,10 @@ $parsed = require '/app/appinfo/routes.php';
 $a(\is_array($parsed) && isset($parsed['routes']) && \is_array($parsed['routes']),
     'routes.php still returns the expected structure after edit');
 $embedRoute = null;
+$embedPostRoute = null;
 foreach ($parsed['routes'] as $r) {
-    if (($r['name'] ?? null) === 'page#embed') { $embedRoute = $r; break; }
+    if (($r['name'] ?? null) === 'page#embed') { $embedRoute = $r; }
+    if (($r['name'] ?? null) === 'page#embedPost') { $embedPostRoute = $r; }
 }
 $a($embedRoute !== null,
     'page#embed route entry parseable from routes.php');
@@ -91,6 +95,18 @@ $a($embedRoute !== null && ($embedRoute['verb'] ?? null) === 'GET',
     'page#embed responds to GET (WebView loads via GET)');
 $a($embedRoute !== null && ($embedRoute['url'] ?? null) === '/embed',
     'page#embed URL is exactly /embed (no trailing slash)');
+$a($embedPostRoute !== null,
+    'page#embedPost route entry parseable from routes.php');
+$a($embedPostRoute !== null && ($embedPostRoute['verb'] ?? null) === 'POST',
+    'page#embedPost responds to POST (SnappyMail\'s relative-URL AJAX target)');
+$a($embedPostRoute !== null && ($embedPostRoute['url'] ?? null) === '/embed',
+    'page#embedPost bound to the SAME /embed URL as the GET route');
+
+// PageController exposes both handlers.
+$a(\str_contains($ctrl, 'public function embedPost()'),
+    'PageController exposes embedPost() action');
+$a(\str_contains($ctrl, "engineHelper->startApp(true)"),
+    'embedPost() delegates to the SnappyMail engine directly (same pattern as indexPost/appPost)');
 
 // -----------------------------------------------------------------
 // 3. standalone.css exists and covers the essentials

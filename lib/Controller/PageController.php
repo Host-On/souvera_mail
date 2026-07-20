@@ -211,6 +211,27 @@ class PageController extends Controller
         $this->engineHelper->startApp(true);
     }
 
+    // v0.17.1 — POST-Handler für /embed. SnappyMail's client macht
+    // relative AJAX-POSTs an die aktuelle Seiten-URL. Ohne diesen
+    // Handler würde `POST /apps/souvera_mail/embed` einen 404 werfen,
+    // weil `page#embed` (GET) die Methode nicht behandelt und die
+    // Root-Route (`page#indexPost`) nur `POST /` bedient. Auf dem
+    // WebView ist das der „Please refresh the page"-Fehler-Screen.
+    //
+    // Delegiert an dieselbe Engine-Aufrufkette wie `indexPost()` /
+    // `appPost()` — der SnappyMail-Engine parsed den Query-String
+    // selbst und dispatched an die richtige Aktion. Auth-Middleware
+    // (NoAdminRequired) bleibt aktiv, damit die OIDC-Session wie
+    // gewohnt greift; NoCSRFRequired, weil der Engine seine eigene
+    // Session-basierte CSRF-Prüfung mitbringt und der NC-Token in
+    // POSTs vom SnappyMail-Client nicht mitfährt.
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function embedPost(): void
+    {
+        $this->engineHelper->startApp(true);
+    }
+
     // NoCSRFRequired: the engine's internal AJAX does not carry Nextcloud CSRF
     // tokens; it uses its own CSRF protection within the engine session.
     #[NoAdminRequired]
