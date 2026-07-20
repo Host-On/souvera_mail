@@ -6,6 +6,108 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.17.3] — 2026-02 (P0-Hotfix: leerer Streifen oben in `/embed`)
+
+### Operator-Report zu v0.17.2
+
+> „`/embed` funktioniert jetzt und die Netzwerkfehler sind weg —
+>  aber oben am Bildschirm ist eine leere Fläche/Lücke, wo früher
+>  das Nextcloud-Menü war. Der Mail-Client soll bündig mit dem
+>  oberen Rand abschließen."
+
+### Root Cause
+
+`PageController::renderMailApp()` schickt die `/embed`-Antwort mit
+`renderAs('base')` los. Das entfernt zwar Header, App-Menu und
+`layout.user.php`-Shell — aber Nextclouds `base`-Layout
+(`core/templates/layout.base.php`) wickelt unser Template trotzdem
+in:
+
+```html
+<body id="body-public" class="layout-base">
+  <div id="content" class="app-public" role="main">
+    <!-- unser Mail-UI -->
+  </div>
+</body>
+```
+
+`core/css/server.css` gibt `#content.app-public` einen Top-Offset
+(padding-top / margin-top ≈ 50 px), damit Platz für den *sonst
+gerenderten* App-Header bleibt. In `base`-Modus existiert dieser
+Header aber gar nicht — die reservierte Höhe steht trotzdem, und
+das gesamte Mail-UI rutscht ~50 px nach unten. Auf einer WebView-
+Umgebung sieht das exakt wie „leere weiße Fläche am oberen Rand"
+aus.
+
+`css/standalone.css` v0.17.0 hat nur `body` neutralisiert, den
+`#content`-Wrapper aber übersehen — weil er im normalen NC-Layout
+gar nicht existiert (dort wickelt `layout.user.php` in `#content`
+OHNE `.app-public`) und das v0.17.0-Testing per PHP-Regression den
+DOM-Baum nicht rendern konnte.
+
+### Fix
+
+`css/standalone.css` (v0.17.3):
+
+- Neuer `#content.app-public`-Reset-Block, doppelt gescoped auf
+  `body.layout-base` UND `#body-public`, weil NC seit v30 die
+  Body-Klasse benutzt, ältere Builds das Body-ID-Konvention.
+- Alle Top-Offsets werden mit `!important` auf 0 gezwungen
+  (`padding`, `margin`, `top`, `border-radius`, `box-shadow`,
+  `border`) — NC's Core-CSS benutzt selbst `!important` für
+  `#content { padding-top: var(--header-height) }`, ohne den
+  Konflikt gewinnt die spezifischere Regel.
+- `#content.app-public` wird explizit auf `position: absolute;
+  inset: 0; width: 100vw; height: 100vh` gesetzt, damit ein
+  eventuell auf `min-height` verzichtender Theme-Override
+  auch keinen Restrahmen mehr erzeugt.
+- `#x2m-app` bekommt zusätzlich explizite `top: 0 !important`
+  und `left: 0 !important` (statt sich nur auf das
+  `inset: 0`-Shorthand zu verlassen) — defence-in-depth für den
+  Fall, dass ein Theme mit gleicher Spezifität `top: 50px`
+  drüberlegt.
+- Zusätzliche Force-Hide für `#skip-actions` und
+  `#initial-state-container` — Nextcloud injiziert die vor
+  unserem Content und normalerweise sind sie `display:none`, ein
+  paar Legacy-Themes vergessen den Reset aber und lassen sie als
+  `display:block` mit ein paar Pixel Höhe stehen.
+
+### Regressions-Pin
+
+`tests/test_v0_17_3_embed_top_gap_fix.php` (28 Assertions):
+- Prüft die Präsenz aller `#content` / `.app-public` /
+  `body.layout-base` / `#body-public` Selektoren.
+- Prüft, dass alle Offsetting-Properties (`padding`, `margin`,
+  `top`, `border-radius`, `height`) mit `!important` auf 0 stehen.
+- Prüft, dass `#skip-actions` und `#initial-state-container` mit
+  `display: none !important` maskiert sind.
+- Prüft `#x2m-app` auf explizite `top: 0` / `left: 0` und
+  `margin/padding: 0 !important`.
+- Prüft, dass die alten SSO-Guard-Regeln (Logout-Buttons,
+  Auto-Logout) NICHT beim Umbau verloren gegangen sind.
+- Prüft `PageController::renderMailApp()` auf `renderAs('base')`
+  und `addStyle('souvera_mail','standalone')`.
+- Prüft Versions-Bump auf `0.17.3` oder höher.
+
+### Regressions-Suite
+
+Alle 63 lokalen Test-Suites bestehen zu 100 %:
+
+```
+$ for t in tests/test_*.php; do php "$t"; done
+… PASSED: 63 / 63
+```
+
+### Files touched (v0.17.3)
+
+- `css/standalone.css` — `#content.app-public` reset, plus
+  `#skip-actions` / `#initial-state-container` hide, plus
+  defence-in-depth on `#x2m-app`.
+- `appinfo/info.xml` — Version-Bump `0.17.2 → 0.17.3`.
+- `package.json` — Version-Bump `0.17.2 → 0.17.3`.
+- `tests/test_v0_17_3_embed_top_gap_fix.php` — neu (28
+  Regressions-Assertions).
+
 ## [0.17.2] — 2026-02 (P0-Hotfix: /embed AJAX-URL-Rewrite in boot.js + app.js)
 
 ### Operator-Report zu v0.17.1

@@ -40,18 +40,80 @@ body {
 	box-sizing: border-box;
 }
 
+/* v0.17.3 — Kill the residual top-gap in /embed.
+ *
+ * Nextcloud's `base` layout (core/templates/layout.base.php) still
+ * wraps our template output in:
+ *
+ *     <body id="body-public" class="layout-base">
+ *       <div id="content" class="app-public" role="main">
+ *         … our HTML …
+ *       </div>
+ *     </body>
+ *
+ * The `#content.app-public` selector inherits a `padding-top: 50px`
+ * (and, in NC 34, sometimes `margin-top`) from `core/css/server.css`
+ * to leave room for the header that WOULD have been rendered by
+ * `layout.user.php`. Because we picked `base`, that header does not
+ * exist — but the offset still does, and the whole mail UI slides
+ * down by ~50px, leaving a white bar at the top exactly where the
+ * missing header would have sat. Users on WebView wrappers see this
+ * as "there's an empty space at the top of the screen".
+ *
+ * Reset every dimension NC's layout might set on the wrapping
+ * `#content` shell. `!important` because NC's core CSS also uses
+ * `!important` on `#content { padding-top: var(--header-height); }`
+ * in some versions. Also strip the border-radius and box-shadow
+ * that some themes stack on top of `.app-public`. */
+body.layout-base #content,
+body.layout-base #content.app-public,
+#body-public #content,
+#body-public #content.app-public {
+	position: absolute !important;
+	inset: 0 !important;
+	top: 0 !important;
+	left: 0 !important;
+	right: 0 !important;
+	bottom: 0 !important;
+	width: 100vw !important;
+	height: 100vh !important;
+	min-height: 100vh !important;
+	max-height: none !important;
+	margin: 0 !important;
+	padding: 0 !important;
+	border: 0 !important;
+	border-radius: 0 !important;
+	box-shadow: none !important;
+	background: var(--color-main-background, #fff);
+	overflow: hidden !important;
+}
+
+/* Nextcloud injects a hidden `<div id="skip-actions">` (screen-reader
+ * skip-links) and `<div id="initial-state-container">` before our
+ * template output. Both are `display:none`/`hidden` in the DOM, but
+ * older NC themes forgot the reset and leave them as `display: block`.
+ * Force-hide, otherwise they push #content down by a line-height. */
+body.layout-base #skip-actions,
+body.layout-base #initial-state-container,
+#body-public #skip-actions,
+#body-public #initial-state-container {
+	display: none !important;
+}
+
 /* SnappyMail's root — full viewport, no rounded corners, no scroll
  * chaining to the browser. */
 #x2m-app {
 	position: fixed;
 	inset: 0;
+	top: 0 !important;
+	left: 0 !important;
 	width: 100vw;
 	height: 100vh;
 	max-width: none;
 	max-height: none;
 	min-height: 100vh;
-	margin: 0;
-	padding: 0;
+	margin: 0 !important;
+	padding: 0 !important;
 	border: 0;
 	border-radius: 0;
 	background: var(--color-main-background, #fff);
