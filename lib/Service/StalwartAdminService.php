@@ -42,6 +42,23 @@ class StalwartAdminService
 
     private const HTTP_TIMEOUT_SECONDS = 8;
 
+    /**
+     * Alphabet Stalwart uses to encode/decode JMAP `Id` values as strings
+     * (e.g. the `accountId` in `/jmap/session` `primaryAccounts`, or any
+     * `ids` argument to a `/get` method) — verified against upstream
+     * `crates/types/src/id.rs` (`BASE32_ALPHABET`) and
+     * `crates/utils/src/codec/base32_custom.rs` (`stalwartlabs/stalwart`
+     * @ main, checked 2026-07-21).
+     *
+     * Decoding (`Id::from_str`) is a plain MSB-first base-32 read —
+     * `id = (id << 5) | digit` per character, no special-casing. Stalwart's
+     * own encoder (`Id::as_string`) additionally strips leading zero-value
+     * digits for a minimal/canonical string, but since decode does not
+     * care about that, a plain divmod-32 encode below round-trips to the
+     * exact same numeric value Stalwart would decode it to.
+     */
+    private const JMAP_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz792013';
+
     public function __construct(
         private IConfig $config,
         private IClientService $clientService,
@@ -276,6 +293,83 @@ class StalwartAdminService
             }
         }
         return ['status' => $status, 'body' => $body];
+    }
+
+    /**
+     * Encodes a Stalwart-internal numeric id (e.g. the `accountId` carried
+     * by the `message-ingest.*` webhook event — see
+     * {@see \OCA\SouveraMail\Controller\StalwartWebhookController}) into
+     * the base32 string form Stalwart's JMAP wire protocol expects for any
+     * `ids` argument. See {@see self::JMAP_ID_ALPHABET} for the verified
+     * source-of-truth reference.
+     */
+    public static function encodeJmapId(int $numericId): string
+    {
+        if ($numericId <= 0) {
+            return self::JMAP_ID_ALPHABET[0];
+        }
+        $encoded = '';
+        while ($numericId > 0) {
+            $encoded = self::JMAP_ID_ALPHABET[$numericId & 0x1F] . $encoded;
+            $numericId >>= 5;
+        }
+        return $encoded;
+    }
+
+    /**
+     * Resolves a Stalwart-internal numeric accountId — as carried by the
+     * `message-ingest.*` webhook event, see
+     * {@see \OCA\SouveraMail\Controller\StalwartWebhookController} — to
+     * the principal's e-mail/login, via the admin-only `Principal/get`
+     * JMAP method.
+     *
+     * `Principal/get` is the ONE JMAP method in Stalwart's whole surface
+     * that does not validate/scope its `accountId` request field against
+     * the caller — verified against upstream `crates/jmap/src/api/request.rs`
+     * (no `assert_has_access`/`assert_is_member` call for
+     * `GetRequestMethod::Principal`, unlike every other `/get` method) and
+     * `crates/jmap/src/principal/get.rs` (looks `ids` up directly against
+     * the global principal registry, `request.account_id` is only echoed
+     * back in the response). That means Basic-auth ADMIN credentials alone
+     * are sufficient here — no per-user OIDC bearer is needed (unlike
+     * {@see \OCA\SouveraMail\Service\StalwartUserContext::resolveAccountId()},
+     * which needs a bearer for a user we don't know yet at this point).
+     *
+     * @return non-empty-string|null null if the principal does not exist,
+     *     admin credentials/API URL are not configured, or on any failure
+     */
+    public function lookupPrincipalEmailByAccountId(int $accountId): ?string
+    {
+        if (!$this->isConfigured() || $this->getAdminCredentials() === null) {
+            return null;
+        }
+
+        try {
+            $response = $this->jmapCallAsAdmin(
+                [
+                    ['Principal/get', [
+                        'ids' => [self::encodeJmapId($accountId)],
+                        'properties' => ['email', 'name'],
+                    ], 'p0'],
+                ],
+                ['urn:ietf:params:jmap:principals'],
+            );
+            $result = $this->extractMethodResponse($response, 'Principal/get');
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail: Stalwart Principal/get lookup failed for accountId '
+                . $accountId . ': ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
+            return null;
+        }
+
+        $principal = $result['list'][0] ?? null;
+        if (!\is_array($principal)) {
+            return null;
+        }
+        $email = $principal['email'] ?? $principal['name'] ?? null;
+        return \is_string($email) && $email !== '' ? $email : null;
     }
 
     /**

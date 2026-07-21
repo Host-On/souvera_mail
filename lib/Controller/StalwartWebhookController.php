@@ -6,6 +6,7 @@ namespace OCA\SouveraMail\Controller;
 
 use OCA\SouveraMail\Db\DeviceTokenMapper;
 use OCA\SouveraMail\Service\FcmClient;
+use OCA\SouveraMail\Service\StalwartAdminService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\BruteForceProtection;
@@ -26,7 +27,7 @@ use Psr\Log\LoggerInterface;
  * is only a low-frequency fallback safety net.
  *
  * ==============================================================
- * EXACT CONTRACT — this is what Stalwart must be configured to send
+ * EXACT CONTRACT — verified against the Stalwart source
  * ==============================================================
  *
  * URL:    POST https://<nc-host>/index.php/apps/souvera_mail/webhooks/stalwart
@@ -36,30 +37,71 @@ use Psr\Log\LoggerInterface;
  *         <secret> must match the system-config value
  *         `souvera_mail.stalwart_webhook_secret` (config.php).
  *
- * Body (application/json) — ASSUMED shape, see "Uncertainty" below.
- * Every field is read defensively; unknown/extra fields are ignored.
+ * Body (application/json) — REAL shape, verified 2026-07-21 against
+ * `stalwartlabs/stalwart` @ main, `crates/email/src/message/ingest.rs`
+ * (the `trc::event!(MessageIngest(...), AccountId = account_id, ...)`
+ * call emitted at the end of `email_ingest()`):
  *
  *   {
- *     "event": "message.received",
- *     "account": "recipient@example.com",
- *     "recipients": ["recipient@example.com", "other@example.com"],
- *     "message": { "id": "...", "mailboxName": "INBOX" }
+ *     "events": [
+ *       {
+ *         "id": "...", "createdAt": "...",
+ *         "type": "message-ingest.ham",
+ *         "data": {
+ *           "accountId": 123, "documentId": 1, "mailboxId": [1],
+ *           "blobId": "...", "changeId": 9, "messageId": "<...>",
+ *           "size": 4821, "elapsed": 12
+ *         }
+ *       }
+ *     ]
  *   }
  *
+ * Crucially, there is NO recipient e-mail string anywhere in this payload
+ * — only `data.accountId`, Stalwart's internal numeric account id. See
+ * "accountId resolution" below for how that is turned into an NC user.
+ *
  * Field-access notes (tolerant parser, centralized in the private
- * `extract*()` methods below so a real-world schema mismatch is a
- * one-line change):
- *   - `event` / `type` / `eventType` — first non-empty string wins.
- *     Only "message.received" / "message.appended" / "message.new"
- *     trigger a push; anything else returns 200 "ignored".
- *   - Recipient email(s) are read from ANY of: `account`, `recipient`,
- *     `email`, `recipients`, `to`, `rcptTo`, `rcpt_to`. Each of these
- *     may be a single string, OR a list of strings, OR a list of
- *     objects carrying an `email`/`address` key (e.g. `{"email": "..."}`).
- *     All matches across all of these keys are merged (deduplicated).
- *   - The message body/subject is deliberately NEVER read — only
- *     `message.id` presence is used for defensive existence-checking,
- *     and is never included in the outgoing push (see privacy note).
+ * `extract*()` methods below so schema drift is a one-line change):
+ *   - Top level: an `events` array is expected; a bare single event
+ *     object (no wrapper) is also accepted, as is the OLDER assumed flat
+ *     shape from before this payload was verified (`event`/`account`/
+ *     `recipients`/... directly on the body) — see "Legacy fallback".
+ *   - Per event, `type` (or legacy `event`/`eventType`) selects handling:
+ *       - `message-ingest.ham`  → resolve `data.accountId` and push.
+ *       - `message-ingest.spam` → ignored (200, debug log).
+ *       - any other/unknown type → ignored (200, debug log), EXCEPT the
+ *         legacy trigger types below, kept for backwards tolerance.
+ *   - Legacy fallback (pre-verification assumption, kept only so an
+ *     unexpected older/alternate Stalwart build doesn't silently break):
+ *     `event`/`type`/`eventType` == "message.received"/"message.appended"/
+ *     "message.new" triggers a push resolved via a recipient e-mail read
+ *     from `account`/`recipient`/`email`/`recipients`/`to`/`rcptTo`/
+ *     `rcpt_to` on the event object (string, list of strings, or list of
+ *     `{"email"|"address": "..."}` objects).
+ *
+ * accountId resolution (numeric → Nextcloud user), centralized in
+ * {@see self::resolveNcUserForStalwartAccountId()}:
+ *   1. `data.accountId` is Stalwart's internal numeric (u32) account id —
+ *      NOT the JMAP `accountId` STRING seen elsewhere in this app (e.g.
+ *      {@see \OCA\SouveraMail\Service\StalwartUserContext::resolveAccountId()}).
+ *      Verified: the JMAP accountId string is `Id::from(numeric_id).to_string()`
+ *      (`crates/types/src/id.rs`) — a base32 encoding of that SAME numeric
+ *      id using the alphabet `abcdefghijklmnopqrstuvwxyz792013`. So the two
+ *      are the same account, just encoded differently.
+ *   2. {@see StalwartAdminService::lookupPrincipalEmailByAccountId()} base32-
+ *      encodes the numeric id and issues an ADMIN (Basic-auth) JMAP
+ *      `Principal/get` call — the one JMAP method Stalwart does not scope
+ *      to a caller-owned account (verified against
+ *      `crates/jmap/src/api/request.rs` + `crates/jmap/src/principal/get.rs`)
+ *      — to get the principal's e-mail/login. No per-user OIDC bearer is
+ *      needed or obtainable at this point (we don't know the user yet).
+ *   3. The resulting e-mail is resolved to an NC user via
+ *      {@see IUserManager::getByEmail()}, same as the legacy path.
+ *   No persistent NC-user↔accountId cache is kept: `Principal/get` is a
+ *   single cheap admin call per ham event, and this app has no existing
+ *   table that already stores this mapping (checked: DeviceToken,
+ *   AppPasswordMapping, MigrationJob — none carry a Stalwart accountId).
+ *   Revisit if webhook volume ever makes that round-trip a bottleneck.
  *
  * Response: always 200 OK as fast as possible (Stalwart should not retry
  * webhook delivery indefinitely). Non-2xx is reserved for auth failures
@@ -74,28 +116,28 @@ use Psr\Log\LoggerInterface;
  * `data: {type: "new_mail"}` — NEVER the subject or message body. The
  * Android app must open the app and sync via IMAP/JMAP to learn what
  * actually arrived.
- *
- * ==============================================================
- * Uncertainty (documented per implementation instructions)
- * ==============================================================
- * Stalwart's exact webhook JSON schema was not available in this repo
- * at implementation time. The parser above is intentionally tolerant
- * and centralizes field access so adapting to the real shape is a
- * one-line change in `extractEventType()` / `extractRecipientEmails()`.
  */
 class StalwartWebhookController extends Controller
 {
     public const SYSTEM_CONFIG_WEBHOOK_SECRET = 'souvera_mail.stalwart_webhook_secret';
 
-    /** Event types that trigger a push. Extend here if Stalwart's real
-     *  event taxonomy differs. */
-    private const TRIGGER_EVENTS = ['message.received', 'message.appended', 'message.new'];
+    /** Real Stalwart event type that means "new mail, not spam, push it". */
+    private const HAM_EVENT_TYPE = 'message-ingest.ham';
 
-    /** JSON keys (in priority order) that may carry recipient email(s). */
+    /** Legacy/assumed event types, kept only as a backwards-tolerant
+     *  fallback — see class docblock "Legacy fallback". */
+    private const LEGACY_TRIGGER_EVENTS = ['message.received', 'message.appended', 'message.new'];
+
+    /** JSON keys (in priority order) that may carry recipient email(s) on
+     *  a LEGACY-shaped event. */
     private const RECIPIENT_KEYS = ['account', 'recipient', 'email', 'recipients', 'to', 'rcptTo', 'rcpt_to'];
 
     private const PUSH_TITLE = 'Neue E-Mail';
     private const PUSH_BODY = 'Du hast eine neue Nachricht erhalten.';
+
+    /** @var array<int, string|null> per-request memo: numeric Stalwart
+     *  accountId → resolved NC user id (or null = unresolved). */
+    private array $accountIdUserCache = [];
 
     public function __construct(
         string $appName,
@@ -104,6 +146,7 @@ class StalwartWebhookController extends Controller
         private IUserManager $userManager,
         private DeviceTokenMapper $tokens,
         private FcmClient $fcm,
+        private StalwartAdminService $stalwartAdmin,
         private LoggerInterface $logger,
     ) {
         parent::__construct($appName, $request);
@@ -137,38 +180,74 @@ class StalwartWebhookController extends Controller
         }
 
         $payload = $this->readPayload();
-        $event = $this->extractEventType($payload);
-        if (!\in_array($event, self::TRIGGER_EVENTS, true)) {
-            $this->logger->debug(
-                'Souvera Mail: Stalwart webhook ignored event type "' . $event . '"',
-                ['app' => 'souvera_mail']
-            );
-            return new DataResponse(['status' => 'ignored', 'reason' => 'unhandled event type']);
-        }
-
-        $emails = $this->extractRecipientEmails($payload);
-        if ($emails === []) {
-            $this->logger->debug(
-                'Souvera Mail: Stalwart webhook payload carried no resolvable recipient email',
-                ['app' => 'souvera_mail']
-            );
-            return new DataResponse(['status' => 'ignored', 'reason' => 'no recipient email in payload']);
-        }
+        $events = $this->extractEvents($payload);
 
         $notified = 0;
-        foreach ($this->resolveNextcloudUserIds($emails) as $userId) {
-            $fcmTokens = \array_map(
-                static fn ($t) => $t->getFcmToken(),
-                $this->tokens->findAllForUser($userId),
-            );
-            if ($fcmTokens === []) {
-                continue;
-            }
-            $this->fcm->send($fcmTokens, self::PUSH_TITLE, self::PUSH_BODY, ['type' => 'new_mail']);
-            $notified++;
+        foreach ($events as $event) {
+            $notified += $this->processEvent($event);
         }
 
-        return new DataResponse(['status' => 'ok', 'notifiedUsers' => $notified]);
+        return new DataResponse(['status' => 'ok', 'eventsReceived' => \count($events), 'notifiedUsers' => $notified]);
+    }
+
+    /**
+     * Handles a single event object and returns how many NC users were
+     * pushed to (0 if the event was ignored or unresolvable). See the
+     * class docblock ("EXACT CONTRACT") for the event shape.
+     *
+     * @param array<string, mixed> $event
+     */
+    private function processEvent(array $event): int
+    {
+        $type = \strtolower($this->extractEventType($event));
+
+        if ($type === self::HAM_EVENT_TYPE) {
+            $accountId = $this->extractAccountId($event);
+            if ($accountId === null) {
+                $this->logger->debug(
+                    'Souvera Mail: Stalwart webhook ham event carried no numeric data.accountId',
+                    ['app' => 'souvera_mail']
+                );
+                return 0;
+            }
+            $userId = $this->resolveNcUserForStalwartAccountId($accountId);
+            if ($userId === null) {
+                return 0;
+            }
+            return $this->pushToUser($userId) ? 1 : 0;
+        }
+
+        if (\in_array($type, self::LEGACY_TRIGGER_EVENTS, true)) {
+            $notified = 0;
+            foreach ($this->resolveNextcloudUserIdsByEmail($this->extractRecipientEmails($event)) as $userId) {
+                $notified += $this->pushToUser($userId) ? 1 : 0;
+            }
+            return $notified;
+        }
+
+        $this->logger->debug(
+            'Souvera Mail: Stalwart webhook ignored event type "' . $type . '"',
+            ['app' => 'souvera_mail']
+        );
+        return 0;
+    }
+
+    /**
+     * Sends the push to every device registered for one NC user.
+     *
+     * @return bool true if at least one device token existed and a push was sent
+     */
+    private function pushToUser(string $userId): bool
+    {
+        $fcmTokens = \array_map(
+            static fn ($t) => $t->getFcmToken(),
+            $this->tokens->findAllForUser($userId),
+        );
+        if ($fcmTokens === []) {
+            return false;
+        }
+        $this->fcm->send($fcmTokens, self::PUSH_TITLE, self::PUSH_BODY, ['type' => 'new_mail']);
+        return true;
     }
 
     private function extractProvidedSecret(): string
@@ -195,12 +274,42 @@ class StalwartWebhookController extends Controller
     }
 
     /**
+     * Parses the top-level payload into a list of individual event
+     * objects. Real shape is `{"events": [...]}` (see class docblock);
+     * a bare single event object, or the pre-verification flat shape
+     * (event fields directly on the body), are also accepted so a
+     * future schema tweak on Stalwart's side degrades gracefully instead
+     * of dropping every webhook.
+     *
      * @param array<string, mixed> $payload
+     * @return list<array<string, mixed>>
      */
-    private function extractEventType(array $payload): string
+    private function extractEvents(array $payload): array
     {
-        foreach (['event', 'type', 'eventType'] as $key) {
-            $value = $payload[$key] ?? null;
+        if (isset($payload['events']) && \is_array($payload['events'])) {
+            $events = [];
+            foreach ($payload['events'] as $event) {
+                if (\is_array($event)) {
+                    $events[] = $event;
+                }
+            }
+            return $events;
+        }
+
+        if (isset($payload['type']) || isset($payload['data']) || isset($payload['event'])) {
+            return [$payload];
+        }
+
+        return [];
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     */
+    private function extractEventType(array $event): string
+    {
+        foreach (['type', 'event', 'eventType'] as $key) {
+            $value = $event[$key] ?? null;
             if (\is_string($value) && $value !== '') {
                 return $value;
             }
@@ -209,17 +318,37 @@ class StalwartWebhookController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * Reads the real payload's `data.accountId` (Stalwart's internal
+     * numeric account id) — falling back to a top-level `accountId` for
+     * tolerance. Accepts a JSON number or a numeric string.
+     *
+     * @param array<string, mixed> $event
+     */
+    private function extractAccountId(array $event): ?int
+    {
+        $data = $event['data'] ?? null;
+        $raw = \is_array($data) ? ($data['accountId'] ?? null) : ($event['accountId'] ?? null);
+        if (\is_int($raw)) {
+            return $raw;
+        }
+        if (\is_string($raw) && \ctype_digit($raw)) {
+            return (int) $raw;
+        }
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $event
      * @return list<string>
      */
-    private function extractRecipientEmails(array $payload): array
+    private function extractRecipientEmails(array $event): array
     {
         $emails = [];
         foreach (self::RECIPIENT_KEYS as $key) {
-            if (!\array_key_exists($key, $payload)) {
+            if (!\array_key_exists($key, $event)) {
                 continue;
             }
-            foreach ($this->normalizeEmailList($payload[$key]) as $email) {
+            foreach ($this->normalizeEmailList($event[$key]) as $email) {
                 $emails[\strtolower($email)] = $email;
             }
         }
@@ -256,20 +385,18 @@ class StalwartWebhookController extends Controller
      * Resolves e-mail addresses to Nextcloud user ids via
      * {@see IUserManager::getByEmail()}. Unresolvable addresses are
      * skipped (logged at debug) rather than failing the whole webhook.
+     * Only used by the LEGACY flat-shape fallback path — see class docblock.
      *
      * ASSUMPTION: this only finds users whose NC-profile e-mail
      * (`settings/email`, synced into `oc_accounts`) matches. A user who
      * set a Souvera-Mail-specific override (`IUserConfig souvera_mail/email`
      * — see {@see \OCA\SouveraMail\Util\EngineHelper::getSsoEmail()}) but
-     * has a different NC-profile e-mail will NOT be resolved here. This
-     * mirrors the one realistic source of truth available without an
-     * exhaustive per-user config scan; see the deliverable report for
-     * the flagged uncertainty.
+     * has a different NC-profile e-mail will NOT be resolved here.
      *
      * @param list<string> $emails
      * @return list<string>
      */
-    private function resolveNextcloudUserIds(array $emails): array
+    private function resolveNextcloudUserIdsByEmail(array $emails): array
     {
         $userIds = [];
         foreach ($emails as $email) {
@@ -286,5 +413,42 @@ class StalwartWebhookController extends Controller
             }
         }
         return \array_values($userIds);
+    }
+
+    /**
+     * Resolves Stalwart's internal numeric `accountId` (from the real
+     * webhook payload's `data.accountId`) to a Nextcloud user id. See the
+     * class docblock ("accountId resolution") for the full chain and why
+     * an admin `Principal/get` call is used instead of a cached mapping.
+     *
+     * Memoised per request — a batch of `events` in one webhook delivery
+     * commonly shares the same accountId (several messages for the same
+     * mailbox arriving together).
+     */
+    private function resolveNcUserForStalwartAccountId(int $accountId): ?string
+    {
+        if (\array_key_exists($accountId, $this->accountIdUserCache)) {
+            return $this->accountIdUserCache[$accountId];
+        }
+
+        $email = $this->stalwartAdmin->lookupPrincipalEmailByAccountId($accountId);
+        if ($email === null) {
+            $this->logger->debug(
+                'Souvera Mail: Stalwart webhook accountId ' . $accountId . ' did not resolve to a principal e-mail',
+                ['app' => 'souvera_mail']
+            );
+            return $this->accountIdUserCache[$accountId] = null;
+        }
+
+        $matches = $this->userManager->getByEmail($email);
+        if ($matches === []) {
+            $this->logger->debug(
+                'Souvera Mail: Stalwart webhook accountId ' . $accountId . ' (' . $email . ') not resolvable to an NC user',
+                ['app' => 'souvera_mail']
+            );
+            return $this->accountIdUserCache[$accountId] = null;
+        }
+
+        return $this->accountIdUserCache[$accountId] = $matches[0]->getUID();
     }
 }

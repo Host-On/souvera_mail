@@ -6,6 +6,27 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.19.1] — 2026-07-21 (Fix: Stalwart-Webhook-Payload-Format)
+
+Das reale Stalwart-Webhook-Payload (verifiziert anhand des Stalwart-Quellcodes,
+`crates/email/src/message/ingest.rs`) trägt gar keine Empfänger-E-Mail —
+sondern `{"events":[{"type":"message-ingest.ham","data":{"accountId": 123, ...}}]}`
+mit einer numerischen, Stalwart-internen `accountId`. Der bisherige Parser
+(v0.19.0) ging fälschlich von einer flachen Struktur mit E-Mail-Feldern aus
+und hätte daher nie einen echten Push ausgelöst.
+
+- `StalwartWebhookController` liest jetzt das `events`-Array, verarbeitet
+  nur `message-ingest.ham` (ignoriert `message-ingest.spam`/unbekannte
+  Typen) und löst `data.accountId` über einen neuen Admin-JMAP-Aufruf
+  (`Principal/get`, Basic-Auth) zu einer Nextcloud-Benutzer-E-Mail auf.
+  Die alte flache Payload-Annahme bleibt als Fallback erhalten.
+- `StalwartAdminService::encodeJmapId()` / `lookupPrincipalEmailByAccountId()`
+  kodieren die numerische Stalwart-`accountId` in die Base32-JMAP-Id-Form
+  (gleiches Konto wie die String-`accountId` aus `/jmap/session`, nur
+  anders kodiert) und fragen den Principal darüber ab.
+- `MailPushPoller` war von diesem Bug nicht betroffen (löst pro NC-Benutzer
+  über `StalwartUserContext` auf, nicht über das Webhook-Payload).
+
 ## [0.19.0] — 2026-07-21 (Feature: FCM Push-Benachrichtigungen für neue Mails)
 
 Event-getriebene Firebase Cloud Messaging (HTTP v1) Push-Benachrichtigungen
