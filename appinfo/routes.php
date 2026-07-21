@@ -214,6 +214,21 @@ return [
             'verb' => 'POST',
         ],
         [
+            // Out-of-office / "Abwesenheitsnotiz" — read current state.
+            // GET /apps/souvera_mail/vacation
+            //   → { status, available, vacation:{enabled,subject,message,from,to} }
+            'name' => 'vacation#index',
+            'url' => '/vacation',
+            'verb' => 'GET',
+        ],
+        [
+            // Out-of-office — save/enable/disable. POST /apps/souvera_mail/vacation
+            //   Body: { enabled, subject, message, from?, to? }
+            'name' => 'vacation#save',
+            'url' => '/vacation',
+            'verb' => 'POST',
+        ],
+        [
             // v0.15.0 — External accounts feature-status endpoint.
             // GET /apps/souvera_mail/external/status → { enabled, allowed_for_me,
             //   max_per_user, current_count, consent_required, consent_given }

@@ -43,6 +43,10 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 			// Knockout ViewModel — matches the pattern used by
 			// dropdown-menu.js and folder-names.js.
 			$this->addJs('js/sieve-apply.js');
+			// Out-of-office / "Abwesenheitsnotiz" — simple form in the
+			// top-right system dropdown. Pure DOM + fetch, same pattern
+			// as sieve-apply.js.
+			$this->addJs('js/vacation.js');
 			$this->addJs('js/external-accounts.js');
 			// v0.16.0 — "NEW" badge on freshly-imported folders (P1).
 			// Reads localStorage populated by useMigration.js when a
@@ -330,6 +334,10 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 				// body { folderId, limit, includeRedirect }.
 				'SmailSieveApplyFoldersUrl' => $oUrlGen->linkToRoute('souvera_mail.sieveApply.folders'),
 				'SmailSieveApplyUrl' => $oUrlGen->linkToRoute('souvera_mail.sieveApply.apply'),
+				// Out-of-office / "Abwesenheitsnotiz" endpoints consumed by
+				// js/vacation.js. GET reads state, POST saves it. Same route,
+				// method-dispatched.
+				'SmailVacationUrl' => $oUrlGen->linkToRoute('souvera_mail.vacation.index'),
 				// v0.15.0 — External accounts (POP3/IMAP/SMTP) endpoints
 				// consumed by js/external-accounts.js.
 				'SmailExternalStatusUrl'    => $oUrlGen->linkToRoute('souvera_mail.externalAccounts.status'),
