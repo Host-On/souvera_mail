@@ -262,5 +262,34 @@ return [
             'url' => '/external/consent',
             'verb' => 'POST',
         ],
+        [
+            // v0.19.0 — Android FCM push: register/list the current
+            // user's device tokens. GET /apps/souvera_mail/devices
+            //   → { status, items:[{id,platform,createdAt,lastSeenAt}] }
+            'name' => 'deviceToken#index',
+            'url' => '/devices',
+            'verb' => 'GET',
+        ],
+        [
+            // POST /apps/souvera_mail/devices  Body: {fcmToken, platform}
+            //   → { status, id }
+            'name' => 'deviceToken#register',
+            'url' => '/devices',
+            'verb' => 'POST',
+        ],
+        [
+            'name' => 'deviceToken#unregister',
+            'url' => '/devices/{id}',
+            'verb' => 'DELETE',
+            'requirements' => ['id' => '\d+'],
+        ],
+        [
+            // v0.19.0 — Stalwart new-mail webhook (server-to-server,
+            // shared-secret auth). See StalwartWebhookController.php for
+            // the full contract.
+            'name' => 'stalwartWebhook#push',
+            'url' => '/webhooks/stalwart',
+            'verb' => 'POST',
+        ],
     ]
 ];

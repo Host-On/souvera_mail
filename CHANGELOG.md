@@ -6,6 +6,46 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-07-21 (Feature: FCM Push-Benachrichtigungen für neue Mails)
+
+Event-getriebene Firebase Cloud Messaging (HTTP v1) Push-Benachrichtigungen
+für den nativen Android-Client (`eu.souvera.workspace`, Firebase-Projekt
+`souvera-apps`). Architektur: Stalwart feuert bei neuer Mail einen Webhook
+→ souvera_mail löst die Empfänger-Gerätetokens auf → FCM-Push → Android
+wacht auf. Ein niederfrequenter Poller (alle 15 Minuten) dient als
+Fallback-Sicherheitsnetz, falls ein Webhook verloren geht.
+
+- `POST /apps/souvera_mail/devices` — Android registriert/aktualisiert
+  sein FCM-Token (Basic-Auth mit App-Passwort, wie jeder andere
+  DAV-Endpoint).
+- `POST /apps/souvera_mail/webhooks/stalwart` — Stalwart-Webhook-Empfänger
+  (Shared-Secret-Auth, siehe `StalwartWebhookController` für den exakten
+  Vertrag).
+- `occ souvera_mail:push:test <uid>` — Diagnose-Kommando für einen
+  Ende-zu-Ende-Test-Push.
+- Neue Config-Keys: `souvera_mail.fcm_service_account_json`,
+  `souvera_mail.fcm_project_id` (optional), `souvera_mail.stalwart_webhook_secret`.
+
+### Fix: Kalendereinladungen landen im Nextcloud-Kalender
+
+Der iTIP-Neutralisierungs-Workaround in `calendarPut()` (webdav.js) ersetzte
+nur die nackten Formen `ATTENDEE:`/`ORGANIZER:` und nur das erste Vorkommen.
+Echte Einladungen nutzen parametrisierte, wiederholte Properties
+(`ATTENDEE;CN=…;RSVP=TRUE:…`, mehrere Zeilen), sodass Nextclouds CalDAV-
+Scheduling-Engine den PUT abfing und der Termin nicht als normaler Eintrag
+erschien. Ersetzung jetzt zeilenverankert, global und case-insensitiv.
+
+### Feature: Abwesenheitsnotiz (Out-of-Office)
+
+Einfaches Formular im System-Dropdown („🌴 Abwesenheitsnotiz") — An/Aus,
+Betreff, Nachricht, optional Von/Bis. Kein Umweg über die Filter.
+
+- `GET/POST /apps/souvera_mail/vacation` (`VacationController`).
+- `VacationService` merged einen verwalteten `vacation`-Block in das aktive
+  Sieve-Script (`smail.user`), sodass bestehende Filter erhalten bleiben
+  (Stalwart erlaubt nur ein aktives Script). Optionale Datumsgrenzen via
+  `currentdate` (`date`+`relational`).
+
 ## [0.18.2] — 2026-02 (Feature: atomarer `/upgrade` Endpoint + Client-Agent-Doku)
 
 ### Operator-Report
