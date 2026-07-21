@@ -144,8 +144,10 @@ The single `appPassword` is the credential for:
       SASL    = LOGIN or PLAIN
       User    = <user-email>             (NOT necessarily `loginName` — for
                                           the exact address, call
-                                          `/apps/souvera_mail/quota` or the
-                                          upcoming `/me` endpoint)
+                                          `GET /apps/souvera_mail/me` — returns
+                                          `email`, `displayName`, `server`,
+                                          and the rotation-policy hint. See
+                                          docs/PASSWORD_ROTATION.txt.)
       Pass    = `appPassword`
 
   Mail (SMTP send):

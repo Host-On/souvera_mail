@@ -88,6 +88,23 @@ return [
             'verb' => 'POST'
         ],
         [
+            // v0.18.1 — Identity + server-hint endpoint.
+            //
+            // Returns { uid, loginName, displayName, email, server,
+            // rotation: {enabled, days, hint}, serverTime }.
+            //
+            // Used by native clients right after the login-flow call to:
+            //   - resolve the SASL user for IMAP/SMTP (may differ from
+            //     `loginName`);
+            //   - display "Signed in as Philip Grassegger" in the UI;
+            //   - schedule automatic password rotation according to the
+            //     server-side `rotation_days` app config (see
+            //     docs/PASSWORD_ROTATION.txt for the admin playbook).
+            'name' => 'me#show',
+            'url' => '/me',
+            'verb' => 'GET'
+        ],
+        [
             'name' => 'quota#index',
             'url' => '/quota',
             'verb' => 'GET'

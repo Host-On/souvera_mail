@@ -6,6 +6,135 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.18.1] — 2026-02 (Feature: `/me` Endpoint + Password-Rotation Server-Hint)
+
+### Operator-Request
+
+> „Optionaler /me Endpoint der zur loginName → email Auflösung dient
+>  (Client-Guide referenziert es bereits) <- das klingt gut.
+>  Und Enhancement-Vorschlag ebenfalls. Wenn der Client Admin dann
+>  dafür was tun muss, erstell wieder ne TXT dafür."
+
+### `/me` Endpoint
+
+Neuer read-only Endpoint für Native-Clients:
+
+```
+GET /apps/souvera_mail/me
+```
+
+Response:
+
+```json
+{
+  "status":      "ok",
+  "uid":         "philip",
+  "loginName":   "philip",
+  "displayName": "Philip Grassegger",
+  "email":       "philip@grassegger.souvera.work",
+  "server":      "https://grassegger.souvera.work",
+  "rotation":    {
+    "enabled":   true,
+    "days":      90,
+    "hint":      "The server recommends rotating this app password every 90 days."
+  },
+  "serverTime":  "2026-02-20T15:42:03Z"
+}
+```
+
+- **Auth**: gleich wie login-flow (Basic-Auth / Session-Cookie /
+  OIDC-Bearer). Kein `BruteForceProtection` — read-only auf eigene
+  Daten ist keine Auth-Surface.
+- **`email`** wird über `StalwartUserContext::resolveEmail()`
+  aufgelöst — respektiert die H2CK/oidc + souvera_central Alias-Map.
+  Fallback auf `IUser::getEMailAddress()` wenn nicht konfiguriert.
+- **`serverTime`** erlaubt Client-Clock-Skew-Detection (wichtig für
+  OIDC-signed Basic-Auth-Deployments).
+
+### Password-Rotation Server-Hint
+
+Neue App-Config `rotation_days` (default `90`, `0` = disabled):
+
+```bash
+occ config:app:set souvera_mail rotation_days --value=90
+```
+
+- Sanity-clamped auf `[1, 3650]` mit WARN-Log bei out-of-range.
+- `0` = explizites Opt-Out, Client sieht `rotation.enabled: false`.
+- Non-integer Werte werden mit WARN geloggt und auf Default zurückgesetzt.
+
+Der Rotation-Algorithmus ist **100 % Client-getrieben** — der Server
+hat keinen Cron, kein Push, kein Wake-Up. Der Client checkt bei jedem
+App-Foreground den Timer.
+
+### `docs/PASSWORD_ROTATION.txt` (neu)
+
+Ausführlicher Doppel-Playbook: Client-Rotation-Algorithmus +
+Admin-Section. Enthält:
+
+**Client-Section:**
+- Exakter Rotations-Algorithmus (5 Schritte, atomic swap-order)
+- 3-Tage-Jitter gegen Fleet-Sync-Rotation
+- Verify-Step (create → test → save → delete-old, in dieser Reihenfolge)
+- Failure-Modes (5 Szenarien: server-side password reset,
+  Network-Flap mid-flow, Rate-Limit, Admin-disabled, Long-offline)
+- Voll-Beispiele Kotlin/Android (OkHttp + Coroutines),
+  Swift/iOS (async/await + Keychain), Rust/Desktop (reqwest + tokio +
+  keyring-crate)
+
+**Admin-Section:**
+- OCC-Befehle für Cadence-Config (Set/Get/Delete)
+- Rate-Limit-Impact-Sizing (Rotations pro Tag × Devices)
+- Brute-Force-Counter Tuning (whitelist, threshold, reset)
+- Monitoring: Access-Log Grafana-Metriken (POST/DELETE/GET Ratios)
+- Log-Grep-Patterns für die neuen WARN-Meldungen
+- Stale-Token-Cleanup (aktueller Zustand: manuell; Backlog: OCC-Command)
+- Notfall-Deaktivierung ohne Client-Restart
+
+### Update von `docs/LOGIN_FLOW_CLIENT_INTEGRATION.txt`
+
+Der Guide referenzierte bereits einen „upcoming /me endpoint" —
+jetzt ist er da und der Guide verweist auf `PASSWORD_ROTATION.txt`
+für Rotation-Details.
+
+### Files touched (v0.18.1)
+
+**Neu:**
+- `lib/Controller/MeController.php`
+- `docs/PASSWORD_ROTATION.txt`
+- `tests/test_v0_18_1_me_endpoint_and_rotation.php` (67 Assertions)
+
+**Modifiziert:**
+- `appinfo/routes.php` — `me#show` Route (`GET /me`)
+- `docs/LOGIN_FLOW_CLIENT_INTEGRATION.txt` — `/me` als verfügbar
+  markieren + Cross-Link
+- `appinfo/info.xml` — `0.18.0 → 0.18.1`
+- `package.json` — `0.18.0 → 0.18.1`
+- `vendor/composer/autoload_classmap.php` — MeController PSR-4
+
+### Deploy
+
+```bash
+rsync -av /repo/ /mnt/nc-shared/custom_apps/souvera_mail/ \
+  && cd /mnt/nc-shared/custom_apps/souvera_mail \
+  && composer dump-autoload -o \
+  && systemctl reload php8.5-fpm
+
+# Optional — set rotation cadence explicitly (config is created on
+# first read otherwise, using default 90):
+sudo -u www-data php /var/www/nextcloud/occ \
+     config:app:set souvera_mail rotation_days --value=90
+```
+
+### Regressions-Suite
+
+Alle 65 lokalen Test-Suites bestehen zu 100 %:
+
+```
+$ for t in tests/test_*.php; do php "$t"; done
+… PASSED: 65 / 65
+```
+
 ## [0.18.0] — 2026-02 (Feature: gepaartes App-Password via Native-Client-Endpoint)
 
 ### Operator-Request
