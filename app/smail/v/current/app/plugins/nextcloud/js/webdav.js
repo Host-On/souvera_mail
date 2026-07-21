@@ -449,12 +449,19 @@ rl.nextcloud = {
 		.catch(() => false),
 
 	calendarPut: (path, event) => {
+		// Neutralise iTIP/iMIP scheduling semantics so Nextcloud stores the
+		// event as a plain calendar entry instead of routing the PUT through
+		// its CalDAV scheduling engine (https://github.com/nextcloud/calendar/issues/4684).
+		// Real invitations carry parameterised, repeated properties
+		// (ATTENDEE;CN=…;RSVP=TRUE:…, multiple ATTENDEE lines), so match
+		// line-anchored, case-insensitive and globally — a plain string
+		// .replace() only hits the first, bare "PROP:" occurrence and lets the
+		// invitation slip through unneutralised.
 		const icsBody = event.rawText
-			.replace('METHOD:', 'X-METHOD:')
-			// https://github.com/nextcloud/calendar/issues/4684
-			.replace('ATTENDEE:', 'X-ATTENDEE:')
-			.replace('ORGANIZER:', 'X-ORGANIZER:')
-			.replace(/RSVP=TRUE/g, 'RSVP=FALSE')
+			.replace(/^METHOD:/gim,          'X-METHOD:')
+			.replace(/^ATTENDEE([;:])/gim,   'X-ATTENDEE$1')
+			.replace(/^ORGANIZER([;:])/gim,  'X-ORGANIZER$1')
+			.replace(/RSVP=TRUE/gi,          'RSVP=FALSE')
 			.replace(/\r?\n/g, '\r\n');
 		const headers = { 'Content-Type': 'text/calendar' };
 		return davFetch('calendars', path + '/' + event.UID + '.ics', {

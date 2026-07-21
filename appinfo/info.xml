@@ -3,7 +3,7 @@
 	<id>souvera_mail</id>
 	<name>Souvera Mail</name>
 	<summary>Nextcloud-native webmail with Nextcloud as the OIDC Provider — CLI-configurable for automated deploys</summary>
-	<version>0.18.2</version>
+	<version>0.19.0</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author homepage="https://github.com/PhiGi87/souvera_mail">Souvera</author>
 	<website>https://github.com/PhiGi87/souvera_mail</website>
@@ -85,9 +85,11 @@ All write commands accept `--json` and `--dry-run`.
 		<command>OCA\SouveraMail\Command\External\Status</command>
 		<command>OCA\SouveraMail\Command\External\ListAccounts</command>
 		<command>OCA\SouveraMail\Command\External\Revoke</command>
+		<command>OCA\SouveraMail\Command\Push\Test</command>
 	</commands>
 	<background-jobs>
 		<job>OCA\SouveraMail\Cron\MigrationPoller</job>
 		<job>OCA\SouveraMail\Cron\MigrationCleanup</job>
+		<job>OCA\SouveraMail\Cron\MailPushPoller</job>
 	</background-jobs>
 </info>
