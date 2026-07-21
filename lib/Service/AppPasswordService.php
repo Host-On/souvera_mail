@@ -321,6 +321,56 @@ class AppPasswordService
     }
 
     /**
+     * Best-effort revocation of an NC auth-token identified by its
+     * plaintext secret. Used by {@see LoginFlowController::upgrade()}
+     * to invalidate the ORIGINAL NC-only token (`X`) that a native
+     * client obtained via `/login/v2/*`, after we've already handed
+     * that client a fresh paired credential (`Y`).
+     *
+     * Design notes:
+     *
+     * - `ITokenProvider::invalidateToken()` takes the PLAINTEXT and
+     *   hashes it internally — the only public accessor for that
+     *   flow (`invalidateTokenById` needs the numeric id which we
+     *   don't have without an extra lookup).
+     *
+     * - If the plaintext matches NOTHING in `oc_authtoken` (e.g. the
+     *   caller was authenticated via session cookie so PHP_AUTH_PW
+     *   is empty, or the caller passed the user's actual password
+     *   rather than an app-password), NC silently no-ops. We do NOT
+     *   raise — the whole method is best-effort.
+     *
+     * - If the plaintext DOES match a mapping row (very unlikely
+     *   edge case: someone upgrades a token that was already
+     *   Souvera-paired), the reverse-invalidation listener
+     *   ({@see \OCA\SouveraMail\Listeners\NcTokenInvalidatedListener})
+     *   cascades to Stalwart + mapping. That's the correct behaviour
+     *   for a "clean the entire pair" call, so no re-entrancy guard
+     *   is needed here.
+     *
+     * - Any thrown exception is logged and swallowed. A failed
+     *   invalidation is not a data-integrity issue — worst case the
+     *   user sees a stale "device" entry in `/settings/user/security`
+     *   and can revoke it manually. Losing `Y` because `X` couldn't
+     *   be killed would be far worse.
+     */
+    public function revokeByRawSecret(string $userId, string $rawSecret): void
+    {
+        if ($rawSecret === '') {
+            return;
+        }
+        try {
+            $this->ncTokenProvider->invalidateToken($rawSecret);
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail upgrade: could not invalidate NC token by raw secret '
+                . 'after successful Y-create for user ' . $userId . ': ' . $e->getMessage(),
+                ['app' => 'souvera_mail'],
+            );
+        }
+    }
+
+    /**
      * Revoke a combined app password. Order: NC token first, Stalwart
      * second, mapping row last. Rationale: an orphan Stalwart entry only
      * affects mail (user simply sees it disappear on the next list()),

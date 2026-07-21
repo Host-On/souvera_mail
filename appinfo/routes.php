@@ -88,6 +88,25 @@ return [
             'verb' => 'POST'
         ],
         [
+            // v0.18.2 — Post-Login Upgrade endpoint.
+            //
+            // Client obtained an NC-only app-password `X` via NC's stock
+            // `/login/v2/*` flow (SSO / OIDC / Basic-Auth — all three
+            // work). Now it wants a paired mail+DAV credential `Y`
+            // AND wants X to be cleaned up atomically so it does not
+            // linger in the connected-devices list.
+            //
+            // Auth MUST be Basic-Auth with X — we read PHP_AUTH_PW to
+            // identify which NC token to invalidate after Y is created.
+            //
+            // See docs/CLIENT_UPGRADE_PATTERN.txt for the client-agent
+            // playbook (why this exists, when to prefer it over
+            // /login-flow, exact Kotlin / Swift / Rust examples).
+            'name' => 'loginFlow#upgrade',
+            'url' => '/app-passwords/upgrade',
+            'verb' => 'POST'
+        ],
+        [
             // v0.18.1 — Identity + server-hint endpoint.
             //
             // Returns { uid, loginName, displayName, email, server,

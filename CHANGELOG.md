@@ -6,6 +6,124 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.18.2] — 2026-02 (Feature: atomarer `/upgrade` Endpoint + Client-Agent-Doku)
+
+### Operator-Report
+
+> „Was der Client gerade gebaut hat: Der Login-Flow ruft nach jedem
+>  erfolgreichen Login automatisch den souvera_mail-Endpoint auf,
+>  tauscht das App-Passwort gegen das kombinierte aus. Ist das so
+>  gedacht von dir?"
+
+Antwort: prinzipiell ja — der Ansatz ist sogar besser als der
+ursprüngliche Vorschlag (SSO-freundlich, graceful degradation).
+Zwei Verbesserungspunkte identifiziert:
+
+1. Ohne expliziten Cleanup bleibt das originale NC-App-Password `X`
+   als „Zombie-Token" in `/settings/user/security` sichtbar.
+2. Der Client müsste zwei Calls machen (create Y + optional
+   DELETE X), was nicht atomar ist — bei einem Crash zwischen den
+   beiden Calls verlieren die User Cleanup-Garantien.
+
+### `POST /apps/souvera_mail/app-passwords/upgrade`
+
+Neuer Endpoint der beide Schritte atomar zusammenfasst:
+
+1. Nimmt X als HTTP Basic-Auth entgegen.
+2. Erstellt Y via existierender `AppPasswordService::createForUser()`
+   (Stalwart-first, NC-Token paired, Mapping-Row).
+3. Invalidiert X best-effort via neuer
+   `AppPasswordService::revokeByRawSecret()`.
+4. Response enthält Y (bit-kompatibel mit /login-flow) plus
+   `upgradedFrom.invalidated`-Metadatenblock, damit der Client weiß
+   ob er X aus dem lokalen Storage entfernen kann oder ob er einen
+   Cleanup-Fallback über `/connected-devices` fahren muss.
+
+**Atomicity contract (garantiert):**
+- 200 → Y erhalten, X-Invalidierung wurde versucht (Ergebnis in
+  `upgradedFrom.invalidated`)
+- Non-200 → nichts wurde angelegt/gelöscht, X funktioniert weiter
+- Y wird IMMER auf 200 zurückgegeben, auch wenn X-Invalidierung
+  fehlschlug (Verlust von Y wäre strikt schlimmer als Zombie-X)
+
+**Auth-Zwang:** Endpoint verlangt Basic-Auth mit `X` — Session-Cookie
+oder OIDC-Bearer werden mit 400 abgelehnt, weil das Backend nicht
+zuverlässig ermitteln kann welchen NC-Token es invalidieren soll.
+Fehler-Message weist explizit auf `/login-flow` als Alternative hin.
+
+### `AppPasswordService::revokeByRawSecret()`
+
+Neue Helper-Methode: nimmt Klartext-Secret entgegen, ruft
+`ITokenProvider::invalidateToken()` auf (hasht intern), log-and-swallow
+für Fehler. Löst automatisch die bestehende `TokenInvalidatedEvent →
+NcTokenInvalidatedListener → revokeByNcTokenId` Kaskade aus — d. h.
+wenn `X` (per Edge-Case) doch mal gepairte Mapping-Row hätte, würde
+Stalwart mit-invalidiert. Für den Standardfall (X ist NC-only)
+harmloser No-Op auf der Stalwart-Seite.
+
+### `docs/CLIENT_UPGRADE_PATTERN.txt` (neue Agent-Doku)
+
+Dedizierte Playbook-TXT für die Client-Agents (Android/iOS/Desktop):
+
+- **Entscheidungsmatrix**: wann `/upgrade` vs. `/login-flow` verwenden
+- **Request/Response-Contract**: exakte Auth-Header, Body-Format,
+  alle Status-Codes (200/400/401/429/502/503) mit Client-Aktion
+- **Atomicity guarantees G1–G4** (was wird geschrieben/gelöscht wann)
+- **Client-Algorithmus in 5 Schritten** — inkl. der wichtigen Regel
+  „X bleibt in RAM only, wird erst NACH erfolgreichem Upgrade
+  persistiert, sonst 2-credential-Race bei Crash"
+- **Cleanup-Fallback** für `invalidated=false` (rare edge case) —
+  bedient sich `/connected-devices` + DELETE
+- **Vollbeispiele** Kotlin/Android (Login-Success-Handler),
+  Swift/iOS (URLSession + async/await + Keychain), Rust/Desktop
+  (reqwest + tokio)
+- **Test-Checkliste** für 8 Szenarien (Happy path, Wrong X,
+  Session-cookie auth, Stalwart down, Souvera_central missing,
+  Brute-force, invalidated=false, Kill-mid-upgrade)
+
+### `docs/LOGIN_FLOW_CLIENT_INTEGRATION.txt` Update
+
+Neuer Abschnitt „RELATED ENDPOINTS — WHICH ONE TO USE" oben —
+Entscheidungshilfe zwischen `/login-flow`, `/upgrade` und `/me`.
+Cross-Link auf CLIENT_UPGRADE_PATTERN.txt.
+
+### Files touched (v0.18.2)
+
+**Neu:**
+- `docs/CLIENT_UPGRADE_PATTERN.txt`
+- `tests/test_v0_18_2_upgrade_endpoint.php` (59 Assertions)
+
+**Modifiziert:**
+- `lib/Controller/LoginFlowController.php` — `upgrade()` Method
+- `lib/Service/AppPasswordService.php` — `revokeByRawSecret()` Helper
+- `appinfo/routes.php` — `loginFlow#upgrade` Route
+- `docs/LOGIN_FLOW_CLIENT_INTEGRATION.txt` — Related-Endpoints Section
+- `appinfo/info.xml` — `0.18.1 → 0.18.2`
+- `package.json` — `0.18.1 → 0.18.2`
+- `vendor/composer/autoload_classmap.php` — regeneriert
+
+### Deploy
+
+Reine Controller-Erweiterung, keine DB-Migration, keine neue Klasse:
+
+```bash
+rsync -av /repo/ /mnt/nc-shared/custom_apps/souvera_mail/ \
+  && cd /mnt/nc-shared/custom_apps/souvera_mail \
+  && composer dump-autoload -o \
+  && systemctl reload php8.5-fpm
+```
+
+### Regressions-Suite
+
+Alle 66 lokalen Test-Suites bestehen zu 100 %.
+
+### Client-Umstellung
+
+Kein „Bruch" — der bestehende Zwei-Call-Ansatz funktioniert weiterhin.
+Neuer atomarer Weg ist zusätzlich verfügbar. Client-Teams können auf
+ihrem Rhythmus umstellen — `CLIENT_UPGRADE_PATTERN.txt` erklärt genau,
+wann `/upgrade` vs. `/login-flow` verwendet werden soll.
+
 ## [0.18.1] — 2026-02 (Feature: `/me` Endpoint + Password-Rotation Server-Hint)
 
 ### Operator-Request

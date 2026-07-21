@@ -1,0 +1,519 @@
+================================================================================
+  Souvera Mail — Post-Login Upgrade Pattern
+  Client-Agent Playbook for Android / iOS / Desktop
+  Introduced in: v0.18.2 (2026-02)
+
+  Endpoint under test:
+    POST /apps/souvera_mail/app-passwords/upgrade
+================================================================================
+
+WHAT IS THIS
+--------------------------------------------------------------------------------
+
+A one-shot endpoint that a native client uses IMMEDIATELY after a
+successful Nextcloud login-flow-v2 to atomically:
+
+  1. mint a paired mail+DAV credential (`Y`), and
+  2. invalidate the NC-only credential (`X`) it just received from
+     NC's `/login/v2/poll`.
+
+You want this when the user's login path is any of:
+
+  - Nextcloud stock login-flow-v2 (SSO / OIDC / social login)
+  - QR-scan / open-in-Nextcloud add-account flows
+  - "Add account" dialog in the Souvera-Android / iOS / Desktop app
+
+…all of which end with the client holding a plain NC app-password `X`
+that works for files / DAV / CalDAV / CardDAV BUT NOT for mail (because
+Stalwart never learned about it). Historically the client had to
+either (a) ask the user to type a mail password again — bad UX — or
+(b) leave the user mail-less until they went to the Souvera Mail
+settings page and provisioned a paired credential manually.
+
+The `upgrade` endpoint is the fix. Client does it silently once, right
+after the NC login-flow returns, and from that point on the SAME
+credential works for mail and NC-files.
+
+================================================================================
+  WHEN TO CALL `/upgrade`  vs.  `/login-flow`
+================================================================================
+
+  /apps/souvera_mail/app-passwords/upgrade
+      Use RIGHT AFTER a successful NC `/login/v2/*` flow.
+      You HAVE an NC-only app-password `X`. You want `Y` AND you want
+      `X` invalidated atomically.
+
+  /apps/souvera_mail/app-passwords/login-flow
+      Use in every OTHER situation:
+        - You already have a paired credential and want to rotate.
+        - You are authenticated by session cookie (browser-embedded
+          WebView on desktop, or your own OIDC redirect flow that
+          landed you on a NC session cookie).
+        - You are authenticated by an OIDC access token issued for
+          this NC instance.
+      In all these cases there is no "X" to invalidate — just
+      provision a paired Y.
+
+Rule of thumb: **/login-flow is the general endpoint, /upgrade is the
+optimization for the specific case where you already own X**.
+
+================================================================================
+  REQUEST
+================================================================================
+
+    POST https://<host>/apps/souvera_mail/app-passwords/upgrade
+    Authorization: Basic base64(<loginName>:<X>)
+    Content-Type:  application/json     (only if body is non-empty)
+    User-Agent:    <your-client-ua>
+
+Optional body:
+
+    { "description": "Souvera-android v1.0.2 (auto-upgraded 2026-02-20)" }
+
+`description` follows the same rules as /login-flow — silently
+truncated to 120 chars, auto-derived from User-Agent + date if omitted.
+
+Auth requirement — READ THIS
+--------------------------------------------------------------------------------
+
+The `Authorization: Basic` header is MANDATORY on this endpoint. It is
+the ONLY reliable way for the server to identify which NC token to
+invalidate (session cookies and OIDC bearer tokens don't map 1:1 to a
+specific `oc_authtoken` row). If you omit Basic-Auth and pass another
+credential:
+
+  - Session cookie present  →  the request is authenticated but
+                                the endpoint returns 400 with a
+                                clear error message ("upgrade requires
+                                Basic-Auth with the current NC
+                                app-password (X)").
+  - OIDC bearer present     →  same 400.
+  - Nothing at all          →  401.
+
+If your login path landed you on a session cookie (not on a plaintext
+`X`) you have TWO options:
+
+  a) Call /login-flow instead. You'll get a paired Y but you won't
+     have anything to invalidate. This is the correct choice for
+     browser-embedded flows.
+
+  b) Convert your session to a fresh app-password first by calling
+     the OCS endpoint
+        GET /ocs/v2.php/core/getapppassword
+        Authorization: Basic base64(<loginName>:<real-user-password>)
+     — but only do this if you actually have the user's plaintext
+     password in scope, which native app-flows usually don't.
+
+================================================================================
+  RESPONSE
+================================================================================
+
+  200 OK
+
+    {
+      "status":       "ok",
+      "server":       "https://grassegger.souvera.work",
+      "loginName":    "philip",
+      "appPassword":  "app_yourNewPairedSecretHere",
+      "stalwartId":   "1a2b3c4d5e6f",
+      "description":  "Souvera-android v1.0.2 (auto-upgraded 2026-02-20)",
+      "createdAt":    "2026-02-20T15:44:31Z",
+      "upgradedFrom": {
+        "invalidated": true,
+        "note":        "The X token you sent has been invalidated. Delete
+                        it from local secure storage now and use the new
+                        appPassword (Y) exclusively."
+      }
+    }
+
+  Field semantics:
+
+    server, loginName, appPassword, stalwartId, description, createdAt
+        Same as `/login-flow` — bit-compatible with NC's /login/v2/poll.
+
+    upgradedFrom.invalidated
+        `true`  → X was successfully removed from NC's oc_authtoken.
+                  DELETE X from your local secure storage immediately.
+        `false` → X create-succeeded, but X invalidate-failed. You still
+                  got Y (mail+DAV works). But X is STILL alive on the
+                  server. Do NOT retry the upgrade — that would try to
+                  create yet-another Y. Instead:
+                    - Delete X from your local storage,
+                    - Ask the server for the connected-devices list
+                      (GET /apps/souvera_mail/connected-devices),
+                    - Find the entry whose `name` matches your
+                      original NC login and call
+                      DELETE /apps/souvera_mail/connected-devices/{id}
+                      with Y as Basic-Auth.
+                  See "Cleanup fallback" below.
+
+    upgradedFrom.note
+        Human-readable string. UI MAY show; otherwise treat as debug.
+
+  400 Bad Request — Basic-Auth password missing
+
+    { "status": "error",
+      "message": "/app-passwords/upgrade requires HTTP Basic-Auth with
+                  the current NC app-password (X). ..." }
+
+  401 Unauthorized — auth rejected outright
+
+    Increments the brute-force counter for `souvera_mail_login_flow`
+    (SAME counter as /login-flow — one shared budget per IP).
+
+  429 Too Many Requests — brute-force throttle
+
+    Wait or reset (see docs/PASSWORD_ROTATION.txt "BRUTE-FORCE").
+
+  502 Bad Gateway — Y creation failed
+
+    Nothing was invalidated. Your X still works. Retry.
+
+  503 Service Unavailable — server not configured for paired passwords
+
+    Do NOT retry — this is a permanent server-side config issue.
+    Fall back to using X as an NC-only credential and prompt the
+    user (or your admin dashboard) that mail is unavailable until
+    the admin sets up souvera_central + Stalwart API + H2CK/oidc.
+
+================================================================================
+  ATOMICITY GUARANTEES
+================================================================================
+
+The endpoint provides these guarantees, in this exact order:
+
+  G1. If you receive a 200, you got Y (paired credential) and we
+      attempted to invalidate X. `upgradedFrom.invalidated` tells you
+      whether the X-invalidation succeeded.
+
+  G2. If you receive a non-200, NOTHING was invalidated. Your X is
+      still alive and works exactly as before the request. Safe to
+      retry.
+
+  G3. Y is ALWAYS returned on 200, even if X invalidation failed.
+      Losing Y because X couldn't be killed would be strictly worse
+      than a stale X in the device list.
+
+  G4. The server WILL log a WARNING on X-invalidation failures. Ops
+      can grep:
+        grep -a "Souvera Mail upgrade: could not invalidate NC token" \
+             /var/lib/nextcloud-data/nextcloud.log
+
+================================================================================
+  CLIENT ALGORITHM (recommended)
+================================================================================
+
+Do this INSIDE your existing successful-login handler, RIGHT AFTER you
+received X from NC's `/login/v2/poll` — and BEFORE you have persisted
+X to secure storage:
+
+    1. Store X in a TEMPORARY variable (RAM only), NOT in
+       Keystore/Keychain/DPAPI yet.
+
+    2. Call POST /apps/souvera_mail/app-passwords/upgrade with X
+       as Basic-Auth.
+
+    3a. If 200:
+          - Persist Y (from response) to secure storage.
+          - Persist stalwartId + createdAt (for rotation).
+          - DO NOT persist X. Overwrite the RAM variable holding it
+            with zero-bytes (defensive against post-mortem heap dumps).
+          - Log locally: "Auto-upgraded to paired credential."
+
+    3b. If 400 (endpoint refused because auth was wrong / no
+        PHP_AUTH_PW):
+          - You likely reached this code path via a session-cookie
+            flow. Persist X and immediately call /login-flow with
+            X as Basic-Auth to still get Y — you just won't have
+            atomic X-cleanup. Log "Non-atomic upgrade path used."
+
+    3c. If 502/503 (server said "we can't pair right now"):
+          - Persist X. Mark the account as "mail-degraded" in your
+            UI (banner or badge). Schedule a background retry every
+            few minutes. Next successful upgrade will silently swap X
+            for Y.
+
+    3d. If 429:
+          - Back off exponentially. Persist X so the user's NC session
+            works while we wait. Never more than 3 retries per hour.
+
+    3e. If timeout / network error:
+          - Persist X and treat as 502 (mail-degraded, schedule retry).
+
+Client CODE ordering pitfall: persist X **after** the upgrade attempt.
+If you persist X first and then call /upgrade, a crash between the two
+leaves you with X in Keystore AND a Y from a completed upgrade the
+next time you try — you now have TWO credentials and don't know which
+one to use.
+
+Cleanup fallback (when upgradedFrom.invalidated = false)
+--------------------------------------------------------------------------------
+
+Rare. Happens when NC's PublicKeyTokenProvider is misconfigured or a
+race with a concurrent revoke happens. To clean up:
+
+    // 1) Use Y from here on.
+    // 2) Ask the server for your token list:
+    GET /apps/souvera_mail/connected-devices
+    Authorization: Basic base64(loginName:Y)
+    → returns [{id: 42, name: "Souvera-android via NC login-flow", ...}, ...]
+
+    // 3) Find the entry that matches your ORIGINAL NC login
+    //    (heuristic: same or older createdAt than yours, name contains
+    //    "login-flow" or your client's User-Agent from step 0).
+    // 4) DELETE /apps/souvera_mail/connected-devices/{that_id}
+    Authorization: Basic base64(loginName:Y)
+
+Do not do this eagerly on every upgrade — only when
+`upgradedFrom.invalidated == false`.
+
+================================================================================
+  EXAMPLE — Kotlin / Android (OkHttp) — glue into your existing
+                                        onLoginSuccess() handler
+================================================================================
+
+    // Assume you already have:
+    //   val ncLoginResult: NCLoginFlowResult  // from /login/v2/poll
+    //   val server         = ncLoginResult.server
+    //   val loginName      = ncLoginResult.loginName
+    //   val xAppPassword   = ncLoginResult.appPassword   // <— X, RAM only!
+
+    suspend fun onLoginSuccess(ncLoginResult: NCLoginFlowResult) {
+        val client = OkHttpClient()
+        val body = JSONObject().put(
+            "description",
+            "Souvera-android v${BuildConfig.VERSION_NAME} " +
+                "(auto-upgraded ${java.time.LocalDate.now()})"
+        ).toString().toRequestBody("application/json".toMediaType())
+
+        val req = Request.Builder()
+            .url("${ncLoginResult.server}/apps/souvera_mail/app-passwords/upgrade")
+            .header("Authorization", Credentials.basic(ncLoginResult.loginName, ncLoginResult.appPassword))
+            .header("User-Agent", "Souvera-android/${BuildConfig.VERSION_NAME}")
+            .header("Content-Type", "application/json")
+            .post(body)
+            .build()
+
+        val cred = try {
+            client.newCall(req).execute().use { resp ->
+                when (resp.code) {
+                    200 -> {
+                        val j = JSONObject(resp.body!!.string())
+                        val invalidated = j.getJSONObject("upgradedFrom")
+                                           .getBoolean("invalidated")
+                        if (!invalidated) {
+                            // Fire-and-forget best-effort cleanup on background.
+                            launchStaleXCleanup(ncLoginResult, y = j.getString("appPassword"))
+                        }
+                        Cred(
+                            server      = j.getString("server"),
+                            loginName   = j.getString("loginName"),
+                            appPassword = j.getString("appPassword"),   // Y
+                            stalwartId  = j.getString("stalwartId"),
+                            createdAt   = j.getString("createdAt"),
+                        )
+                    }
+
+                    400 -> {
+                        // No PHP_AUTH_PW available (session-cookie auth
+                        // path). Fall back to /login-flow — will not
+                        // invalidate X, so also enqueue a background
+                        // cleanup of X.
+                        Log.w("Souvera", "Non-atomic upgrade path — falling back to /login-flow.")
+                        provisionViaLoginFlow(ncLoginResult)
+                    }
+
+                    502, 503 -> {
+                        // Mail unavailable — persist X, degrade UI.
+                        Log.w("Souvera", "Server can't pair right now (${resp.code}). Degraded mode.")
+                        Cred(
+                            server = ncLoginResult.server, loginName = ncLoginResult.loginName,
+                            appPassword = ncLoginResult.appPassword,   // X
+                            stalwartId = "", createdAt = java.time.Instant.now().toString(),
+                        ).also { markMailDegraded() }
+                    }
+
+                    429 -> {
+                        scheduleUpgradeRetry(backoffMinutes = 5)
+                        Cred(
+                            server = ncLoginResult.server, loginName = ncLoginResult.loginName,
+                            appPassword = ncLoginResult.appPassword, stalwartId = "",
+                            createdAt = java.time.Instant.now().toString(),
+                        )
+                    }
+
+                    else -> throw RuntimeException("Upgrade failed: HTTP ${resp.code}")
+                }
+            }
+        } catch (io: java.io.IOException) {
+            Log.w("Souvera", "Upgrade network error — degraded mode.", io)
+            Cred(
+                server = ncLoginResult.server, loginName = ncLoginResult.loginName,
+                appPassword = ncLoginResult.appPassword, stalwartId = "",
+                createdAt = java.time.Instant.now().toString(),
+            ).also { markMailDegraded() }
+        }
+
+        credentialStore.save(cred)     // <— only NOW persist. Overwrite X in RAM.
+    }
+
+================================================================================
+  EXAMPLE — Swift / iOS
+================================================================================
+
+    struct SouveraUpgradeResult: Decodable {
+        let server, loginName, appPassword, stalwartId, createdAt: String
+        let upgradedFrom: UpgradedFrom
+        struct UpgradedFrom: Decodable { let invalidated: Bool; let note: String }
+    }
+
+    func onNCLoginSuccess(ncResult: NCLoginResult) async {
+        let url = URL(string: "\(ncResult.server)/apps/souvera_mail/app-passwords/upgrade")!
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+
+        let credData = "\(ncResult.loginName):\(ncResult.appPassword)".data(using: .utf8)!
+        req.setValue("Basic \(credData.base64EncodedString())", forHTTPHeaderField: "Authorization")
+        req.setValue("Souvera-ios/\(Bundle.main.infoDictionary!["CFBundleShortVersionString"] as! String)",
+                     forHTTPHeaderField: "User-Agent")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONEncoder().encode([
+            "description": "Souvera-ios auto-upgraded \(Date())"
+        ])
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+
+            switch http.statusCode {
+            case 200:
+                let r = try JSONDecoder().decode(SouveraUpgradeResult.self, from: data)
+                await Keychain.save(cred: Credential(
+                    server: r.server, loginName: r.loginName,
+                    appPassword: r.appPassword, stalwartId: r.stalwartId,
+                    createdAt: r.createdAt
+                ))
+                if !r.upgradedFrom.invalidated {
+                    Task.detached { await cleanupStaleX(ncResult: ncResult, y: r.appPassword) }
+                }
+
+            case 400:
+                await provisionViaLoginFlow(ncResult: ncResult)
+
+            case 502, 503:
+                await Keychain.save(cred: fromNC(ncResult))
+                await markMailDegraded()
+
+            case 429:
+                scheduleRetry(after: .minutes(5))
+                await Keychain.save(cred: fromNC(ncResult))
+
+            default:
+                throw URLError(.badServerResponse)
+            }
+        } catch {
+            await Keychain.save(cred: fromNC(ncResult))
+            await markMailDegraded()
+        }
+    }
+
+================================================================================
+  EXAMPLE — Rust / Desktop
+================================================================================
+
+    use reqwest::{Client, StatusCode};
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct UpgradeResp {
+        server: String,
+        #[serde(rename = "loginName")]  login_name: String,
+        #[serde(rename = "appPassword")] app_password: String,
+        #[serde(rename = "stalwartId")]  stalwart_id: String,
+        #[serde(rename = "createdAt")]   created_at: String,
+        #[serde(rename = "upgradedFrom")] upgraded_from: UpgradedFrom,
+    }
+    #[derive(Deserialize)]
+    struct UpgradedFrom { invalidated: bool, note: String }
+
+    pub async fn on_nc_login_success(nc: &NcLoginResult) -> anyhow::Result<Credential> {
+        let client = Client::new();
+        let url = format!("{}/apps/souvera_mail/app-passwords/upgrade", nc.server);
+
+        let resp = client.post(&url)
+            .basic_auth(&nc.login_name, Some(&nc.app_password))
+            .header("User-Agent", format!("Souvera-desktop/{}", env!("CARGO_PKG_VERSION")))
+            .json(&serde_json::json!({
+                "description": format!("Souvera-desktop auto-upgraded {}",
+                                        chrono::Utc::now().format("%Y-%m-%d"))
+            }))
+            .send().await;
+
+        match resp {
+            Ok(r) if r.status() == StatusCode::OK => {
+                let body: UpgradeResp = r.json().await?;
+                if !body.upgraded_from.invalidated {
+                    tokio::spawn(cleanup_stale_x(nc.clone(), body.app_password.clone()));
+                }
+                Ok(Credential {
+                    server: body.server,
+                    login_name: body.login_name,
+                    app_password: body.app_password,
+                    stalwart_id: body.stalwart_id,
+                    created_at: body.created_at,
+                })
+            }
+            Ok(r) if r.status() == StatusCode::BAD_REQUEST => {
+                provision_via_login_flow(nc).await
+            }
+            Ok(r) if r.status() == StatusCode::TOO_MANY_REQUESTS => {
+                schedule_retry(std::time::Duration::from_secs(5 * 60));
+                Ok(nc.into_degraded_credential())
+            }
+            Ok(_) | Err(_) => Ok(nc.into_degraded_credential()),
+        }
+    }
+
+================================================================================
+  TEST CHECKLIST FOR CLIENT AGENTS
+================================================================================
+
+Before shipping, verify manually:
+
+  [ ] Happy path (Basic-Auth with valid X):
+      → 200, appPassword swapped, X gone from
+        /settings/user/security in NC.
+
+  [ ] Wrong X (invalidated server-side already):
+      → 401. Retry not attempted. UI prompts re-login.
+
+  [ ] Session-cookie auth:
+      → 400 with clear message. Client falls back to /login-flow.
+
+  [ ] Stalwart down (Iptables-blocked while testing):
+      → 502. Client persists X and marks mail-degraded. Retry scheduled.
+
+  [ ] Souvera_central not configured:
+      → 503. Client persists X and STOPS retrying (this is a permanent
+        server config issue, not a transient error).
+
+  [ ] Brute-force after 12+ failed logins from same IP:
+      → 429. Client backs off exponentially. Never more than 3 retries.
+
+  [ ] Post-upgrade cleanup when invalidated=false:
+      → Client scans /apps/souvera_mail/connected-devices and DELETEs
+        the stale X entry.
+
+  [ ] Kill client mid-upgrade (between POST and Keystore save):
+      → On next start, client detects "no stored credential" and
+        prompts re-login. X is either invalidated (client sees 401
+        with old X → prompts) or still alive (client uses it for the
+        retry cycle).
+
+================================================================================
+  CHANGELOG
+================================================================================
+
+v0.18.2 (2026-02) — endpoint introduced.
+
+================================================================================

@@ -203,6 +203,170 @@ class LoginFlowController extends Controller
     }
 
     /**
+     * POST /apps/souvera_mail/app-passwords/upgrade
+     *
+     * Post-Login upgrade path for native clients (Souvera-Android / iOS /
+     * Desktop) that first went through Nextcloud's stock `/login/v2/*`
+     * flow — got back a plain NC-only app-password `X` — and now want
+     * to atomically UPGRADE it to a paired mail+DAV credential `Y`.
+     *
+     * Why not just call `create()` above? Because after `create()`, the
+     * client would still own a live NC-only token `X` alongside the new
+     * paired `Y`. That "zombie X" shows up as a duplicate device in
+     * `/settings/user/security`, holds DAV access with no matching
+     * Stalwart pair, and confuses users on device-management screens.
+     *
+     * This endpoint eliminates the zombie: it performs
+     *   1) create paired Y  (Stalwart-first, then NC-token, then mapping)
+     *   2) invalidate X     (best-effort — uses the incoming Basic-Auth
+     *                        plaintext to identify the caller's token)
+     *
+     * Contract with the client:
+     *
+     * - Auth MUST be `Authorization: Basic base64(loginName:X)` — the
+     *   endpoint reads `PHP_AUTH_PW` to identify which token to
+     *   invalidate. Session-cookie / OIDC-bearer auth is rejected with
+     *   400, because we cannot safely resolve which NC token backed
+     *   the session without the plaintext.
+     *
+     * - `X` is INVALIDATED after `Y` has been created. If `X` cannot
+     *   be invalidated (network flap, token already gone), we log a
+     *   WARNING and still return `Y` — losing `Y` because `X` couldn't
+     *   be killed would be a far worse outcome than a single leftover
+     *   NC token that the user can revoke manually.
+     *
+     * - The atomicity guarantee is: EITHER the caller gets `Y` and we
+     *   TRIED to invalidate `X` (never leaks two live NC-only tokens),
+     *   OR the caller gets a non-200 and NOTHING was created/deleted.
+     *
+     * Response 200:
+     *   {
+     *     "status":       "ok",
+     *     "server":       "https://grassegger.souvera.work",
+     *     "loginName":    "philip",
+     *     "appPassword":  "app_...",       // this is Y (paired plaintext)
+     *     "stalwartId":   "abcd1234",
+     *     "description":  "...",
+     *     "createdAt":    "...",
+     *     "upgradedFrom": {                // Souvera-specific hint block
+     *       "invalidated": true,           //   false if invalidate failed
+     *       "note":        "The X token you sent has been invalidated. "
+     *                    . "Delete it from local secure storage now."
+     *     }
+     *   }
+     *
+     * Errors:
+     *   400 — no Basic-Auth password → cannot resolve X for revoke
+     *   401 — unauthenticated
+     *   503 — souvera_central not configured
+     *   502 — Stalwart/NC pair creation failed
+     *   429 — brute-force throttle
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    #[BruteForceProtection(action: 'souvera_mail_login_flow')]
+    public function upgrade(string $description = ''): DataResponse
+    {
+        $user = $this->userSession->getUser();
+        if ($user === null) {
+            $r = $this->error(
+                'unauthenticated — send Authorization: Basic base64(loginName:X) '
+                . 'where X is the NC app-password you obtained from /login/v2/poll',
+                Http::STATUS_UNAUTHORIZED,
+            );
+            $r->throttle(['action' => 'souvera_mail_login_flow']);
+            return $r;
+        }
+
+        // Basic-Auth plaintext MUST be present — we need it to
+        // invalidate X below. If empty, the caller is authenticated
+        // via session-cookie or OIDC-bearer, neither of which lets us
+        // safely identify the specific NC token to revoke.
+        $rawX = (string) ($this->request->server['PHP_AUTH_PW'] ?? '');
+        if ($rawX === '') {
+            return $this->error(
+                '/app-passwords/upgrade requires HTTP Basic-Auth with the '
+                . 'current NC app-password (X). Session-cookie or OIDC-bearer '
+                . 'authentication is not supported on this endpoint because we '
+                . 'cannot resolve which NC token backs your session. Use '
+                . '/app-passwords/login-flow instead if you only need to '
+                . 'create a fresh paired credential.',
+                Http::STATUS_BAD_REQUEST,
+            );
+        }
+
+        if (!$this->appPasswords->isAvailable()) {
+            return $this->error(
+                'App passwords are unavailable on this instance: '
+                . 'souvera_central + Stalwart API URL + H2CK/oidc must be configured.',
+                Http::STATUS_SERVICE_UNAVAILABLE,
+            );
+        }
+
+        $description = $this->resolveDescription($description);
+        $userId = $user->getUID();
+
+        // Phase 1: create Y (paired combined password). If this fails,
+        // NOTHING has been touched yet on either side — we return the
+        // error and leave X intact so the caller retains their working
+        // NC session.
+        try {
+            $created = $this->appPasswords->createForUser($userId, $description);
+        } catch (\InvalidArgumentException $e) {
+            return $this->error($e->getMessage(), Http::STATUS_BAD_REQUEST);
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail upgrade failed on Y-create for ' . $userId . ': '
+                . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e, 'user' => $userId],
+            );
+            return $this->error($e->getMessage(), Http::STATUS_BAD_GATEWAY);
+        }
+
+        // Phase 2: best-effort invalidation of X. Any failure is logged
+        // and reflected in `upgradedFrom.invalidated` — but we STILL
+        // return Y so the client's mail-and-DAV flow works. A stale X
+        // in NC's device list is a UX blemish, not a security issue
+        // (the user can revoke it manually from /settings/user/security).
+        $invalidated = true;
+        try {
+            $this->appPasswords->revokeByRawSecret($userId, $rawX);
+        } catch (\Throwable $e) {
+            // revokeByRawSecret itself swallows exceptions, so this
+            // catch is defensive. If we ever reach here it means the
+            // swallow was bypassed — treat as "invalidation failed".
+            $invalidated = false;
+            $this->logger->warning(
+                'Souvera Mail upgrade: revokeByRawSecret unexpectedly threw for '
+                . $userId . ': ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e],
+            );
+        }
+
+        $nowIso = \gmdate('Y-m-d\TH:i:s\Z');
+        $server = \rtrim($this->urlGenerator->getAbsoluteURL('/'), '/');
+
+        return new DataResponse(
+            [
+                'status' => 'ok',
+                'server' => $server,
+                'loginName' => $userId,
+                self::RESPONSE_KEY_APP_PASSWORD => $created['secret'],
+                'stalwartId' => $created['id'],
+                'description' => $created['description'],
+                'createdAt' => $nowIso,
+                'upgradedFrom' => [
+                    'invalidated' => $invalidated,
+                    'note' => $invalidated
+                        ? 'The X token you sent has been invalidated. Delete it from local secure storage now and use the new appPassword (Y) exclusively.'
+                        : 'The X token could NOT be invalidated automatically (see server log). Please revoke it manually from /settings/user/security so it does not linger as a duplicate device.',
+                ],
+            ],
+            Http::STATUS_OK,
+        );
+    }
+
+    /**
      * Derive the token description: caller value wins; otherwise
      * fall back to `Souvera Client — <User-Agent> — YYYY-MM-DD`.
      *

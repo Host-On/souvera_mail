@@ -26,6 +26,31 @@ capability. This document is ONLY for native/headless clients that cannot open
 a browser.
 
 ================================================================================
+  RELATED ENDPOINTS — WHICH ONE TO USE
+================================================================================
+
+  /apps/souvera_mail/app-passwords/login-flow   ← this document
+      General-purpose endpoint. Any authenticated user provisions a
+      NEW paired credential from scratch. Use for:
+        - First provisioning (no prior NC session)
+        - Session-cookie or OIDC-bearer auth flows
+        - Programmatic tools (curl scripts, backup runners)
+        - Password ROTATION (see docs/PASSWORD_ROTATION.txt)
+
+  /apps/souvera_mail/app-passwords/upgrade      ← see CLIENT_UPGRADE_PATTERN.txt
+      OPTIMIZED sub-case for native clients that just went through
+      NC's stock `/login/v2/*` flow and hold an NC-only X they
+      want to atomically upgrade to a paired Y (with automatic
+      X-invalidation). Prefer this over /login-flow when applicable —
+      it prevents "zombie NC tokens" in the user's device list.
+
+  /apps/souvera_mail/me
+      Identity + server-hint endpoint. Returns email, displayName,
+      server URL, rotation policy. Call after login-flow / upgrade
+      to complete client bootstrap.
+
+
+================================================================================
   REQUEST
 ================================================================================
 
