@@ -234,7 +234,20 @@ class ImapClient extends \Smail\Mail\Net\NetClient
 			// `[CAPABILITY …]` block, refetch. Servers that DO include
 			// it (Stalwart, modern Dovecot with `imap_capability`
 			// tweaks, …) short-circuit here and save the roundtrip.
-			if (!$oResponse->getCapabilityResult()) {
+			//
+			// v0.19.x — ALSO refetch when the post-auth capability list we
+			// currently hold is missing SORT. Stalwart 0.16 echoes a
+			// `[CAPABILITY …]` block on the AUTHENTICATE OK reply that omits
+			// SORT, yet advertises SORT on a fresh standalone `CAPABILITY`
+			// command. Without this refetch, `hasCapability('SORT')` stays
+			// false, the server-side IMAP SORT is never used, and message
+			// ordering falls back to the fragile UID-order heuristic in
+			// MailClient::GetUids() — which ignores the user's chosen sort
+			// direction and mis-places messages whose UID order differs from
+			// their Date order (the "neue Mails landen am Ende, egal ob auf-
+			// oder absteigend" report). One extra round-trip, only when SORT
+			// is not already known.
+			if (!$oResponse->getCapabilityResult() || !$this->hasCapability('SORT')) {
 				$this->aCapa = null;
 				$this->aCapaRaw = null;
 				$this->Capability();

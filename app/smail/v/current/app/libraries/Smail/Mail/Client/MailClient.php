@@ -622,6 +622,10 @@ class MailClient
 		$sFolderName = $oParams->sFolderName;
 
 		$bUseSort = $oParams->bUseSort && $this->oImapClient->hasCapability('SORT');
+		// Preserve the caller's requested sort BEFORE it is rewritten below
+		// (when server-side SORT is unavailable the code clears $oParams->sSort
+		// to ''). The SEARCH fallback needs it to honour the chosen direction.
+		$sRequestedSort = \strtoupper((string) $oParams->sSort);
 		$aSortTypes = [];
 		if ($bUseSort) {
 			if ($oParams->sSort) {
@@ -701,7 +705,17 @@ class MailClient
 			// folder traffic. Skipped when server-side SORT worked
 			// (bUseSort=true above), when the caller passed an explicit
 			// sequence-set range, or when a search is active.
-			if (\is_array($aResultUids) && \count($aResultUids) > 1
+			//
+			// v0.19.x — honour the requested direction. Previously this
+			// reversed UNCONDITIONALLY, so toggling ascending/descending in
+			// the UI had no effect (the fallback always showed newest-first).
+			// The default/empty sort and any "…REVERSE" sort mean descending
+			// (newest first → reverse the ascending UID list); an explicit
+			// ascending sort (e.g. plain "DATE" / "ARRIVAL") must keep the
+			// natural ascending UID order.
+			$bReverseFallback = ('' === $sRequestedSort) || \str_contains($sRequestedSort, 'REVERSE');
+			if ($bReverseFallback
+			 && \is_array($aResultUids) && \count($aResultUids) > 1
 			 && !\strlen($oParams->sSearch)
 			 && !$oParams->oSequenceSet
 			) {
