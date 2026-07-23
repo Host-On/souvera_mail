@@ -87,9 +87,12 @@ class FcmClient
     }
 
     /**
-     * Sends a data+notification push to every given FCM registration
-     * token. Tokens that Google reports as unregistered/invalid are
-     * deleted from `oc_souvera_mail_devicetoken` as a side effect.
+     * Sends a data-only push (no `notification` block) to every given FCM
+     * registration token, so the Android client's own message handler runs
+     * in foreground AND background instead of the system tray auto-showing
+     * this generic title/body. Tokens that Google reports as
+     * unregistered/invalid are deleted from `oc_souvera_mail_devicetoken`
+     * as a side effect.
      *
      * No-ops (logging at debug) if the service account is not configured
      * or an access token cannot be minted — callers do not need to guard
@@ -127,16 +130,20 @@ class FcmClient
         $client = $this->httpClientService->newClient();
 
         foreach ($fcmTokens as $fcmToken) {
+            // Data-only message: no top-level `notification` block, so the
+            // Android client's FirebaseMessagingService.onMessageReceived()
+            // always runs (foreground AND background/Doze) and can build a
+            // privacy-preserving rich notification itself instead of the
+            // system tray auto-displaying this generic title/body.
+            $messageData = \array_map('strval', $data) + ['title' => $title, 'body' => $body];
+
             $payload = [
                 'message' => [
                     'token' => $fcmToken,
-                    'notification' => [
-                        'title' => $title,
-                        'body' => $body,
-                    ],
-                    'data' => \array_map('strval', $data),
+                    'data' => $messageData,
                     'android' => [
                         'priority' => 'high',
+                        'ttl' => '3600s',
                     ],
                 ],
             ];

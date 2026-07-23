@@ -6,6 +6,15 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.19.2] — 2026-07-22 (Fix: FCM data-only Push)
+
+FCM-Nachrichten werden jetzt als reine Data-Messages gesendet (kein
+top-level `notification`-Block) + `ttl: 3600s`. Dadurch läuft der
+`onMessageReceived()`-Handler des Android-Clients im Vorder- UND
+Hintergrund (inkl. Doze), statt dass die System-Leiste automatisch einen
+generischen Titel/Text anzeigt — der Client kann eine datenschutzfreundliche
+eigene Benachrichtigung bauen. (`FcmClient`)
+
 ## [0.19.1] — 2026-07-21 (Fix: Stalwart-Webhook-Payload-Format)
 
 Das reale Stalwart-Webhook-Payload (verifiziert anhand des Stalwart-Quellcodes,
