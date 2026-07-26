@@ -291,5 +291,4 @@ return [
             'url' => '/webhooks/stalwart',
             'verb' => 'POST',
         ],
-        [
 ];
