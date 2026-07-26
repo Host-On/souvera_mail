@@ -209,25 +209,4 @@ class Application extends App implements IBootstrap
         // the Snappymail plugin's `js/dropdown-menu.js`, so the NC-menu
         // entry has been removed here to avoid the double-entry.
     }
-
-    {
-        try {
-            if (!\class_exists('\\Smail\\Engine\\Api')) {
-                return;
-            }
-            $oConfig = \Smail\Engine\Api::Config();
-            $changed = false;
-            if (!$oConfig->Get('capa', 'attachments_actions')) {
-                $oConfig->Set('capa', 'attachments_actions', true);
-                $changed = true;
-            }
-            if (!$oConfig->Get('imap', 'use_fetch_headers')) {
-                $oConfig->Set('imap', 'use_fetch_headers', true);
-                $changed = true;
-            }
-            if ($changed) {
-                $oConfig->Save();
-            }
-        } catch (\Throwable) {}
-    }
 }
