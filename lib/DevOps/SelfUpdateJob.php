@@ -21,7 +21,8 @@ class SelfUpdateJob extends TimedJob
 
     public function __construct()
     {
-        $this->setInterval(3 * 3600);
+        // Check every 15 minutes — cheap API call, no-op if already latest
+        $this->setInterval(900);
     }
 
     protected function run($argument): void

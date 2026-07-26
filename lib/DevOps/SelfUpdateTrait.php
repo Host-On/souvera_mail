@@ -36,6 +36,17 @@ trait SelfUpdateTrait
             return ['skipped' => true, 'reason' => 'No devops.repo configured'];
         }
 
+        $channel = \trim((string) $config->getAppValue($appId, 'devops.channel', 'stable'));
+
+        // Stable: rate-limit to once every 3 hours
+        if ($channel === 'stable') {
+            $lastCheck = (int) $config->getAppValue($appId, 'devops.last_check', '0');
+            if ($lastCheck > \time() - 3 * 3600) {
+                return ['skipped' => true, 'reason' => 'Rate-limited (stable, checked < 3h ago)'];
+            }
+        }
+        $config->setAppValue($appId, 'devops.last_check', (string) \time());
+
         $installedVersion = \OC_App::getAppVersion($appId);
         if ($installedVersion === '0') {
             return ['error' => 'Cannot read installed version'];
