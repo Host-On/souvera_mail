@@ -76,20 +76,13 @@ trait SelfUpdateTrait
 
     private function fetchLatestRelease(string $repo): ?string
     {
-        $url = "https://api.github.com/repos/$repo/releases/latest";
-        $ctx = \stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'header' => "User-Agent: Souvera-DevOps\r\nAccept: application/vnd.github+json\r\n",
-                'timeout' => 15,
-            ],
-        ]);
-        $json = @\file_get_contents($url, false, $ctx);
-        if ($json === false) {
-            return null;
-        }
+        $json = \shell_exec(\sprintf(
+            'gh release list -R %s -L 1 --json tagName 2>/dev/null',
+            \escapeshellarg($repo)
+        ));
+        if ($json === null || $json === '') return null;
         $data = \json_decode($json, true);
-        return isset($data['tag_name']) ? \ltrim((string) $data['tag_name'], 'v') : null;
+        return isset($data[0]['tagName']) ? \ltrim((string) $data[0]['tagName'], 'v') : null;
     }
 
     private function pullTag(string $appId, string $appPath, string $tag, string $repo): array
