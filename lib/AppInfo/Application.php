@@ -200,7 +200,6 @@ class Application extends App implements IBootstrap
         });
 
         // Enforce critical release defaults on every boot
-        $this->applyBootConfig();
 
         // v0.14.17: "Alte Mails importieren" was briefly registered as a
         // Nextcloud user-menu entry (`type => 'settings'`) in v0.14.12,
@@ -211,7 +210,6 @@ class Application extends App implements IBootstrap
         // entry has been removed here to avoid the double-entry.
     }
 
-    private function applyBootConfig(): void
     {
         try {
             if (!\class_exists('\\Smail\\Engine\\Api')) {
