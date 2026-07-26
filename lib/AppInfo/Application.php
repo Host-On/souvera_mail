@@ -199,20 +199,8 @@ class Application extends App implements IBootstrap
             ];
         });
 
-        // Enforce critical release defaults on every boot — no repair-step lag
-        try {
-            $oConfig = \Smail\Engine\Api::Config();
-            if (!(bool)$oConfig->Get('capa', 'attachments_actions', false)) {
-                $oConfig->Set('capa', 'attachments_actions', true);
-                $oConfig->Save();
-            }
-            if (!(bool)$oConfig->Get('imap', 'use_fetch_headers', false)) {
-                $oConfig->Set('imap', 'use_fetch_headers', true);
-                $oConfig->Save();
-            }
-        } catch (\Throwable $e) {
-            // Engine not booted yet or config write failed — InstallStep will retry
-        }
+        // Enforce critical release defaults on every boot
+        $this->applyBootConfig();
 
         // v0.14.17: "Alte Mails importieren" was briefly registered as a
         // Nextcloud user-menu entry (`type => 'settings'`) in v0.14.12,
@@ -221,5 +209,27 @@ class Application extends App implements IBootstrap
         // dropdown (SystemDropDown.html). That entry is now injected by
         // the Snappymail plugin's `js/dropdown-menu.js`, so the NC-menu
         // entry has been removed here to avoid the double-entry.
+    }
+
+    private function applyBootConfig(): void
+    {
+        try {
+            if (!\class_exists('\\Smail\\Engine\\Api')) {
+                return;
+            }
+            $oConfig = \Smail\Engine\Api::Config();
+            $changed = false;
+            if (!$oConfig->Get('capa', 'attachments_actions')) {
+                $oConfig->Set('capa', 'attachments_actions', true);
+                $changed = true;
+            }
+            if (!$oConfig->Get('imap', 'use_fetch_headers')) {
+                $oConfig->Set('imap', 'use_fetch_headers', true);
+                $changed = true;
+            }
+            if ($changed) {
+                $oConfig->Save();
+            }
+        } catch (\Throwable) {}
     }
 }
