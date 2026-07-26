@@ -12,9 +12,15 @@ class SelfUpdateJob extends TimedJob
 {
     use SelfUpdateTrait;
 
-    protected function getAppId(): string { return 'souvera_mail'; }
+    protected function getAppId(): string
+    {
+        return 'souvera_mail';
+    }
 
-    public function __construct() { $this->setInterval(900); }
+    public function __construct()
+    {
+        $this->setInterval(900);
+    }
 
     protected function run($argument): void
     {
@@ -23,6 +29,8 @@ class SelfUpdateJob extends TimedJob
             if (!empty($result['success'])) {
                 \OCP\Server::get(LoggerInterface::class)->info('souvera_mail self-update: ' . \json_encode($result));
             }
-        } catch (\Throwable) {}
+        } catch (\Throwable $e) {
+            // Silently retry next cycle
+        }
     }
 }
