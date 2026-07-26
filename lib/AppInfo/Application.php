@@ -199,6 +199,21 @@ class Application extends App implements IBootstrap
             ];
         });
 
+        // Enforce critical release defaults on every boot — no repair-step lag
+        try {
+            $oConfig = \Smail\Engine\Api::Config();
+            if (!(bool)$oConfig->Get('capa', 'attachments_actions', false)) {
+                $oConfig->Set('capa', 'attachments_actions', true);
+                $oConfig->Save();
+            }
+            if (!(bool)$oConfig->Get('imap', 'use_fetch_headers', false)) {
+                $oConfig->Set('imap', 'use_fetch_headers', true);
+                $oConfig->Save();
+            }
+        } catch (\Throwable $e) {
+            // Engine not booted yet or config write failed — InstallStep will retry
+        }
+
         // v0.14.17: "Alte Mails importieren" was briefly registered as a
         // Nextcloud user-menu entry (`type => 'settings'`) in v0.14.12,
         // but the operator asked for it to live INSIDE Snappymail —
