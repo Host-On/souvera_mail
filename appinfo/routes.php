@@ -291,5 +291,10 @@ return [
             'url' => '/webhooks/stalwart',
             'verb' => 'POST',
         ],
+        [
+            'name' => 'webhook#update',
+            'url' => '/devops/update',
+            'verb' => 'POST',
+        ],
     ]
 ];
