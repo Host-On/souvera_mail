@@ -27,25 +27,44 @@ trait SelfUpdateTrait
 {
     abstract protected function getAppId(): string;
 
-    public function checkAndUpdate(string $defaultRepo = ''): array
+    public function checkAndUpdate(): array
     {
         $appId = $this->getAppId();
         $config = \OCP\Server::get(\OCP\IConfig::class);
-        $repo = \trim((string) $config->getAppValue($appId, 'devops.repo', $defaultRepo));
-        if ($repo === '') {
-            return ['skipped' => true, 'reason' => 'No devops.repo configured'];
-        }
-
         $channel = \trim((string) $config->getAppValue($appId, 'devops.channel', 'stable'));
 
         // Stable: rate-limit to once every 3 hours
         if ($channel === 'stable') {
             $lastCheck = (int) $config->getAppValue($appId, 'devops.last_check', '0');
             if ($lastCheck > \time() - 3 * 3600) {
-                return ['skipped' => true, 'reason' => 'Rate-limited (stable, checked < 3h ago)'];
+                return ['skipped' => true, 'reason' => 'Rate-limited (stable, < 3h)'];
             }
         }
         $config->setAppValue($appId, 'devops.last_check', (string) \time());
+
+        $installedVersion = \OC_App::getAppVersion($appId);
+        if ($installedVersion === '0') {
+            return ['error' => 'Cannot read installed version'];
+        }
+
+        $appPath = \OC_App::getAppPath($appId);
+        $branch = \trim((string) $config->getAppValue($appId, 'devops.branch', 'main'));
+
+        if ($channel === 'dev') {
+            return $this->pullBranch($appId, $appPath, $branch);
+        }
+
+        $latest = $this->fetchLatestRelease();
+        if ($latest === null) {
+            return ['error' => 'Cannot fetch git tags'];
+        }
+
+        if (\version_compare($latest, $installedVersion, '<=')) {
+            return ['up_to_date' => true, 'installed' => $installedVersion, 'latest' => $latest];
+        }
+
+        return $this->pullTag($appId, $appPath, $latest);
+    }
 
         $installedVersion = \OC_App::getAppVersion($appId);
         if ($installedVersion === '0') {
@@ -74,15 +93,18 @@ trait SelfUpdateTrait
         return $this->pullTag($appId, $appPath, $latest, $repo);
     }
 
-    private function fetchLatestRelease(string $repo): ?string
+    private function fetchLatestRelease(): ?string
     {
-        $json = \shell_exec(\sprintf(
-            'gh release list -R %s -L 1 --json tagName 2>/dev/null',
-            \escapeshellarg($repo)
+        $appPath = \OC_App::getAppPath($this->getAppId());
+        // git fetch the tags, then list them sorted by version
+        \exec(\sprintf('cd %s && git fetch origin --tags 2>/dev/null', \escapeshellarg($appPath)));
+        $output = \shell_exec(\sprintf(
+            'cd %s && git tag --sort=-version:refname 2>/dev/null | head -1',
+            \escapeshellarg($appPath)
         ));
-        if ($json === null || $json === '') return null;
-        $data = \json_decode($json, true);
-        return isset($data[0]['tagName']) ? \ltrim((string) $data[0]['tagName'], 'v') : null;
+        if ($output === null || $output === '') return null;
+        $tag = \trim((string) $output);
+        return \ltrim($tag, 'v');
     }
 
     private function pullTag(string $appId, string $appPath, string $tag, string $repo): array
