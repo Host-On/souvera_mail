@@ -12,6 +12,8 @@ class SelfUpdateJob extends TimedJob
 {
     use SelfUpdateTrait;
 
+    private const DEFAULT_REPO = 'PhiGi87/souvera_mail';
+
     protected function getAppId(): string
     {
         return 'souvera_mail';
@@ -19,20 +21,17 @@ class SelfUpdateJob extends TimedJob
 
     public function __construct()
     {
-        // Run every 3 hours
         $this->setInterval(3 * 3600);
     }
 
     protected function run($argument): void
     {
         try {
-            $result = $this->checkAndUpdate();
+            $result = $this->checkAndUpdate(self::DEFAULT_REPO);
             $logger = \OCP\Server::get(LoggerInterface::class);
             if (!empty($result['success'])) {
                 $logger->info('souvera_mail self-update: ' . \json_encode($result));
             }
-        } catch (\Throwable $e) {
-            // Never crash the cron — just log and retry next cycle
-        }
+        } catch (\Throwable) {}
     }
 }

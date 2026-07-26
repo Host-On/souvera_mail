@@ -27,11 +27,11 @@ trait SelfUpdateTrait
 {
     abstract protected function getAppId(): string;
 
-    public function checkAndUpdate(): array
+    public function checkAndUpdate(string $defaultRepo = ''): array
     {
         $appId = $this->getAppId();
         $config = \OCP\Server::get(\OCP\IConfig::class);
-        $repo = \trim((string) $config->getAppValue($appId, 'devops.repo', ''));
+        $repo = \trim((string) $config->getAppValue($appId, 'devops.repo', $defaultRepo));
         if ($repo === '') {
             return ['skipped' => true, 'reason' => 'No devops.repo configured'];
         }
