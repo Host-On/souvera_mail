@@ -239,6 +239,33 @@ class InstallStep implements IRepairStep
             $output,
             'Disabled contacts autosave for release defaults',
         );
+        $this->setIfCurrentIn(
+            $config,
+            'capa',
+            'attachments_actions',
+            true,
+            [false],
+            $output,
+            'Enabled attachment actions (view/save/save-to-nextcloud)',
+        );
+        $this->setIfCurrentIn(
+            $config,
+            'capa',
+            'additional_accounts',
+            true,
+            [false],
+            $output,
+            'Enabled additional mail accounts for release defaults',
+        );
+        $this->setIfCurrentIn(
+            $config,
+            'imap',
+            'use_fetch_headers',
+            true,
+            [false],
+            $output,
+            'Enabled FETCH HEADERS for faster mailbox listing',
+        );
     }
 
     /**
