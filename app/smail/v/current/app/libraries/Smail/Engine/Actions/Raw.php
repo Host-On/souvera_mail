@@ -35,32 +35,35 @@ trait Raw
 
 	public function RawDownload() : bool
 	{
-		if (!$this->rawSmart(true)) {
-			\http_response_code(404);
-			echo '<p>Attachment not found. It may have been deleted or the server connection failed.</p>';
-			return false;
+		$result = $this->rawSmart(true);
+		if (!$result) {
+			\header('Content-Type: text/html; charset=utf-8', true, 500);
+			echo '<h3>Download fehlgeschlagen</h3><p>Der Anhang konnte nicht heruntergeladen werden. Die Server-Verbindung wurde unterbrochen oder die Nachricht existiert nicht mehr.</p>';
+			$this->logWrite('RawDownload failed: rawSmart returned false');
+			exit;
 		}
-		return true;
+		return $result;
 	}
 
 	public function RawView() : bool
 	{
-		if (!$this->rawSmart(false)) {
-			\http_response_code(404);
-			echo '<p>Attachment preview not available.</p>';
-			return false;
+		$result = $this->rawSmart(false);
+		if (!$result) {
+			\header('Content-Type: text/html; charset=utf-8', true, 500);
+			echo '<h3>Vorschau nicht verfügbar</h3><p>Der Anhang konnte nicht geladen werden. Mögliche Ursachen: Server-Verbindung unterbrochen oder Nachricht nicht mehr vorhanden.</p>';
+			$this->logWrite('RawView failed: rawSmart returned false');
+			exit;
 		}
 		return true;
 	}
 
 	public function RawViewThumbnail() : bool
 	{
-		if (!$this->rawSmart(false, true)) {
-			\http_response_code(404);
-			echo '<p>Thumbnail not available.</p>';
-			return false;
+		$result = $this->rawSmart(false, true);
+		if (!$result) {
+			$this->logWrite('RawViewThumbnail failed: rawSmart returned false');
 		}
-		return true;
+		return $result;
 	}
 
 	public function RawUserBackground() : bool
