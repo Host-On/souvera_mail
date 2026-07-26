@@ -35,17 +35,32 @@ trait Raw
 
 	public function RawDownload() : bool
 	{
-		return $this->rawSmart(true);
+		if (!$this->rawSmart(true)) {
+			\http_response_code(404);
+			echo '<p>Attachment not found. It may have been deleted or the server connection failed.</p>';
+			return false;
+		}
+		return true;
 	}
 
 	public function RawView() : bool
 	{
-		return $this->rawSmart(false);
+		if (!$this->rawSmart(false)) {
+			\http_response_code(404);
+			echo '<p>Attachment preview not available.</p>';
+			return false;
+		}
+		return true;
 	}
 
 	public function RawViewThumbnail() : bool
 	{
-		return $this->rawSmart(false, true);
+		if (!$this->rawSmart(false, true)) {
+			\http_response_code(404);
+			echo '<p>Thumbnail not available.</p>';
+			return false;
+		}
+		return true;
 	}
 
 	public function RawUserBackground() : bool
