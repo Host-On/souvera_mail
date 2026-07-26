@@ -292,9 +292,4 @@ return [
             'verb' => 'POST',
         ],
         [
-            'name' => 'webhook#update',
-            'url' => '/devops/update',
-            'verb' => 'POST',
-        ],
-    ]
 ];
