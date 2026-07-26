@@ -5,23 +5,17 @@ declare(strict_types=1);
 namespace OCA\SouveraMail\DevOps;
 
 /**
- * Shared auto-update via periodic GitHub release polling.
+ * Self-update via GitHub Releases API with a single token in config.php.
  *
- * Each app registers a Nextcloud background job that runs every 3 hours,
- * checks the GitHub releases API for a newer version, and — if a higher
- * semver tag is found — pulls + enables the update automatically.
+ * No git, no gh CLI, no webhooks, no per-app setup.
  *
- * NO secrets, NO webhooks, NO external dependencies. Just HTTP.
+ * ONE-TIME SERVER SETUP:
+ *   Add to config/config.php:
+ *     'souvera.devops_token' => 'github_pat_...',
  *
- * Setup per app (one-time, via occ):
- *   occ config:app:set <appid> devops.repo --value "PhiGi87/souvera_mail"
- *   occ config:app:set <appid> devops.channel --value "stable"
- *
- * Channels:
- *   "stable" (default) — only pulls release tags (v0.19.7, v0.19.8, …)
- *   "dev"              — pulls every commit from the configured branch
- *
- * Versions compared via version_compare() on the info.xml <version> field.
+ * USAGE:
+ *   occ souvera_mail:devops:channel dev     (every 15 min, every push)
+ *   occ souvera_mail:devops:channel stable  (every 3 hours, releases only)
  */
 trait SelfUpdateTrait
 {
@@ -33,133 +27,204 @@ trait SelfUpdateTrait
         $config = \OCP\Server::get(\OCP\IConfig::class);
         $channel = \trim((string) $config->getAppValue($appId, 'devops.channel', 'stable'));
 
-        // Stable: rate-limit to once every 3 hours
         if ($channel === 'stable') {
-            $lastCheck = (int) $config->getAppValue($appId, 'devops.last_check', '0');
-            if ($lastCheck > \time() - 3 * 3600) {
-                return ['skipped' => true, 'reason' => 'Rate-limited (stable, < 3h)'];
+            $last = (int) $config->getAppValue($appId, 'devops.last_check', '0');
+            if ($last > \time() - 3 * 3600) {
+                return ['skipped' => true, 'reason' => 'Rate-limited'];
             }
         }
         $config->setAppValue($appId, 'devops.last_check', (string) \time());
 
-        $installedVersion = \OC_App::getAppVersion($appId);
-        if ($installedVersion === '0') {
-            return ['error' => 'Cannot read installed version'];
-        }
+        $installed = \OC_App::getAppVersion($appId);
+        if ($installed === '0') return ['error' => 'No version'];
 
         $appPath = \OC_App::getAppPath($appId);
         $branch = \trim((string) $config->getAppValue($appId, 'devops.branch', 'main'));
 
         if ($channel === 'dev') {
-            return $this->pullBranch($appId, $appPath, $branch);
+            return $this->pullDev($appId, $appPath, $branch);
         }
 
-        $latest = $this->fetchLatestRelease();
-        if ($latest === null) {
-            return ['error' => 'Cannot fetch git tags'];
+        $latest = $this->latestTag();
+        if ($latest === null) return ['error' => 'API unreachable'];
+        if (\version_compare($latest, $installed, '<=')) {
+            return ['up_to_date' => true, 'installed' => $installed, 'latest' => $latest];
         }
-
-        if (\version_compare($latest, $installedVersion, '<=')) {
-            return ['up_to_date' => true, 'installed' => $installedVersion, 'latest' => $latest];
-        }
-
-        return $this->pullTag($appId, $appPath, $latest);
+        return $this->applyTag($appId, $appPath, $latest);
     }
 
-        $installedVersion = \OC_App::getAppVersion($appId);
-        if ($installedVersion === '0') {
-            return ['error' => 'Cannot read installed version'];
-        }
-
-        $channel = \trim((string) $config->getAppValue($appId, 'devops.channel', 'stable'));
-
-        $branch = \trim((string) $config->getAppValue($appId, 'devops.branch', 'main'));
-        $appPath = \OC_App::getAppPath($appId);
-
-        if ($channel === 'dev') {
-            return $this->pullBranch($appId, $appPath, $branch, $repo);
-        }
-
-        // Stable: check GitHub releases
-        $latest = $this->fetchLatestRelease($repo);
-        if ($latest === null) {
-            return ['error' => 'Cannot fetch GitHub releases'];
-        }
-
-        if (\version_compare($latest, $installedVersion, '<=')) {
-            return ['up_to_date' => true, 'installed' => $installedVersion, 'latest' => $latest];
-        }
-
-        return $this->pullTag($appId, $appPath, $latest, $repo);
-    }
-
-    private function fetchLatestRelease(): ?string
+    private function latestTag(): ?string
     {
-        $appPath = \OC_App::getAppPath($this->getAppId());
-        // git fetch the tags, then list them sorted by version
-        \exec(\sprintf('cd %s && git fetch origin --tags 2>/dev/null', \escapeshellarg($appPath)));
-        $output = \shell_exec(\sprintf(
-            'cd %s && git tag --sort=-version:refname 2>/dev/null | head -1',
-            \escapeshellarg($appPath)
-        ));
-        if ($output === null || $output === '') return null;
-        $tag = \trim((string) $output);
-        return \ltrim($tag, 'v');
+        $repo = match ($this->getAppId()) {
+            'souvera_mail' => 'PhiGi87/souvera_mail',
+            'souvera_central' => 'PhiGi87/souvera_central',
+            'souvera_shield' => 'PhiGi87/souvera_shield',
+            default => '',
+        };
+        if ($repo === '') return null;
+
+        $tagName = $this->apiGet("repos/$repo/releases/latest", 'tag_name');
+        return $tagName ? \ltrim((string) $tagName, 'v') : null;
     }
 
-    private function pullTag(string $appId, string $appPath, string $tag, string $repo): array
+    private function pullDev(string $appId, string $appPath, string $branch): array
     {
-        \OCP\Server::get(\Psr\Log\LoggerInterface::class)->info("$appId devops: updating to tag v$tag");
+        $repo = match ($appId) {
+            'souvera_mail' => 'PhiGi87/souvera_mail',
+            'souvera_central' => 'PhiGi87/souvera_central',
+            'souvera_shield' => 'PhiGi87/souvera_shield',
+            default => '',
+        };
+        if ($repo === '') return ['error' => 'Unknown app'];
 
-        $output = [];
-        $exitCode = 0;
-        \exec(\sprintf(
-            'cd %s && git fetch origin --tags 2>&1 && git checkout v%s 2>&1',
-            \escapeshellarg($appPath), \escapeshellarg($tag)
-        ), $output, $exitCode);
+        // Download latest commit as zip from GitHub, extract, enable
+        $token = $this->token();
+        $archiveUrl = "https://api.github.com/repos/$repo/zipball/$branch";
+        $appDir = \dirname($appPath);
+        $tmpZip = \sys_get_temp_dir() . "/{$appId}_update.zip";
 
-        if ($exitCode !== 0) {
-            return ['error' => 'Git checkout failed', 'log' => \implode("\n", $output)];
+        $zipContent = @\file_get_contents($archiveUrl, false, \stream_context_create(['http' => [
+            'method' => 'GET',
+            'header' => "User-Agent: Souvera\r\nAuthorization: Bearer $token\r\n",
+            'timeout' => 60,
+            'follow_location' => 1,
+        ]]));
+        if ($zipContent === false) return ['error' => 'Download failed'];
+
+        \file_put_contents($tmpZip, $zipContent);
+
+        $zip = new \ZipArchive();
+        if ($zip->open($tmpZip) !== true) {
+            \unlink($tmpZip);
+            return ['error' => 'ZIP extract failed'];
         }
 
-        return $this->enableApp($appId, $appPath, $tag, \implode("\n", $output));
+        // GitHub zipball extracts to <repo>-<commit>/ — find that dir
+        $extractDir = \sys_get_temp_dir() . "/{$appId}_extract";
+        @\mkdir($extractDir, 0755, true);
+        $zip->extractTo($extractDir);
+        $zip->close();
+        \unlink($tmpZip);
+
+        // Find the extracted root dir
+        $dirs = \glob("$extractDir/*", GLOB_ONLYDIR);
+        if (empty($dirs)) return ['error' => 'Empty archive'];
+        $sourceDir = $dirs[0];
+
+        // Move files into app dir (overwrite)
+        $this->recursiveCopy($sourceDir, $appPath);
+        $this->recursiveDelete($extractDir);
+
+        return $this->enableApp($appId, $appPath);
     }
 
-    private function pullBranch(string $appId, string $appPath, string $branch, string $repo): array
+    private function applyTag(string $appId, string $appPath, string $tag): array
     {
-        \OCP\Server::get(\Psr\Log\LoggerInterface::class)->info("$appId devops [dev]: pulling $branch");
+        $repo = match ($appId) {
+            'souvera_mail' => 'PhiGi87/souvera_mail',
+            'souvera_central' => 'PhiGi87/souvera_central',
+            'souvera_shield' => 'PhiGi87/souvera_shield',
+            default => '',
+        };
+        if ($repo === '') return ['error' => 'Unknown app'];
 
-        $output = [];
-        $exitCode = 0;
-        \exec(\sprintf(
-            'cd %s && git fetch origin %s 2>&1 && git reset --hard origin/%s 2>&1',
-            \escapeshellarg($appPath), \escapeshellarg($branch), \escapeshellarg($branch)
-        ), $output, $exitCode);
+        $token = $this->token();
+        $url = "https://api.github.com/repos/$repo/zipball/v$tag";
+        $appDir = \dirname($appPath);
+        $tmpZip = \sys_get_temp_dir() . "/{$appId}_v{$tag}.zip";
 
-        if ($exitCode !== 0) {
-            return ['error' => 'Git pull failed', 'log' => \implode("\n", $output)];
-        }
+        $zipContent = @\file_get_contents($url, false, \stream_context_create(['http' => [
+            'method' => 'GET',
+            'header' => "User-Agent: Souvera\r\nAuthorization: Bearer $token\r\n",
+            'timeout' => 60,
+            'follow_location' => 1,
+        ]]));
+        if ($zipContent === false) return ['error' => 'Tag download failed'];
 
-        $commit = \trim((string) \shell_exec("cd $appPath && git log -1 --format=%h"));
-        return $this->enableApp($appId, $appPath, $commit, \implode("\n", $output));
+        \file_put_contents($tmpZip, $zipContent);
+
+        $zip = new \ZipArchive();
+        if ($zip->open($tmpZip) !== true) { \unlink($tmpZip); return ['error' => 'ZIP failed']; }
+
+        $extractDir = \sys_get_temp_dir() . "/{$appId}_v{$tag}";
+        @\mkdir($extractDir, 0755, true);
+        $zip->extractTo($extractDir);
+        $zip->close();
+        \unlink($tmpZip);
+
+        $dirs = \glob("$extractDir/*", GLOB_ONLYDIR);
+        if (empty($dirs)) return ['error' => 'Empty tag archive'];
+        $sourceDir = $dirs[0];
+
+        $this->recursiveCopy($sourceDir, $appPath);
+        $this->recursiveDelete($extractDir);
+
+        return $this->enableApp($appId, $appPath);
     }
 
-    private function enableApp(string $appId, string $appPath, string $ref, string $gitLog): array
+    private function enableApp(string $appId, string $appPath): array
     {
         $occOut = [];
         $occExit = 0;
-        \exec(\sprintf(
-            'php %s/occ app:enable %s 2>&1',
+        \exec(\sprintf('php %s/occ app:enable %s 2>&1',
             \escapeshellarg(\dirname($appPath, 3)), \escapeshellarg($appId)
         ), $occOut, $occExit);
-
-        \OCP\Server::get(\Psr\Log\LoggerInterface::class)->info("$appId devops: updated to $ref");
-
         return [
             'success' => true,
-            'updated_to' => $ref,
-            'git_log' => $gitLog,
             'occ_log' => \implode("\n", $occOut),
+            'occ_exit' => $occExit,
         ];
+    }
+
+    private function token(): string
+    {
+        try {
+            return \trim((string) \OCP\Server::get(\OCP\IConfig::class)
+                ->getSystemValue('souvera.devops_token', ''));
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
+    private function apiGet(string $path, string $field): mixed
+    {
+        $token = $this->token();
+        if ($token === '') return null;
+        $json = @\file_get_contents("https://api.github.com/$path", false, \stream_context_create(['http' => [
+            'method' => 'GET',
+            'header' => "User-Agent: Souvera\r\nAuthorization: Bearer $token\r\nAccept: application/vnd.github+json\r\n",
+            'timeout' => 15,
+        ]]));
+        if ($json === false) return null;
+        $data = \json_decode($json, true);
+        return $data[$field] ?? null;
+    }
+
+    private function recursiveCopy(string $src, string $dst): void
+    {
+        $dir = \opendir($src);
+        @\mkdir($dst, 0755, true);
+        while (($file = \readdir($dir)) !== false) {
+            if ($file === '.' || $file === '..') continue;
+            $sp = "$src/$file";
+            $dp = "$dst/$file";
+            if (\is_dir($sp)) {
+                $this->recursiveCopy($sp, $dp);
+            } else {
+                \copy($sp, $dp);
+            }
+        }
+        \closedir($dir);
+    }
+
+    private function recursiveDelete(string $dir): void
+    {
+        if (!\is_dir($dir)) return;
+        foreach (\scandir($dir) as $f) {
+            if ($f === '.' || $f === '..') continue;
+            $p = "$dir/$f";
+            \is_dir($p) ? $this->recursiveDelete($p) : \unlink($p);
+        }
+        \rmdir($dir);
     }
 }
