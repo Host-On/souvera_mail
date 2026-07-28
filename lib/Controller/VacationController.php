@@ -7,7 +7,9 @@ use OCA\SouveraMail\Service\VacationService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataResponse;
+use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
 use Psr\Log\LoggerInterface;
 
@@ -64,6 +66,7 @@ class VacationController extends Controller
     }
 
     #[NoAdminRequired]
+    #[NoCSRFRequired]
     public function save(): DataResponse
     {
         if ($this->userId === null) {
@@ -100,6 +103,20 @@ class VacationController extends Controller
             );
         }
         return new DataResponse(['status' => 'ok']);
+    }
+
+    /**
+     * Renders a standalone "Abwesenheitsnotiz" form that any logged-in user can
+     * access without opening the full webmail. The form talks to this
+     * controller's JSON endpoints via fetch().
+     */
+    #[NoAdminRequired]
+    public function form(): TemplateResponse
+    {
+        return new TemplateResponse('souvera_mail', 'vacation-form', [
+            'apiUrl' => \OCP\Server::get(\OCP\IURLGenerator::class)->linkToRoute('souvera_mail.vacation.index'),
+            'requestToken' => \OCP\Util::getRequestToken(),
+        ]);
     }
 
     private function unauthenticated(): DataResponse

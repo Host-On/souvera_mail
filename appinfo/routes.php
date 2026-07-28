@@ -229,6 +229,13 @@ return [
             'verb' => 'POST',
         ],
         [
+            // Out-of-office — standalone user-friendly form (no webmail needed).
+            // GET /apps/souvera_mail/vacation/form → HTML page
+            'name' => 'vacation#form',
+            'url' => '/vacation/form',
+            'verb' => 'GET',
+        ],
+        [
             // v0.15.0 — External accounts feature-status endpoint.
             // GET /apps/souvera_mail/external/status → { enabled, allowed_for_me,
             //   max_per_user, current_count, consent_required, consent_given }
