@@ -140,8 +140,11 @@ class StalwartWebhookController extends Controller
      *  accountId → resolved NC user id (or null = unresolved). */
     private array $accountIdUserCache = [];
 
-    /** TTL for persistent accountId→user mappings in IAppConfig (seconds). */
+    /** TTL for persistent accountId→user mappings in IAppConfig (seconds).
+     *  Successful resolutions get the full TTL; unresolved (null) results get
+     *  a shorter TTL so transient provisioning races self-heal quickly. */
     private const ACCOUNT_CACHE_TTL = 86400;
+    private const ACCOUNT_CACHE_TTL_NULL = 300;
     private const ACCOUNT_CACHE_PREFIX = 'stalwart_account_';
 
     public function __construct(
@@ -445,14 +448,17 @@ class StalwartWebhookController extends Controller
         // Tier 3: live resolution
         $email = $this->stalwartAdmin->lookupPrincipalEmailByAccountId($accountId);
         if ($email === null) {
-            $this->saveAccountCache($accountId, null);
+            // Short TTL for unresolved — the principal may not be provisioned yet.
+            $this->saveAccountCache($accountId, null, self::ACCOUNT_CACHE_TTL_NULL);
             return $this->accountIdUserCache[$accountId] = null;
         }
 
         $matches = $this->userManager->getByEmail($email);
         $userId = ($matches === []) ? null : $matches[0]->getUID();
 
-        $this->saveAccountCache($accountId, $userId);
+        // Full TTL for successful resolution; short TTL for unresolved (provisioning race).
+        $ttl = ($userId !== null) ? self::ACCOUNT_CACHE_TTL : self::ACCOUNT_CACHE_TTL_NULL;
+        $this->saveAccountCache($accountId, $userId, $ttl);
         return $this->accountIdUserCache[$accountId] = $userId;
     }
 
@@ -484,12 +490,12 @@ class StalwartWebhookController extends Controller
      * Stores a resolved (or null) accountId→userId mapping with current
      * time + TTL expiry.
      */
-    private function saveAccountCache(int $accountId, ?string $userId): void
+    private function saveAccountCache(int $accountId, ?string $userId, int $ttl = 0): void
     {
         $key = self::ACCOUNT_CACHE_PREFIX . $accountId;
         $this->appConfig->setValueString('souvera_mail', $key, \json_encode([
             'u' => $userId ?? '__null__',
-            'x' => \time() + self::ACCOUNT_CACHE_TTL,
+            'x' => \time() + ($ttl > 0 ? $ttl : self::ACCOUNT_CACHE_TTL),
         ], JSON_UNESCAPED_SLASHES));
     }
 }
