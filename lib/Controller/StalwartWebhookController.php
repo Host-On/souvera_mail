@@ -14,6 +14,7 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\Attribute\PublicPage;
 use OCP\AppFramework\Http\DataResponse;
+use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IUserManager;
@@ -139,10 +140,15 @@ class StalwartWebhookController extends Controller
      *  accountId → resolved NC user id (or null = unresolved). */
     private array $accountIdUserCache = [];
 
+    /** TTL for persistent accountId→user mappings in IAppConfig (seconds). */
+    private const ACCOUNT_CACHE_TTL = 86400;
+    private const ACCOUNT_CACHE_PREFIX = 'stalwart_account_';
+
     public function __construct(
         string $appName,
         IRequest $request,
         private IConfig $config,
+        private IAppConfig $appConfig,
         private IUserManager $userManager,
         private DeviceTokenMapper $tokens,
         private FcmClient $fcm,
@@ -416,39 +422,74 @@ class StalwartWebhookController extends Controller
     }
 
     /**
-     * Resolves Stalwart's internal numeric `accountId` (from the real
-     * webhook payload's `data.accountId`) to a Nextcloud user id. See the
-     * class docblock ("accountId resolution") for the full chain and why
-     * an admin `Principal/get` call is used instead of a cached mapping.
-     *
-     * Memoised per request — a batch of `events` in one webhook delivery
-     * commonly shares the same accountId (several messages for the same
-     * mailbox arriving together).
+     * Resolves Stalwart's internal numeric `accountId` to a Nextcloud user id.
+     * Three-tier cache:
+     *   1. In-process (per-request) — $this->accountIdUserCache
+     *   2. Persistent (IAppConfig, 24h TTL) — avoids JMAP round-trip
+     *   3. On miss: JMAP Principal/get + IUserManager.getByEmail
      */
     private function resolveNcUserForStalwartAccountId(int $accountId): ?string
     {
+        // Tier 1: in-process memo (already checked by processEvent, but double-check)
         if (\array_key_exists($accountId, $this->accountIdUserCache)) {
             return $this->accountIdUserCache[$accountId];
         }
 
+        // Tier 2: persistent cache
+        $cached = $this->loadAccountCache($accountId);
+        if ($cached !== null) {
+            $this->accountIdUserCache[$accountId] = $cached;
+            return $cached;
+        }
+
+        // Tier 3: live resolution
         $email = $this->stalwartAdmin->lookupPrincipalEmailByAccountId($accountId);
         if ($email === null) {
-            $this->logger->debug(
-                'Souvera Mail: Stalwart webhook accountId ' . $accountId . ' did not resolve to a principal e-mail',
-                ['app' => 'souvera_mail']
-            );
+            $this->saveAccountCache($accountId, null);
             return $this->accountIdUserCache[$accountId] = null;
         }
 
         $matches = $this->userManager->getByEmail($email);
-        if ($matches === []) {
-            $this->logger->debug(
-                'Souvera Mail: Stalwart webhook accountId ' . $accountId . ' (' . $email . ') not resolvable to an NC user',
-                ['app' => 'souvera_mail']
-            );
-            return $this->accountIdUserCache[$accountId] = null;
-        }
+        $userId = ($matches === []) ? null : $matches[0]->getUID();
 
-        return $this->accountIdUserCache[$accountId] = $matches[0]->getUID();
+        $this->saveAccountCache($accountId, $userId);
+        return $this->accountIdUserCache[$accountId] = $userId;
+    }
+
+    /**
+     * Reads a cached accountId→userId mapping. Returns the user id, or
+     * `'__null__'` as a sentinel for "resolved to nothing", or null on miss.
+     */
+    private function loadAccountCache(int $accountId): ?string
+    {
+        $key = self::ACCOUNT_CACHE_PREFIX . $accountId;
+        $raw = $this->appConfig->getValueString('souvera_mail', $key, '');
+        if ($raw === '') {
+            return null;
+        }
+        $entry = \json_decode($raw, true);
+        if (!\is_array($entry) || !isset($entry['x'])) {
+            $this->appConfig->deleteAppValue('souvera_mail', $key);
+            return null;
+        }
+        if (($entry['x'] ?? 0) < \time()) {
+            $this->appConfig->deleteAppValue('souvera_mail', $key);
+            return null;
+        }
+        $uid = $entry['u'] ?? null;
+        return $uid === '__null__' ? null : $uid;
+    }
+
+    /**
+     * Stores a resolved (or null) accountId→userId mapping with current
+     * time + TTL expiry.
+     */
+    private function saveAccountCache(int $accountId, ?string $userId): void
+    {
+        $key = self::ACCOUNT_CACHE_PREFIX . $accountId;
+        $this->appConfig->setValueString('souvera_mail', $key, \json_encode([
+            'u' => $userId ?? '__null__',
+            'x' => \time() + self::ACCOUNT_CACHE_TTL,
+        ], JSON_UNESCAPED_SLASHES));
     }
 }

@@ -50,15 +50,21 @@ class FcmClient
     private const DEFAULT_TOKEN_URI = 'https://oauth2.googleapis.com/token';
     private const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
     private const SEND_URL_TEMPLATE = 'https://fcm.googleapis.com/v1/projects/%s/messages:send';
+    private const BATCH_URL = 'https://fcm.googleapis.com/batch';
 
     private const APP_CONFIG_TOKEN_KEY = 'fcm_access_token';
     private const APP_CONFIG_TOKEN_EXPIRY_KEY = 'fcm_access_token_expires_at';
 
-    /** Cap the cached-token lifetime below Google's ~3600s validity so we
-     *  never present an expired token to FCM. */
     private const TOKEN_CACHE_SECONDS = 3300;
-
     private const HTTP_TIMEOUT_SECONDS = 10;
+
+    /** Maximum sub-requests in a single batch call — Google's batch endpoint
+     *  is documented to support up to 1000, but we cap conservatively. */
+    private const BATCH_MAX_SIZE = 100;
+
+    /** Send-path for each sub-request: the relative path inside the batch
+     *  multipart body (no host, no query). */
+    private const FCM_SEND_PATH = '/v1/projects/%s/messages:send';
 
     /** @var array{client_email: string, private_key: string, token_uri: string}|false|null */
     private array|false|null $serviceAccount = null;
@@ -87,16 +93,9 @@ class FcmClient
     }
 
     /**
-     * Sends a data-only push (no `notification` block) to every given FCM
-     * registration token, so the Android client's own message handler runs
-     * in foreground AND background instead of the system tray auto-showing
-     * this generic title/body. Tokens that Google reports as
-     * unregistered/invalid are deleted from `oc_souvera_mail_devicetoken`
-     * as a side effect.
-     *
-     * No-ops (logging at debug) if the service account is not configured
-     * or an access token cannot be minted — callers do not need to guard
-     * with {@see isConfigured()} themselves.
+     * Sends a data-only push to every FCM registration token in a single
+     * Google API batch request.  Tokens that the batch response reports as
+     * unregistered/invalid are deleted from the database as a side effect.
      *
      * @param list<string> $fcmTokens
      * @param array<string, string> $data
@@ -126,60 +125,200 @@ class FcmClient
         }
 
         $projectId = $this->getProjectId();
-        $url = \sprintf(self::SEND_URL_TEMPLATE, $projectId);
-        $client = $this->httpClientService->newClient();
+        $messageData = \array_map('strval', $data) + ['title' => $title, 'body' => $body];
+        $sendPath = \sprintf(self::FCM_SEND_PATH, $projectId);
 
-        foreach ($fcmTokens as $fcmToken) {
-            // Data-only message: no top-level `notification` block, so the
-            // Android client's FirebaseMessagingService.onMessageReceived()
-            // always runs (foreground AND background/Doze) and can build a
-            // privacy-preserving rich notification itself instead of the
-            // system tray auto-displaying this generic title/body.
-            $messageData = \array_map('strval', $data) + ['title' => $title, 'body' => $body];
+        // Chunk tokens so we stay under Google's batch size limit.
+        foreach (\array_chunk($fcmTokens, self::BATCH_MAX_SIZE) as $chunk) {
+            $this->sendBatch($accessToken, $sendPath, $messageData, $chunk);
+        }
+    }
 
-            $payload = [
+    /**
+     * Builds a multipart/mixed batch body and POSTs it to
+     * `https://fcm.googleapis.com/batch`. Each sub-request targets
+     * `messages:send` with one device token.
+     *
+     * @param list<string> $tokens
+     */
+    private function sendBatch(
+        string $accessToken,
+        string $sendPath,
+        array $messageData,
+        array $tokens
+    ): void {
+        $boundary = 'fcm_batch_' . \bin2hex(\random_bytes(8));
+        $body = $this->buildBatchBody($boundary, $sendPath, $messageData, $tokens);
+
+        try {
+            $client = $this->httpClientService->newClient();
+            $response = $client->post(self::BATCH_URL, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'multipart/mixed; boundary=' . $boundary,
+                    'Accept' => 'multipart/mixed',
+                ],
+                'body' => $body,
+                'timeout' => self::HTTP_TIMEOUT_SECONDS,
+                'connect_timeout' => self::HTTP_TIMEOUT_SECONDS,
+                'http_errors' => false,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail: FCM batch request failed: ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
+            return;
+        }
+
+        $this->handleBatchResponse($response, $tokens, $boundary);
+    }
+
+    /**
+     * Constructs the multipart/mixed body.  Each part is a self-contained
+     * HTTP sub-request (method, path, headers, empty line, JSON body).
+     */
+    private function buildBatchBody(
+        string $boundary,
+        string $sendPath,
+        array $messageData,
+        array $tokens
+    ): string {
+        $parts = [];
+        $idx = 0;
+        foreach ($tokens as $token) {
+            $idx++;
+            $payload = \json_encode([
                 'message' => [
-                    'token' => $fcmToken,
+                    'token' => $token,
                     'data' => $messageData,
                     'android' => [
                         'priority' => 'high',
                         'ttl' => '3600s',
                     ],
                 ],
-            ];
+            ], JSON_UNESCAPED_SLASHES);
 
-            try {
-                $response = $client->post($url, [
-                    'headers' => [
-                        'Authorization' => 'Bearer ' . $accessToken,
-                        'Content-Type' => 'application/json',
-                        'Accept' => 'application/json',
-                    ],
-                    'json' => $payload,
-                    'timeout' => self::HTTP_TIMEOUT_SECONDS,
-                    'connect_timeout' => self::HTTP_TIMEOUT_SECONDS,
-                    'http_errors' => false,
-                ]);
-            } catch (\Throwable $e) {
-                $this->logger->warning(
-                    'Souvera Mail: FCM send request failed: ' . $e->getMessage(),
-                    ['app' => 'souvera_mail', 'exception' => $e]
-                );
+            // `Content-ID` carries the token so we can match sub-responses
+            // back to their originating token in the batch response parser
+            // without relying on ordering alone (Google does preserve
+            // ordering, but explicit matching is safer).
+            $parts[] = \implode("\r\n", [
+                '--' . $boundary,
+                'Content-Type: application/http',
+                'Content-Transfer-Encoding: binary',
+                'Content-ID: <item' . $idx . ':' . $token . '>',
+                '',
+                'POST ' . $sendPath . ' HTTP/1.1',
+                'Content-Type: application/json',
+                'accept: application/json',
+                '',
+                $payload,
+            ]);
+        }
+        $parts[] = '--' . $boundary . '--';
+        return \implode("\r\n", $parts);
+    }
+
+    /**
+     * Parses a multipart batch response and processes each sub-response
+     * individually (delete dead tokens, invalidate cached access token
+     * on 401/403, etc.).
+     *
+     * @param list<string> $originalTokens the tokens in the order they were
+     *     sent (used as a fallback when Content-ID matching fails).
+     */
+    private function handleBatchResponse(
+        IResponse $response,
+        array $originalTokens,
+        string $boundary
+    ): void {
+        $contentType = $response->getHeader('Content-Type');
+        // Google may return the batch with a slightly different boundary.
+        $actualBoundary = $boundary;
+        if (\is_string($contentType) && \preg_match('/boundary=([^\s;]+)/', $contentType, $m)) {
+            $actualBoundary = \trim($m[1], '"\'');
+        }
+        $parts = \explode('--' . $actualBoundary, (string) $response->getBody());
+
+        // Map Content-ID → token for sub-response matching.
+        $tokenMap = [];
+        $idx = 0;
+        foreach ($originalTokens as $t) {
+            $idx++;
+            $tokenMap['item' . $idx] = $t;
+        }
+
+        $fallbackMap = \array_values($originalTokens);
+        $fallbackIdx = 0;
+        $any401 = false;
+
+        foreach ($parts as $part) {
+            $part = \trim($part);
+            if ($part === '' || $part === '--' || \str_starts_with($part, '--')) {
                 continue;
             }
 
-            $this->handleSendResponse($response, $fcmToken);
+            // Split the sub-response into headers and body at the first
+            // blank line ("\r\n\r\n" or "\n\n").
+            $headerEnd = \strpos($part, "\r\n\r\n");
+            if ($headerEnd === false) {
+                $headerEnd = \strpos($part, "\n\n");
+            }
+            if ($headerEnd === false) {
+                continue;
+            }
+
+            $headerBlock = \substr($part, 0, $headerEnd);
+            $sepLen = \str_contains($part, "\r\n\r\n") ? 4 : 2;
+            $bodyBlock = \trim(\substr($part, $headerEnd + $sepLen));
+
+            // Extract HTTP status from the first line of the sub-response.
+            $firstLine = \strtok($headerBlock, "\r\n");
+            if ($firstLine === false) {
+                $firstLine = \strtok($headerBlock, "\n");
+            }
+            $status = 0;
+            if (\preg_match('/^HTTP\/[\d.]+\s+(\d{3})/', (string) $firstLine, $m)) {
+                $status = (int) $m[1];
+            }
+
+            // Extract Content-ID for token matching.
+            $contentId = '';
+            if (\preg_match('/Content-ID:\s*<([^>]+)>/i', $headerBlock, $m)) {
+                $contentId = $m[1];
+            }
+            $parts2 = \explode(':', $contentId, 2);
+            $cidKey = $parts2[0] ?? '';
+            $cidToken = $parts2[1] ?? '';
+            $token = $cidToken !== '' ? $cidToken : ($tokenMap[$cidKey] ?? ($fallbackMap[$fallbackIdx] ?? null));
+            if ($token !== null) {
+                $fallbackIdx++;
+            }
+
+            $this->handleSubResponse($status, $bodyBlock, $token, $any401);
+        }
+
+        if ($any401) {
+            $this->invalidateCachedAccessToken();
         }
     }
 
-    private function handleSendResponse(IResponse $response, string $fcmToken): void
+    /**
+     * Handles the status of a single sub-response inside the batch.
+     *
+     * @param-out bool $any401 set to true if the access token was rejected
+     */
+    private function handleSubResponse(int $status, string $body, ?string $token, bool &$any401): void
     {
-        $status = $response->getStatusCode();
+        if ($token === null) {
+            return;
+        }
         if ($status >= 200 && $status < 300) {
             return;
         }
 
-        $decoded = \json_decode((string) $response->getBody(), true);
+        $decoded = \json_decode($body, true);
         $error = \is_array($decoded) && \is_array($decoded['error'] ?? null) ? $decoded['error'] : [];
         $errorCode = '';
         foreach ((\is_array($error['details'] ?? null) ? $error['details'] : []) as $detail) {
@@ -189,12 +328,8 @@ class FcmClient
             }
         }
 
-        // FCM v1 reports a dead registration token as HTTP 404 with
-        // errorCode UNREGISTERED, or HTTP 400 INVALID_ARGUMENT when the
-        // token is malformed/belongs to a different Firebase project.
-        // Either way the token can never succeed again — clean it up.
         if ($status === 404 || $status === 400) {
-            $this->tokens->deleteByToken($fcmToken);
+            $this->tokens->deleteByToken($token);
             $this->logger->info(
                 'Souvera Mail: FCM token rejected (HTTP ' . $status . ', errorCode=' . $errorCode
                 . ') — removed from oc_souvera_mail_devicetoken',
@@ -204,16 +339,12 @@ class FcmClient
         }
 
         if ($status === 401 || $status === 403) {
-            // The cached access token was rejected (revoked service-account
-            // key, clock skew, Google-side invalidation) — drop the cache
-            // so the NEXT send() call mints a fresh one instead of
-            // silently failing for up to TOKEN_CACHE_SECONDS.
-            $this->invalidateCachedAccessToken();
+            $any401 = true;
         }
 
         $this->logger->warning(
-            'Souvera Mail: FCM send failed with HTTP ' . $status . ': '
-            . (string) ($error['message'] ?? $response->getBody()),
+            'Souvera Mail: FCM sub-request failed HTTP ' . $status . ': '
+            . (string) ($error['message'] ?? $body),
             ['app' => 'souvera_mail']
         );
     }
