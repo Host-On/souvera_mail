@@ -29,12 +29,15 @@ trait SelfUpdateTrait
         }
         $config->setAppValue($appId, 'devops.last_check', (string) time());
 
-        $installed = \OC_App::getAppVersion($appId);
+        $installed = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId);
         if ($installed === '0') {
             return ['error' => 'No version'];
         }
 
-        $appPath = \OC_App::getAppPath($appId);
+        $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath($appId);
+        if ($appPath === null) {
+            return ['error' => 'App not found'];
+        }
         $branch = trim((string) $config->getAppValue($appId, 'devops.branch', 'main'));
 
         if ($channel === 'dev') {
@@ -135,9 +138,10 @@ trait SelfUpdateTrait
     {
         $occOut = [];
         $occExit = 0;
+        $occPath = \OC::$SERVERROOT . '/occ';
         exec(sprintf(
-            'php %s/occ app:enable %s 2>&1',
-            escapeshellarg(dirname($appPath, 3)),
+            'php %s app:enable %s 2>&1',
+            escapeshellarg($occPath),
             escapeshellarg($appId)
         ), $occOut, $occExit);
         return [
