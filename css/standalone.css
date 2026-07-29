@@ -212,70 +212,56 @@ body.layout-base #initial-state-container,
 	min-height: 200px;
 }
 
-/* ---- Squire WYSIWYG editor: clean toolbar + visible paragraphs ---- */
-
-/* Toolbar container: flex layout, groups separated by pipe */
-#x2m-app .squire-toolbar.btn-toolbar {
-	height: auto !important;
-	padding: 4px 6px !important;
-	display: flex !important;
+/* Squire WYSIWYG toolbar only — does NOT touch tabs or other toolbar buttons */
+#x2m-app .squire-toolbar {
+	height: auto;
+	padding: 4px 6px;
+	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 0;
-	background: var(--color-main-background, #fff);
 	border-bottom: 1px solid var(--color-border, #ddd);
 }
-#x2m-app .btn-toolbar .btn-group {
+#x2m-app .squire-toolbar .btn-group {
 	display: flex;
 	gap: 0;
 	border-right: 1px solid var(--color-border, #ddd);
 	padding-right: 6px;
 	margin-right: 6px;
 }
-#x2m-app .btn-toolbar .btn-group:last-child {
+#x2m-app .squire-toolbar .btn-group:last-child {
 	border-right: 0;
 	padding-right: 0;
 	margin-right: 0;
 }
-#x2m-app .btn-toolbar .btn-group .btn {
-	all: unset;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 30px;
+#x2m-app .squire-toolbar .btn-group .btn {
+	min-width: 30px;
 	height: 28px;
 	font-size: 13px;
 	font-weight: 600;
-	color: var(--color-main-text, #222);
 	border-radius: 4px;
-	cursor: pointer;
-	text-align: center;
+	padding: 2px 6px;
 }
-#x2m-app .btn-toolbar .btn-group .btn:hover {
+#x2m-app .squire-toolbar .btn-group .btn:hover {
 	background: var(--color-background-hover, #e8e8e8);
 }
-#x2m-app .btn-toolbar .btn-group .btn[data-toggled="true"],
-#x2m-app .btn-toolbar .btn-group .btn.active {
+#x2m-app .squire-toolbar .btn-group .btn[data-toggled="true"],
+#x2m-app .squire-toolbar .btn-group .btn.active {
 	background: var(--color-primary-element, #0082c9) !important;
 	color: #fff !important;
 }
-#x2m-app .btn-toolbar .btn-group select.btn {
+#x2m-app .squire-toolbar .btn-group select.btn {
 	width: auto;
 	padding: 0 4px;
-	background: transparent;
 	border: 1px solid var(--color-border, #ddd);
 	border-radius: 4px;
 }
 
-/* Visible paragraphs inside the editor: Enter creates <div>, make them visibly separated */
+/* Paragraph spacing inside squire editor: Enter = <div>, Shift+Enter = <br> */
 #x2m-app .squire-wysiwyg > div,
 #x2m-app .squire-plain > div {
 	margin-bottom: 4px;
 	min-height: 1.2em;
-}
-#x2m-app .squire-wysiwyg br,
-#x2m-app .squire-plain br {
-	/* br is Shift+Enter, no extra spacing needed */
 }
 
 /* Small-screen tweak — no NC header so the left panel starts at 0 */
