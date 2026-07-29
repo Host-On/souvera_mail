@@ -149,7 +149,7 @@ This stylesheet is used when Souvera Mail runs in embed mode.
 /* Paragraph spacing inside squire editor: Enter = <div>, Shift+Enter = <br> */
 #x2m-app .squire-wysiwyg > div,
 #x2m-app .squire-plain > div {
-	margin-bottom: 4px;
+	margin-bottom: 8px;
 	min-height: 1.2em;
 }
 

@@ -13,18 +13,56 @@
 						const squire = squireUI?.squire;
 						if (!squire) return;
 
-						// Squire intercepts Enter/Shift+Enter via `_beforeInput`.
-						// Override the handler to let the browser manage the cursor
-						// natively — Squire's manual splitBlock causes the cursor
-						// to jump back to the previous line on the next keystroke.
-						const origHandler = squire._beforeInput.bind(squire);
-						squire._beforeInput = function(event) {
-							if (event.inputType === 'insertLineBreak'
-								|| event.inputType === 'insertParagraph') {
-								return; // let the browser handle Enter natively
+						// Squire intercepts Enter/Shift+Enter via `_beforeInput` →
+						// `splitBlock`. Its complex cursor manipulation causes the
+						// cursor to jump back on the next keystroke.
+						// Solution: remove Squire's handler, register our own
+						// that uses native browser behaviour for Enter/Shift+Enter.
+						const origBeforeInput = squire._beforeInput;
+						squire.removeEventListener('beforeinput', origBeforeInput);
+						squire.addEventListener('beforeinput', function(event) {
+							if (event.inputType === 'insertLineBreak') {
+								event.preventDefault();
+								const sel = squire.getSelection();
+								const br = document.createElement('br');
+								sel.insertNode(br);
+								sel.setStartAfter(br);
+								sel.collapse(true);
+								squire.setSelection(sel);
+								squire._docWasChanged();
+								return;
 							}
-							return origHandler(event);
-						};
+							if (event.inputType === 'insertParagraph') {
+								event.preventDefault();
+								const sel = squire.getSelection();
+								const block = document.createElement('DIV');
+								const br = document.createElement('br');
+								block.appendChild(br);
+								// If cursor is in the middle of text, carry the
+								// remainder into the new block.
+								if (sel.endContainer.nodeType === Node.TEXT_NODE
+									&& sel.endOffset < sel.endContainer.textContent.length) {
+									const remainder = sel.endContainer.splitText(sel.endOffset);
+									block.insertBefore(remainder, br);
+								}
+								// Find the current block to insert after it.
+								let blockEl = sel.endContainer;
+								while (blockEl && blockEl !== squire._root && blockEl.nodeName !== 'DIV' && blockEl.nodeName !== 'P') {
+									blockEl = blockEl.parentNode;
+								}
+								if (blockEl && blockEl !== squire._root) {
+									blockEl.parentNode.insertBefore(block, blockEl.nextSibling);
+								} else {
+									squire._root.appendChild(block);
+								}
+								sel.setStart(block, 0);
+								sel.collapse(true);
+								squire.setSelection(sel);
+								squire._docWasChanged();
+								return;
+							}
+							return origBeforeInput.call(squire, event);
+						});
 					} catch (e) { /* silent */ }
 				});
 			}
