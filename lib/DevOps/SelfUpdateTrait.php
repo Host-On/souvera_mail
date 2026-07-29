@@ -242,7 +242,7 @@ trait SelfUpdateTrait
         return ['success' => true, 'occ_log' => $log, 'occ_exit' => $occExit];
     }
 
-    private function acquireLock(string $appId): $fp
+    private function acquireLock(string $appId): mixed
     {
         $lockFile = sys_get_temp_dir() . "/{$appId}_update.lock";
         $fp = @fopen($lockFile, 'w+');
@@ -256,7 +256,7 @@ trait SelfUpdateTrait
         return $fp;
     }
 
-    private function releaseLock($fp): void
+    private function releaseLock(mixed $fp): void
     {
         if ($fp === null) {
             return;
