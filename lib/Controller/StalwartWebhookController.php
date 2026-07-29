@@ -475,11 +475,11 @@ class StalwartWebhookController extends Controller
         }
         $entry = \json_decode($raw, true);
         if (!\is_array($entry) || !isset($entry['x'])) {
-            $this->appConfig->deleteAppValue('souvera_mail', $key);
+            $this->appConfig->setValueString('souvera_mail', $key, '');
             return null;
         }
         if (($entry['x'] ?? 0) < \time()) {
-            $this->appConfig->deleteAppValue('souvera_mail', $key);
+            $this->appConfig->setValueString('souvera_mail', $key, '');
             return null;
         }
         $uid = $entry['u'] ?? null;
