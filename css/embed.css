@@ -101,6 +101,64 @@ This stylesheet is used when Souvera Mail runs in embed mode.
 	min-height: 200px;
 }
 
+/* Squire WYSIWYG toolbar: clean, modern button styling */
+#x2m-app .squire-toolbar {
+	height: auto;
+	padding: 6px 4px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px;
+	border-bottom: 1px solid var(--color-border, #ddd);
+	background: var(--color-background-hover, #f5f5f5);
+}
+#x2m-app .squire-toolbar .btn-group {
+	display: flex;
+	gap: 1px;
+	margin-right: 6px;
+	padding-right: 6px;
+	border-right: 1px solid var(--color-border, #ddd);
+}
+#x2m-app .squire-toolbar .btn-group:last-child {
+	border-right: none;
+	margin-right: 0;
+	padding-right: 0;
+}
+#x2m-app .squire-toolbar .btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 30px;
+	padding: 0;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--color-main-text, #222);
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	cursor: pointer;
+}
+#x2m-app .squire-toolbar .btn:hover {
+	background: var(--color-background-dark, #e0e0e0);
+	border-color: var(--color-border, #ccc);
+}
+#x2m-app .squire-toolbar .btn[data-toggled="true"],
+#x2m-app .squire-toolbar .btn.active {
+	background: var(--color-primary-element, #0082c9);
+	color: var(--color-primary-element-text, #fff);
+	border-color: var(--color-primary-element, #0082c9);
+}
+#x2m-app .squire-toolbar select.btn {
+	width: auto;
+	padding: 0 6px;
+	font-size: 12px;
+}
+#x2m-app .squire-toolbar input.btn {
+	width: auto;
+	padding: 0 6px;
+	font-size: 12px;
+}
+
 #x2m-app tbody tr:hover {
 	background-color: inherit;
 }
