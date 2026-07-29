@@ -25,18 +25,13 @@ class SelfUpdateJob extends TimedJob
     {
         try {
             $result = $this->checkAndUpdate();
-            if (!empty($result['success'])) {
-                \OCP\Server::get(LoggerInterface::class)->info(
-                    'souvera_mail self-update: ' . json_encode($result)
-                );
-            } elseif (!empty($result['error'])) {
-                \OCP\Server::get(LoggerInterface::class)->warning(
-                    'souvera_mail self-update error: ' . json_encode($result)
-                );
-            }
+            $resultJson = json_encode($result, JSON_UNESCAPED_SLASHES);
+            \OCP\Server::get(LoggerInterface::class)->info(
+                'souvera_mail self-update: ' . $resultJson
+            );
         } catch (\Throwable $e) {
             \OCP\Server::get(LoggerInterface::class)->error(
-                'souvera_mail self-update exception: ' . $e->getMessage(),
+                'souvera_mail self-update EXCEPTION: ' . $e->getMessage(),
                 ['exception' => $e]
             );
         }
