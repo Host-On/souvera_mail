@@ -442,7 +442,13 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 	public function MainFabrica(string $sName, &$mResult)
 	{
 		if (static::isLoggedIn()) {
-			if ('address-book' === $sName) {
+			if ('storage' === $sName || 'storage-local' === $sName) {
+				include_once __DIR__ . '/storage.php';
+				$mResult = new \NextcloudStorage(
+					APP_PRIVATE_DATA . 'storage',
+					'storage-local' === $sName
+				);
+			} elseif ('address-book' === $sName) {
 				include_once __DIR__ . '/NextcloudAddressBook.php';
 				$mResult = new \NextcloudAddressBook();
 			} elseif ('filters' === $sName) {

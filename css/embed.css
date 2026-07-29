@@ -97,7 +97,7 @@ This stylesheet is used when Souvera Mail runs in embed mode.
 #x2m-app .squire-plain, #x2m-app .squire-wysiwyg {
 	font-size: 13px;
 	height: 100%;
-	line-height: 16px;
+	line-height: 1.5;
 	min-height: 200px;
 }
 
