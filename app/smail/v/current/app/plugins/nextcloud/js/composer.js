@@ -5,23 +5,26 @@
 		if ('PopupsCompose' === e.detail.viewModelTemplateID) {
 			let view = e.detail;
 
-			// Patch Squire editor after it initializes: ensure new blocks
-			// created by Enter have a visible height so the cursor stays in
-			// the new line instead of jumping back to the previous one.
+			// Patch Squire editor after it initializes: fix cursor jump on Enter.
 			if (view.oEditor && view.oEditor.onReady) {
 				view.oEditor.onReady(() => {
 					try {
-						const squire = view.oEditor.editor?.squire;
-						if (squire && squire.createDefaultBlock) {
-							const orig = squire.createDefaultBlock.bind(squire);
-							squire.createDefaultBlock = children => {
-								const block = orig(children);
-								if (!block.textContent) {
-									block.append(document.createElement('br'));
-								}
-								return block;
-							};
-						}
+						const squireUI = view.oEditor.editor;
+						const squire = squireUI?.squire;
+						if (!squire) return;
+
+						// Squire intercepts Enter/Shift+Enter via `_beforeInput`.
+						// Override the handler to let the browser manage the cursor
+						// natively — Squire's manual splitBlock causes the cursor
+						// to jump back to the previous line on the next keystroke.
+						const origHandler = squire._beforeInput.bind(squire);
+						squire._beforeInput = function(event) {
+							if (event.inputType === 'insertLineBreak'
+								|| event.inputType === 'insertParagraph') {
+								return; // let the browser handle Enter natively
+							}
+							return origHandler(event);
+						};
 					} catch (e) { /* silent */ }
 				});
 			}
