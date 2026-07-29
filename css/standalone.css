@@ -208,7 +208,7 @@ body.layout-base #initial-state-container,
 #x2m-app .squire-wysiwyg {
 	font-size: 13px;
 	height: 100%;
-	line-height: 1.5;
+	line-height: 16px;
 	min-height: 200px;
 }
 

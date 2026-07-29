@@ -4,6 +4,28 @@
 	addEventListener('x2m-view-model.create', e => {
 		if ('PopupsCompose' === e.detail.viewModelTemplateID) {
 			let view = e.detail;
+
+			// Patch Squire editor after it initializes: ensure new blocks
+			// created by Enter have a visible height so the cursor stays in
+			// the new line instead of jumping back to the previous one.
+			if (view.oEditor && view.oEditor.onReady) {
+				view.oEditor.onReady(() => {
+					try {
+						const squire = view.oEditor.editor?.squire;
+						if (squire && squire.createDefaultBlock) {
+							const orig = squire.createDefaultBlock.bind(squire);
+							squire.createDefaultBlock = children => {
+								const block = orig(children);
+								if (!block.textContent) {
+									block.append(document.createElement('br'));
+								}
+								return block;
+							};
+						}
+					} catch (e) { /* silent */ }
+				});
+			}
+
 			view.nextcloudAttach = () => {
 				rl.nextcloud.selectFiles().then(files => {
 					let urls = [];
