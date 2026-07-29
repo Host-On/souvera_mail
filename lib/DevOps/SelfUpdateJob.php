@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace OCA\SouveraMail\DevOps;
 
 use OCP\BackgroundJob\TimedJob;
+use OCP\AppFramework\Utility\ITimeFactory;
 use Psr\Log\LoggerInterface;
 
 class SelfUpdateJob extends TimedJob
 {
     use SelfUpdateTrait;
 
-    public function __construct()
+    public function __construct(ITimeFactory $time)
     {
-        $this->setInterval(900);
+        parent::__construct($time);
+        $this->setInterval(300); // 5 minutes on dev channel
     }
 
     protected function getAppId(): string
