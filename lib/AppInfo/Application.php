@@ -20,6 +20,7 @@ if (\is_file($vendorAutoload)) {
 }
 
 use OCA\SouveraMail\Dashboard\UnreadMailWidget;
+use OCA\SouveraMail\Listeners\ArchiveIntegrationListener;
 use OCA\SouveraMail\Listeners\ImpersonateListener;
 use OCA\SouveraMail\Listeners\LoginBridgeListener;
 use OCA\SouveraMail\Listeners\LogoutListener;
@@ -116,6 +117,12 @@ class Application extends App implements IBootstrap
         $context->registerEventListener(
             BeforeTemplateRenderedEvent::class,
             SecurityPageHijackListener::class
+        );
+
+        // Archive-Integration: Button in SnappyMail-Toolbar
+        $context->registerEventListener(
+            BeforeTemplateRenderedEvent::class,
+            ArchiveIntegrationListener::class
         );
 
         // (b) Mirror NC-side token invalidations to Stalwart — if a user
