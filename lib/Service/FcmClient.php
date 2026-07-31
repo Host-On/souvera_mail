@@ -57,6 +57,9 @@ class FcmClient
     private const TOKEN_CACHE_SECONDS = 3300;
     private const HTTP_TIMEOUT_SECONDS = 10;
 
+    /** Max parallel FCM HTTP v1 sends per call (no official batch endpoint). */
+    private const MAX_CONCURRENT = 10;
+
     /** @var array{client_email: string, private_key: string, token_uri: string}|false|null */
     private array|false|null $serviceAccount = null;
 
@@ -85,9 +88,10 @@ class FcmClient
 
     /**
      * Sends a data-only push (no `notification` block) to every given FCM
-     * registration token individually.  Tokens that Google reports as
-     * unregistered/invalid are deleted from `oc_souvera_mail_devicetoken`
-     * as a side effect.
+     * registration token. FCM HTTP v1 has no batch endpoint, so sends run
+     * concurrently in bounded chunks (sendEach pattern) instead of strictly
+     * sequentially. Tokens that Google reports as unregistered/invalid are
+     * deleted from `oc_souvera_mail_devicetoken` as a side effect.
      *
      * @param list<string> $fcmTokens
      * @param array<string, string> $data
@@ -120,21 +124,24 @@ class FcmClient
         $url = \sprintf(self::SEND_URL_TEMPLATE, $projectId);
         $client = $this->httpClientService->newClient();
 
-        foreach ($fcmTokens as $fcmToken) {
-            $messageData = \array_map('strval', $data) + ['title' => $title, 'body' => $body];
-            $payload = [
-                'message' => [
-                    'token' => $fcmToken,
-                    'data' => $messageData,
-                    'android' => [
-                        'priority' => 'high',
-                        'ttl' => '3600s',
+        /** @var array<string, IResponse|\Throwable> $results */
+        $results = [];
+        foreach (\array_chunk($fcmTokens, self::MAX_CONCURRENT) as $chunk) {
+            $promises = [];
+            foreach ($chunk as $fcmToken) {
+                $messageData = \array_map('strval', $data) + ['title' => $title, 'body' => $body];
+                $payload = [
+                    'message' => [
+                        'token' => $fcmToken,
+                        'data' => $messageData,
+                        'android' => [
+                            'priority' => 'high',
+                            'ttl' => '3600s',
+                        ],
                     ],
-                ],
-            ];
+                ];
 
-            try {
-                $response = $client->post($url, [
+                $promises[$fcmToken] = $client->postAsync($url, [
                     'headers' => [
                         'Authorization' => 'Bearer ' . $accessToken,
                         'Content-Type' => 'application/json',
@@ -144,16 +151,29 @@ class FcmClient
                     'timeout' => self::HTTP_TIMEOUT_SECONDS,
                     'connect_timeout' => self::HTTP_TIMEOUT_SECONDS,
                     'http_errors' => false,
-                ]);
-            } catch (\Throwable $e) {
-                $this->logger->warning(
-                    'Souvera Mail: FCM send request failed: ' . $e->getMessage(),
-                    ['app' => 'souvera_mail', 'exception' => $e]
+                ])->then(
+                    static function (IResponse $response) use (&$results, $fcmToken): IResponse {
+                        $results[$fcmToken] = $response;
+                        return $response;
+                    },
+                    static function (\Throwable $e) use (&$results, $fcmToken) {
+                        $results[$fcmToken] = $e;
+                        return null;
+                    }
                 );
+            }
+            \GuzzleHttp\Promise\Utils::settle($promises)->wait();
+        }
+
+        foreach ($results as $fcmToken => $result) {
+            if ($result instanceof IResponse) {
+                $this->handleSendResponse($result, $fcmToken);
                 continue;
             }
-
-            $this->handleSendResponse($response, $fcmToken);
+            $this->logger->warning(
+                'Souvera Mail: FCM send request failed: ' . $result->getMessage(),
+                ['app' => 'souvera_mail']
+            );
         }
     }
 

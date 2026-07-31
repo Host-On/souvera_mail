@@ -14,6 +14,7 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\Attribute\PublicPage;
 use OCP\AppFramework\Http\DataResponse;
+use OCP\Http\Client\IClientService;
 use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\IRequest;
@@ -122,6 +123,12 @@ class StalwartWebhookController extends Controller
 {
     public const SYSTEM_CONFIG_WEBHOOK_SECRET = 'souvera_mail.stalwart_webhook_secret';
 
+    /** Optional monitoring endpoint for webhook health reports (latency/load
+     *  monitoring). When set, every accepted webhook posts a compact report;
+     *  otherwise the report degrades to a debug log entry. */
+    public const SYSTEM_CONFIG_HEALTH_URL = 'souvera_mail.webhook_health_url';
+    public const SYSTEM_CONFIG_HEALTH_TOKEN = 'souvera_mail.webhook_health_token';
+
     /** Real Stalwart event type that means "new mail, not spam, push it". */
     private const HAM_EVENT_TYPE = 'message-ingest.ham';
 
@@ -156,6 +163,7 @@ class StalwartWebhookController extends Controller
         private DeviceTokenMapper $tokens,
         private FcmClient $fcm,
         private StalwartAdminService $stalwartAdmin,
+        private IClientService $httpClientService,
         private LoggerInterface $logger,
     ) {
         parent::__construct($appName, $request);
@@ -173,6 +181,7 @@ class StalwartWebhookController extends Controller
     #[BruteForceProtection(action: 'souvera_mail_stalwart_webhook')]
     public function push(): DataResponse
     {
+        $started = \microtime(true);
         $expectedSecret = \trim((string) $this->config->getSystemValue(self::SYSTEM_CONFIG_WEBHOOK_SECRET, ''));
         if ($expectedSecret === '') {
             return new DataResponse(
@@ -196,7 +205,99 @@ class StalwartWebhookController extends Controller
             $notified += $this->processEvent($event);
         }
 
+        $this->reportHealth(
+            processedMs: (int) \round((\microtime(true) - $started) * 1000),
+            eventsReceived: \count($events),
+            notifiedUsers: $notified,
+            events: $events,
+        );
+
         return new DataResponse(['status' => 'ok', 'eventsReceived' => \count($events), 'notifiedUsers' => $notified]);
+    }
+
+    /**
+     * Posts a compact health report (latency/load) to the optional monitoring
+     * endpoint configured via {@see SYSTEM_CONFIG_HEALTH_URL}; without a
+     * configured endpoint this degrades to a debug log entry. Failures are
+     * logged but never break webhook processing.
+     *
+     * @param list<array<string, mixed>> $events
+     */
+    private function reportHealth(int $processedMs, int $eventsReceived, int $notifiedUsers, array $events): void
+    {
+        $url = \trim((string) $this->config->getSystemValue(self::SYSTEM_CONFIG_HEALTH_URL, ''));
+        if ($url === '') {
+            $this->logger->debug(
+                'Souvera Mail: webhook health report skipped — ' . self::SYSTEM_CONFIG_HEALTH_URL . ' not configured',
+                ['app' => 'souvera_mail']
+            );
+            return;
+        }
+
+        $headers = [
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json',
+        ];
+        $token = \trim((string) $this->config->getSystemValue(self::SYSTEM_CONFIG_HEALTH_TOKEN, ''));
+        if ($token !== '') {
+            $headers['Authorization'] = 'Bearer ' . $token;
+        }
+
+        $payload = [
+            'source' => 'souvera_mail',
+            'type' => 'webhook_health',
+            'timestamp' => \time(),
+            'processedMs' => $processedMs,
+            'eventsReceived' => $eventsReceived,
+            'notifiedUsers' => $notifiedUsers,
+            'oldestEventAgeSeconds' => $this->oldestEventAgeSeconds($events),
+        ];
+
+        try {
+            $client = $this->httpClientService->newClient();
+            $client->post($url, [
+                'json' => $payload,
+                'headers' => $headers,
+                'timeout' => 5,
+                'connect_timeout' => 5,
+                'http_errors' => false,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail: webhook health report failed: ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
+        }
+    }
+
+    /**
+     * Best-effort age of the oldest event in seconds (null when no usable
+     * timestamp is present on any event). Accepts seconds or milliseconds.
+     *
+     * @param list<array<string, mixed>> $events
+     */
+    private function oldestEventAgeSeconds(array $events): ?int
+    {
+        $now = \time();
+        $oldest = null;
+        foreach ($events as $event) {
+            if (!\is_array($event)) {
+                continue;
+            }
+            $ts = $event['receivedAt'] ?? $event['ts'] ?? $event['timestamp'] ?? null;
+            if (!\is_numeric($ts)) {
+                continue;
+            }
+            $seconds = (float) $ts;
+            if ($seconds > 1_000_000_000_000) {
+                $seconds /= 1000; // milliseconds
+            }
+            $age = $now - $seconds;
+            if ($age >= 0 && ($oldest === null || $age > $oldest)) {
+                $oldest = (int) $age;
+            }
+        }
+        return $oldest;
     }
 
     /**

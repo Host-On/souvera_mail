@@ -17,7 +17,7 @@ use Psr\Log\LoggerInterface;
  * Low-frequency safety net for the event-driven Stalwart webhook
  * ({@see \OCA\SouveraMail\Controller\StalwartWebhookController}): if a
  * webhook delivery is ever lost (Stalwart misconfigured, network flap,
- * NC instance briefly down), this poller notices new mail within 15
+ * NC instance briefly down), this poller notices new mail within 5
  * minutes and sends the missed push.
  *
  * For each user with at least one registered device token, we fetch the
@@ -34,8 +34,8 @@ use Psr\Log\LoggerInterface;
  */
 class MailPushPoller extends TimedJob
 {
-    /** Poll interval in seconds (15 minutes). */
-    private const INTERVAL_SECONDS = 900;
+    /** Poll interval in seconds (5 minutes). */
+    private const INTERVAL_SECONDS = 300;
 
     /** Page size when sweeping `oc_souvera_mail_devicetoken`. */
     private const BATCH_SIZE = 200;
