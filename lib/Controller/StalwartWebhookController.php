@@ -243,17 +243,17 @@ class StalwartWebhookController extends Controller
             $headers['Authorization'] = 'Bearer ' . $token;
         }
 
-        $payload = [
-            'source' => 'souvera_mail',
-            'type' => 'webhook_health',
-            'timestamp' => \time(),
-            'processedMs' => $processedMs,
-            'eventsReceived' => $eventsReceived,
-            'notifiedUsers' => $notifiedUsers,
-            'oldestEventAgeSeconds' => $this->oldestEventAgeSeconds($events),
-        ];
-
         try {
+            $payload = [
+                'source' => 'souvera_mail',
+                'type' => 'webhook_health',
+                'timestamp' => \time(),
+                'processedMs' => $processedMs,
+                'eventsReceived' => $eventsReceived,
+                'notifiedUsers' => $notifiedUsers,
+                'oldestEventAgeSeconds' => $this->oldestEventAgeSeconds($events),
+            ];
+
             $client = $this->httpClientService->newClient();
             $client->post($url, [
                 'json' => $payload,
@@ -272,7 +272,8 @@ class StalwartWebhookController extends Controller
 
     /**
      * Best-effort age of the oldest event in seconds (null when no usable
-     * timestamp is present on any event). Accepts seconds or milliseconds.
+     * timestamp is present on any event). Accepts numeric seconds or
+     * milliseconds as well as ISO-8601 strings (e.g. `createdAt`).
      *
      * @param list<array<string, mixed>> $events
      */
@@ -284,13 +285,20 @@ class StalwartWebhookController extends Controller
             if (!\is_array($event)) {
                 continue;
             }
-            $ts = $event['receivedAt'] ?? $event['ts'] ?? $event['timestamp'] ?? null;
-            if (!\is_numeric($ts)) {
+            $ts = $event['receivedAt'] ?? $event['ts'] ?? $event['timestamp'] ?? $event['createdAt'] ?? null;
+            if (\is_numeric($ts)) {
+                $seconds = (float) $ts;
+                if ($seconds > 1_000_000_000_000) {
+                    $seconds /= 1000; // milliseconds
+                }
+            } elseif (\is_string($ts) && \trim($ts) !== '') {
+                $parsed = \strtotime($ts);
+                if ($parsed === false) {
+                    continue;
+                }
+                $seconds = (float) $parsed;
+            } else {
                 continue;
-            }
-            $seconds = (float) $ts;
-            if ($seconds > 1_000_000_000_000) {
-                $seconds /= 1000; // milliseconds
             }
             $age = $now - $seconds;
             if ($age >= 0 && ($oldest === null || $age > $oldest)) {

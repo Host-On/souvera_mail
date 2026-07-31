@@ -98,7 +98,7 @@ class FcmClient
      */
     public function send(array $fcmTokens, string $title, string $body, array $data = []): void
     {
-        $fcmTokens = \array_values(\array_filter($fcmTokens, static fn ($t) => \is_string($t) && $t !== ''));
+        $fcmTokens = \array_values(\array_unique(\array_filter($fcmTokens, static fn ($t) => \is_string($t) && $t !== '')));
         if ($fcmTokens === []) {
             return;
         }
@@ -172,7 +172,7 @@ class FcmClient
             }
             $this->logger->warning(
                 'Souvera Mail: FCM send request failed: ' . $result->getMessage(),
-                ['app' => 'souvera_mail']
+                ['app' => 'souvera_mail', 'exception' => $result]
             );
         }
     }
