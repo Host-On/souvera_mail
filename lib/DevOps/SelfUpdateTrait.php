@@ -28,8 +28,8 @@ trait SelfUpdateTrait
 
         if ($channel === 'stable') {
             // Release channel: check/install at most once per 24h and only
-            // inside Nextcloud's maintenance window (config.php:
-            // 'maintenance_window_start' => hour 0-23, window length 4h).
+            // inside the maintenance window (config.php:
+            // 'maintenance_window_start' => hour 0-23, window length 1h).
             if (!$this->inMaintenanceWindow()) {
                 return ['skipped' => true, 'reason' => 'Outside maintenance window'];
             }
@@ -89,13 +89,16 @@ trait SelfUpdateTrait
 
     private function inMaintenanceWindow(): bool
     {
+        // Config value = first hour of the maintenance window; the window is
+        // exactly 1 hour long (operator-defined semantics — Nextcloud core
+        // uses start..start+4h, this app intentionally deviates).
         $start = (int) \OCP\Server::get(\OCP\IConfig::class)
             ->getSystemValue('maintenance_window_start', 0);
         $hour = (int) date('G');
-        if ($start + 4 <= 24) {
-            return $hour >= $start && $hour < $start + 4;
-        }
-        return $hour >= $start || $hour < ($start + 4) % 24;
+        $end = ($start + 1) % 24;
+        return $start < $end
+            ? $hour >= $start && $hour < $end
+            : $hour >= $start || $hour < $end;
     }
 
     private function latestReleaseTag(): ?string
