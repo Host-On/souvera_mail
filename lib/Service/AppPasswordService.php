@@ -616,7 +616,7 @@ class AppPasswordService
                             //     perm-id strings.
                             'permissions' => [
                                 '@type' => 'Replace',
-                                'permissions' => \array_fill_keys(
+                                'value' => \array_fill_keys(
                                     self::APP_PASSWORD_PERMISSIONS,
                                     true,
                                 ),
