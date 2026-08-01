@@ -712,6 +712,11 @@ class Actions
 
 		if ($aResult['Auth']) {
 			$aResult['proxyExternalImages'] = (bool)$oConfig->Get('labs', 'use_local_proxy_for_external_images', false);
+			// Souvera Mail patch (v0.22.8): expose the installed app version
+			// in the engine boot response itself (independent of the
+			// nextcloud plugin, which is synced separately into the engine
+			// data dir) — the F1 help modal renders it as a fallback.
+			$aResult['AppVersion'] = \defined('APP_VERSION') ? APP_VERSION : 'unknown';
 			$aResult['autoVerifySignatures'] = (bool)$oConfig->Get('security', 'auto_verify_signatures', false);
 			$aResult['allowLanguagesOnSettings'] = (bool) $oConfig->Get('webmail', 'allow_languages_on_settings', true);
 			$aResult['minRefreshInterval'] = (int) $oConfig->Get('webmail', 'min_refresh_interval', 5);

@@ -108,7 +108,14 @@
 		var slots = popupEl.querySelectorAll('[data-smail-help]');
 		Array.prototype.forEach.call(slots, function (el) {
 			var key = el.getAttribute('data-smail-help');
-			el.textContent = valueOrDash(c[key]);
+			// v0.22.8: the version slot falls back to the engine boot
+			// response (AppVersion) when the plugin payload is stale
+			// (plugin dir in the engine data path not yet re-synced).
+			var value = c[key];
+			if ((value === undefined || value === '') && key === 'SmailHelpAppVersion') {
+				value = rl.settings.get('AppVersion') || '';
+			}
+			el.textContent = valueOrDash(value);
 		});
 
 		// 2. Shield block: show if URL present, hide entirely otherwise.
