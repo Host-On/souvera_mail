@@ -40,8 +40,9 @@ class SelfUpdateNowStep implements IRepairStep {
         foreach (['souvera_central', 'souvera_mail', 'souvera_shield'] as $appId) {
             try {
                 $this->appId = $appId;
-                // The stable channel throttles checks to 3h; an explicit
-                // `occ app:update` must always check for a newer release.
+                // The stable channel checks once per 24h inside the
+                // maintenance window; an explicit `occ app:update` must
+                // always check for a newer release.
                 $config->setAppValue($appId, 'devops.last_check', '0');
                 $result = $this->checkAndUpdate();
                 $logger->info(
