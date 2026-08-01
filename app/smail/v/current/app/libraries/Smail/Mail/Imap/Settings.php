@@ -27,7 +27,7 @@ class Settings extends \Smail\Mail\Net\ConnectSettings
 
 	public bool
 		$expunge_all_on_delete = false,
-		$fast_simple_search = true,
+		$fast_simple_search = false,
 		$fetch_new_messages = true,
 		$force_select = false,
 		$message_all_headers = false;

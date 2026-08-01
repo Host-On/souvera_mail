@@ -769,7 +769,7 @@ class MailClient
 		if (10 > $oParams->iLimit) {
 			$oParams->iLimit = 10;
 		} else if (999 < $oParams->iLimit) {
-			$oParams->iLimit = 50;
+			$oParams->iLimit = 999;
 		}
 
 		$sSearch = \trim($oParams->sSearch);
@@ -840,8 +840,14 @@ class MailClient
 			$oMessageCollection->Limited = true;
 			$this->logWrite('List optimization (count: '.$oInfo->MESSAGES.', limit:'.$message_list_limit.')');
 			if (\strlen($sSearch)) {
-				// Don't use SORT for speed
-				$oParams->bUseSort = false;
+				// Souvera Mail patch (v0.22.5): keep server-side SORT for
+				// searches. Previously SORT was disabled here, so search
+				// results came back in ascending UID order — "sorting by
+				// date does not work" on every Stalwart deployment that
+				// hits the limited path (large mailboxes with
+				// message_list_limit). GetUids() issues `UID SORT (…)
+				// <search-criteria>` in one round trip when the server
+				// has SORT — no extra cost over SEARCH alone.
 				$aUids = $this->GetUids($oParams, $oInfo);
 			} else {
 				if ($bUseSort) {
@@ -892,7 +898,10 @@ class MailClient
 			}
 
 			if ($aUids && \strlen($sSearch)) {
-				$oParams->bUseSort = false;
+				// Souvera Mail patch (v0.22.5): keep SORT for the search
+				// pass too. GetUids() combines `UID SORT (…) <criteria>`
+				// into one round trip; the results are already in the
+				// requested order, so the thread-filter below preserves it.
 				$aSearchedUids = $this->GetUids($oParams, $oInfo);
 				if ($oParams->bUseThreads && !$oParams->iThreadUid) {
 					$matchingThreadUids = [];

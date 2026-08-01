@@ -81,6 +81,7 @@ All write commands accept `--json` and `--dry-run`.
 		<command>OCA\SouveraMail\Command\Whoami</command>
 		<command>OCA\SouveraMail\Command\Reset</command>
 		<command>OCA\SouveraMail\Command\WarmupOidc</command>
+		<command>OCA\SouveraMail\Command\DataCheck</command>
 		<command>OCA\SouveraMail\Command\Oidc\RegisterClient</command>
 		<command>OCA\SouveraMail\Command\External\Status</command>
 		<command>OCA\SouveraMail\Command\External\ListAccounts</command>
