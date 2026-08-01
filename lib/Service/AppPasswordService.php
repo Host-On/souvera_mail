@@ -600,28 +600,14 @@ class AppPasswordService
                     'create' => [
                         $creationId => [
                             'description' => $description,
-                            // Stalwart 0.16 CredentialPermissions wire-format
-                            // (live-verified 2026-07-01 against Stalwart
-                            // 0.16.10 on the operator's `fccec267` cluster
-                            // by exhaustively fuzzing every plausible shape):
-                            //   { "@type": "Replace",
-                            //     "permissions": { "authenticate": true,
-                            //                      "emailSend": true, … } }
-                            // Key observations:
-                            //   - `@type` must be "Replace".
-                            //   - The KEY under "Replace" is `permissions`,
-                            //     NOT `value` / `perms` / `list`.
-                            //   - The VALUE at `permissions` is a MAP of
-                            //     `<perm-id> => bool`, NOT an array of
-                            //     perm-id strings.
-                            'permissions' => [
-                                '@type' => 'Replace',
-                                'value' => \array_fill_keys(
+                             // Stalwart AppPassword permissions: flat map of
+                             // <perm-id> => bool. No @type wrapper — that
+                             // pattern is for Email/set keywords only.
+                             'permissions' => \array_fill_keys(
                                     self::APP_PASSWORD_PERMISSIONS,
                                     true,
                                 ),
-                            ],
-                            'allowedIps' => (object) [],
+                             'allowedIps' => (object) [],
                         ],
                     ],
                 ],
