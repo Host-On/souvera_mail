@@ -30,13 +30,14 @@ class FileStorage implements \Smail\Engine\Providers\Storage\IStorage
 			// true) — settings silently vanished after a reload. Log and
 			// report the failure instead.
 			if (!$sFileName) {
-				\Smail\Engine\Log::warning('FileStorage', 'Put() got an empty filename for key "' . $sKey . '" — not persisted');
+				$sExpectedDir = $this->GenerateFilePath($mAccount, $iStorageType);
+				\Smail\Engine\Log::warning('FileStorage', 'Put() got an empty filename for key "' . $sKey . '" (storage base "' . $this->sDataPath . '", expected dir "' . $sExpectedDir . '") — not persisted');
 				return false;
 			}
 			\Smail\Engine\Utils::saveFile($sFileName, $sValue);
 			return true;
 		} catch (\Throwable $e) {
-			\Smail\Engine\Log::warning('FileStorage', $e->getMessage());
+			\Smail\Engine\Log::warning('FileStorage', 'Put() failed for key "' . $sKey . '" -> "' . $sFileName . '": ' . $e->getMessage());
 		}
 		return false;
 	}

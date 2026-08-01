@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\SouveraMail\Command;
 
 use OCA\SouveraMail\Service\DomainConfigService;
+use OCA\SouveraMail\Util\EngineHelper;
 use OCP\IUserManager;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -12,19 +13,26 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * `occ souvera_mail:data:check [uid]` — resolves the engine data directory
- * and the per-user settings storage path, verifies write access and shows
- * whether the settings file actually exists and when it was last modified.
+ * `occ souvera_mail:data:check [uid]` — full persistence diagnostics.
  *
- * Purpose: "my webmail settings are not saved persistently" usually means
- * either the settings file is written somewhere unexpected (MULTIDOMAIN
- * switch, local-vs-central storage) or writes fail silently. This command
- * makes both visible in one shot.
+ * Boots the engine like a web request does, then resolves EVERY candidate
+ * storage root and shows the EXACT paths the settings save would use
+ * (plugin override AND engine fallback), verifies write access with a
+ * real probe write, and scans every plausible data directory for
+ * settings*.json files.
+ *
+ * Purpose: "my webmail settings are not saved persistently" — this
+ * command makes visible in one run:
+ *   - which data root the engine REALLY uses at runtime
+ *   - whether a settings write would succeed (permissions / open_basedir)
+ *   - where settings files ACTUALLY live (incl. engine-default `data/`
+ *     inside the app dir, which vanishes on every re-deploy)
  */
 class DataCheck extends Command {
 
     public function __construct(
         private DomainConfigService $domainService,
+        private EngineHelper $engineHelper,
         private IUserManager $userManager,
     ) {
         parent::__construct();
@@ -33,18 +41,28 @@ class DataCheck extends Command {
     protected function configure(): void {
         $this
             ->setName('souvera_mail:data:check')
-            ->setDescription('Show engine data path + per-user settings storage status')
+            ->setDescription('Full engine settings-persistence diagnostics')
             ->addArgument('uid', InputArgument::OPTIONAL, 'Nextcloud user id (resolves their settings file)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int {
+        $this->bootEngine();
         $dataPath = $this->domainService->getDataPath();
-        $output->writeln('Engine data root : ' . $dataPath);
-        $output->writeln('MULTIDOMAIN      : ' . (\defined('MULTIDOMAIN') ? 'ON (settings are per host!)' : 'off'));
-        $output->writeln('APP_PRIVATE_DATA : ' . (\defined('APP_PRIVATE_DATA') ? APP_PRIVATE_DATA : '(engine not booted yet)'));
 
-        $rootWritable = \is_dir($dataPath) && \is_writable($dataPath);
-        $output->writeln('data root exists : ' . (\is_dir($dataPath) ? 'yes' : 'NO') . ', writable: ' . ($rootWritable ? 'yes' : 'NO'));
+        $output->writeln('=== Engine data root ===');
+        $output->writeln('datadirectory      : ' . $dataPath);
+        $output->writeln('MULTIDOMAIN        : ' . (\defined('MULTIDOMAIN') ? 'ON (settings are per host!)' : 'off'));
+        $output->writeln('APP_DATA_FOLDER_PATH: ' . (\defined('APP_DATA_FOLDER_PATH') ? APP_DATA_FOLDER_PATH : 'NOT SET'));
+        $output->writeln('APP_PRIVATE_DATA   : ' . (\defined('APP_PRIVATE_DATA') ? APP_PRIVATE_DATA : 'NOT SET'));
+        $output->writeln('data root exists   : ' . (\is_dir($dataPath) ? 'yes' : 'NO') . ', writable: ' . (\is_dir($dataPath) && \is_writable($dataPath) ? 'yes' : 'NO'));
+
+        // Engine-default data dirs INSIDE the app — these vanish on every
+        // re-deploy (git-clone) and are the classic "not persistent" cause.
+        $appDataDefault = (\defined('APP_INDEX_ROOT_PATH') ? APP_INDEX_ROOT_PATH : \dirname(__DIR__, 2) . '/app/') . 'data/';
+        $output->writeln('engine default data: ' . $appDataDefault
+            . ' -> ' . (\is_dir($appDataDefault) ? 'EXISTS (!)' : 'absent'));
+
+        $this->showMount($output, $dataPath);
 
         $uid = (string) ($input->getArgument('uid') ?: '');
         if ($uid === '') {
@@ -57,56 +75,135 @@ class DataCheck extends Command {
             return Command::FAILURE;
         }
 
-        // Mirror the engine's FileStorage layout exactly:
-        // <dataPath>/_data_/_default_/storage/<domain>/<localpart>/.config/<uid>/settings[|_local].json
-        // The .config/<uid> part is added by the NextcloudStorage plugin
-        // override; WITHOUT the plugin (or when the plugin's isLoggedIn()
-        // check fails) the engine writes directly into
-        // <dataPath>/_data_/_default_/storage/<domain>/<localpart>/.
         $email = (string) ($user->getEMailAddress() ?: $uid);
         $parts = \explode('@', $email);
         $domain = \trim(1 < \count($parts) ? \array_pop($parts) : '');
         $localpart = \implode('@', $parts) ?: '.unknown';
-        $storageBase = $dataPath . '/_data_/_default_/storage/'
-            . ($domain !== '' ? $domain : 'unknown.tld')
-            . '/' . $localpart;
-        $settingsBase = $storageBase . '/.config/' . $uid;
 
-        $output->writeln('resolved email  : ' . $email);
-        $output->writeln('plugin path      : ' . $settingsBase);
-        $output->writeln('  exists         : ' . (\is_dir($settingsBase) ? 'yes' : 'NO'));
-        $output->writeln('  writable       : ' . (\is_dir($settingsBase) && \is_writable($settingsBase) ? 'yes' : 'NO'));
-        $output->writeln('fallback path    : ' . $storageBase . '  (without .config/<uid>)');
-        $output->writeln('  exists         : ' . (\is_dir($storageBase) ? 'yes' : 'NO'));
+        $output->writeln('');
+        $output->writeln('=== Per-user paths (email ' . $email . ') ===');
 
-        foreach (['settings.json' => $settingsBase . '/settings.json', 'settings_local.json' => $settingsBase . '/settings_local.json',
-                  'settings.json (fallback)' => $storageBase . '/settings.json', 'settings_local.json (fallback)' => $storageBase . '/settings_local.json'] as $label => $file) {
-            if (\is_file($file)) {
-                $size = \filesize($file);
-                $mtime = \date('Y-m-d H:i:s', (int) \filemtime($file));
-                $output->writeln('  ' . $label . ' : exists (' . $size . ' bytes, modified ' . $mtime . ')');
-            } else {
-                $output->writeln('  ' . $label . ' : NOT FOUND');
-            }
+        // 1) Plugin path — what a logged-in browser request uses.
+        $pluginPath = $this->pluginConfigDir($domain, $localpart, $uid);
+        $output->writeln('plugin path       : ' . $pluginPath);
+        $this->showDirStatus($output, $pluginPath);
+        $this->probeWrite($output, $pluginPath);
+
+        // 2) Engine fallback — what an unauthenticated / non-plugin write uses.
+        $fallbackDir = APP_PRIVATE_DATA . 'storage/'
+            . ($domain !== '' ? $domain : 'unknown.tld') . '/' . $localpart;
+        $output->writeln('fallback path     : ' . $fallbackDir);
+        $this->showDirStatus($output, $fallbackDir);
+        $this->probeWrite($output, $fallbackDir);
+
+        // 3) Files in each candidate location.
+        foreach ([
+            'plugin settings'     => $pluginPath . '/settings.json',
+            'plugin settings_local' => $pluginPath . '/settings_local.json',
+            'fallback settings'   => $fallbackDir . '/settings.json',
+            'fallback settings_local' => $fallbackDir . '/settings_local.json',
+        ] as $label => $file) {
+            $output->writeln('  ' . $label . ' : ' . (\is_file($file) ? 'exists (' . \filesize($file) . ' bytes, modified ' . \date('Y-m-d H:i:s', (int) \filemtime($file)) . ')' : 'NOT FOUND'));
         }
 
-        // Ground truth: scan the whole engine data tree for settings files
-        // — this shows where writes ACTUALLY land, whatever the code path.
-        $output->writeln('---');
-        $output->writeln('scan: all settings*.json under ' . $dataPath . ':');
+        $output->writeln('');
+        $output->writeln('=== Scan: settings*.json across ALL candidate roots ===');
+        $roots = [];
+        if (\is_dir($dataPath)) {
+            $roots[] = $dataPath;                      // NC datadir / appdata_souvera_mail
+        }
+        $appRoot = \defined('APP_INDEX_ROOT_PATH') ? APP_INDEX_ROOT_PATH : \dirname(__DIR__, 2) . '/app/';
+        $roots[] = $appRoot . 'data/';                  // engine default (in-app)
+        $roots[] = $appRoot . 'app/data/';              // legacy app-level variant
         $found = 0;
-        $it = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dataPath, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::LEAVES_ONLY
-        );
-        foreach ($it as $fileInfo) {
-            if ($fileInfo->isFile() && \preg_match('/^settings.*\.json$/', $fileInfo->getFilename())) {
-                $found++;
-                $output->writeln('  ' . $fileInfo->getPathname() . ' (' . $fileInfo->getSize() . ' bytes, modified ' . \date('Y-m-d H:i:s', $fileInfo->getMTime()) . ')');
+        foreach (\array_unique($roots) as $root) {
+            $root = \rtrim($root, '\\/');
+            $output->writeln('root: ' . $root . ' -> ' . (\is_dir($root) ? 'dir' : 'absent'));
+            if (!\is_dir($root)) {
+                continue;
+            }
+            $it = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::LEAVES_ONLY
+            );
+            foreach ($it as $fileInfo) {
+                if ($fileInfo->isFile() && \preg_match('/^settings.*\.json$/', $fileInfo->getFilename())) {
+                    $found++;
+                    $output->writeln('  ' . $fileInfo->getPathname() . ' (' . $fileInfo->getSize() . ' bytes, modified ' . \date('Y-m-d H:i:s', $fileInfo->getMTime()) . ')');
+                }
             }
         }
-        $output->writeln('  (' . $found . ' settings file(s) found)');
+        $output->writeln('  (' . $found . ' settings file(s) found across all roots)');
+
+        $output->writeln('');
+        $output->writeln('=== Hints ===');
+        $output->writeln('- If settings files sit under "engine default data" (in-app), they are wiped by every git-clone deploy.');
+        $output->writeln('- If nothing was written at all, check nextcloud.log for "FileStorage" / "Failed to save" warnings.');
+        $output->writeln('- open_basedir: ' . (\ini_get('open_basedir') ?: 'not set (unrestricted)'));
 
         return Command::SUCCESS;
+    }
+
+    /** Boot the engine exactly like a web request (best-effort). */
+    private function bootEngine(): void {
+        try {
+            $this->engineHelper->loadApp();
+        } catch (\Throwable $e) {
+            \fwrite(STDERR, 'engine boot failed (continuing with static paths): ' . $e->getMessage() . PHP_EOL);
+        }
+    }
+
+    /** Storage path the NextcloudStorage plugin override produces. */
+    private function pluginConfigDir(string $domain, string $localpart, string $uid): string {
+        $base = \defined('APP_PRIVATE_DATA') ? APP_PRIVATE_DATA : $this->domainService->getDataPath() . '/_data_/_default_/';
+        return $base . 'storage/'
+            . ($domain !== '' ? $domain : 'unknown.tld') . '/' . $localpart
+            . '/.config/' . $uid;
+    }
+
+    private function showDirStatus(OutputInterface $output, string $dir): void {
+        $exists = \is_dir($dir);
+        $output->writeln('  exists   : ' . ($exists ? 'yes' : 'NO'));
+        $output->writeln('  writable : ' . ($exists && \is_writable($dir) ? 'yes' : 'NO'));
+    }
+
+    /** Real probe write — creates the directory chain, then removes the file. */
+    private function probeWrite(OutputInterface $output, string $dir): void {
+        $probe = $dir . '/.write_probe';
+        try {
+            if (\is_dir($dir) || \mkdir($dir, 0700, true)) {
+                if (\file_put_contents($probe, 'probe') !== false) {
+                    $output->writeln('  PROBE WRITE OK -> ' . $probe);
+                    \unlink($probe);
+                } else {
+                    $output->writeln('  PROBE WRITE FAILED: file_put_contents returned false');
+                }
+            } else {
+                $output->writeln('  PROBE WRITE FAILED: mkdir(' . $dir . ') returned false');
+            }
+        } catch (\Throwable $e) {
+            $output->writeln('  PROBE WRITE FAILED: ' . $e->getMessage());
+        }
+    }
+
+    private function showMount(OutputInterface $output, string $path): void {
+        $parent = $path;
+        while (!\is_dir($parent) && $parent !== \dirname($parent)) {
+            $parent = \dirname($parent);
+        }
+        $output->writeln('closest existing dir: ' . $parent);
+        if (\is_dir($parent)) {
+            $st = \stat($parent);
+            $out = [];
+            \exec('df -T ' . \escapeshellarg($parent) . ' 2>/dev/null', $out, $rc);
+            if ($rc === 0 && $out) {
+                $output->writeln('filesystem (df -T): ' . \implode(' | ', $out));
+            } else {
+                $output->writeln('filesystem (df -T): not available (exec disabled?)');
+            }
+            if ($st !== false) {
+                $output->writeln('owner of ' . $parent . ': uid=' . $st['uid'] . ', gid=' . $st['gid'] . ' (this process euid=' . (\function_exists('posix_geteuid') ? posix_geteuid() : '?') . ')');
+            }
+        }
     }
 }
