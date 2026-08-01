@@ -676,6 +676,16 @@ class Actions
 					$aResult['AllowDraftAutosave'] = (bool)$oSettings->GetConf('AllowDraftAutosave', $aResult['AllowDraftAutosave']);
 					$aResult['AutoLogout'] = (int)$oSettings->GetConf('AutoLogout', $aResult['AutoLogout']);
 					$aResult['keyPassForget'] = (int)$oSettings->GetConf('keyPassForget', $aResult['keyPassForget']);
+					// Souvera Mail patch (v0.22.5): CheckMailInterval lives in
+					// the LOCAL settings (settings_local.json, see
+					// Actions\User::DoSettingsUpdate) but was never included
+					// in this boot response — the client always re-read the
+					// server default after a reload, so the "check for new
+					// messages" interval appeared not to persist.
+					$oSettingsLocal = $this->SettingsProvider(true)->Load($oAccount);
+					if ($oSettingsLocal instanceof Settings) {
+						$aResult['CheckMailInterval'] = (int) $oSettingsLocal->GetConf('CheckMailInterval', $aResult['CheckMailInterval'] ?? 15);
+					}
 					$aResult['Layout'] = (int)$oSettings->GetConf('Layout', $aResult['Layout']);
 					$aResult['Resizer4Width'] = (int)$oSettings->GetConf('Resizer4Width', 0);
 					$aResult['Resizer5Width'] = (int)$oSettings->GetConf('Resizer5Width', 0);

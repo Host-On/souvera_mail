@@ -38,10 +38,15 @@ use Psr\Log\LoggerInterface;
  */
 class MailboxAccessGuard
 {
+    private const CACHE_PREFIX = 'souvera_mail_guard';
+    private const CACHE_OK = 'ok';
+    private const CACHE_TTL_SECONDS = 60;
+
     public function __construct(
         private StalwartAdminService $stalwart,
         private StalwartUserContext $userContext,
         private LoggerInterface $logger,
+        private ?\OCP\ICacheFactory $cacheFactory = null,
     ) {
     }
 
@@ -52,10 +57,21 @@ class MailboxAccessGuard
      * Callers: {@see \OCA\SouveraMail\Util\EngineHelper::startApp}
      * right before it hands credentials to Snappymail's Actions.
      *
+     * Success is cached for 60 seconds: the guard runs on EVERY engine
+     * request (every AJAX call of the webmail, including the boot
+     * sequence) and each uncached run costs a Stalwart JMAP round-trip —
+     * with a slow or loaded Stalwart this made the webmail "preload"
+     * take many seconds. Failures are never cached (fail-closed).
+     *
      * @throws MailboxAccessDenied
      */
     public function assertMailboxOwnership(string $userId): void
     {
+        $cache = $this->cacheFactory?->createDistributed(self::CACHE_PREFIX);
+        if ($cache !== null && $cache->get($userId) === self::CACHE_OK) {
+            return;
+        }
+
         if (!$this->stalwart->isConfigured()) {
             // No Stalwart configured (e.g. dev/CI). Bail out — better
             // to break the login than to serve a mailbox we cannot
@@ -147,6 +163,11 @@ class MailboxAccessGuard
                 . '`occ souvera_mail:whoami ' . $userId . '`.'
             );
         }
+
+        // Only successful checks are cached — a denied/failed check must
+        // be re-run on the next request (fail-closed, no lockout window
+        // for legitimately re-provisioned users).
+        $cache?->set($userId, self::CACHE_OK, self::CACHE_TTL_SECONDS);
     }
 
     /**
@@ -157,8 +178,7 @@ class MailboxAccessGuard
      * @param array<string, mixed> $body
      */
     public static function extractAuthenticatedIdentity(array $body): ?string
-    {
-        $username = $body['username'] ?? null;
+    {        $username = $body['username'] ?? null;
         if (\is_string($username) && $username !== '') {
             return $username;
         }
