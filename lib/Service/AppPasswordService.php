@@ -98,6 +98,13 @@ class AppPasswordService
         'sieveListScripts', 'sieveSetActive',
         'sieveGetScript', 'sievePutScript', 'sieveDeleteScript',
         'sieveRenameScript', 'sieveCheckScript', 'sieveHaveSpace',
+
+        // ── JMAP (Souvera Android App) ──────────────────────────────
+        'jmapAuthenticate',
+        'jmapEmailGet', 'jmapEmailQuery', 'jmapEmailSet',
+        'jmapEmailSubmission',
+        'jmapMailboxGet', 'jmapMailboxQuery',
+        'jmapBlobGet',
     ];
 
     /**
