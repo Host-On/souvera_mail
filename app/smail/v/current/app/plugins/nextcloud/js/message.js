@@ -30,21 +30,30 @@
 	class AttachmentPreviewPopupView extends rl.pluginPopupView {
 		constructor() {
 			super('AttachmentPreview');
-			this.attachmentName = '';
-			this.previewUrl = '';
-			this.downloadUrl = '';
-			this.isImage = false;
-			this.isPdf = false;
+			// Knockout observables — the template binds to these, so they
+			// must be observable() and be written via the function call.
+			this.attachmentName = ko.observable('');
+			this.previewUrl = ko.observable('');
+			this.downloadUrl = ko.observable('');
+			this.isImage = ko.observable(false);
+			this.isPdf = ko.observable(false);
 		}
 
 		beforeShow(fResolve, attachment) {
 			this.fResolve = fResolve;
 			this.attachment = attachment || null;
-			this.attachmentName = attachment?.fileName || '';
-			this.previewUrl = attachment?.linkPreview() || '';
-			this.downloadUrl = attachment?.linkDownload() || '';
-			this.isImage = !!attachment?.isImage();
-			this.isPdf = !!attachment?.pdfPreview?.();
+			this.attachmentName(attachment?.fileName || '');
+			this.previewUrl(attachment?.linkPreview() || '');
+			this.downloadUrl(attachment?.linkDownload() || '');
+			this.isImage(!!attachment?.isImage());
+			// Robust PDF detection: pdfPreview() relies on the deprecated
+			// navigator.mimeTypes, which returns undefined in modern
+			// browsers — fall back to fileType/mimeType checks.
+			this.isPdf(
+				attachment?.fileType === 'pdf'
+				|| attachment?.mimeType === 'application/pdf'
+				|| !!attachment?.pdfPreview?.()
+			);
 		}
 
 		onHide() {

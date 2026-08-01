@@ -8,7 +8,7 @@
 	<img data-bind="attr: { src: previewUrl, alt: attachmentName }">
 	<!-- /ko -->
 	<!-- ko if: isPdf -->
-	<iframe data-bind="attr: { src: previewUrl, title: attachmentName }"></iframe>
+	<iframe data-bind="attr: { src: previewUrl, title: attachmentName }" sandbox="allow-same-origin allow-scripts allow-downloads"></iframe>
 	<!-- /ko -->
 	<!-- ko ifnot: isImage || isPdf -->
 	<div class="x2m-nc-attachment-nopreview"><span data-i18n="NEXTCLOUD/ATTACHMENT_NO_PREVIEW"></span></div>
