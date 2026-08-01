@@ -1,0 +1,16 @@
+<header>
+	<a class="close" href="#" data-bind="click: close">×</a>
+	<h3 data-bind="text: attachmentName"></h3>
+	<a class="x2m-nc-attachment-download button-vue" data-bind="attr: { href: downloadUrl, download: attachmentName }">⬇ <span data-i18n="NEXTCLOUD/ATTACHMENT_DOWNLOAD"></span></a>
+</header>
+<div class="modal-body form-horizontal x2m-nc-attachment-preview">
+	<!-- ko if: isImage -->
+	<img data-bind="attr: { src: previewUrl, alt: attachmentName }">
+	<!-- /ko -->
+	<!-- ko if: isPdf -->
+	<iframe data-bind="attr: { src: previewUrl, title: attachmentName }"></iframe>
+	<!-- /ko -->
+	<!-- ko ifnot: isImage || isPdf -->
+	<div class="x2m-nc-attachment-nopreview"><span data-i18n="NEXTCLOUD/ATTACHMENT_NO_PREVIEW"></span></div>
+	<!-- /ko -->
+</div>

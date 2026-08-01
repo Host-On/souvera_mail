@@ -245,7 +245,7 @@
 									<div class="attachmentIcon" data-bind="css: { hasPreview: hasPreview(), hasPreplay: hasPreplay(), isImage: isImage() }, attr: { style: thumbnailStyle() }">
 										<i class="hidePreview iconMain" data-bind="css: iconClass()"></i>
 										<div class="showPreview">
-											<a data-bind="css: {attachmentImagePreview: isImage()}, attr: { title: fileName, href: linkPreviewMain() }" target="_blank">
+											<a data-bind="css: {attachmentImagePreview: isImage()}, attr: { title: fileName, href: linkPreviewMain() }, click: $parent.openAttachmentPreview" target="_blank">
 												<i class="iconMain" data-bind="visible: !hasThumbnail(), css: iconClass()"></i>
 												<div class="iconPreview fontastic">👁</div>
 											</a>
@@ -263,7 +263,7 @@
 							<!-- ko if: simpleAttachmentsList -->
 							<ul class="attachmentListSimple" data-bind="foreach: listAttachments">
 								<li class="attachmentItem" data-bind="attr: { title: fileName }, css: {checked: checked}">
-									<span class="attachmentName" data-bind="text: fileName"></span>
+									<span class="attachmentName x2m-nc-attachment-name" data-bind="text: fileName, click: $parent.openAttachmentPreview"></span>
 									<i class="checkboxAttachment fontastic"
 										data-bind="visible: download, text: checked() ? '☑' : '☐', click: toggleChecked"></i>
 								</li>

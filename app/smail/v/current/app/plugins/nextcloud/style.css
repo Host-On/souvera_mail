@@ -132,3 +132,39 @@
 	font-size: 13px;
 	color: var(--nc-color-element-success, #099f05);
 }
+
+/* Attachment preview modal (v0.22.5) */
+.x2m-nc-attachment-preview {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 50vh;
+	max-height: 70vh;
+	overflow: auto;
+	background: #333;
+}
+.x2m-nc-attachment-preview img {
+	max-width: 100%;
+	max-height: 70vh;
+	object-fit: contain;
+}
+.x2m-nc-attachment-preview iframe {
+	width: 100%;
+	height: 70vh;
+	border: 0;
+	background: #fff;
+}
+.x2m-nc-attachment-nopreview {
+	padding: 24px;
+	color: var(--nc-color-main-text, #222);
+}
+.x2m-nc-attachment-download {
+	margin-left: 12px;
+	text-decoration: none;
+}
+.x2m-nc-attachment-name {
+	cursor: pointer;
+}
+.x2m-nc-attachment-name:hover {
+	text-decoration: underline;
+}

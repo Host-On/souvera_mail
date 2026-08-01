@@ -48,7 +48,9 @@
 		"EVENT_CARD_ORGANIZER": "Organizer",
 		"EVENT_CARD_WHEN": "When",
 		"EVENT_CARD_WHERE": "Where",
-		"EVENT_CARD_ATTENDEES": "Attendees"
+		"EVENT_CARD_ATTENDEES": "Attendees",
+		"ATTACHMENT_DOWNLOAD": "Download",
+		"ATTACHMENT_NO_PREVIEW": "No preview available — please download the file."
 	},
 	"MENU": {
 		"IMPORT_OLD_MAIL": "Import old mail",

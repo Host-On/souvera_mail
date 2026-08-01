@@ -24,6 +24,34 @@
 		return cn ? cn[1] + (mailto ? ' <' + mailto[1] + '>' : '') : (mailto ? mailto[1] : raw);
 	};
 
+	// v0.22.5: attachment preview modal (PDF / images / others) with a
+	// download button in the title bar. Preview uses the inline Raw/View
+	// URL; the title-bar button uses the Raw/Download URL.
+	class AttachmentPreviewPopupView extends rl.pluginPopupView {
+		constructor() {
+			super('AttachmentPreview');
+			this.attachmentName = '';
+			this.previewUrl = '';
+			this.downloadUrl = '';
+			this.isImage = false;
+			this.isPdf = false;
+		}
+
+		beforeShow(fResolve, attachment) {
+			this.fResolve = fResolve;
+			this.attachment = attachment || null;
+			this.attachmentName = attachment?.fileName || '';
+			this.previewUrl = attachment?.linkPreview() || '';
+			this.downloadUrl = attachment?.linkDownload() || '';
+			this.isImage = !!attachment?.isImage();
+			this.isPdf = !!attachment?.pdfPreview?.();
+		}
+
+		onHide() {
+			this.fResolve?.(this.attachment);
+		}
+	}
+
 	addEventListener('x2m-view-model.create', e => {
 		if (templateId === e.detail.viewModelTemplateID) {
 
@@ -127,6 +155,15 @@
 			}
 
 			let view = e.detail;
+
+			// v0.22.5: attachment preview modal — wired via
+			// `click: $parent.openAttachmentPreview` on the attachment
+			// preview link in MailMessageView.html.
+			view.openAttachmentPreview = (item, event) => {
+				event?.preventDefault?.();
+				item && AttachmentPreviewPopupView.showModal([() => {}, item]);
+			};
+
 			view.saveNextcloudError = ko.observable(false).extend({ falseTimeout: 7000 });
 			view.saveNextcloudLoading = ko.observable(false);
 			view.saveNextcloud = () => {

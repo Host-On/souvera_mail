@@ -61,6 +61,7 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 
 			$this->addTemplate('templates/PopupsNextcloudFiles.html');
 			$this->addTemplate('templates/PopupsNextcloudCalendars.html');
+			$this->addTemplate('templates/PopupsAttachmentPreview.html');
 			$this->addTemplate('templates/SettingsSouveraAccount.html');
 
 			$this->addHook('imap.before-login', 'beforeLogin');

@@ -48,7 +48,9 @@
 		"EVENT_CARD_ORGANIZER": "Organisator",
 		"EVENT_CARD_WHEN": "Wann",
 		"EVENT_CARD_WHERE": "Ort",
-		"EVENT_CARD_ATTENDEES": "Teilnehmer"
+		"EVENT_CARD_ATTENDEES": "Teilnehmer",
+		"ATTACHMENT_DOWNLOAD": "Herunterladen",
+		"ATTACHMENT_NO_PREVIEW": "Keine Vorschau verfügbar — bitte laden Sie die Datei herunter."
 	},
 	"MENU": {
 		"IMPORT_OLD_MAIL": "Alte Mails importieren",
