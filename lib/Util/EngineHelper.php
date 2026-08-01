@@ -103,6 +103,16 @@ class EngineHelper
             $oConfig = \Smail\Engine\Api::Config();
             $oConfig->Set('webmail', 'allow_additional_accounts', $externalCfg->isEnabled());
 
+            // v0.22.20: operator-controllable mail check interval floor.
+            // The engine clamps the per-user "CheckMailInterval" setting to
+            // webmail.min_refresh_interval (default 5 minutes) on every
+            // read; operators who want faster polling set:
+            //   occ config:app:set souvera_mail min_refresh_interval --value 1
+            // The value is synced into the engine's runtime config on every
+            // boot, so the change takes effect on the next request.
+            $minRefresh = (int) $this->config->getAppValue('souvera_mail', 'min_refresh_interval', '5');
+            $oConfig->Set('webmail', 'min_refresh_interval', $minRefresh > 0 ? $minRefresh : 5);
+
             // v0.22.5: full-text search is the engine default (see
             // Imap\Settings fast_simple_search=false). The instance config
             // key is intentionally left untouched here — it no longer gates
