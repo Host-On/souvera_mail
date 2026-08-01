@@ -36,11 +36,12 @@ class SelfUpdate extends Command {
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int {
-        $config = \OCP\Server::get(\OCP\IConfig::class);
         $ok = true;
         foreach (['souvera_mail', 'souvera_central', 'souvera_shield'] as $appId) {
             try {
                 $this->appId = $appId;
+                $output->writeln('checking ' . $appId . ' …');
+                $config = \OCP\Server::get(\OCP\IConfig::class);
                 // Explicit manual run: always check, ignore the 3h throttle.
                 $config->setAppValue($appId, 'devops.last_check', '0');
                 $result = $this->checkAndUpdate();

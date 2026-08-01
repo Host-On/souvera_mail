@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraCentral\DevOps;
+namespace OCA\SouveraMail\DevOps;
 
 /**
  * Self-update via GitHub Releases API (ZIP download).
@@ -11,6 +11,10 @@ namespace OCA\SouveraCentral\DevOps;
  * Reads token from config.php: 'souvera.devops_token'
  * Runs as a Nextcloud background job every 5 minutes
  * (see SelfUpdateJob — one instance per managed app).
+ *
+ * v0.22.13: HTTP via Nextcloud's IClientService (Guzzle) with a real
+ * connect_timeout; exec() is guarded so a disabled exec cannot silently
+ * fail an update; failure responses are reported instead of swallowed.
  */
 trait SelfUpdateTrait
 {
@@ -154,18 +158,29 @@ trait SelfUpdateTrait
             return ['error' => 'No devops token configured'];
         }
 
-        $zipContent = @file_get_contents($url, false, stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'header' => "User-Agent: Souvera-DevOps\r\nAuthorization: Bearer $token\r\n",
+        $client = \OCP\Server::get(\OCP\Http\Client\IClientService::class)->newClient();
+        try {
+            $response = $client->get($url, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'User-Agent' => 'Souvera-DevOps',
+                    'Accept' => 'application/vnd.github+json',
+                ],
                 'timeout' => 60,
-                'follow_location' => 1,
-            ],
-        ]));
-
-        if ($zipContent === false) {
-            return ['error' => 'Download failed'];
+                'connect_timeout' => 15,
+                'http_errors' => false,
+            ]);
+        } catch (\Throwable $e) {
+            return ['error' => 'Download failed: ' . $e->getMessage()];
         }
+        if ($response->getStatusCode() >= 400) {
+            return [
+                'error' => 'Download returned HTTP ' . $response->getStatusCode(),
+                'hint' => \mb_substr((string) $response->getBody(), 0, 300),
+            ];
+        }
+
+        $zipContent = (string) $response->getBody();
         // GitHub zipball responses are ZIP archives (magic bytes "PK");
         // anything else is an API error body (auth/rate-limit/not-found).
         if (strlen($zipContent) < 100 || !str_starts_with($zipContent, 'PK')) {
@@ -232,6 +247,9 @@ trait SelfUpdateTrait
 
     private function enableApp(string $appId): array
     {
+        if (!\function_exists('exec')) {
+            return ['error' => 'exec() is disabled — cannot run occ app:enable'];
+        }
         $occOut = [];
         $occExit = 0;
         $occPath = \OC::$SERVERROOT . '/occ';
@@ -301,17 +319,25 @@ trait SelfUpdateTrait
         if ($token === '') {
             return null;
         }
-        $json = @file_get_contents($url, false, stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'header' => "User-Agent: Souvera-DevOps\r\nAuthorization: Bearer $token\r\nAccept: application/vnd.github+json\r\n",
+        $client = \OCP\Server::get(\OCP\Http\Client\IClientService::class)->newClient();
+        try {
+            $response = $client->get($url, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'User-Agent' => 'Souvera-DevOps',
+                    'Accept' => 'application/vnd.github+json',
+                ],
                 'timeout' => 15,
-            ],
-        ]));
-        if ($json === false) {
+                'connect_timeout' => 10,
+                'http_errors' => false,
+            ]);
+        } catch (\Throwable) {
             return null;
         }
-        $data = json_decode($json, true);
+        if ($response->getStatusCode() >= 400) {
+            return null;
+        }
+        $data = json_decode((string) $response->getBody(), true);
         return is_array($data) ? $data : null;
     }
 
