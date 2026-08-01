@@ -674,6 +674,7 @@ public function NextcloudSaveMsg() : array
 				'SmailHelpSieveHost' => '', 'SmailHelpSievePort' => '', 'SmailHelpSieveSsl' => '',
 				'SmailHelpCalDavUrl' => '', 'SmailHelpCardDavUrl' => '',
 				'SmailHelpShieldUrl' => '',
+				'SmailHelpAppVersion' => '',
 				'SmailHelpExtMaxPerUser' => 3,
 			];
 		}
@@ -843,6 +844,9 @@ public function NextcloudSaveMsg() : array
 			'SmailHelpCalDavUrl' => $calDavUrl,
 			'SmailHelpCardDavUrl' => $cardDavUrl,
 			'SmailHelpShieldUrl' => $shieldUrl,
+			// v0.22.7 — installed app version for the F1 help modal, so
+			// support can immediately tell which build a server runs.
+			'SmailHelpAppVersion' => \defined('APP_VERSION') ? APP_VERSION : 'unknown',
 			// v0.15.0 — surface the max-per-user cap for the F1
 			// help modal's External-mailboxes tab.
 			'SmailHelpExtMaxPerUser' => $this->safeExtMaxPerUser(),

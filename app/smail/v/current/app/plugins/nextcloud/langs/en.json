@@ -92,6 +92,8 @@
 		"TAB_CALDAV": "Calendar & Contacts",
 		"TAB_SHIELDAPPS": "Shield & Apps",
 		"TAB_SHORTCUTS": "Keyboard shortcuts",
+		"SECTION_VERSION": "Souvera Mail version",
+		"VERSION_LABEL": "Installed version",
 		"LEAD_MAILCLIENT": "Souvera Mail talks to every common mail app — Thunderbird, Apple Mail, Outlook, K-9 Mail, FairEmail and others. Enter the server details below there.",
 		"CALLOUT_TITLE": "Important: you need an <em>app password</em>, not your login password",
 		"CALLOUT_INTRO": "External programs <strong>cannot</strong> sign in with your normal Souvera login password — they need their own app password per device.",
