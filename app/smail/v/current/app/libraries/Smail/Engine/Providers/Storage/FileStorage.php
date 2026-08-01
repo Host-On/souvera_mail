@@ -25,7 +25,15 @@ class FileStorage implements \Smail\Engine\Providers\Storage\IStorage
 	{
 		$sFileName = $this->generateFileName($mAccount, $iStorageType, $sKey, true);
 		try {
-			$sFileName && \Smail\Engine\Utils::saveFile($sFileName, $sValue);
+			// Souvera Mail patch (v0.22.7): an empty filename used to be
+			// treated as success (`$sFileName && saveFile(...)` + return
+			// true) — settings silently vanished after a reload. Log and
+			// report the failure instead.
+			if (!$sFileName) {
+				\Smail\Engine\Log::warning('FileStorage', 'Put() got an empty filename for key "' . $sKey . '" — not persisted');
+				return false;
+			}
+			\Smail\Engine\Utils::saveFile($sFileName, $sValue);
 			return true;
 		} catch (\Throwable $e) {
 			\Smail\Engine\Log::warning('FileStorage', $e->getMessage());

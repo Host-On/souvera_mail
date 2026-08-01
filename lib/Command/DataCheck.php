@@ -59,23 +59,28 @@ class DataCheck extends Command {
 
         // Mirror the engine's FileStorage layout exactly:
         // <dataPath>/_data_/_default_/storage/<domain>/<localpart>/.config/<uid>/settings[|_local].json
+        // The .config/<uid> part is added by the NextcloudStorage plugin
+        // override; WITHOUT the plugin (or when the plugin's isLoggedIn()
+        // check fails) the engine writes directly into
+        // <dataPath>/_data_/_default_/storage/<domain>/<localpart>/.
         $email = (string) ($user->getEMailAddress() ?: $uid);
         $parts = \explode('@', $email);
         $domain = \trim(1 < \count($parts) ? \array_pop($parts) : '');
         $localpart = \implode('@', $parts) ?: '.unknown';
-        $settingsBase = $dataPath . '/_data_/_default_/storage/'
+        $storageBase = $dataPath . '/_data_/_default_/storage/'
             . ($domain !== '' ? $domain : 'unknown.tld')
-            . '/' . $localpart
-            . '/.config/' . $uid;
-        $settingsFile = $settingsBase . '/settings.json';
-        $settingsLocalFile = $settingsBase . '/settings_local.json';
+            . '/' . $localpart;
+        $settingsBase = $storageBase . '/.config/' . $uid;
 
         $output->writeln('resolved email  : ' . $email);
-        $output->writeln('settings dir     : ' . $settingsBase);
+        $output->writeln('plugin path      : ' . $settingsBase);
         $output->writeln('  exists         : ' . (\is_dir($settingsBase) ? 'yes' : 'NO'));
         $output->writeln('  writable       : ' . (\is_dir($settingsBase) && \is_writable($settingsBase) ? 'yes' : 'NO'));
+        $output->writeln('fallback path    : ' . $storageBase . '  (without .config/<uid>)');
+        $output->writeln('  exists         : ' . (\is_dir($storageBase) ? 'yes' : 'NO'));
 
-        foreach (['settings.json' => $settingsFile, 'settings_local.json' => $settingsLocalFile] as $label => $file) {
+        foreach (['settings.json' => $settingsBase . '/settings.json', 'settings_local.json' => $settingsBase . '/settings_local.json',
+                  'settings.json (fallback)' => $storageBase . '/settings.json', 'settings_local.json (fallback)' => $storageBase . '/settings_local.json'] as $label => $file) {
             if (\is_file($file)) {
                 $size = \filesize($file);
                 $mtime = \date('Y-m-d H:i:s', (int) \filemtime($file));
@@ -84,6 +89,23 @@ class DataCheck extends Command {
                 $output->writeln('  ' . $label . ' : NOT FOUND');
             }
         }
+
+        // Ground truth: scan the whole engine data tree for settings files
+        // — this shows where writes ACTUALLY land, whatever the code path.
+        $output->writeln('---');
+        $output->writeln('scan: all settings*.json under ' . $dataPath . ':');
+        $found = 0;
+        $it = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dataPath, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::LEAVES_ONLY
+        );
+        foreach ($it as $fileInfo) {
+            if ($fileInfo->isFile() && \preg_match('/^settings.*\.json$/', $fileInfo->getFilename())) {
+                $found++;
+                $output->writeln('  ' . $fileInfo->getPathname() . ' (' . $fileInfo->getSize() . ' bytes, modified ' . \date('Y-m-d H:i:s', $fileInfo->getMTime()) . ')');
+            }
+        }
+        $output->writeln('  (' . $found . ' settings file(s) found)');
 
         return Command::SUCCESS;
     }
