@@ -223,12 +223,18 @@ trait SelfUpdateTrait
             $this->rmdirRecursive($extractDir);
             return ['error' => 'Cannot move current app to backup'];
         }
-        if (!rename($sourceDir, $appPath)) {
+        // EXDEV-safe install: the extract dir lives on the local filesystem
+        // (/tmp), the app dir on NFS — rename() across mounts fails with
+        // "Invalid cross-device link". Copy file-by-file instead.
+        try {
+            $this->copyRecursive($sourceDir, $appPath);
+        } catch (\Throwable $e) {
             // Restore backup.
             rename($backupDir, $appPath);
             $this->rmdirRecursive($extractDir);
-            return ['error' => 'Cannot move extracted app into place'];
+            return ['error' => 'Cannot copy extracted app into place: ' . $e->getMessage()];
         }
+        $this->rmdirRecursive($sourceDir);
 
         $enableResult = $this->enableApp($appId);
         if (!empty($enableResult['error'])) {
@@ -343,7 +349,10 @@ trait SelfUpdateTrait
 
     private function copyRecursive(string $src, string $dst): void
     {
-        $dir = opendir($src);
+        $dir = @opendir($src);
+        if ($dir === false) {
+            throw new \RuntimeException("Cannot open source directory $src");
+        }
         @mkdir($dst, 0755, true);
         while (($file = readdir($dir)) !== false) {
             if ($file === '.' || $file === '..') {
