@@ -6,6 +6,147 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.22.20] — 2026-08-01 (Konfigurierbares Prüfintervall-Minimum)
+
+Das Prüfintervall für neue Nachrichten kann der Betreiber jetzt pro Instanz
+lockern: `occ config:app:set souvera_mail min_refresh_interval --value 1`.
+Der Wert wird bei jedem Boot in die Engine-Config (`webmail.min_refresh_interval`)
+synchronisiert; Default bleibt 5 Minuten (Server-Schutz gegen Polling-Last).
+
+## [0.22.19] — 2026-08-01 (Persistenz-Diagnose: simulate-save)
+
+`occ souvera_mail:data:check <uid> --simulate-save` fährt die echte
+Engine-Instanz hoch und testet einen realen StorageProvider-Put/Get-
+Roundtrip inkl. Live-CONFIG-Pfadausgabe — zeigt sofort, wo Settings
+wirklich landen (oder warum nicht).
+
+## [0.22.18] — 2026-08-01 (Persistenz-Diagnose v2)
+
+`occ souvera_mail:data:check` bootet die Engine wie ein Web-Request,
+prüft Plugin- und Fallback-Pfade mit echten Probe-Writes, zeigt
+Dateisystem-/Owner-Infos und scannt ALLE Kandidaten-Roots (inkl. des
+In-App-Engine-Default-`data/`, das bei git-clone-Deploys verschwindet).
+`FileStorage::Put` loggt bei Fehlern künftig den vollständigen Zielpfad.
+
+## [0.22.17] — 2026-08-01 (Wartungsfenster-Länge 1h)
+
+Das stable-Kanal-Wartungsfenster ist exakt 1 Stunde lang
+(`maintenance_window_start` bis +1h, Mitternachts-Wrap-sicher) — bewusste
+Abweichung von Nextcloud-Core (+4h), per Operator-Vorgabe.
+
+## [0.22.16] — 2026-08-01 (Stable-Kanal: 24h im Wartungsfenster)
+
+Stable-Release-Updates laufen höchstens einmal pro 24h und nur innerhalb
+des Nextcloud-Wartungsfensters (`maintenance_window_start` aus config.php);
+der Dev-Kanal bleibt unverändert bei 5 Minuten (Branch-HEAD).
+
+## [0.22.14] — 2026-08-01 (EXDEV-sicheres Update-Install)
+
+Das Selbst-Update installierte neue Versionen per `rename()` vom Temp-
+Verzeichnis (/tmp) auf das NFS-Ziel (`custom_apps`) — `rename()` über
+Dateisystem-Grenzen schlägt mit EXDEV fehl ("Cannot move extracted app
+into place"). Jetzt: rekursive Datei-Kopie (`copyRecursive`) mit Rollback
+und `opendir`-Guard — funktioniert über Mount-Grenzen hinweg.
+
+## [0.22.13] — 2026-08-01 (SelfUpdate-Namespace-Fix)
+
+`SelfUpdateTrait` lag unter `OCA\SouveraCentral\DevOps` statt
+`OCA\SouveraMail\DevOps` — der SelfUpdate-Befehl/Job/Repair-Step lief nie
+("Trait not found", keine Ausgabe). Plus: HTTP über `IClientService`
+(Guzzle) mit echten Timeouts, `exec()`-Guard und frühe Fortschrittsausgabe.
+
+## [0.22.12] — 2026-08-01 (expliziter Self-Update-Befehl)
+
+`occ souvera_mail:self-update` aktualisiert alle verwalteten Apps direkt
+von GitHub — `occ app:update` bewirkt bei Custom-Apps nichts ("is
+up-to-date or no updates could be found").
+
+## [0.22.10] — 2026-08-01 (Update über occ app:update)
+
+`occ app:update souvera_mail` löst über einen Pre-Update-Repair-Step das
+GitHub-Self-Update für alle verwalteten Apps aus.
+
+## [0.22.9] — 2026-08-01 (App-Version im Boot-Response)
+
+App-Version als Fallback im Engine-Boot-Response für das F1-Hilfe-Modal
+(falls das Plugin-Payload veraltet ist).
+
+## [0.22.8] — 2026-08-01 (Settings-Diagnose)
+
+`FileStorage::Put` meldet leere Dateinamen als Fehler statt stillschweigend
+zu "gelingen" (Settings gingen bei Reload verloren); `occ
+souvera_mail:data:check` scannt die realen Settings-Ablageorte inkl.
+Fallback-Pfad.
+
+## [0.22.7] — 2026-08-01 (Version im F1-Hilfe-Modal)
+
+Zeigt die installierte App-Version im F1-Hilfe-Modal an, damit Support
+sofort den Build des Servers erkennt.
+
+## [0.22.5] — 2026-08-01 (Kalender-Einladungen + Einstellungs-Diagnose)
+
+Calendar-Invitation-Card (Plugin/Calendar wurde nie aktiviert) mit
+Annehmen/Unter Vorbehalt/Ablehnen; Einstellungs-Speicher-Diagnose,
+SORT+SEARCH-Kombination, Volltextsuche als Default, Limit-Clamping-Fix.
+
+## [0.22.4] — 2026-07-29 (Composer-Eingabe-Fix)
+
+`beforeinput`-Listener sauber entfernen/neu registrieren, native
+Enter/Br-Absatzabstände (8px).
+
+## [0.22.3] — 2026-07-29 (Squire-Toolbar-Design)
+
+Moderne Squire-Toolbar (Buttons, Gruppen, Hover, Active), CSS auf
+`.squire-toolbar` gescoped, Absatzabstände für div-Blöcke.
+
+## [0.22.2] — 2026-07-29 (Enter nativ im Editor)
+
+Browser übernimmt Enter nativ im Squire-Editor — verhindert
+Cursor-Sprünge.
+
+## [0.22.1] — 2026-07-29 (Squire-Absatz-Fix)
+
+`createDefaultBlock`-Patch verhindert Cursor-Sprung auf Enter.
+
+## [0.22.0] — 2026-07-29 (UID-gescoptes Settings-Storage)
+
+Zeilenabstand 1.5 im Composer; Einstellungs-Speicherung UID-gescoped.
+
+## [0.21.2] — 2026-07-29 (NC-Kompatibilität)
+
+`deleteAppValue` durch `setValueString` ersetzt (ältere Nextcloud-
+Versionen).
+
+## [0.21.1] — 2026-07-28 (SelfUpdate-Härtung)
+
+SHA-Check, atomarer Swap, Exit-Code-Auswertung, Locks, Logging,
+`is_writable`-Guard; Vacation-Formular in den Settings.
+
+## [0.21.0] — 2026-07-28 (Abwesenheitsnotiz)
+
+Standalone-Out-of-Office-Formular (ohne Webmail-Konto nötig).
+
+## [0.20.4] — 2026-07-28 (Deprecations entfernt)
+
+Veraltete `OC_App`-Aufrufe + falscher OCC-Pfad im SelfUpdate ersetzt.
+
+## [0.20.3] — 2026-07-28 (accountId-Cache-Fix)
+
+Null-accountId-Cache mit kurzem TTL — heilt Provisioning-Races selbst.
+
+## [0.20.2] — 2026-07-28 (FCM-Batch zurückgerollt)
+
+FCM-Batch-Send wird von der v1-API nicht unterstützt — zurück auf
+Einzelsendung; accountId-Cache bleibt.
+
+## [0.20.1] — 2026-07-28 (FCM-Performance)
+
+FCM-Batch-Send + accountId-Cache.
+
+## [0.20.0] — 2026-07-26 (Selbst-Update via GitHub ZIP)
+
+Erstes automatisches Selbst-Update über GitHub-ZIP-Download.
+
 ## [0.19.2] — 2026-07-22 (Fix: FCM data-only Push)
 
 FCM-Nachrichten werden jetzt als reine Data-Messages gesendet (kein
