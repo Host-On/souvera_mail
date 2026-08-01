@@ -103,14 +103,11 @@ class EngineHelper
             $oConfig = \Smail\Engine\Api::Config();
             $oConfig->Set('webmail', 'allow_additional_accounts', $externalCfg->isEnabled());
 
-            // v0.22.5: full-text search by default. The engine's
-            // fast_simple_search limits the plain search box to
-            // FROM/TO/CC/SUBJECT headers; TEXT criteria hit Stalwart's FTS
-            // (indexed, fast even on 1M-message mailboxes) and match bodies.
-            // Operators can re-enable the header-only mode via the engine
-            // config (imap.message_list_fast_simple_search) — the per-user
-            // checkbox is AND-combined with this instance value.
-            $oConfig->Set('imap', 'message_list_fast_simple_search', false);
+            // v0.22.5: full-text search is the engine default (see
+            // Imap\Settings fast_simple_search=false). The instance config
+            // key is intentionally left untouched here — it no longer gates
+            // the per-user checkbox (Account.php patch), so users can opt
+            // back into header-only fast search themselves.
         } catch (\Throwable $e) {
             $this->logger->debug(
                 'Souvera Mail: external-accounts flag sync skipped: ' . $e->getMessage(),

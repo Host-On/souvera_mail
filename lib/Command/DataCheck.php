@@ -51,16 +51,26 @@ class DataCheck extends Command {
             $output->writeln('(pass a uid to inspect the per-user settings file)');
             return Command::SUCCESS;
         }
-        if (!$this->userManager->userExists($uid)) {
+        $user = $this->userManager->get($uid);
+        if ($user === null) {
             $output->writeln('<error>User "' . $uid . '" does not exist</error>');
             return Command::FAILURE;
         }
 
-        $email = $uid;
-        $settingsBase = $dataPath . '/_data_/_default_/storage/' . $email . '/config/.config/' . $uid;
+        // Mirror the engine's FileStorage layout exactly:
+        // <dataPath>/_data_/_default_/storage/<domain>/<localpart>/.config/<uid>/settings[|_local].json
+        $email = (string) ($user->getEMailAddress() ?: $uid);
+        $parts = \explode('@', $email);
+        $domain = \trim(1 < \count($parts) ? \array_pop($parts) : '');
+        $localpart = \implode('@', $parts) ?: '.unknown';
+        $settingsBase = $dataPath . '/_data_/_default_/storage/'
+            . ($domain !== '' ? $domain : 'unknown.tld')
+            . '/' . $localpart
+            . '/.config/' . $uid;
         $settingsFile = $settingsBase . '/settings.json';
         $settingsLocalFile = $settingsBase . '/settings_local.json';
 
+        $output->writeln('resolved email  : ' . $email);
         $output->writeln('settings dir     : ' . $settingsBase);
         $output->writeln('  exists         : ' . (\is_dir($settingsBase) ? 'yes' : 'NO'));
         $output->writeln('  writable       : ' . (\is_dir($settingsBase) && \is_writable($settingsBase) ? 'yes' : 'NO'));
@@ -70,7 +80,6 @@ class DataCheck extends Command {
                 $size = \filesize($file);
                 $mtime = \date('Y-m-d H:i:s', (int) \filemtime($file));
                 $output->writeln('  ' . $label . ' : exists (' . $size . ' bytes, modified ' . $mtime . ')');
-                $output->writeln('  ' . $label . ' : ' . \mb_substr((string) \file_get_contents($file), 0, 300));
             } else {
                 $output->writeln('  ' . $label . ' : NOT FOUND');
             }

@@ -11,16 +11,33 @@ class NextcloudStorage extends \Smail\Engine\Providers\Storage\FileStorage
 	{
 		$sDataPath = parent::GenerateFilePath($mAccount, $iStorageType, $bMkDir);
 		if (StorageType::CONFIG === $iStorageType) {
-			// Per-user subfolder. Guard against session-less contexts
-			// (cron, dashboard widgets, push, search provider): without
-			// a logged-in user the previous code threw a fatal on
-			// `->getUser()->getUID()` and silently dropped the write —
-			// the UI showed "saved" but nothing was persisted.
+			// Per-user subfolder. Session-less contexts (cron, background
+			// jobs) have no logged-in user — resolve the uid from the
+			// account when possible so background processes read/write the
+			// SAME settings the UI uses (never a shared "system" folder).
 			$sUID = 'system';
 			try {
 				$oUser = \OC::$server->getUserSession()->getUser();
 				if (null !== $oUser) {
 					$sUID = $oUser->getUID();
+				} else {
+					$sCandidate = ($mAccount instanceof \Smail\Engine\Model\Account) ? $mAccount->ImapUser() : (string)$mAccount;
+					if ('' !== $sCandidate) {
+						$oUserManager = \OC::$server->getUserManager();
+						if ($oUserManager->userExists($sCandidate)) {
+							$sUID = $sCandidate;
+						} else {
+							$aParts = \explode('@', $sCandidate);
+							if (1 < \count($aParts) && $oUserManager->userExists($aParts[0])) {
+								$sUID = $aParts[0];
+							} else {
+								$aUsers = $oUserManager->getByEmail($sCandidate);
+								if ([] !== $aUsers) {
+									$sUID = \array_key_first($aUsers);
+								}
+							}
+						}
+					}
 				}
 			} catch (\Throwable) {
 			}

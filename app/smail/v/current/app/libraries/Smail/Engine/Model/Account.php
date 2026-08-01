@@ -285,7 +285,13 @@ abstract class Account implements \JsonSerializable
 		$oSettings->username = $this->ImapUser();
 
 		$oSettings->expunge_all_on_delete = $oSettings->expunge_all_on_delete || !!$oConfig->Get('imap', 'use_expunge_all_on_delete', false);
-		$oSettings->fast_simple_search = !(!$oSettings->fast_simple_search || !$oConfig->Get('imap', 'message_list_fast_simple_search', true));
+		// Souvera Mail patch (v0.22.5): the user setting decides alone.
+		// Previously this AND-combined the user checkbox with the instance
+		// config — as soon as an operator (or this repo's default) set the
+		// config value to false, the checkbox in the UI had no effect at
+		// all. Default is full-text search (false); users may opt into
+		// header-only fast search in their settings.
+		$oSettings->fast_simple_search = (bool) $oSettings->fast_simple_search;
 		$oSettings->fetch_new_messages = !(!$oSettings->fetch_new_messages || !$oConfig->Get('imap', 'fetch_new_messages', true));
 		$oSettings->force_select = $oSettings->force_select || !!$oConfig->Get('imap', 'use_force_selection', false);
 		$oSettings->message_all_headers = $oSettings->message_all_headers || !!$oConfig->Get('imap', 'message_all_headers', false);
