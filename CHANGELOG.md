@@ -6,6 +6,16 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
+## [0.22.22] — 2026-08-01 (Changelog-Vervollständigung)
+
+Vollständige Release-Historie (0.20.0–0.22.20) als kanonische
+Changelog-Quelle für den öffentlichen Changelog-Viewer in Souvera Central
+(`GET /api/v1/changelogs/souvera_mail`).
+
+## [0.22.21] — 2026-08-01 (Changelog-Quelle)
+
+CHANGELOG.md um alle Releases 0.20.0–0.22.20 ergänzt.
+
 ## [0.22.20] — 2026-08-01 (Konfigurierbares Prüfintervall-Minimum)
 
 Das Prüfintervall für neue Nachrichten kann der Betreiber jetzt pro Instanz
