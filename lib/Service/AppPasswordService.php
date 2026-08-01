@@ -599,14 +599,18 @@ class AppPasswordService
                     'accountId' => $accountId,
                     'create' => [
                         $creationId => [
-                             'description' => $description,
-                             // Stalwart v1.0.x AppPassword permissions:
-                             // @type at same level as the actual perm keys.
-                              'permissions' => ['@type' => 'Replace'] + \array_fill_keys(
-                                    self::APP_PASSWORD_PERMISSIONS,
-                                    true,
-                                ),
-                             'allowedIps' => (object) [],
+                            'description' => $description,
+                            'allowedIps' => (object) [],
+                        ],
+                    ],
+                    // Stalwart v0.16.15+: permissions cannot be set in
+                    // create. Set them via update with back-reference.
+                    'update' => [
+                        "#$creationId" => [
+                            'permissions' => ['@type' => 'Replace'] + \array_fill_keys(
+                                self::APP_PASSWORD_PERMISSIONS,
+                                true,
+                            ),
                         ],
                     ],
                 ],
@@ -628,6 +632,16 @@ class AppPasswordService
             throw new \RuntimeException(
                 'Stalwart did not return the new AppPassword id/secret. Raw response: '
                 . \json_encode($setResp, JSON_UNESCAPED_SLASHES)
+            );
+        }
+
+        // Permissions update failure: log but don't throw — the credential
+        // was created with default permissions (which still include IMAP/POP3/
+        // SMTP because the account's role inherits them).
+        if (isset($setResp['notUpdated']["#$creationId"])) {
+            $err = $setResp['notUpdated']["#$creationId"];
+            \OCP\Server::get(\Psr\Log\LoggerInterface::class)->warning(
+                'souvera_mail: AppPassword permissions update failed: ' . \json_encode($err)
             );
         }
 
