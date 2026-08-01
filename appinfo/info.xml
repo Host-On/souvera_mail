@@ -3,7 +3,7 @@
 	<id>souvera_mail</id>
 	<name>Souvera Mail</name>
 	<summary>Nextcloud-native webmail with Nextcloud as the OIDC Provider — CLI-configurable for automated deploys</summary>
-	<version>0.22.9</version>
+	<version>0.22.10</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author homepage="https://github.com/PhiGi87/souvera_mail">Souvera</author>
 	<website>https://github.com/PhiGi87/souvera_mail</website>
@@ -65,6 +65,12 @@ All write commands accept `--json` and `--dry-run`.
 		<admin-section>OCA\SouveraMail\Settings\AdminSection</admin-section>
 	</settings>
 	<repair-steps>
+		<pre-update>
+			<!-- v0.22.10: `occ app:update souvera_mail` pulls the newest
+			     GitHub releases for all managed apps BEFORE the migration
+			     machinery runs — no manual git pull needed. -->
+			<step>OCA\SouveraMail\Repair\SelfUpdateNowStep</step>
+		</pre-update>
 		<install>
 			<step>OCA\SouveraMail\Migration\InstallStep</step>
 			<step>OCA\SouveraMail\Migration\EnforceGroupRestriction</step>

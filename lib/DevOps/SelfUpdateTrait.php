@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\DevOps;
+namespace OCA\SouveraCentral\DevOps;
 
 /**
  * Self-update via GitHub Releases API (ZIP download).
  * No git, no gh CLI, no webhooks required.
  *
  * Reads token from config.php: 'souvera.devops_token'
- * Runs as a Nextcloud background job every 15 minutes.
+ * Runs as a Nextcloud background job every 5 minutes
+ * (see SelfUpdateJob — one instance per managed app).
  */
 trait SelfUpdateTrait
 {
@@ -165,8 +166,13 @@ trait SelfUpdateTrait
         if ($zipContent === false) {
             return ['error' => 'Download failed'];
         }
-        if (strlen($zipContent) < 100) {
-            return ['error' => 'Download returned empty'];
+        // GitHub zipball responses are ZIP archives (magic bytes "PK");
+        // anything else is an API error body (auth/rate-limit/not-found).
+        if (strlen($zipContent) < 100 || !str_starts_with($zipContent, 'PK')) {
+            return [
+                'error' => 'Download returned no ZIP archive',
+                'hint' => \mb_substr($zipContent, 0, 300),
+            ];
         }
 
         $tmpZip = sys_get_temp_dir() . "/{$appId}_update.zip";
@@ -229,8 +235,11 @@ trait SelfUpdateTrait
         $occOut = [];
         $occExit = 0;
         $occPath = \OC::$SERVERROOT . '/occ';
+        // PHP_BINARY instead of "php": cron often runs with a minimal PATH
+        // where the interpreter is not resolvable, failing every update.
         exec(sprintf(
-            'php %s app:enable %s 2>&1',
+            '%s %s app:enable %s 2>&1',
+            escapeshellarg(\PHP_BINARY),
             escapeshellarg($occPath),
             escapeshellarg($appId)
         ), $occOut, $occExit);
