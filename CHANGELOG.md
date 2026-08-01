@@ -6,226 +6,41 @@ Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
 ## [Unreleased]
 
-## [0.22.22] — 2026-08-01 (Changelog-Vervollständigung)
-
-Vollständige Release-Historie (0.20.0–0.22.20) als kanonische
-Changelog-Quelle für den öffentlichen Changelog-Viewer in Souvera Central
-(`GET /api/v1/changelogs/souvera_mail`).
-
-## [0.22.21] — 2026-08-01 (Changelog-Quelle)
-
-CHANGELOG.md um alle Releases 0.20.0–0.22.20 ergänzt.
-
-## [0.22.20] — 2026-08-01 (Konfigurierbares Prüfintervall-Minimum)
-
-Das Prüfintervall für neue Nachrichten kann der Betreiber jetzt pro Instanz
-lockern: `occ config:app:set souvera_mail min_refresh_interval --value 1`.
-Der Wert wird bei jedem Boot in die Engine-Config (`webmail.min_refresh_interval`)
-synchronisiert; Default bleibt 5 Minuten (Server-Schutz gegen Polling-Last).
-
-## [0.22.19] — 2026-08-01 (Persistenz-Diagnose: simulate-save)
-
-`occ souvera_mail:data:check <uid> --simulate-save` fährt die echte
-Engine-Instanz hoch und testet einen realen StorageProvider-Put/Get-
-Roundtrip inkl. Live-CONFIG-Pfadausgabe — zeigt sofort, wo Settings
-wirklich landen (oder warum nicht).
-
-## [0.22.18] — 2026-08-01 (Persistenz-Diagnose v2)
-
-`occ souvera_mail:data:check` bootet die Engine wie ein Web-Request,
-prüft Plugin- und Fallback-Pfade mit echten Probe-Writes, zeigt
-Dateisystem-/Owner-Infos und scannt ALLE Kandidaten-Roots (inkl. des
-In-App-Engine-Default-`data/`, das bei git-clone-Deploys verschwindet).
-`FileStorage::Put` loggt bei Fehlern künftig den vollständigen Zielpfad.
-
-## [0.22.17] — 2026-08-01 (Wartungsfenster-Länge 1h)
-
-Das stable-Kanal-Wartungsfenster ist exakt 1 Stunde lang
-(`maintenance_window_start` bis +1h, Mitternachts-Wrap-sicher) — bewusste
-Abweichung von Nextcloud-Core (+4h), per Operator-Vorgabe.
-
-## [0.22.16] — 2026-08-01 (Stable-Kanal: 24h im Wartungsfenster)
-
-Stable-Release-Updates laufen höchstens einmal pro 24h und nur innerhalb
-des Nextcloud-Wartungsfensters (`maintenance_window_start` aus config.php);
-der Dev-Kanal bleibt unverändert bei 5 Minuten (Branch-HEAD).
-
-## [0.22.14] — 2026-08-01 (EXDEV-sicheres Update-Install)
-
-Das Selbst-Update installierte neue Versionen per `rename()` vom Temp-
-Verzeichnis (/tmp) auf das NFS-Ziel (`custom_apps`) — `rename()` über
-Dateisystem-Grenzen schlägt mit EXDEV fehl ("Cannot move extracted app
-into place"). Jetzt: rekursive Datei-Kopie (`copyRecursive`) mit Rollback
-und `opendir`-Guard — funktioniert über Mount-Grenzen hinweg.
-
-## [0.22.13] — 2026-08-01 (SelfUpdate-Namespace-Fix)
-
-`SelfUpdateTrait` lag unter `OCA\SouveraCentral\DevOps` statt
-`OCA\SouveraMail\DevOps` — der SelfUpdate-Befehl/Job/Repair-Step lief nie
-("Trait not found", keine Ausgabe). Plus: HTTP über `IClientService`
-(Guzzle) mit echten Timeouts, `exec()`-Guard und frühe Fortschrittsausgabe.
-
-## [0.22.12] — 2026-08-01 (expliziter Self-Update-Befehl)
-
-`occ souvera_mail:self-update` aktualisiert alle verwalteten Apps direkt
-von GitHub — `occ app:update` bewirkt bei Custom-Apps nichts ("is
-up-to-date or no updates could be found").
-
-## [0.22.10] — 2026-08-01 (Update über occ app:update)
-
-`occ app:update souvera_mail` löst über einen Pre-Update-Repair-Step das
-GitHub-Self-Update für alle verwalteten Apps aus.
-
-## [0.22.9] — 2026-08-01 (App-Version im Boot-Response)
-
-App-Version als Fallback im Engine-Boot-Response für das F1-Hilfe-Modal
-(falls das Plugin-Payload veraltet ist).
-
-## [0.22.8] — 2026-08-01 (Settings-Diagnose)
-
-`FileStorage::Put` meldet leere Dateinamen als Fehler statt stillschweigend
-zu "gelingen" (Settings gingen bei Reload verloren); `occ
-souvera_mail:data:check` scannt die realen Settings-Ablageorte inkl.
-Fallback-Pfad.
-
-## [0.22.7] — 2026-08-01 (Version im F1-Hilfe-Modal)
-
-Zeigt die installierte App-Version im F1-Hilfe-Modal an, damit Support
-sofort den Build des Servers erkennt.
-
-## [0.22.5] — 2026-08-01 (Kalender-Einladungen + Einstellungs-Diagnose)
-
-Calendar-Invitation-Card (Plugin/Calendar wurde nie aktiviert) mit
-Annehmen/Unter Vorbehalt/Ablehnen; Einstellungs-Speicher-Diagnose,
-SORT+SEARCH-Kombination, Volltextsuche als Default, Limit-Clamping-Fix.
-
-## [0.22.4] — 2026-07-29 (Composer-Eingabe-Fix)
-
-`beforeinput`-Listener sauber entfernen/neu registrieren, native
-Enter/Br-Absatzabstände (8px).
-
-## [0.22.3] — 2026-07-29 (Squire-Toolbar-Design)
-
-Moderne Squire-Toolbar (Buttons, Gruppen, Hover, Active), CSS auf
-`.squire-toolbar` gescoped, Absatzabstände für div-Blöcke.
-
-## [0.22.2] — 2026-07-29 (Enter nativ im Editor)
-
-Browser übernimmt Enter nativ im Squire-Editor — verhindert
-Cursor-Sprünge.
-
-## [0.22.1] — 2026-07-29 (Squire-Absatz-Fix)
-
-`createDefaultBlock`-Patch verhindert Cursor-Sprung auf Enter.
-
-## [0.22.0] — 2026-07-29 (UID-gescoptes Settings-Storage)
-
-Zeilenabstand 1.5 im Composer; Einstellungs-Speicherung UID-gescoped.
-
-## [0.21.2] — 2026-07-29 (NC-Kompatibilität)
-
-`deleteAppValue` durch `setValueString` ersetzt (ältere Nextcloud-
-Versionen).
-
-## [0.21.1] — 2026-07-28 (SelfUpdate-Härtung)
-
-SHA-Check, atomarer Swap, Exit-Code-Auswertung, Locks, Logging,
-`is_writable`-Guard; Vacation-Formular in den Settings.
-
-## [0.21.0] — 2026-07-28 (Abwesenheitsnotiz)
-
-Standalone-Out-of-Office-Formular (ohne Webmail-Konto nötig).
-
-## [0.20.4] — 2026-07-28 (Deprecations entfernt)
-
-Veraltete `OC_App`-Aufrufe + falscher OCC-Pfad im SelfUpdate ersetzt.
-
-## [0.20.3] — 2026-07-28 (accountId-Cache-Fix)
-
-Null-accountId-Cache mit kurzem TTL — heilt Provisioning-Races selbst.
-
-## [0.20.2] — 2026-07-28 (FCM-Batch zurückgerollt)
-
-FCM-Batch-Send wird von der v1-API nicht unterstützt — zurück auf
-Einzelsendung; accountId-Cache bleibt.
-
-## [0.20.1] — 2026-07-28 (FCM-Performance)
-
-FCM-Batch-Send + accountId-Cache.
-
-## [0.20.0] — 2026-07-26 (Selbst-Update via GitHub ZIP)
-
-Erstes automatisches Selbst-Update über GitHub-ZIP-Download.
-
-## [0.19.2] — 2026-07-22 (Fix: FCM data-only Push)
-
-FCM-Nachrichten werden jetzt als reine Data-Messages gesendet (kein
-top-level `notification`-Block) + `ttl: 3600s`. Dadurch läuft der
-`onMessageReceived()`-Handler des Android-Clients im Vorder- UND
-Hintergrund (inkl. Doze), statt dass die System-Leiste automatisch einen
-generischen Titel/Text anzeigt — der Client kann eine datenschutzfreundliche
-eigene Benachrichtigung bauen. (`FcmClient`)
-
-## [0.19.1] — 2026-07-21 (Fix: Stalwart-Webhook-Payload-Format)
-
-Das reale Stalwart-Webhook-Payload (verifiziert anhand des Stalwart-Quellcodes,
-`crates/email/src/message/ingest.rs`) trägt gar keine Empfänger-E-Mail —
-sondern `{"events":[{"type":"message-ingest.ham","data":{"accountId": 123, ...}}]}`
-mit einer numerischen, Stalwart-internen `accountId`. Der bisherige Parser
-(v0.19.0) ging fälschlich von einer flachen Struktur mit E-Mail-Feldern aus
-und hätte daher nie einen echten Push ausgelöst.
-
-- `StalwartWebhookController` liest jetzt das `events`-Array, verarbeitet
-  nur `message-ingest.ham` (ignoriert `message-ingest.spam`/unbekannte
-  Typen) und löst `data.accountId` über einen neuen Admin-JMAP-Aufruf
-  (`Principal/get`, Basic-Auth) zu einer Nextcloud-Benutzer-E-Mail auf.
-  Die alte flache Payload-Annahme bleibt als Fallback erhalten.
-- `StalwartAdminService::encodeJmapId()` / `lookupPrincipalEmailByAccountId()`
-  kodieren die numerische Stalwart-`accountId` in die Base32-JMAP-Id-Form
-  (gleiches Konto wie die String-`accountId` aus `/jmap/session`, nur
-  anders kodiert) und fragen den Principal darüber ab.
-- `MailPushPoller` war von diesem Bug nicht betroffen (löst pro NC-Benutzer
-  über `StalwartUserContext` auf, nicht über das Webhook-Payload).
-
-## [0.19.0] — 2026-07-21 (Feature: FCM Push-Benachrichtigungen für neue Mails)
-
-Event-getriebene Firebase Cloud Messaging (HTTP v1) Push-Benachrichtigungen
-für den nativen Android-Client (`eu.souvera.workspace`, Firebase-Projekt
-`souvera-apps`). Architektur: Stalwart feuert bei neuer Mail einen Webhook
-→ souvera_mail löst die Empfänger-Gerätetokens auf → FCM-Push → Android
-wacht auf. Ein niederfrequenter Poller (alle 15 Minuten) dient als
-Fallback-Sicherheitsnetz, falls ein Webhook verloren geht.
-
-- `POST /apps/souvera_mail/devices` — Android registriert/aktualisiert
-  sein FCM-Token (Basic-Auth mit App-Passwort, wie jeder andere
-  DAV-Endpoint).
-- `POST /apps/souvera_mail/webhooks/stalwart` — Stalwart-Webhook-Empfänger
-  (Shared-Secret-Auth, siehe `StalwartWebhookController` für den exakten
-  Vertrag).
-- `occ souvera_mail:push:test <uid>` — Diagnose-Kommando für einen
-  Ende-zu-Ende-Test-Push.
-- Neue Config-Keys: `souvera_mail.fcm_service_account_json`,
-  `souvera_mail.fcm_project_id` (optional), `souvera_mail.stalwart_webhook_secret`.
-
-### Fix: Kalendereinladungen landen im Nextcloud-Kalender
-
-Der iTIP-Neutralisierungs-Workaround in `calendarPut()` (webdav.js) ersetzte
-nur die nackten Formen `ATTENDEE:`/`ORGANIZER:` und nur das erste Vorkommen.
-Echte Einladungen nutzen parametrisierte, wiederholte Properties
-(`ATTENDEE;CN=…;RSVP=TRUE:…`, mehrere Zeilen), sodass Nextclouds CalDAV-
-Scheduling-Engine den PUT abfing und der Termin nicht als normaler Eintrag
-erschien. Ersetzung jetzt zeilenverankert, global und case-insensitiv.
-
-### Feature: Abwesenheitsnotiz (Out-of-Office)
-
-Einfaches Formular im System-Dropdown („🌴 Abwesenheitsnotiz") — An/Aus,
-Betreff, Nachricht, optional Von/Bis. Kein Umweg über die Filter.
-
-- `GET/POST /apps/souvera_mail/vacation` (`VacationController`).
-- `VacationService` merged einen verwalteten `vacation`-Block in das aktive
-  Sieve-Script (`smail.user`), sodass bestehende Filter erhalten bleiben
-  (Stalwart erlaubt nur ein aktives Script). Optionale Datumsgrenzen via
-  `currentdate` (`date`+`relational`).
+## [0.22.22] — 2026-08-01 (Release-Zusammenfassung: 2026-07-11 bis 2026-08-01)
+
+Alle Änderungen der letzten drei Wochen, gebündelt in der aktuellen Version.
+
+### Neue Funktionen
+- FCM-Push-Benachrichtigungen für neue Mails (data-only Messages, TTL 3600s): Empfänger-Auflösung über Stalwart-Webhook (`message-ingest.ham` → accountId → Nutzer-E-Mail), Webhook-Health-Report, accountId-Cache, `sendEach` mit begrenztem Parallelversand; MailPushPoller von 15 auf 5 Minuten verkürzt.
+- Archiv-Button in SnappyMail ("Archiv") über ArchiveIntegrationListener + archive-integration.js.
+- Anhang-Vorschau als Inline-Popup (PDF/Bilder) mit Download-Button (Raw/View + Raw/Download), eingebunden in beide Anhang-Listen-Varianten; robuste PDF-Erkennung + iframe-Sandbox.
+- Kalender-Einladungskarten (Plugin/Calendar erstmals aktiviert): Annehmen / Unter Vorbehalt / Ablehnen, CONFIRMED-Default.
+- Standalone-Abwesenheitsnotiz-Formular (Out-of-Office, ohne Webmail-Konto) in den Settings.
+- Modernes Squire-Toolbar-Design (Buttons, Gruppen, Hover, Active), scoped auf `.squire-toolbar`.
+- Volltextsuche als Engine-Default; SORT kombiniert mit SEARCH.
+- Automatisches Selbst-Update über GitHub (mehrere Iterationen): Webhook, stable/dev-Kanäle, Cron, Zero-Config, `occ souvera_mail:self-update` (nicht `occ app:update` — bewirkt bei Custom-Apps nichts); `occ app:update` löst das Update über einen Pre-Update-Repair-Step aus; stable-Kanal checkt 1×/24h im Wartungsfenster (`maintenance_window_start`, 1h), dev-Kanal alle 5 Minuten.
+- `occ souvera_mail:data:check` + `--simulate-save`: vollständige Settings-Persistenz-Diagnose (Engine-Boot, Plugin-/Fallback-Pfade, Probe-Writes, Dateisystem-Infos, Scan über alle Kandidaten-Roots, realer Put/Get-Roundtrip).
+- Operator-steuerbares Prüfintervall-Minimum: `occ config:app:set souvera_mail min_refresh_interval --value 1` (Default 5).
+- Installierte App-Version im F1-Hilfe-Modal (Fallback im Boot-Response).
+- Vollständige CHANGELOG.md als kanonische Changelog-Quelle.
+
+### Behobene Fehler
+- Stalwart-Webhook-Payload-Format korrekt geparst (`events[].data.accountId` statt flacher E-Mail-Struktur) — Push funktionierte zuvor nie.
+- E-Mail-Sortierung: SORT-Capability-Erkennung + Fallback-Richtung.
+- FCM-Batch-Send zurückgerollt (v1-API unterstützt es nicht); null-accountId-Cache mit kurzem TTL.
+- Settings-Persistenz: CheckMailInterval nach Reload erhalten (Boot-Response enthielt den local-Settings-Wert nicht); `FileStorage::Put` meldet leere Dateinamen statt stillschweigend zu scheitern; Einstellungs-Speicher UID-gescoped; Mailbox-Ownership-Guard 60 s gecacht (Stalwart-Roundtrip pro Request entfiel).
+- SelfUpdate-Kette: `SelfUpdateTrait`-Namespace korrigiert (Trait wurde nie gefunden → Befehl/Job lief nicht), HTTP über IClientService mit echten Timeouts, exec-Guard, frühe Fortschrittsausgabe; EXDEV-sicheres Install (Datei-Kopie statt `rename()` über NFS-Mount-Grenzen); SHA-Check, atomarer Swap, Locks, Logging, `is_writable`-Guard; Job-Registrierung mit ITimeFactory + 5-Minuten-Intervall; `acquireLock`-Rückgabetyp.
+- Composer: Enter nativ im Squire-Editor (kein Cursor-Sprung), `createDefaultBlock`-Patch, Zeilenabstand 1.5, beforeinput-Listener sauber re-registriert.
+- `deleteAppValue` durch `setValueString` ersetzt (ältere Nextcloud-Versionen); veraltete `OC_App`-Aufrufe + falscher OCC-Pfad.
+- Anhang-Download-Fehler zeigen Meldungen statt leerer Seite; Fehler-Seiten mit exit() in RawDownload/RawView.
+- Attachment-Preview-Review-Fixes (KO-Observables, mimeType/fileType-Fallback, pdfPreview-Deprecation).
+- Phase-B-Review-Fixes (STATUS-Multiline-Anchor, idempotentes Plugin/Calendar-Enable, Cancel-Button-Styling).
+- Kalender-/Abwesenheits-Zusammenführung und -Fixes.
+
+### Technik / Infrastruktur
+- Attachment-Actions, IMAP-Fetch-Headers, Zusatzkonten in den Release-Defaults aktiviert; `capa.attachments_actions` bei jedem Boot erzwungen; Boot-Config in eigene Methode ausgelagert.
+- DataCheck spiegelt das reale Storage-Layout (domain/localpart/.config/uid); Session-loser Storage-Guard löst UID aus dem Konto auf; per-User-Such-Setting entscheidet allein.
+- Selbst-Update-Experimentierphase (GitHub-API → gh CLI → git tags → ZIP) auf ZIP-basierten Download vereinheitlicht; SelfUpdate-Job aus info.xml entfernt (wird programmatisch registriert).
 
 ## [0.18.2] — 2026-02 (Feature: atomarer `/upgrade` Endpoint + Client-Agent-Doku)
 
