@@ -121,6 +121,10 @@
 	font-size: 13px;
 	cursor: pointer;
 }
+.x2m-nc-event-card__cancel:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
 .x2m-nc-event-card__cancel:hover {
 	background: var(--nc-color-background-hover, #f5f5f5);
 }

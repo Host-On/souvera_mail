@@ -95,8 +95,12 @@ class InstallStep implements IRepairStep
             // `plugin/calendar` (default false) and hides the entire
             // feature when unset — which made "accept invitation" appear
             // broken even though the client code was fully wired.
-            $oConfig->Set('plugin', 'calendar', true);
-            $output->info('Enabled calendar invitation handling (plugin/calendar)');
+            // Set only when never configured so an admin's explicit
+            // deactivation survives future upgrades.
+            if (null === $oConfig->Get('plugin', 'calendar', null)) {
+                $oConfig->Set('plugin', 'calendar', true);
+                $output->info('Enabled calendar invitation handling (plugin/calendar)');
+            }
 
             // Delete old plugin dir to prevent stale files
             if (\is_dir($installedPlugin)) {

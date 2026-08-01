@@ -234,10 +234,13 @@
 			// writes an event. The STATUS line is patched into the raw ICS
 			// before the CalDAV PUT (calendarPut serialises rawText).
 			const applyVeventStatus = (VEVENT, status) => {
-				if (/^STATUS:/gim.test(VEVENT.rawText)) {
-					VEVENT.rawText = VEVENT.rawText.replace(/^STATUS:[^\r\n]*/gim, 'STATUS:' + status);
+				// Multiline anchors: rawText starts with BEGIN:VCALENDAR, so
+				// without /m the insert never matches. Replace only the FIRST
+				// STATUS line (an ICS may carry several VEVENTs/exceptions).
+				if (/^STATUS:/im.test(VEVENT.rawText)) {
+					VEVENT.rawText = VEVENT.rawText.replace(/^STATUS:[^\r\n]*/im, 'STATUS:' + status);
 				} else {
-					VEVENT.rawText = VEVENT.rawText.replace(/^(BEGIN:VEVENT\r?\n)/i, '$1STATUS:' + status + '\r\n');
+					VEVENT.rawText = VEVENT.rawText.replace(/^(BEGIN:VEVENT\r?\n)/im, '$1STATUS:' + status + '\r\n');
 				}
 				VEVENT.STATUS = status;
 			};
