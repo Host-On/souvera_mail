@@ -82,9 +82,12 @@
 							<!-- /ko -->
 						</div>
 						<div class="x2m-nc-event-card__actions">
+							<!-- v0.22.5: accept / tentative / decline semantics.
+							     Accept sets STATUS=CONFIRMED (default), tentative sets
+							     STATUS=TENTATIVE; decline never writes an event. -->
 							<button class="x2m-nc-event-card__save"
-								data-bind="click: nextcloudSaveICS,
-									disable: nextcloudICSSaving() || nextcloudICSSaved() || (nextcloudICS() && nextcloudICS().isCancelled()),
+								data-bind="click: nextcloudAcceptInvite,
+									disable: nextcloudICSSaving() || nextcloudICSSaved() || nextcloudICSDeclined() || (nextcloudICS() && nextcloudICS().isCancelled()),
 									css: {
 										'x2m-nc-event-card__save--saved': nextcloudICSSaved(),
 										'x2m-nc-event-card__save--updated': nextcloudICSUpdated(),
@@ -96,7 +99,17 @@
 									: nextcloudICSSaved() ? '✓ ${i('NEXTCLOUD/EVENT_CARD_SAVED')}'
 									: nextcloudICSExists() ? '🔄 ${i('NEXTCLOUD/EVENT_CARD_UPDATE_CONFIRM')}'
 									: nextcloudICSError() ? '✗ ${i('NEXTCLOUD/EVENT_CARD_ERROR')}'
-									: '📅 ${i('NEXTCLOUD/EVENT_CARD_SAVE')}'"></span>
+									: '📅 ${i('NEXTCLOUD/EVENT_CARD_ACCEPT')}'"></span>
+							</button>
+							<button class="x2m-nc-event-card__save"
+								data-bind="click: nextcloudTentativeInvite,
+									disable: nextcloudICSSaving() || nextcloudICSSaved() || nextcloudICSDeclined() || (nextcloudICS() && nextcloudICS().isCancelled())">
+								<span data-bind="text: nextcloudICSSaving() ? '⏳ ...' : '🤷 ${i('NEXTCLOUD/EVENT_CARD_TENTATIVE')}'"></span>
+							</button>
+							<button class="x2m-nc-event-card__cancel"
+								data-bind="click: nextcloudDeclineInvite,
+									disable: nextcloudICSSaving() || nextcloudICSSaved() || nextcloudICSDeclined()">
+								<span data-bind="text: nextcloudICSDeclined() ? '✕ ${i('NEXTCLOUD/EVENT_CARD_DECLINED')}' : '✕ ${i('NEXTCLOUD/EVENT_CARD_DECLINE')}'"></span>
 							</button>
 							<!-- ko if: nextcloudICSExists -->
 							<button class="x2m-nc-event-card__cancel"
@@ -172,6 +185,7 @@
 			view.nextcloudICSSaving = ko.observable(false);   // PUT in progress
 			view.nextcloudICSExists = ko.observable(false);   // event exists, waiting for confirm
 			view.nextcloudICSCalHref = ko.observable('');      // selected calendar href for confirm flow
+			view.nextcloudICSDeclined = ko.observable(false); // v0.22.5: invitation declined (no event written)
 
 			// Computed display values for event card
 			view.nextcloudICSWhen = ko.computed(() => {
@@ -215,7 +229,20 @@
 				});
 			};
 
-			view.nextcloudSaveICS = () => {
+			// v0.22.5: accept / tentative / decline. Accept defaults to
+			// CONFIRMED, tentative stores STATUS=TENTATIVE; decline never
+			// writes an event. The STATUS line is patched into the raw ICS
+			// before the CalDAV PUT (calendarPut serialises rawText).
+			const applyVeventStatus = (VEVENT, status) => {
+				if (/^STATUS:/gim.test(VEVENT.rawText)) {
+					VEVENT.rawText = VEVENT.rawText.replace(/^STATUS:[^\r\n]*/gim, 'STATUS:' + status);
+				} else {
+					VEVENT.rawText = VEVENT.rawText.replace(/^(BEGIN:VEVENT\r?\n)/i, '$1STATUS:' + status + '\r\n');
+				}
+				VEVENT.STATUS = status;
+			};
+
+			view.nextcloudSaveICSWithStatus = (status) => {
 				let VEVENT = view.nextcloudICS();
 				if (!VEVENT || view.nextcloudICSSaving()) return;
 
@@ -224,6 +251,9 @@
 					doCalendarPut(view.nextcloudICSCalHref(), VEVENT);
 					return;
 				}
+
+				applyVeventStatus(VEVENT, status);
+				view.nextcloudICSDeclined(false);
 
 				rl.nextcloud.selectCalendar()
 				.then(href => {
@@ -246,6 +276,15 @@
 				});
 			};
 
+			view.nextcloudAcceptInvite = () => view.nextcloudSaveICSWithStatus('CONFIRMED');
+			view.nextcloudTentativeInvite = () => view.nextcloudSaveICSWithStatus('TENTATIVE');
+			view.nextcloudDeclineInvite = () => {
+				if (view.nextcloudICSSaving()) return;
+				view.nextcloudICSDeclined(true);
+				// Deliberately no calendar write — declined invitations are
+				// never entered into the Nextcloud calendar.
+			};
+
 			view.message.subscribe(msg => {
 				view.nextcloudICS(null);
 				view.nextcloudICSSaved(false);
@@ -254,6 +293,7 @@
 				view.nextcloudICSSaving(false);
 				view.nextcloudICSExists(false);
 				view.nextcloudICSCalHref('');
+				view.nextcloudICSDeclined(false);
 				if (msg && cfg.CalDAV) {
 //					let ics = msg.attachments.find(attachment => 'application/ics' == attachment.mimeType);
 					let ics = msg.attachments.find(attachment => 'text/calendar' == attachment.mimeType);

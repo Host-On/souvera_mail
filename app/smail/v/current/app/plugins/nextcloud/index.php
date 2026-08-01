@@ -190,7 +190,7 @@ class NextcloudPlugin extends \Smail\Engine\Plugins\AbstractPlugin
 		return $this->jsonResponse(__FUNCTION__, $aResult);
 	}
 
-	public function NextcloudSaveMsg() : array
+public function NextcloudSaveMsg() : array
 	{
 		$sSaveFolder = \ltrim($this->jsonParam('folder', ''), '/');
 //		$aValues = \Smail\Engine\Api::Actions()->decodeRawKey($this->jsonParam('msgHash', ''));

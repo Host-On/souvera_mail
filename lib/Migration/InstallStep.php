@@ -90,6 +90,14 @@ class InstallStep implements IRepairStep
                 $output->info('Enabled bundled nextcloud plugin');
             }
 
+            // v0.22.5: enable the calendar-invitation event card (ICS
+            // accept/decline → Nextcloud calendar). The plugin reads
+            // `plugin/calendar` (default false) and hides the entire
+            // feature when unset — which made "accept invitation" appear
+            // broken even though the client code was fully wired.
+            $oConfig->Set('plugin', 'calendar', true);
+            $output->info('Enabled calendar invitation handling (plugin/calendar)');
+
             // Delete old plugin dir to prevent stale files
             if (\is_dir($installedPlugin)) {
                 $output->info('Clean installed plugin dir');
