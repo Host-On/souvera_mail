@@ -42,7 +42,8 @@ class DataCheck extends Command {
         $this
             ->setName('souvera_mail:data:check')
             ->setDescription('Full engine settings-persistence diagnostics')
-            ->addArgument('uid', InputArgument::OPTIONAL, 'Nextcloud user id (resolves their settings file)');
+            ->addArgument('uid', InputArgument::OPTIONAL, 'Nextcloud user id (resolves their settings file)')
+            ->addOption('simulate-save', null, \Symfony\Component\Console\Input\InputOption::VALUE_NONE, 'Run a real engine StorageProvider Put/Get round-trip');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int {
@@ -141,7 +142,49 @@ class DataCheck extends Command {
         $output->writeln('- If nothing was written at all, check nextcloud.log for "FileStorage" / "Failed to save" warnings.');
         $output->writeln('- open_basedir: ' . (\ini_get('open_basedir') ?: 'not set (unrestricted)'));
 
+        if ($input->getOption('simulate-save')) {
+            $output->writeln('');
+            $this->simulateSave($output, $email);
+        }
+
         return Command::SUCCESS;
+    }
+
+    /**
+     * Run a REAL Put/Get round-trip through the live engine storage
+     * providers. The engine is booted like a web request would; the
+     * providers are the exact instances the Settings page uses. A
+     * string account is accepted by GenerateFilePath as an email.
+     */
+    private function simulateSave(OutputInterface $output, string $email): void {
+        try {
+            $oActions = \Smail\Engine\Api::Actions();
+            $oStorage = $oActions->StorageProvider();
+            $oLocal = $oActions->LocalStorageProvider();
+
+            foreach (['StorageProvider()' => $oStorage, 'LocalStorageProvider()' => $oLocal] as $label => $provider) {
+                try {
+                    $filePath = $provider->GenerateFilePath($email, \Smail\Engine\Providers\Storage\Enumerations\StorageType::CONFIG->value, false);
+                } catch (\Throwable $e) {
+                    $output->writeln('  [' . $label . '] GenerateFilePath threw: ' . $e->getMessage());
+                    continue;
+                }
+                $output->writeln('  [' . $label . '] CONFIG dir for ' . $email . ' -> ' . $filePath);
+                $output->writeln('    exists: ' . (\is_dir($filePath) ? 'yes' : 'NO'));
+
+                $probe = '{"__probe":true}';
+                $okPut = $provider->Put($email, \Smail\Engine\Providers\Storage\Enumerations\StorageType::CONFIG->value, '__probe', $probe);
+                $output->writeln('    Put("__probe") returned: ' . ($okPut ? 'true' : 'FALSE'));
+                $probeFile = $filePath . '/__probe';
+                $output->writeln('    probe file exists after Put: ' . (\is_file($probeFile) ? 'yes (' . \filesize($probeFile) . ' bytes)' : 'NO'));
+                $read = $provider->Get($email, \Smail\Engine\Providers\Storage\Enumerations\StorageType::CONFIG->value, '__probe');
+                $output->writeln('    Get("__probe") returned: ' . ($read === $probe ? 'MATCH' : (\is_string($read) ? 'DIFFERENT: ' . \mb_substr($read, 0, 80) : 'no value (' . \var_export($read, true) . ')')));
+                $provider->Clear($email, \Smail\Engine\Providers\Storage\Enumerations\StorageType::CONFIG->value, '__probe');
+                $output->writeln('    probe cleaned: ' . (!\is_file($probeFile) ? 'yes' : 'NO'));
+            }
+        } catch (\Throwable $e) {
+            $output->writeln('  simulate-save crashed: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+        }
     }
 
     /** Boot the engine exactly like a web request (best-effort). */
