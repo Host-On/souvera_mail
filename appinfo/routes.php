@@ -400,5 +400,15 @@ return [
             'url' => '/api/v2/blobs/{id}/{name}',
             'verb' => 'GET',
         ],
+        [
+            'name' => 'v2_shared#list',
+            'url' => '/api/v2/shared',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'v2_shared#setPosition',
+            'url' => '/api/v2/shared/position',
+            'verb' => 'PUT',
+        ],
     ],
 ];

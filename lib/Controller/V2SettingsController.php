@@ -29,15 +29,18 @@ class V2SettingsController extends Controller
     #[NoCSRFRequired]
     public function quota(): JSONResponse
     {
-        $user = $this->userSession->getUser();
-        if ($user === null) {
-            return new JSONResponse(['error' => 'Not authenticated'], 401);
-        }
         try {
+            $user = $this->userSession->getUser();
+            if ($user === null) {
+                return new JSONResponse(['used' => 0, 'total' => 0]);
+            }
+            if (!$this->quotaService->isAvailable()) {
+                return new JSONResponse(['used' => 0, 'total' => 0]);
+            }
             $data = $this->quotaService->getForUser($user->getUID());
             return new JSONResponse(['used' => $data['used'] ?? 0, 'total' => $data['total'] ?? 0]);
         } catch (\Throwable $e) {
-            return new JSONResponse(['error' => $e->getMessage()], 500);
+            return new JSONResponse(['used' => 0, 'total' => 0, 'error' => $e->getMessage()]);
         }
     }
 
