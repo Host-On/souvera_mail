@@ -34,7 +34,7 @@
 			</NcButton>
 
 			<div v-if="showCreate" class="create-row">
-				<NcTextField v-model:value="newName" :placeholder="t('souvera_mail', 'Name (e.g. Android, iOS)')" />
+				<NcTextField v-model="newName" :placeholder="t('souvera_mail', 'Name (e.g. Android, iOS)')" />
 				<NcButton variant="primary" @click="create" :disabled="newName.trim() === ''">{{ t('souvera_mail', 'Create') }}</NcButton>
 				<NcButton variant="tertiary" @click="showCreate = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
 			</div>

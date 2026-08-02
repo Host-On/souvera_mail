@@ -23,7 +23,7 @@
 					<div class="compose-autocomplete-wrapper">
 						<NcTextField class="compose-input"
 							ref="toInput"
-							v-model:value="toStr"
+							v-model="toStr"
 							:placeholder="t('souvera_mail', 'recipient@example.com')"
 							@input="onToInput" />
 						<ul v-if="contactSuggestions.length > 0" class="compose-suggestions">
@@ -37,7 +37,7 @@
 				</div>
 				<div class="compose-field">
 					<label>{{ t('souvera_mail', 'Subject') }}</label>
-					<NcTextField class="compose-input" v-model:value="subject" :placeholder="t('souvera_mail', 'Subject...')" />
+					<NcTextField class="compose-input" v-model="subject" :placeholder="t('souvera_mail', 'Subject...')" />
 				</div>
 			</div>
 
