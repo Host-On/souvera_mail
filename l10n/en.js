@@ -140,6 +140,7 @@ OC.L10N.register(
         "Message" : "Message",
         "Messages are not yet visible after a migration" : "Messages are not yet visible after a migration",
         "Move to" : "Move to",
+        "Move to folder" : "Move to folder",
         "Name (e.g. Android, iOS)" : "Name (e.g. Android, iOS)",
         "Native NC app menu only — not Custom Menu / side_menu. Reload after save." : "Native NC app menu only — not Custom Menu / side_menu. Reload after save.",
         "New" : "New",
@@ -215,6 +216,7 @@ OC.L10N.register(
         "Settings" : "Settings",
         "Setup Wizard" : "Setup Wizard",
         "Shared folders" : "Shared folders",
+        "Shared folders are mailboxes that other users have granted you access to." : "Shared folders are mailboxes that other users have granted you access to.",
         "Shared with me" : "Shared with me",
         "Show attachment thumbnails" : "Show attachment thumbnails",
         "Show images" : "Show images",
@@ -296,6 +298,7 @@ OC.L10N.register(
         "recipient@example.com" : "recipient@example.com",
         "registered" : "registered",
         "same as IMAP" : "same as IMAP",
+        "selected" : "selected",
         "space-separated, only if your IdP requires extra scopes" : "space-separated, only if your IdP requires extra scopes",
     },
     "nplurals=2; plural=(n != 1);"

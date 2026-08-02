@@ -2,9 +2,11 @@
 	<div class="mail-home">
 		<div class="mail-list-panel" :style="{ width: listWidth }">
 			<EmailListToolbar
-				:selected-count="0"
+				:selected-count="checkedIds.size"
 				@refresh="refreshEmails"
-				@compose="$router.push({name:'compose'})" />
+				@compose="$router.push({name:'compose'})"
+				@mark-read="bulkMarkRead"
+				@bulk-delete="bulkDelete" />
 
 			<div v-if="loadingEmails" class="mail-loading">
 				<span class="icon-loading" />
@@ -17,7 +19,9 @@
 						:key="email.id"
 						:email="email"
 						:active="selectedEmail?.id === email.id"
-						@click="onOpenEmail(email)" />
+						:checked="checkedIds.has(email.id)"
+						@click="onOpenEmail(email)"
+						@check="toggleCheck(email.id)" />
 				</div>
 				<PaginationBar
 					:offset="offset"
@@ -62,7 +66,7 @@ import EmailListItem from '../components/EmailListItem.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import EmailDetail from '../components/EmailDetail.vue'
 
-const { fetchEmails, fetchEmailBody, deleteEmailApi, moveEmail, markEmailRead } = useJmapClient()
+const { fetchEmails, fetchEmailBody, deleteEmailApi, moveEmail, markEmailRead, toggleEmailFlag } = useJmapClient()
 
 export default {
 	name: 'MailHomeView',
@@ -78,10 +82,11 @@ export default {
 			selectedEmail: null,
 			emailBodyHtml: '', emailBodyPlain: '',
 			listWidth: '420px',
+			checkedIds: new Set(),
 		}
 	},
 	watch: {
-		selectedMailbox() { this.offset = 0; this.selectedEmail = null; this.loadEmails() },
+		selectedMailbox() { this.checkedIds.clear(); this.offset = 0; this.selectedEmail = null; this.loadEmails() },
 	},
 	async mounted() {
 		if (this.selectedMailbox) await this.loadEmails()
@@ -89,19 +94,33 @@ export default {
 	methods: {
 		async loadEmails() {
 			this.loadingEmails = true
-			try {
-				const r = await fetchEmails(this.selectedMailbox, this.limit, this.offset)
-				this.emails = r.emails; this.emailTotal = r.total
-			} catch {} finally { this.loadingEmails = false }
+			try { const r = await fetchEmails(this.selectedMailbox, this.limit, this.offset); this.emails = r.emails; this.emailTotal = r.total } catch {} finally { this.loadingEmails = false }
 		},
-		async refreshEmails() { this.offset = 0; await this.loadEmails() },
+		async refreshEmails() { this.checkedIds.clear(); this.offset = 0; await this.loadEmails() },
+		toggleCheck(id) {
+			if (this.checkedIds.has(id)) this.checkedIds.delete(id)
+			else this.checkedIds.add(id)
+		},
+		async bulkMarkRead() {
+			for (const id of this.checkedIds) {
+				try { await markEmailRead(id, true) } catch {}
+			}
+			this.checkedIds.clear()
+			await this.loadEmails()
+		},
+		async bulkDelete() {
+			for (const id of this.checkedIds) {
+				try { await deleteEmailApi(id) } catch {}
+			}
+			this.checkedIds.clear()
+			await this.loadEmails()
+		},
 		async onOpenEmail(email) {
 			this.selectedEmail = email
 			this.emailBodyHtml = ''; this.emailBodyPlain = ''; this.loadingBody = true
 			try {
 				const body = await fetchEmailBody(email.id)
-				this.emailBodyHtml = body.htmlBody || ''
-				this.emailBodyPlain = body.plainBody || ''
+				this.emailBodyHtml = body.htmlBody || ''; this.emailBodyPlain = body.plainBody || ''
 				this.selectedEmail = { ...email, ...body }
 				await markEmailRead(email.id, true)
 			} catch {} finally { this.loadingBody = false }
@@ -116,10 +135,7 @@ export default {
 		},
 		async deleteEmail() {
 			if (!this.selectedEmail) return
-			try {
-				await deleteEmailApi(this.selectedEmail.id)
-				this.selectedEmail = null; await this.refreshEmails()
-			} catch {}
+			try { await deleteEmailApi(this.selectedEmail.id); this.selectedEmail = null; await this.refreshEmails() } catch {}
 		},
 		async onMove(mailboxId) {
 			if (!this.selectedEmail) return

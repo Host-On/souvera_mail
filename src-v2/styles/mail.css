@@ -6,7 +6,7 @@
 	--mail-transition: 0.2s ease;
 }
 
-.mail-loading, .search-loading, .shield-loading {
+.mail-loading {
 	display: flex;
 	justify-content: center;
 	padding: 48px;
@@ -24,10 +24,8 @@
 		z-index: 10;
 		overflow-y: auto;
 	}
-	.compose-modal {
-		width: 100% !important;
-		height: 100% !important;
-		max-width: none !important;
+	.compose-overlay {
+		z-index: 2000;
 	}
 }
 

@@ -310,7 +310,10 @@
     "Today": "Heute",
     "Yesterday": "Gestern",
     "Show images": "Bilder anzeigen",
-    "Download all": "Alle herunterladen"
+    "Download all": "Alle herunterladen",
+    "selected": "ausgewählt",
+    "Move to folder": "In Ordner verschieben",
+    "Shared folders are mailboxes that other users have granted you access to.": "Geteilte Ordner sind Postfächer, zu denen andere Nutzer Ihnen Zugriff gewährt haben."
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

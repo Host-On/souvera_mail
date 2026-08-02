@@ -310,7 +310,10 @@
     "Today": "Today",
     "Yesterday": "Yesterday",
     "Show images": "Show images",
-    "Download all": "Download all"
+    "Download all": "Download all",
+    "selected": "selected",
+    "Move to folder": "Move to folder",
+    "Shared folders are mailboxes that other users have granted you access to.": "Shared folders are mailboxes that other users have granted you access to."
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

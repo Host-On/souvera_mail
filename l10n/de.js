@@ -140,6 +140,7 @@ OC.L10N.register(
         "Message" : "Nachricht",
         "Messages are not yet visible after a migration" : "Nach einer Migration Nachrichten noch nicht sichtbar sind",
         "Move to" : "Verschieben nach",
+        "Move to folder" : "In Ordner verschieben",
         "Name (e.g. Android, iOS)" : "Name (z.B. Android, iOS)",
         "Native NC app menu only — not Custom Menu / side_menu. Reload after save." : "Nur das native NC-App-Menü — nicht Custom Menu / side_menu. Nach dem Speichern neu laden.",
         "New" : "Neu",
@@ -215,6 +216,7 @@ OC.L10N.register(
         "Settings" : "Einstellungen",
         "Setup Wizard" : "Einrichtungsassistent",
         "Shared folders" : "Geteilte Ordner",
+        "Shared folders are mailboxes that other users have granted you access to." : "Geteilte Ordner sind Postfächer, zu denen andere Nutzer Ihnen Zugriff gewährt haben.",
         "Shared with me" : "Mit mir geteilt",
         "Show attachment thumbnails" : "Anhang-Vorschaubilder anzeigen",
         "Show images" : "Bilder anzeigen",
@@ -296,6 +298,7 @@ OC.L10N.register(
         "recipient@example.com" : "empfaenger@example.com",
         "registered" : "registriert",
         "same as IMAP" : "wie IMAP",
+        "selected" : "ausgewählt",
         "space-separated, only if your IdP requires extra scopes" : "durch Leerzeichen getrennt, nur falls der IdP zusätzliche Scopes verlangt",
     },
     "nplurals=2; plural=(n != 1);"
