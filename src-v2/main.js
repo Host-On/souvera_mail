@@ -1,8 +1,5 @@
 /**
  * souvera_mail v2 — Vue 3 Entry Point
- *
- * Parallel to SnappyMail (v1). Activated via feature flag
- * `souvera_mail.v2_enabled` + OCC toggle. Builds to js/souvera_mail-v2.js.
  */
 
 import { createApp } from 'vue'
@@ -16,9 +13,17 @@ function bootstrap() {
 
 	const app = createApp(App)
 
-	app.config.globalProperties.t = window.t || ((_app, msg) => msg)
-	app.config.globalProperties.n = window.n || ((_app, s, p, count) => count === 1 ? s : p)
+	const tFn = window.t || ((app, msg) => msg)
+	const nFn = window.n || ((app, singular, plural, count) => count === 1 ? singular : plural)
+	app.config.globalProperties.t = tFn
+	app.config.globalProperties.n = nFn
 	app.config.globalProperties.OC = typeof OC !== 'undefined' ? OC : null
+	app.mixin({
+		methods: {
+			t(...args) { return tFn(...args) },
+			n(...args) { return nFn(...args) },
+		},
+	})
 
 	app.use(router)
 	app.mount('#souvera-mail-v2-app')
