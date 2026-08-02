@@ -390,5 +390,10 @@ return [
             'url' => '/api/v2/settings/app-passwords/{id}',
             'verb' => 'DELETE',
         ],
+        [
+            'name' => 'v2_contacts#search',
+            'url' => '/api/v2/contacts/search',
+            'verb' => 'GET',
+        ],
     ],
 ];
