@@ -179,18 +179,20 @@ class V2MailboxController extends Controller
             $bresult = $this->jmap->singleCall('Blob/get', [
                 'accountId' => $accountId, 'ids' => [$bid],
             ]);
-            $bdata = $bresult['data']['list'][0]['data:asBase64'] ?? null;
-            if ($bdata !== null) {
-                $htmlBody = \base64_decode($bdata, true) ?: null;
+            $blist = $bresult['data']['list'] ?? [];
+            $bdata = $blist[0]['data:asBase64'] ?? ($blist[0]['data'] ?? null);
+            if (\is_string($bdata) && $bdata !== '') {
+                $htmlBody = \base64_decode($bdata, true) ?: $bdata;
             }
         }
         if ($plainBody === null && $textPart !== null && ($bid = ($textPart['blobId'] ?? '')) !== '') {
             $bresult = $this->jmap->singleCall('Blob/get', [
                 'accountId' => $accountId, 'ids' => [$bid],
             ]);
-            $bdata = $bresult['data']['list'][0]['data:asBase64'] ?? null;
-            if ($bdata !== null) {
-                $plainBody = \base64_decode($bdata, true) ?: null;
+            $blist = $bresult['data']['list'] ?? [];
+            $bdata = $blist[0]['data:asBase64'] ?? ($blist[0]['data'] ?? null);
+            if (\is_string($bdata) && $bdata !== '') {
+                $plainBody = \base64_decode($bdata, true) ?: $bdata;
             }
         }
 

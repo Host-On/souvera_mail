@@ -46,14 +46,16 @@
 			</div>
 		</div>
 
-		<div class="email-detail__body" v-if="htmlBody || plainBody">
+		<div class="email-detail__body">
 			<div v-if="htmlBody" class="email-body-html" v-html="sanitizedHtml" />
-			<div v-else class="email-body-text">{{ plainBody }}</div>
-		</div>
-
-		<div v-if="loading" class="email-detail__loading">
-			<span class="icon-loading" />
+			<div v-else-if="plainBody" class="email-body-text">{{ plainBody }}</div>
+			<div v-else-if="loading" class="email-detail__loading">
+				<span class="icon-loading" />
 			</div>
+			<p v-else class="email-detail__empty">
+				{{ t('souvera_mail', 'This message has no content or could not be loaded.') }}
+			</p>
+		</div>
 			<div v-if="showMove" class="move-dropdown">
 				<div class="move-dropdown__header">
 					<span>{{ t('souvera_mail', 'Move to folder') }}</span>
