@@ -10,7 +10,7 @@
 // CSS is scoped inside the Vue bundle — no addStyle needed.
 ?>
 
-<div id="souvera-mail-v2-app">
+<div id="souvera-mail-v2-app" style="height:100%">
 	<div id="app-content">
 		<div class="loading-container">
 			<div class="icon-loading"></div>
