@@ -325,5 +325,10 @@ return [
             'url' => '/api/v2/send',
             'verb' => 'POST',
         ],
+        [
+            'name' => 'v2_search#search',
+            'url' => '/api/v2/search',
+            'verb' => 'GET',
+        ],
     ],
 ];

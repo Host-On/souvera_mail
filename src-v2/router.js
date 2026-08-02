@@ -16,7 +16,7 @@ const routes = [
 	{
 		path: '/search',
 		name: 'search',
-		component: MailHomeView, // placeholder until SearchView is built
+		component: () => import('./views/SearchView.vue'),
 	},
 	{
 		path: '/shield',
