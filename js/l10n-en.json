@@ -313,7 +313,8 @@
     "Download all": "Download all",
     "selected": "selected",
     "Move to folder": "Move to folder",
-    "Shared folders are mailboxes that other users have granted you access to.": "Shared folders are mailboxes that other users have granted you access to."
+    "Shared folders are mailboxes that other users have granted you access to.": "Shared folders are mailboxes that other users have granted you access to.",
+    "This message has no content or could not be loaded.": "This message has no content or could not be loaded."
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

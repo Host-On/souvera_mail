@@ -115,7 +115,7 @@ export default {
 			return Math.round(s) + ' ' + u[i]
 		},
 		blobUrl(blobId, name) {
-			return OC.generateUrl('/apps/souvera_mail/api/v2/blobs/' + blobId + '/' + name)
+			return (window.OC || this.OC || { generateUrl: (p) => p }).generateUrl('/apps/souvera_mail/api/v2/blobs/' + blobId + '/' + encodeURIComponent(name))
 		},
 		moveTo(mailboxId) {
 			this.$emit('move', mailboxId)

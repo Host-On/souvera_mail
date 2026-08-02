@@ -16,11 +16,11 @@
 			<p class="settings-muted">{{ t('souvera_mail', 'Shared folders are mailboxes that other users have granted you access to.') }}</p>
 			<div class="shared-position-row">
 				<NcCheckboxRadioSwitch :checked="sharedAbove" type="radio"
-					@update:checked="setSharedPosition(true)">
+					@update:modelValue="setSharedPosition(true)">
 					{{ t('souvera_mail', 'Show shared folders above own folders') }}
 				</NcCheckboxRadioSwitch>
 				<NcCheckboxRadioSwitch :checked="!sharedAbove" type="radio"
-					@update:checked="setSharedPosition(false)">
+					@update:modelValue="setSharedPosition(false)">
 					{{ t('souvera_mail', 'Show shared folders below own folders') }}
 				</NcCheckboxRadioSwitch>
 			</div>

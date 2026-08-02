@@ -258,6 +258,7 @@ OC.L10N.register(
         "There was a problem transferring the mail. Please contact support with the error details below." : "Es gab ein Problem beim Übertragen der Mails. Bitte kontaktiere den Support mit den Fehler-Details unten.",
         "This Nextcloud instance has Souvera Mail installed, but no mail domain is configured yet. Souvera Mail is a CLI-managed application: there is no browser-based setup UI. Run the following command on the Nextcloud host to register the OIDC client with H2CK/oidc, persist the mail domain, and finalise the bootstrap:" : "Auf dieser Nextcloud-Instanz ist Souvera Mail installiert, aber es ist noch keine Mail-Domain konfiguriert. Souvera Mail ist eine CLI-verwaltete Anwendung: Es gibt keine browserbasierte Einrichtungs-UI. Führe den folgenden Befehl auf dem Nextcloud-Host aus, um den OIDC-Client bei H2CK/oidc zu registrieren, die Mail-Domain zu speichern und den Bootstrap abzuschließen:",
         "This clears the local cache in your browser and Souvera Mail reloads the current mailbox state completely from the server. This helps when:" : "Damit wird der lokale Cache in deinem Browser geleert und Souvera Mail lädt den aktuellen Postfach-Zustand komplett neu vom Server. Das hilft, wenn:",
+        "This message has no content or could not be loaded." : "Diese Nachricht hat keinen Inhalt oder konnte nicht geladen werden.",
         "To import" : "Zu importieren",
         "To start over" : "Um neu zu beginnen",
         "To:" : "An:",
