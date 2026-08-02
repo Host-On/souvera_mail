@@ -331,6 +331,26 @@ return [
             'verb' => 'DELETE',
         ],
         [
+            'name' => 'v2_mailbox_crud#create',
+            'url' => '/api/v2/mailboxes',
+            'verb' => 'POST',
+        ],
+        [
+            'name' => 'v2_mailbox_crud#update',
+            'url' => '/api/v2/mailboxes/{id}',
+            'verb' => 'PUT',
+        ],
+        [
+            'name' => 'v2_mailbox_crud#destroy',
+            'url' => '/api/v2/mailboxes/{id}',
+            'verb' => 'DELETE',
+        ],
+        [
+            'name' => 'v2_mailbox_crud#emptyMailbox',
+            'url' => '/api/v2/mailboxes/{id}/empty',
+            'verb' => 'GET',
+        ],
+        [
             'name' => 'v2_compose#send',
             'url' => '/api/v2/send',
             'verb' => 'POST',
