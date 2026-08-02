@@ -11,7 +11,7 @@ const routes = [
 	{
 		path: '/compose',
 		name: 'compose',
-		component: MailHomeView, // placeholder until ComposeView is built
+		component: () => import('./views/ComposeView.vue'),
 	},
 	{
 		path: '/search',
