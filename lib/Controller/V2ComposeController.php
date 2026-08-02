@@ -11,6 +11,7 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
+use OCP\IUserSession;
 
 class V2ComposeController extends Controller
 {
@@ -19,6 +20,7 @@ class V2ComposeController extends Controller
         IRequest $request,
         private V2JmapProxy $jmap,
         private StalwartUserContext $userContext,
+        private IUserSession $userSession,
     ) {
         parent::__construct($appName, $request);
     }
