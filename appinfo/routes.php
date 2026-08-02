@@ -298,5 +298,17 @@ return [
             'url' => '/webhooks/stalwart',
             'verb' => 'POST',
         ],
+
+        // v2 API — pure JMAP, no IMAP/SnappyMail
+        [
+            'name' => 'v2_mailbox#list',
+            'url' => '/api/v2/mailboxes',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'v2_mailbox#emails',
+            'url' => '/api/v2/emails',
+            'verb' => 'GET',
+        ],
     ],
 ];
