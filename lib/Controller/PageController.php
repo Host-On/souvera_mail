@@ -261,6 +261,13 @@ class PageController extends Controller
     private function renderV2(): TemplateResponse
     {
         $this->navigationManager->setActiveEntry('souvera_mail');
+        // Load l10n before the Vue app so t() has translations.
+        try {
+            $lang = \OC::$server->get(\OCP\IL10N::class)->getLanguageCode(); // short iso code
+        } catch (\Throwable) {
+            $lang = 'en';
+        }
+        \OCP\Util::addScript('souvera_mail', 'l10n-' . $lang);
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
         return new TemplateResponse('souvera_mail', 'v2', []);
     }

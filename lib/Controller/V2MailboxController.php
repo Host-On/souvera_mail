@@ -170,6 +170,30 @@ class V2MailboxController extends Controller
         $htmlPart = $email['htmlBody'][0] ?? null;
         $textPart = $email['textBody'][0] ?? null;
 
+        $htmlBody = $bodyValues[$htmlPart['partId'] ?? $htmlPart['blobId'] ?? ''] ?? null;
+        $plainBody = $bodyValues[$textPart['partId'] ?? $textPart['blobId'] ?? ''] ?? null;
+
+        // Stalwart stores bodies as blobs — fall back to Blob/get when
+        // bodyValues is empty (fetchTextBodyValues not honored).
+        if ($htmlBody === null && $htmlPart !== null && ($bid = ($htmlPart['blobId'] ?? '')) !== '') {
+            $bresult = $this->jmap->singleCall('Blob/get', [
+                'accountId' => $accountId, 'ids' => [$bid],
+            ]);
+            $bdata = $bresult['data']['list'][0]['data:asBase64'] ?? null;
+            if ($bdata !== null) {
+                $htmlBody = \base64_decode($bdata, true) ?: null;
+            }
+        }
+        if ($plainBody === null && $textPart !== null && ($bid = ($textPart['blobId'] ?? '')) !== '') {
+            $bresult = $this->jmap->singleCall('Blob/get', [
+                'accountId' => $accountId, 'ids' => [$bid],
+            ]);
+            $bdata = $bresult['data']['list'][0]['data:asBase64'] ?? null;
+            if ($bdata !== null) {
+                $plainBody = \base64_decode($bdata, true) ?: null;
+            }
+        }
+
         $attachments = [];
         foreach ($email['attachments'] ?? [] as $att) {
             $attachments[] = [
@@ -192,8 +216,8 @@ class V2MailboxController extends Controller
                 'isRead' => isset($keywords['$seen']),
                 'isFlagged' => isset($keywords['$flagged']),
                 'attachments' => $attachments,
-                'htmlBody' => $bodyValues[$htmlPart['partId'] ?? $htmlPart['blobId'] ?? ''] ?? null,
-                'plainBody' => $bodyValues[$textPart['partId'] ?? $textPart['blobId'] ?? ''] ?? null,
+                'htmlBody' => $htmlBody,
+                'plainBody' => $plainBody,
                 'inReplyTo' => $email['inReplyTo'][0] ?? null,
                 'messageId' => $email['messageId'][0] ?? null,
             ],
