@@ -168,7 +168,7 @@ export default {
 </script>
 
 <style scoped>
-.compose-overlay { position: fixed; top:0; left:0; right:0; bottom:0; z-index:1000; background: var(--color-main-background); display: flex; flex-direction: column; }
+.compose-overlay { position: fixed; top:0; left:0; right:0; bottom:0; z-index:3000; background: var(--color-main-background); display: flex; flex-direction: column; }
 .compose-modal { display: flex; flex-direction: column; height: 100%; }
 .compose-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--color-background-dark); border-bottom: 1px solid var(--color-border); }
 .compose-header-right { display: flex; gap: 8px; }
