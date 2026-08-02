@@ -32,10 +32,14 @@
 		<div v-if="email.attachments && email.attachments.length > 0" class="email-detail__attachments">
 			<h4>{{ t('souvera_mail', 'Attachments') }} ({{ email.attachments.length }})</h4>
 			<div class="attachment-chips">
-				<NcButton v-for="att in email.attachments" :key="att.blobId" variant="tertiary">
-					<template #icon><Paperclip :size="16" /></template>
-					{{ att.name }} ({{ formatSize(att.size) }})
-				</NcButton>
+				<a v-for="att in email.attachments" :key="att.blobId"
+					:href="blobUrl(att.blobId, att.name)"
+					class="attachment-link" download>
+					<NcButton variant="tertiary">
+						<template #icon><Paperclip :size="16" /></template>
+						{{ att.name }} ({{ formatSize(att.size) }})
+					</NcButton>
+				</a>
 			</div>
 		</div>
 
@@ -81,6 +85,9 @@ export default {
 			const u = ['B', 'KB', 'MB']; let i = 0, s = bytes
 			while (s >= 1024 && i < u.length - 1) { s /= 1024; i++ }
 			return Math.round(s) + ' ' + u[i]
+		},
+		blobUrl(blobId, name) {
+			return OC.generateUrl('/apps/souvera_mail/api/v2/blobs/' + blobId + '/' + name)
 		},
 	},
 }

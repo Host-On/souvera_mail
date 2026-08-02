@@ -303,4 +303,30 @@ class V2MailboxController extends Controller
 
         return new JSONResponse(['success' => true]);
     }
+
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function downloadBlob(string $id, string $name): \OCP\AppFramework\Http\Response
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+        $result = $this->jmap->singleCall('Blob/get', [
+            'accountId' => $accountId, 'ids' => [$id],
+        ]);
+        if (isset($result['error'])) return new JSONResponse($result, 500);
+        $blob = $result['data']['list'][0] ?? null;
+        if ($blob === null) return new JSONResponse(['error' => 'Blob not found'], 404);
+        $data = \base64_decode($blob['data:asBase64'] ?? '', true) ?: '';
+        $response = new \OCP\AppFramework\Http\Response();
+        $response->setHeaders([
+            'Content-Type' => $blob['type'] ?? 'application/octet-stream',
+            'Content-Disposition' => 'attachment; filename="' . \addcslashes($name, '"') . '"',
+            'Content-Length' => (string) (\strlen($data)),
+        ]);
+        $response->setStatus(200);
+        $response->setBody($data);
+        return $response;
+    }
 }

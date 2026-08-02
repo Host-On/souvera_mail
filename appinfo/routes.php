@@ -395,5 +395,10 @@ return [
             'url' => '/api/v2/contacts/search',
             'verb' => 'GET',
         ],
+        [
+            'name' => 'v2_mailbox#downloadBlob',
+            'url' => '/api/v2/blobs/{id}/{name}',
+            'verb' => 'GET',
+        ],
     ],
 ];

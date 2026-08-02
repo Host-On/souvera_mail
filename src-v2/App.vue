@@ -43,7 +43,9 @@
 		</NcAppNavigation>
 
 		<NcAppContent>
-			<router-view :selected-mailbox="selectedMailbox" />
+			<router-view v-slot="{ Component }">
+				<component :is="Component" :selected-mailbox="selectedMailbox" />
+			</router-view>
 		</NcAppContent>
 	</NcContent>
 </template>
