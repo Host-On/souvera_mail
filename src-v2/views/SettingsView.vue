@@ -12,6 +12,21 @@
 		</section>
 
 		<section class="settings-section">
+			<h3>{{ t('souvera_mail', 'Shared folders') }}</h3>
+			<p class="settings-muted">{{ t('souvera_mail', 'Shared folders are mailboxes that other users have granted you access to.') }}</p>
+			<div class="shared-position-row">
+				<NcCheckboxRadioSwitch :checked="sharedAbove" type="radio"
+					@update:checked="setSharedPosition(true)">
+					{{ t('souvera_mail', 'Show shared folders above own folders') }}
+				</NcCheckboxRadioSwitch>
+				<NcCheckboxRadioSwitch :checked="!sharedAbove" type="radio"
+					@update:checked="setSharedPosition(false)">
+					{{ t('souvera_mail', 'Show shared folders below own folders') }}
+				</NcCheckboxRadioSwitch>
+			</div>
+		</section>
+
+		<section class="settings-section">
 			<h3>{{ t('souvera_mail', 'App passwords') }}</h3>
 			<NcButton variant="primary" @click="showCreate = true">
 				<template #icon><Plus :size="20" /></template>
@@ -37,7 +52,7 @@
 </template>
 
 <script>
-import { NcButton, NcTextField } from '@nextcloud/vue'
+import { NcButton, NcTextField, NcCheckboxRadioSwitch } from '@nextcloud/vue'
 import Plus from 'vue-material-design-icons/Plus.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
 import QuotaDonut from '../components/QuotaDonut.vue'
@@ -46,10 +61,10 @@ import { generateUrl } from '@nextcloud/router'
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, Plus, TrashCan, QuotaDonut },
-	data() { return { quotaUsed:0, quotaTotal:0, passwords:[], showCreate:false, newName:'' } },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, Plus, TrashCan, QuotaDonut },
+	data() { return { quotaUsed:0, quotaTotal:0, passwords:[], showCreate:false, newName:'', sharedAbove:true } },
 	async mounted() {
-		await Promise.all([this.loadQuota(), this.loadPasswords()])
+		await Promise.all([this.loadQuota(), this.loadPasswords(), this.loadShared()])
 	},
 	methods: {
 		formatSize(bytes) {
@@ -81,6 +96,18 @@ export default {
 				this.passwords = this.passwords.filter(p => p.id !== id)
 			} catch {}
 		},
+		async loadShared() {
+			try {
+				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/shared'))
+				this.sharedAbove = data.position === 'above'
+			} catch {}
+		},
+		async setSharedPosition(above) {
+			this.sharedAbove = above
+			try {
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/shared/position'), { position: above ? 'above' : 'below' })
+			} catch {}
+		},
 	},
 }
 </script>
@@ -92,6 +119,7 @@ export default {
 .settings-section h3 { margin: 0 0 12px; font-size: 14px; color: var(--color-text-maxcontrast); }
 .quota-row { display: flex; align-items: center; gap: 16px; }
 .settings-muted { color: var(--color-text-maxcontrast); }
+.shared-position-row { display: flex; flex-direction: column; gap: 6px; }
 .create-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
 .password-list { margin-top: 12px; }
 .password-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--color-border); }
