@@ -49,7 +49,7 @@
 
 		<NcAppContent>
 			<router-view v-slot="{ Component }">
-				<component :is="Component" :selected-mailbox="selectedMailbox" :all-mailboxes="mailboxes" />
+				<component :is="Component" v-bind="routeProps" />
 			</router-view>
 		</NcAppContent>
 	</NcContent>
@@ -77,6 +77,12 @@ export default {
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },
 		systemFolders() { return this.mailboxes.filter(m => SYSTEM_ROLES.includes(m.role)).sort((a,b) => (ROLE_ORDER[a.role]??99) - (ROLE_ORDER[b.role]??99)) },
+		routeProps() {
+			if (this.$route.name === 'inbox') {
+				return { selectedMailbox: this.selectedMailbox, allMailboxes: this.mailboxes }
+			}
+			return {}
+		},
 		userFolders() { return this.mailboxes.filter(m => !SYSTEM_ROLES.includes(m.role)) },
 		userFolderRoots() { return this.userFolders.filter(m => !m.parentId || !this.userFolders.find(p => p.id === m.parentId)) },
 	},
