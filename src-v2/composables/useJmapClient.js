@@ -34,9 +34,13 @@ export function useJmapClient() {
 		await axios.post(base + '/api/v2/emails/' + id + '/flag', { isFlagged })
 	}
 
+	async function moveEmail(id, mailboxId) {
+		await axios.post(base + '/api/v2/emails/' + id + '/move', { mailboxId })
+	}
+
 	async function deleteEmailApi(id) {
 		await axios.delete(base + '/api/v2/emails/' + id)
 	}
 
-	return { fetchMailboxes, fetchEmails, fetchEmailBody, markEmailRead, toggleEmailFlag, deleteEmailApi }
+	return { fetchMailboxes, fetchEmails, fetchEmailBody, markEmailRead, toggleEmailFlag, moveEmail, deleteEmailApi }
 }

@@ -11,6 +11,9 @@
 				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Forward')" @click="$emit('forward')">
 					<template #icon><Forward :size="20" /></template>
 				</NcButton>
+				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Move to')" @click="showMove = true">
+					<template #icon><FolderMove :size="20" /></template>
+				</NcButton>
 				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Delete')" @click="$emit('delete')">
 					<template #icon><TrashCan :size="20" /></template>
 				</NcButton>
@@ -50,8 +53,22 @@
 
 		<div v-if="loading" class="email-detail__loading">
 			<span class="icon-loading" />
+			</div>
+			<div v-if="showMove" class="move-dropdown">
+				<div class="move-dropdown__header">
+					<span>{{ t('souvera_mail', 'Move to folder') }}</span>
+					<NcButton variant="tertiary" size="small" :aria-label="t('souvera_mail', 'Close')" @click="showMove = false">
+						<template #icon><Close :size="14" /></template>
+					</NcButton>
+				</div>
+				<ul class="move-dropdown__list">
+					<li v-for="mb in moveMailboxes" :key="mb.id"
+						class="move-item" @click="moveTo(mb.id)">
+						{{ mb.name }}
+					</li>
+				</ul>
+			</div>
 		</div>
-	</div>
 </template>
 
 <script>
@@ -61,6 +78,8 @@ import Reply from 'vue-material-design-icons/Reply.vue'
 import Forward from 'vue-material-design-icons/Forward.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
+import FolderMove from 'vue-material-design-icons/FolderMove.vue'
+import Close from 'vue-material-design-icons/Close.vue'
 
 function sanitizeHtml(html) {
 	if (!html) return ''
@@ -69,15 +88,22 @@ function sanitizeHtml(html) {
 
 export default {
 	name: 'EmailDetail',
-	components: { NcButton, ArrowLeft, Reply, Forward, TrashCan, Paperclip },
+	components: { NcButton, ArrowLeft, Reply, Forward, TrashCan, Paperclip, FolderMove, Close },
 	props: {
 		email: { type: Object, default: null },
 		htmlBody: { type: String, default: '' },
 		plainBody: { type: String, default: '' },
 		loading: { type: Boolean, default: false },
+		mailboxes: { type: Array, default: () => [] },
 	},
-	emits: ['close', 'reply', 'forward', 'delete'],
-	computed: { sanitizedHtml() { return sanitizeHtml(this.htmlBody) } },
+	emits: ['close', 'reply', 'forward', 'delete', 'move'],
+	data() { return { showMove: false } },
+	computed: {
+		sanitizedHtml() { return sanitizeHtml(this.htmlBody) },
+		moveMailboxes() {
+			return this.mailboxes.filter(m => m.role !== 'trash' && m.role !== 'junk')
+		},
+	},
 	methods: {
 		formatDateTime(iso) { try { return new Date(iso).toLocaleString() } catch { return iso } },
 		formatSize(bytes) {
@@ -88,6 +114,10 @@ export default {
 		},
 		blobUrl(blobId, name) {
 			return OC.generateUrl('/apps/souvera_mail/api/v2/blobs/' + blobId + '/' + name)
+		},
+		moveTo(mailboxId) {
+			this.$emit('move', mailboxId)
+			this.showMove = false
 		},
 	},
 }
@@ -109,4 +139,9 @@ export default {
 .email-body-html :deep(img) { max-width: 100%; height: auto; }
 .email-body-text { white-space: pre-wrap; }
 .email-detail__loading { display: flex; justify-content: center; padding: 48px; }
+.move-dropdown { position: absolute; top: 48px; right: 20px; background: var(--color-main-background); border: 1px solid var(--color-border); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 20; min-width: 200px; }
+.move-dropdown__header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--color-border); font-size: 12px; color: var(--color-text-maxcontrast); }
+.move-dropdown__list { list-style: none; margin: 0; padding: 4px 0; max-height: 240px; overflow-y: auto; }
+.move-item { padding: 8px 12px; cursor: pointer; font-size: 13px; }
+.move-item:hover { background: var(--color-background-hover); }
 </style>

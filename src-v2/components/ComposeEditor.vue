@@ -18,9 +18,22 @@
 					<label>{{ t('souvera_mail', 'From') }}</label>
 					<input class="compose-input" :value="fromAddr" disabled />
 				</div>
-				<div class="compose-field">
+				<div class="compose-field compose-field--to">
 					<label>{{ t('souvera_mail', 'To') }}</label>
-					<NcTextField class="compose-input" v-model:value="toStr" :placeholder="t('souvera_mail', 'recipient@example.com')" />
+					<div class="compose-autocomplete-wrapper">
+						<NcTextField class="compose-input"
+							ref="toInput"
+							v-model:value="toStr"
+							:placeholder="t('souvera_mail', 'recipient@example.com')"
+							@input="onToInput" />
+						<ul v-if="contactSuggestions.length > 0" class="compose-suggestions">
+							<li v-for="c in contactSuggestions" :key="c.email"
+								class="suggestion-item" @mousedown.prevent="selectContact(c)">
+								<span class="suggestion-name">{{ c.name }}</span>
+								<span class="suggestion-email">{{ c.email }}</span>
+							</li>
+						</ul>
+					</div>
 				</div>
 				<div class="compose-field">
 					<label>{{ t('souvera_mail', 'Subject') }}</label>
@@ -45,7 +58,7 @@
 			</div>
 
 			<div v-show="tab === 'attachments'" class="compose-attach-pane">
-				<NcButton variant="tertiary" @click="pickAttachment">
+				<NcButton variant="primary" @click="pickAttachment">
 					<template #icon><Paperclip :size="20" /></template>
 					{{ t('souvera_mail', 'Add attachment') }}
 				</NcButton>
@@ -53,7 +66,7 @@
 				<div v-if="attachments.length > 0" class="attach-list">
 					<div v-for="(att, idx) in attachments" :key="idx" class="attach-item">
 						<span>{{ att.name }}</span>
-						<span class="attach-size">{{ formatSize(att.data.length * 0.75) }}</span>
+						<span class="attach-size">{{ formatSize(Math.round(att.data.length * 0.75)) }}</span>
 						<NcButton variant="tertiary" size="small" :aria-label="t('souvera_mail', 'Remove attachment')" @click="attachments.splice(idx, 1)">
 							<template #icon><Close :size="14" /></template>
 						</NcButton>
@@ -73,6 +86,8 @@ import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 
+let searchTimer = null
+
 export default {
 	name: 'ComposeEditor',
 	components: { NcButton, NcTextField, NcEmptyContent, Send, Close, Paperclip },
@@ -83,7 +98,6 @@ export default {
 	emits: ['cancel', 'sent'],
 	data() {
 		return {
-			visible: true,
 			tab: 'body',
 			toStr: this.replyTo?.fromAddress || '',
 			subject: this.replyTo?.subject ? 'Re: ' + this.replyTo.subject : '',
@@ -91,6 +105,7 @@ export default {
 			fromAddr: '',
 			attachments: [],
 			sending: false,
+			contactSuggestions: [],
 		}
 	},
 	computed: {
@@ -102,6 +117,25 @@ export default {
 			const u = ['B', 'KB', 'MB']; let i = 0, s = bytes
 			while (s >= 1024 && i < u.length - 1) { s /= 1024; i++ }
 			return Math.round(s) + ' ' + u[i]
+		},
+		onToInput() {
+			this.contactSuggestions = []
+			clearTimeout(searchTimer)
+			const q = this.toStr.trim()
+			if (q.length < 2) return
+			searchTimer = setTimeout(async () => {
+				try {
+					const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/contacts/search'), { params: { q, limit: 8 } })
+					this.contactSuggestions = data.contacts || []
+				} catch { this.contactSuggestions = [] }
+			}, 300)
+		},
+		selectContact(contact) {
+			const parts = this.toStr.split(',').map(s => s.trim()).filter(Boolean)
+			parts.pop()
+			parts.push(contact.name ? `"${contact.name}" <${contact.email}>` : contact.email)
+			this.toStr = parts.join(', ') + ', '
+			this.contactSuggestions = []
 		},
 		pickAttachment() { this.$refs.fileInput?.click() },
 		onFilesSelected(e) {
@@ -125,16 +159,16 @@ export default {
 					attachments: this.attachments,
 					inReplyTo: this.replyTo?.messageId || null,
 				})
-				this.visible = false
 				this.$emit('sent')
 			} catch(e) { console.error('Send failed', e) } finally { this.sending = false }
 		},
 	},
+	beforeUnmount() { clearTimeout(searchTimer) },
 }
 </script>
 
 <style scoped>
-.compose-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--color-main-background); display: flex; flex-direction: column; }
+.compose-overlay { position: fixed; top:0; left:0; right:0; bottom:0; z-index:1000; background: var(--color-main-background); display: flex; flex-direction: column; }
 .compose-modal { display: flex; flex-direction: column; height: 100%; }
 .compose-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--color-background-dark); border-bottom: 1px solid var(--color-border); }
 .compose-header-right { display: flex; gap: 8px; }
@@ -142,6 +176,13 @@ export default {
 .compose-field { margin-bottom: 10px; }
 .compose-field label { display: block; font-size: 11px; color: var(--color-text-maxcontrast); margin-bottom: 3px; }
 .compose-input { width: 100%; }
+.compose-autocomplete-wrapper { position: relative; }
+.compose-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: var(--color-main-background); border: 1px solid var(--color-border); border-radius: 6px; max-height: 200px; overflow-y: auto; z-index: 10; list-style: none; margin: 2px 0 0; padding: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.suggestion-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--color-border); }
+.suggestion-item:last-child { border-bottom: none; }
+.suggestion-item:hover { background: var(--color-background-hover); }
+.suggestion-name { font-weight: 600; }
+.suggestion-email { font-size: 12px; color: var(--color-text-maxcontrast); }
 .compose-tabs { display: flex; border-bottom: 1px solid var(--color-border); padding: 0 16px; }
 .compose-tab { padding: 8px 16px; border: none; background: none; cursor: pointer; font: inherit; color: var(--color-text-maxcontrast); border-bottom: 2px solid transparent; }
 .compose-tab.active { color: var(--color-main-text); border-bottom-color: var(--color-primary-element); }

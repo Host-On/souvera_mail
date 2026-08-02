@@ -326,9 +326,9 @@ return [
             'verb' => 'POST',
         ],
         [
-            'name' => 'v2_mailbox#delete',
-            'url' => '/api/v2/emails/{id}',
-            'verb' => 'DELETE',
+            'name' => 'v2_mailbox#move',
+            'url' => '/api/v2/emails/{id}/move',
+            'verb' => 'POST',
         ],
         [
             'name' => 'v2_mailbox_crud#create',

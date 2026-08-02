@@ -329,4 +329,28 @@ class V2MailboxController extends Controller
         $response->setBody($data);
         return $response;
     }
+
+    /**
+     * POST /apps/souvera_mail/api/v2/emails/{id}/move
+     * { mailboxId }
+     */
+    #[NoAdminRequired]
+    public function move(string $id): JSONResponse
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+        $body = \json_decode(\file_get_contents('php://input'), true);
+        $targetId = \trim((string) ($body['mailboxId'] ?? ''));
+        if ($targetId === '') {
+            return new JSONResponse(['error' => 'mailboxId required'], 400);
+        }
+        $result = $this->jmap->call([
+            ['Email/set', ['accountId' => $accountId, 'update' => [$id => ['mailboxIds' => [$targetId => true]]]]],
+        ]);
+        return isset($result['error'])
+            ? new JSONResponse($result, 500)
+            : new JSONResponse(['success' => true]);
+    }
 }

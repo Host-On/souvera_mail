@@ -38,9 +38,11 @@
 				:html-body="emailBodyHtml"
 				:plain-body="emailBodyPlain"
 				:loading="loadingBody"
+				:mailboxes="allMailboxes"
 				@close="selectedEmail = null"
 				@reply="onReply"
 				@forward="onForward"
+				@move="onMove"
 				@delete="deleteEmail" />
 		</div>
 
@@ -60,13 +62,14 @@ import EmailListItem from '../components/EmailListItem.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import EmailDetail from '../components/EmailDetail.vue'
 
-const { fetchEmails, fetchEmailBody, deleteEmailApi, markEmailRead } = useJmapClient()
+const { fetchEmails, fetchEmailBody, deleteEmailApi, moveEmail, markEmailRead } = useJmapClient()
 
 export default {
 	name: 'MailHomeView',
 	components: { EmailListToolbar, EmailListItem, PaginationBar, EmailDetail, NcEmptyContent, EmailOutline },
 	props: {
 		selectedMailbox: { type: String, default: '' },
+		allMailboxes: { type: Array, default: () => [] },
 	},
 	data() {
 		return {
@@ -117,6 +120,10 @@ export default {
 				await deleteEmailApi(this.selectedEmail.id)
 				this.selectedEmail = null; await this.refreshEmails()
 			} catch {}
+		},
+		async onMove(mailboxId) {
+			if (!this.selectedEmail) return
+			try { await moveEmail(this.selectedEmail.id, mailboxId); this.selectedEmail = null; await this.refreshEmails() } catch {}
 		},
 		goPrev() { if (this.offset > 0) { this.offset = Math.max(0, this.offset - this.limit); this.loadEmails() } },
 		goNext() { if (this.offset + this.limit < this.emailTotal) { this.offset += this.limit; this.loadEmails() } },

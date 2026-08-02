@@ -49,7 +49,7 @@
 
 		<NcAppContent>
 			<router-view v-slot="{ Component }">
-				<component :is="Component" :selected-mailbox="selectedMailbox" />
+				<component :is="Component" :selected-mailbox="selectedMailbox" :all-mailboxes="mailboxes" />
 			</router-view>
 		</NcAppContent>
 	</NcContent>
