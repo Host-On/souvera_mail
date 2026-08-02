@@ -1,6 +1,37 @@
-/* souvera_mail v2 — Design System (shared with Central/Shield) */
+/* souvera_mail v2 — Design Tokens & Responsive */
+
 #souvera-mail-v2-app {
 	height: 100%;
 	width: 100%;
+	--mail-transition: 0.2s ease;
 }
-.mail-home { padding: 24px; }
+
+.mail-loading, .search-loading, .shield-loading {
+	display: flex;
+	justify-content: center;
+	padding: 48px;
+}
+
+@media (max-width: 768px) {
+	.mail-list-panel {
+		width: 100% !important;
+		border-right: none !important;
+	}
+	.mail-detail-panel, .mail-detail-empty {
+		position: fixed;
+		top: 0; left: 0; right: 0; bottom: 0;
+		background: var(--color-main-background);
+		z-index: 10;
+		overflow-y: auto;
+	}
+	.compose-modal {
+		width: 100% !important;
+		height: 100% !important;
+		max-width: none !important;
+	}
+}
+
+@media (prefers-color-scheme: dark) {
+	.email-body-html { color-scheme: dark; }
+	.email-body-html img { opacity: 0.9; }
+}

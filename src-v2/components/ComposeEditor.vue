@@ -1,86 +1,99 @@
 <template>
-	<div class="compose-editor">
-		<header class="compose-header">
-			<h2>{{ isReply ? t('souvera_mail', 'Reply') : isForward ? t('souvera_mail', 'Forward') : t('souvera_mail', 'New message') }}</h2>
-			<NcButton type="tertiary" @click="$emit('cancel')">
-				<template #icon><Close :size="20" /></template>
-			</NcButton>
-		</header>
-
-		<div class="compose-field">
-			<label>{{ t('souvera_mail', 'To') }}</label>
-			<NcTextField v-model:value="toStr" :placeholder="t('souvera_mail', 'recipient@example.com')"
-				:disabled="sending" />
-		</div>
-		<div class="compose-field">
-			<label>{{ t('souvera_mail', 'Subject') }}</label>
-			<NcTextField v-model:value="subject" :placeholder="t('souvera_mail', 'Subject...')"
-				:disabled="sending" />
-		</div>
-
-		<div class="compose-field">
-			<label>{{ t('souvera_mail', 'Message') }}</label>
-			<textarea ref="bodyEl" class="compose-body" :value="bodyText"
-				:disabled="sending" @input="bodyText = $event.target.value"
-				:placeholder="t('souvera_mail', 'Write your message...')" rows="12" />
-		</div>
-
-		<div v-if="attachments.length > 0" class="compose-attachments">
-			<div v-for="(att, idx) in attachments" :key="idx" class="compose-attach-chip">
-				<span>{{ att.name }} ({{ formatSize(att.data.length * 0.75) }})</span>
-				<NcButton type="tertiary" size="small" @click="attachments.splice(idx, 1)" :disabled="sending">
-					<template #icon><Close :size="14" /></template>
+	<div class="compose-overlay">
+		<div class="compose-modal">
+			<div class="compose-header">
+				<NcButton type="primary" :disabled="!canSend || sending" @click="doSend">
+					<template #icon><Send :size="20" /></template>
+					{{ sending ? t('souvera_mail', 'Sending...') : t('souvera_mail', 'Send') }}
 				</NcButton>
+				<div class="compose-header-right">
+					<NcButton type="tertiary" @click="$emit('cancel')">
+						<template #icon><Close :size="20" /></template>
+					</NcButton>
+				</div>
+			</div>
+
+			<div class="compose-fields">
+				<div class="compose-field">
+					<label>{{ t('souvera_mail', 'From') }}</label>
+					<input class="compose-input" :value="fromAddr" disabled />
+				</div>
+				<div class="compose-field">
+					<label>{{ t('souvera_mail', 'To') }}</label>
+					<NcTextField class="compose-input" v-model:value="toStr" :placeholder="t('souvera_mail', 'recipient@example.com')" />
+				</div>
+				<div class="compose-field">
+					<label>{{ t('souvera_mail', 'Subject') }}</label>
+					<NcTextField class="compose-input" v-model:value="subject" :placeholder="t('souvera_mail', 'Subject...')" />
+				</div>
+			</div>
+
+			<div class="compose-tabs">
+				<button class="compose-tab" :class="{ active: tab === 'body' }" @click="tab = 'body'">
+					{{ t('souvera_mail', 'Message') }}
+				</button>
+				<button class="compose-tab" :class="{ active: tab === 'attachments' }" @click="tab = 'attachments'">
+					{{ t('souvera_mail', 'Attachments') }}
+					<span v-if="attachments.length > 0" class="compose-tab-badge">{{ attachments.length }}</span>
+				</button>
+			</div>
+
+			<div v-show="tab === 'body'" class="compose-body-pane">
+				<textarea ref="bodyEl" class="compose-body-textarea" :value="bodyText"
+					@input="bodyText = $event.target.value"
+					:placeholder="t('souvera_mail', 'Write your message...')" />
+			</div>
+
+			<div v-show="tab === 'attachments'" class="compose-attach-pane">
+				<NcButton type="tertiary" @click="pickAttachment">
+					<template #icon><Paperclip :size="20" /></template>
+					{{ t('souvera_mail', 'Add attachment') }}
+				</NcButton>
+				<input ref="fileInput" type="file" multiple class="hidden-file-input" @change="onFilesSelected" />
+				<div v-if="attachments.length > 0" class="attach-list">
+					<div v-for="(att, idx) in attachments" :key="idx" class="attach-item">
+						<span>{{ att.name }}</span>
+						<span class="attach-size">{{ formatSize(att.data.length * 0.75) }}</span>
+						<NcButton type="tertiary" size="small" @click="attachments.splice(idx, 1)">
+							<template #icon><Close :size="14" /></template>
+						</NcButton>
+					</div>
+				</div>
+				<NcEmptyContent v-else :title="t('souvera_mail', 'No attachments')" />
 			</div>
 		</div>
-
-		<footer class="compose-footer">
-			<NcButton type="tertiary" @click="pickAttachment" :disabled="sending">
-				<template #icon><Paperclip :size="20" /></template>
-			</NcButton>
-			<input ref="fileInput" type="file" multiple class="compose-file-input"
-				@change="onFilesSelected" />
-			<NcButton type="primary" @click="doSend" :disabled="sending || !canSend">
-				<template #icon v-if="!sending"><Send :size="20" /></template>
-				{{ sending ? t('souvera_mail', 'Sending...') : t('souvera_mail', 'Send') }}
-			</NcButton>
-		</footer>
 	</div>
 </template>
 
 <script>
-import { NcButton, NcTextField } from '@nextcloud/vue'
-import Close from 'vue-material-design-icons/Close.vue'
+import { NcButton, NcTextField, NcEmptyContent } from '@nextcloud/vue'
 import Send from 'vue-material-design-icons/Send.vue'
+import Close from 'vue-material-design-icons/Close.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 
 export default {
 	name: 'ComposeEditor',
-	components: { NcButton, NcTextField, Close, Send, Paperclip },
+	components: { NcButton, NcTextField, NcEmptyContent, Send, Close, Paperclip },
 	props: {
 		replyTo: { type: Object, default: null },
 		forwardOf: { type: Object, default: null },
-		initialTo: { type: String, default: '' },
-		initialSubject: { type: String, default: '' },
-		initialBody: { type: String, default: '' },
 	},
 	emits: ['cancel', 'sent'],
 	data() {
 		return {
-			toStr: this.initialTo || (this.replyTo ? this.replyTo.fromAddress : ''),
-			subject: this.initialSubject || (this.replyTo && !this.replyTo.subject?.startsWith('Re:')
-				? 'Re: ' + this.replyTo.subject
-				: this.forwardOf ? 'Fwd: ' + this.forwardOf.subject : ''),
-			bodyText: this.initialBody || '',
+			visible: true,
+			tab: 'body',
+			toStr: this.replyTo?.fromAddress || '',
+			subject: this.replyTo?.subject ? 'Re: ' + this.replyTo.subject : '',
+			bodyText: '',
+			fromAddr: '',
 			attachments: [],
 			sending: false,
 		}
 	},
 	computed: {
-		isReply() { return !!this.replyTo },
-		isForward() { return !!this.forwardOf },
 		canSend() { return this.toStr.trim() !== '' && !this.sending },
 	},
 	methods: {
@@ -90,53 +103,55 @@ export default {
 			while (s >= 1024 && i < u.length - 1) { s /= 1024; i++ }
 			return Math.round(s) + ' ' + u[i]
 		},
-		pickAttachment() { this.$refs.fileInput.click() },
+		pickAttachment() { this.$refs.fileInput?.click() },
 		onFilesSelected(e) {
-			const files = Array.from(e.target.files || [])
-			for (const file of files) {
+			for (const file of Array.from(e.target.files || [])) {
 				const reader = new FileReader()
 				reader.onload = () => {
-					this.attachments.push({
-						name: file.name,
-						type: file.type || 'application/octet-stream',
-						data: reader.result.split(',')[1] || reader.result,
-					})
+					this.attachments.push({ name: file.name, type: file.type || 'application/octet-stream', data: reader.result.split(',')[1] || reader.result })
 				}
 				reader.readAsDataURL(file)
 			}
 			e.target.value = ''
 		},
 		async doSend() {
+			if (!this.canSend) return
 			this.sending = true
 			try {
-				const payload = {
+				await axios.post(generateUrl('/apps/souvera_mail/api/v2/send'), {
 					to: this.toStr.split(',').map(s => s.trim()).filter(Boolean),
 					subject: this.subject,
 					bodyPlain: this.bodyText,
 					attachments: this.attachments,
 					inReplyTo: this.replyTo?.messageId || null,
-				}
-				await axios.post(generateUrl('/apps/souvera_mail/api/v2/send'), payload)
+				})
+				this.visible = false
 				this.$emit('sent')
-			} catch (e) {
-				console.error('Send failed', e)
-			} finally {
-				this.sending = false
-			}
+			} catch(e) { console.error('Send failed', e) } finally { this.sending = false }
 		},
 	},
 }
 </script>
 
 <style scoped>
-.compose-editor { padding: 16px; max-width: 640px; margin: 0 auto; }
-.compose-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.compose-header h2 { margin: 0; font-size: 16px; }
+.compose-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--color-main-background); display: flex; flex-direction: column; }
+.compose-modal { display: flex; flex-direction: column; height: 100%; }
+.compose-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--color-background-dark); border-bottom: 1px solid var(--color-border); }
+.compose-header-right { display: flex; gap: 8px; }
+.compose-fields { padding: 16px; }
 .compose-field { margin-bottom: 10px; }
-.compose-field label { display: block; font-size: 11px; color: var(--color-text-maxcontrast); margin-bottom: 2px; }
-.compose-body { width: 100%; resize: vertical; font: inherit; padding: 8px; border: 1px solid var(--color-border); border-radius: 4px; background: var(--color-main-background); color: var(--color-main-text); }
-.compose-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-.compose-attach-chip { display: flex; align-items: center; gap: 4px; background: var(--color-background-dark); border-radius: 12px; padding: 2px 8px; font-size: 12px; }
-.compose-footer { display: flex; justify-content: space-between; align-items: center; }
-.compose-file-input { display: none; }
+.compose-field label { display: block; font-size: 11px; color: var(--color-text-maxcontrast); margin-bottom: 3px; }
+.compose-input { width: 100%; }
+.compose-tabs { display: flex; border-bottom: 1px solid var(--color-border); padding: 0 16px; }
+.compose-tab { padding: 8px 16px; border: none; background: none; cursor: pointer; font: inherit; color: var(--color-text-maxcontrast); border-bottom: 2px solid transparent; }
+.compose-tab.active { color: var(--color-main-text); border-bottom-color: var(--color-primary-element); }
+.compose-tab-badge { background: var(--color-primary-element); color: var(--color-primary-text); border-radius: 10px; padding: 0 6px; font-size: 11px; margin-left: 4px; }
+.compose-body-pane { flex: 1; overflow: hidden; display: flex; }
+.compose-body-textarea { flex: 1; border: none; padding: 16px; font: inherit; resize: none; background: var(--color-main-background); color: var(--color-main-text); }
+.compose-body-textarea:focus { outline: none; }
+.compose-attach-pane { flex: 1; padding: 16px; overflow-y: auto; }
+.attach-list { margin-top: 12px; }
+.attach-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--color-background-dark); border-radius: 6px; margin-bottom: 6px; }
+.attach-size { font-size: 12px; color: var(--color-text-maxcontrast); }
+.hidden-file-input { display: none; }
 </style>
