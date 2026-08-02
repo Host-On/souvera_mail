@@ -99,12 +99,18 @@ class AppPasswordService
         'sieveGetScript', 'sievePutScript', 'sieveDeleteScript',
         'sieveRenameScript', 'sieveCheckScript', 'sieveHaveSpace',
 
-        // ── JMAP (Souvera Android App, Stalwart v1.0.x) ───────────
-        'jmapAuthenticate',
-        'jmapEmailGet', 'jmapEmailQuery', 'jmapEmailSet',
-        'jmapEmailSubmission',
-        'jmapMailboxGet', 'jmapMailboxQuery',
+        // ── JMAP (Souvera Android App, Stalwart v0.16.15) ────────────
+        'jmapEmailGet',
+        'jmapEmailQuery',
+        'jmapEmailCreate',
+        'jmapEmailUpdate',
+        'jmapEmailDestroy',
+        'jmapEmailSubmissionCreate',
+        'jmapMailboxGet',
         'jmapBlobGet',
+        'jmapBlobUpload',
+        'jmapPushSubscriptionCreate',
+        'jmapPushSubscriptionGet',
     ];
 
     /**
