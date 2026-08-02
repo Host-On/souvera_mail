@@ -25,6 +25,7 @@ class PageController extends Controller
         private EngineHelper $engineHelper,
         private IURLGenerator $urlGenerator,
         private ?string $userId,
+        private \OCP\IConfig $config,
     ) {
         parent::__construct($appName, $request);
     }
@@ -34,6 +35,9 @@ class PageController extends Controller
     #[NoCSRFRequired]
     public function index(string $target = '')
     {
+        if ($this->config->getAppValue('souvera_mail', 'v2_enabled', '0') === '1') {
+            return $this->renderV2();
+        }
         return $this->renderMailApp(false);
     }
 
@@ -247,6 +251,17 @@ class PageController extends Controller
     #[NoCSRFRequired]
     public function indexPost(): void
     {
+        // When v2 is enabled, AJAX/POST requests from the old SnappyMail
+        // engine must still be forwarded to it (the v2 client uses its own
+        // API controllers at /api/v2/*).
         $this->engineHelper->startApp(true);
+    }
+
+    /** Renders the Vue-3 v2 client (feature-flagged). */
+    private function renderV2(): TemplateResponse
+    {
+        \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
+        \OCP\Util::addStyle('souvera_mail', 'main');
+        return new TemplateResponse('souvera_mail', 'v2', []);
     }
 }

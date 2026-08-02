@@ -4,6 +4,7 @@ const { VueLoaderPlugin } = require('vue-loader')
 module.exports = {
 	entry: {
 		'migration-wizard': path.resolve(__dirname, 'src/main.js'),
+		v2: path.resolve(__dirname, 'src-v2/main.js'),
 	},
 	output: {
 		path: path.resolve(__dirname, 'js'),

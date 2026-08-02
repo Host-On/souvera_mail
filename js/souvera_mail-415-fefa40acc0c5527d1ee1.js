@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunksouvera_mail||=[]).push([[415],{1415(a,s,u){u.r(s),u.d(s,{default:()=>e.N});var e=u(3959)}}]);
