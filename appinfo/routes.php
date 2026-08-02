@@ -320,5 +320,10 @@ return [
             'url' => '/api/v2/emails/{id}/read',
             'verb' => 'POST',
         ],
+        [
+            'name' => 'v2_compose#send',
+            'url' => '/api/v2/send',
+            'verb' => 'POST',
+        ],
     ],
 ];
