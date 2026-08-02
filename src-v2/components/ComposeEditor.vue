@@ -9,12 +9,12 @@
 
 		<div class="compose-field">
 			<label>{{ t('souvera_mail', 'To') }}</label>
-			<NcTextField :value.sync="toStr" :placeholder="t('souvera_mail', 'recipient@example.com')"
+			<NcTextField v-model:value="toStr" :placeholder="t('souvera_mail', 'recipient@example.com')"
 				:disabled="sending" />
 		</div>
 		<div class="compose-field">
 			<label>{{ t('souvera_mail', 'Subject') }}</label>
-			<NcTextField :value.sync="subject" :placeholder="t('souvera_mail', 'Subject...')"
+			<NcTextField v-model:value="subject" :placeholder="t('souvera_mail', 'Subject...')"
 				:disabled="sending" />
 		</div>
 

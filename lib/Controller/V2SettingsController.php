@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\SouveraMail\V2\Controller;
+namespace OCA\SouveraMail\Controller;
 
 use OCA\SouveraMail\Service\AppPasswordService;
 use OCP\AppFramework\Controller;

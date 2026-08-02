@@ -18,7 +18,7 @@
 			</NcButton>
 
 			<div v-if="showCreate" class="create-form">
-				<NcTextField :value.sync="newName" :placeholder="t('souvera_mail', 'Name (e.g. Android, iOS)')" />
+				<NcTextField v-model:value="newName" :placeholder="t('souvera_mail', 'Name (e.g. Android, iOS)')" />
 				<NcButton type="primary" @click="create" :disabled="newName.trim() === ''">
 					{{ t('souvera_mail', 'Create') }}
 				</NcButton>

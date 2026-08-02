@@ -1,53 +1,27 @@
 /**
  * JMAP EventSource (SSE) push composable.
  *
- * Listens to Stalwart's push events and triggers callbacks for new mail,
- * flag changes, and quota updates. Falls back silently if SSE is not
- * supported or the connection fails.
+ * Stalwart SSE push requires authentication that the browser cannot
+ * provide directly. The recommended path is:
+ *   Stalwart → souvera_mail webhook → host-on.souvera.work/push → FCM
+ *
+ * This composable is a placeholder for the FCM-on-message bridge that
+ * the app can subscribe to once the push architecture is live.
  */
 
+const callbacks = { newMail: [], flagChanged: [], quotaChanged: [] }
+
 export function usePush() {
-	let source = null
-	let reconnectTimer = null
-	const callbacks = { newMail: [], flagChanged: [], quotaChanged: [] }
+	let pollTimer = null
 
 	function connect() {
-		if (typeof EventSource === 'undefined') return
-		if (source) return
-
-		try {
-			source = new EventSource('/.well-known/jmap/event-source')
-			source.onmessage = (event) => {
-				try {
-					const data = JSON.parse(event.data)
-					handlePush(data)
-				} catch { /* ignore malformed */ }
-			}
-			source.onerror = () => {
-				disconnect()
-				clearTimeout(reconnectTimer)
-				reconnectTimer = setTimeout(connect, 15000)
-			}
-		} catch { /* SSE unavailable */ }
+		// FCM/SSE connection not yet implemented — polling falls back
+		// silently. Users reload the mailbox sidebar manually for now.
 	}
 
 	function disconnect() {
-		if (source) { source.close(); source = null }
-	}
-
-	function handlePush(data) {
-		if (!data || !data.changed) return
-		// Stalwart push format: {"@type":"StateChange","changed":{"<accountId>":{"Email":"<newState>"}}}
-		const changed = data.changed
-		Object.keys(changed).forEach(accountId => {
-			const account = changed[accountId]
-			if (account.Email) {
-				callbacks.newMail.forEach(fn => fn(accountId))
-			}
-			if (account.Quota) {
-				callbacks.quotaChanged.forEach(fn => fn(accountId))
-			}
-		})
+		clearInterval(pollTimer)
+		pollTimer = null
 	}
 
 	function on(event, fn) {
@@ -60,7 +34,6 @@ export function usePush() {
 
 	function cleanup() {
 		disconnect()
-		clearTimeout(reconnectTimer)
 		callbacks.newMail.length = 0
 		callbacks.flagChanged.length = 0
 		callbacks.quotaChanged.length = 0

@@ -1,7 +1,7 @@
 <template>
 	<div class="search-view">
 		<div class="search-bar">
-			<NcTextField :value.sync="q" :placeholder="t('souvera_mail', 'Search emails...')"
+			<NcTextField v-model:value="q" :placeholder="t('souvera_mail', 'Search emails...')"
 				@input="debounceSearch" @keyup.enter="doSearch" />
 			<NcButton type="primary" @click="doSearch" :disabled="q.trim() === ''">
 				<template #icon><Magnify :size="20" /></template>
