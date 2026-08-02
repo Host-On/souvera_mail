@@ -180,20 +180,14 @@ class V2MailboxController extends Controller
                 'accountId' => $accountId, 'ids' => [$bid],
             ]);
             $blist = $bresult['data']['list'] ?? [];
-            $bdata = $blist[0]['data:asBase64'] ?? ($blist[0]['data'] ?? null);
-            if (\is_string($bdata) && $bdata !== '') {
-                $htmlBody = \base64_decode($bdata, true) ?: $bdata;
-            }
+            $htmlBody = $this->extractBlobBody($blist[0] ?? []);
         }
         if ($plainBody === null && $textPart !== null && ($bid = ($textPart['blobId'] ?? '')) !== '') {
             $bresult = $this->jmap->singleCall('Blob/get', [
                 'accountId' => $accountId, 'ids' => [$bid],
             ]);
             $blist = $bresult['data']['list'] ?? [];
-            $bdata = $blist[0]['data:asBase64'] ?? ($blist[0]['data'] ?? null);
-            if (\is_string($bdata) && $bdata !== '') {
-                $plainBody = \base64_decode($bdata, true) ?: $bdata;
-            }
+            $plainBody = $this->extractBlobBody($blist[0] ?? []);
         }
 
         $attachments = [];
@@ -328,6 +322,24 @@ class V2MailboxController extends Controller
         }
 
         return new JSONResponse(['success' => true]);
+    }
+
+    private function extractBlobBody(array $blob): ?string
+    {
+        // Stalwart 0.16 returns small/UTF-8 blobs as data:asText
+        $text = $blob['data:asText'] ?? null;
+        if (\is_string($text) && $text !== '') {
+            return $text;
+        }
+        // Larger blobs come as base64
+        $b64 = $blob['data:asBase64'] ?? null;
+        if (\is_string($b64) && $b64 !== '') {
+            $decoded = \base64_decode($b64, true);
+            return ($decoded !== false) ? $decoded : null;
+        }
+        // Fallback: raw data key (may be plain text for tiny blobs)
+        $raw = $blob['data'] ?? null;
+        return \is_string($raw) && $raw !== '' ? $raw : null;
     }
 
     #[NoAdminRequired]
