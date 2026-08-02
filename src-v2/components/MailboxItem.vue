@@ -10,7 +10,7 @@
 			<component :is="icon" :size="20" />
 		</template>
 		<template #counter v-if="mailbox.unread > 0">
-			<NcCounterBubble>{{ mailbox.unread }}</NcCounterBubble>
+			<NcCounterBubble :count="mailbox.unread" />
 		</template>
 
 		<template v-if="open && children.length > 0">

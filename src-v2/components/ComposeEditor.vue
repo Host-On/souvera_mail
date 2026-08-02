@@ -53,7 +53,7 @@
 						</NcButton>
 					</div>
 				</div>
-				<NcEmptyContent v-else :title="t('souvera_mail', 'No attachments')" />
+				<NcEmptyContent v-else :name="t('souvera_mail', 'No attachments')" />
 			</div>
 		</div>
 	</NcModal>
@@ -77,8 +77,8 @@ export default {
 	data() {
 		return {
 			visible: true, tab: 'body',
-			toStr: this.replyTo?.fromAddress || '',
-			subject: this.replyTo?.subject ? 'Re: ' + this.replyTo.subject : '',
+			toStr: this.replyTo?.fromAddress || (this.forwardOf?.fromAddress || ''),
+			subject: this.replyTo?.subject ? 'Re: ' + this.replyTo.subject : (this.forwardOf?.subject ? 'Fwd: ' + this.forwardOf.subject : ''),
 			bodyText: '', fromAddr: '',
 			attachments: [], sending: false, contactSuggestions: [],
 		}
@@ -100,7 +100,7 @@ export default {
 				try {
 					const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/contacts/search'), { params: { q, limit: 8 } })
 					this.contactSuggestions = data.contacts || []
-				} catch { this.contactSuggestions = [] }
+				} catch (e) { console.error('Contact search failed', e); this.contactSuggestions = [] }
 			}, 300)
 		},
 		selectContact(contact) {
@@ -131,7 +131,7 @@ export default {
 					inReplyTo: this.replyTo?.messageId || null,
 				})
 				this.$emit('sent')
-			} catch { } finally { this.sending = false }
+			} catch (e) { console.error('Send failed', e) } finally { this.sending = false }
 		},
 	},
 	beforeUnmount() { clearTimeout(searchTimer) },

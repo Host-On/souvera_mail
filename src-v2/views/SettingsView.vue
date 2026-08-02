@@ -15,11 +15,11 @@
 			<h3>{{ t('souvera_mail', 'Shared folders') }}</h3>
 			<p class="settings-muted">{{ t('souvera_mail', 'Shared folders are mailboxes that other users have granted you access to.') }}</p>
 			<div class="shared-position-row">
-				<NcCheckboxRadioSwitch :checked="sharedAbove" type="radio"
+				<NcCheckboxRadioSwitch :model-value="sharedAbove" type="radio"
 					@update:modelValue="setSharedPosition(true)">
 					{{ t('souvera_mail', 'Show shared folders above own folders') }}
 				</NcCheckboxRadioSwitch>
-				<NcCheckboxRadioSwitch :checked="!sharedAbove" type="radio"
+				<NcCheckboxRadioSwitch :model-value="!sharedAbove" type="radio"
 					@update:modelValue="setSharedPosition(false)">
 					{{ t('souvera_mail', 'Show shared folders below own folders') }}
 				</NcCheckboxRadioSwitch>
@@ -76,37 +76,37 @@ export default {
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/quota'))
 				this.quotaUsed = data.used||0; this.quotaTotal = data.total||0
-			} catch {}
+			} catch (e) { console.error('Failed to load quota', e) }
 		},
 		async loadPasswords() {
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'))
 				this.passwords = data.passwords||[]
-			} catch {}
+			} catch (e) { console.error('Failed to load passwords', e) }
 		},
 		async create() {
 			try {
 				const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'), { name: this.newName })
 				this.passwords.push(data); this.showCreate=false; this.newName=''
-			} catch {}
+			} catch (e) { console.error('Failed to create password', e) }
 		},
 		async remove(id) {
 			try {
 				await axios.delete(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords/' + id))
 				this.passwords = this.passwords.filter(p => p.id !== id)
-			} catch {}
+			} catch (e) { console.error('Failed to remove password', e) }
 		},
 		async loadShared() {
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/shared'))
 				this.sharedAbove = data.position === 'above'
-			} catch {}
+			} catch (e) { console.error('Failed to load shared', e) }
 		},
 		async setSharedPosition(above) {
 			this.sharedAbove = above
 			try {
 				await axios.put(generateUrl('/apps/souvera_mail/api/v2/shared/position'), { position: above ? 'above' : 'below' })
-			} catch {}
+			} catch (e) { console.error('Failed to set shared position', e) }
 		},
 	},
 }

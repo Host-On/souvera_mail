@@ -31,7 +31,7 @@
 					@next="goNext" />
 			</template>
 
-			<NcEmptyContent v-else :title="t('souvera_mail', 'No messages')">
+			<NcEmptyContent v-else :name="t('souvera_mail', 'No messages')">
 				<template #icon><EmailOutline :size="64" /></template>
 			</NcEmptyContent>
 		</div>
@@ -50,7 +50,7 @@
 				@delete="deleteEmail" />
 		</div>
 
-		<NcEmptyContent v-else :title="t('souvera_mail', 'Select a message')"
+		<NcEmptyContent v-else :name="t('souvera_mail', 'Select a message')"
 			class="mail-detail-empty">
 			<template #icon><EmailOutline :size="64" /></template>
 		</NcEmptyContent>
@@ -94,7 +94,7 @@ export default {
 	methods: {
 		async loadEmails() {
 			this.loadingEmails = true
-			try { const r = await fetchEmails(this.selectedMailbox, this.limit, this.offset); this.emails = r.emails; this.emailTotal = r.total } catch {} finally { this.loadingEmails = false }
+			try { const r = await fetchEmails(this.selectedMailbox, this.limit, this.offset); this.emails = r.emails; this.emailTotal = r.total } catch (e) { console.error('Failed to load emails', e) } finally { this.loadingEmails = false }
 		},
 		async refreshEmails() { this.checkedIds.clear(); this.offset = 0; await this.loadEmails() },
 		toggleCheck(id) {
@@ -103,14 +103,14 @@ export default {
 		},
 		async bulkMarkRead() {
 			for (const id of this.checkedIds) {
-				try { await markEmailRead(id, true) } catch {}
+				try { await markEmailRead(id, true) } catch (e) { console.error('Failed to mark read', e) }
 			}
 			this.checkedIds.clear()
 			await this.loadEmails()
 		},
 		async bulkDelete() {
 			for (const id of this.checkedIds) {
-				try { await deleteEmailApi(id) } catch {}
+				try { await deleteEmailApi(id) } catch (e) { console.error('Failed to delete', e) }
 			}
 			this.checkedIds.clear()
 			await this.loadEmails()
@@ -123,7 +123,7 @@ export default {
 				this.emailBodyHtml = body.htmlBody || ''; this.emailBodyPlain = body.plainBody || ''
 				this.selectedEmail = { ...email, ...body }
 				await markEmailRead(email.id, true)
-			} catch {} finally { this.loadingBody = false }
+			} catch (e) { console.error('Failed to open email', e) } finally { this.loadingBody = false }
 		},
 		onReply() {
 			const d = { fromAddress: this.selectedEmail.fromAddress, subject: this.selectedEmail.subject, messageId: this.selectedEmail.messageId }
@@ -135,11 +135,11 @@ export default {
 		},
 		async deleteEmail() {
 			if (!this.selectedEmail) return
-			try { await deleteEmailApi(this.selectedEmail.id); this.selectedEmail = null; await this.refreshEmails() } catch {}
+			try { await deleteEmailApi(this.selectedEmail.id); this.selectedEmail = null; await this.refreshEmails() } catch (e) { console.error('Failed to delete email', e) }
 		},
 		async onMove(mailboxId) {
 			if (!this.selectedEmail) return
-			try { await moveEmail(this.selectedEmail.id, mailboxId); this.selectedEmail = null; await this.refreshEmails() } catch {}
+			try { await moveEmail(this.selectedEmail.id, mailboxId); this.selectedEmail = null; await this.refreshEmails() } catch (e) { console.error('Failed to move email', e) }
 		},
 		goPrev() { if (this.offset > 0) { this.offset = Math.max(0, this.offset - this.limit); this.loadEmails() } },
 		goNext() { if (this.offset + this.limit < this.emailTotal) { this.offset += this.limit; this.loadEmails() } },

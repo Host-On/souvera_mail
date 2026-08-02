@@ -18,8 +18,8 @@ export default {
 		const q = this.$route.query
 		let reply = null, forward = null
 		try {
-			if (q.reply) reply = JSON.parse(decodeURIComponent(q.reply))
-			if (q.forward) forward = JSON.parse(decodeURIComponent(q.forward))
+			if (q.reply) reply = JSON.parse(q.reply)
+			if (q.forward) forward = JSON.parse(q.forward)
 		} catch {}
 		return { replyEmail: reply, forwardEmail: forward }
 	},

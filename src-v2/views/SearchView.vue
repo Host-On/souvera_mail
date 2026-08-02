@@ -18,10 +18,10 @@
 				<div class="search-row__preview">{{ r.preview }}</div>
 			</li>
 		</ul>
-		<NcEmptyContent v-else-if="q && !searching" :title="t('souvera_mail', 'No results')">
+		<NcEmptyContent v-else-if="q && !searching" :name="t('souvera_mail', 'No results')">
 			<template #icon><Magnify :size="64" /></template>
 		</NcEmptyContent>
-		<NcEmptyContent v-else :title="t('souvera_mail', 'Search your emails')">
+		<NcEmptyContent v-else :name="t('souvera_mail', 'Search your emails')">
 			<template #icon><Magnify :size="64" /></template>
 		</NcEmptyContent>
 	</div>
@@ -45,7 +45,7 @@ export default {
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/search'), { params: { q: this.q, limit: 50 } })
 				this.results = data.results || []
-			} catch { this.results = [] } finally { this.searching = false }
+			} catch (e) { console.error('Search failed', e); this.results = [] } finally { this.searching = false }
 		},
 	},
 	beforeUnmount() { clearTimeout(timer) },

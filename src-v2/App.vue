@@ -103,7 +103,7 @@ export default {
 				const { generateUrl } = await import('@nextcloud/router')
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/quota'))
 				this.quotaUsed = data.used ?? 0; this.quotaTotal = data.total ?? 0
-			} catch {}
+			} catch (e) { console.error('Failed to load quota', e) }
 		},
 		async loadShared() {
 			try {
@@ -112,7 +112,7 @@ export default {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/shared'))
 				this.sharedFolders = data.shared || []
 				this.sharedAbove = data.position === 'above'
-			} catch {}
+			} catch (e) { console.error('Failed to load shared', e) }
 		},
 	},
 }

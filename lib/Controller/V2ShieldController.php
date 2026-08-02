@@ -41,9 +41,23 @@ class V2ShieldController extends Controller
         }
 
         $limit = \min(100, \max(1, (int) ($this->request->getParam('limit') ?? 50)));
+
+        $mailboxesResult = $this->jmap->singleCall('Mailbox/get', ['accountId' => $accountId]);
+        $junkId = null;
+        foreach ($mailboxesResult['data']['list'] ?? [] as $mb) {
+            if (($mb['role'] ?? '') === 'junk') {
+                $junkId = $mb['id'];
+                break;
+            }
+        }
+
+        if ($junkId === null) {
+            return new JSONResponse(['emails' => [], 'total' => 0]);
+        }
+
         $queryResult = $this->jmap->singleCall('Email/query', [
             'accountId' => $accountId,
-            'filter' => ['inMailboxOtherThan' => ['']],
+            'filter' => ['inMailbox' => $junkId],
             'sort' => [['property' => 'receivedAt', 'isAscending' => false]],
             'position' => 0,
             'limit' => $limit,

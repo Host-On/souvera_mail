@@ -316,6 +316,11 @@ return [
             'verb' => 'GET',
         ],
         [
+            'name' => 'v2_mailbox#delete',
+            'url' => '/api/v2/emails/{id}',
+            'verb' => 'DELETE',
+        ],
+        [
             'name' => 'v2_mailbox#markRead',
             'url' => '/api/v2/emails/{id}/read',
             'verb' => 'POST',

@@ -170,8 +170,8 @@ class V2MailboxController extends Controller
         $htmlPart = $email['htmlBody'][0] ?? null;
         $textPart = $email['textBody'][0] ?? null;
 
-        $htmlBody = $bodyValues[$htmlPart['partId'] ?? $htmlPart['blobId'] ?? ''] ?? null;
-        $plainBody = $bodyValues[$textPart['partId'] ?? $textPart['blobId'] ?? ''] ?? null;
+        $htmlBody = ($bodyValues[$htmlPart['partId'] ?? $htmlPart['blobId'] ?? ''] ?? [])['value'] ?? null;
+        $plainBody = ($bodyValues[$textPart['partId'] ?? $textPart['blobId'] ?? ''] ?? [])['value'] ?? null;
 
         // Stalwart stores bodies as blobs — fall back to Blob/get when
         // bodyValues is empty (fetchTextBodyValues not honored).
@@ -232,7 +232,8 @@ class V2MailboxController extends Controller
             return new JSONResponse(['error' => 'Not authenticated'], 401);
         }
 
-        $isRead = $this->request->getParam('isRead', '1') === '1';
+        $body = \json_decode(\file_get_contents('php://input'), true);
+        $isRead = (bool) ($body['isRead'] ?? true);
         $update = $isRead
             ? ['keywords/$add' => ['$seen' => true]]
             : ['keywords/$remove' => ['$seen']];
@@ -357,15 +358,7 @@ class V2MailboxController extends Controller
         $blob = $result['data']['list'][0] ?? null;
         if ($blob === null) return new JSONResponse(['error' => 'Blob not found'], 404);
         $data = \base64_decode($blob['data:asBase64'] ?? '', true) ?: '';
-        $response = new \OCP\AppFramework\Http\Response();
-        $response->setHeaders([
-            'Content-Type' => $blob['type'] ?? 'application/octet-stream',
-            'Content-Disposition' => 'attachment; filename="' . \addcslashes($name, '"') . '"',
-            'Content-Length' => (string) (\strlen($data)),
-        ]);
-        $response->setStatus(200);
-        $response->setBody($data);
-        return $response;
+        return new \OCP\AppFramework\Http\DataDownloadResponse($data, $name, $blob['type'] ?? 'application/octet-stream');
     }
 
     /**

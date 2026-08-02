@@ -136,7 +136,7 @@ class V2ComposeController extends Controller
             ]],
             ['EmailSubmission/set', [
                 'accountId' => $accountId,
-                'onSuccessCreateEmail' => ['#c' . ($this->jmapCallNumForSubmission() + 0) => 'send1'],
+                'onSuccessUpdateEmail' => ['#c' . ($this->jmapCallNumForSubmission() + 0) => 'send1'],
                 'create' => ['send1' => [
                     'emailId' => '#draft1',
                     'identityId' => $identityId,

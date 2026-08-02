@@ -82,10 +82,11 @@ import TrashCan from 'vue-material-design-icons/TrashCan.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import FolderMove from 'vue-material-design-icons/FolderMove.vue'
 import Close from 'vue-material-design-icons/Close.vue'
+import DOMPurify from 'dompurify'
 
 function sanitizeHtml(html) {
 	if (!html) return ''
-	return html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '').replace(/on\w+="[^"]*"/gi, '').replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+	return DOMPurify.sanitize(html, { ALLOWED_TAGS: ['b','i','em','strong','a','p','br','ul','ol','li','h1','h2','h3','h4','h5','h6','blockquote','pre','code','img','table','thead','tbody','tr','td','th','div','span','font'], ALLOWED_ATTR: ['href','src','alt','title','width','height','style','class','target','rel'] })
 }
 
 export default {

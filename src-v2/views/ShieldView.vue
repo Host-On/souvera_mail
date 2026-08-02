@@ -21,7 +21,7 @@
 					</div>
 				</div>
 			</div>
-			<NcEmptyContent v-else :title="t('souvera_mail', 'Junk mailbox is empty')">
+			<NcEmptyContent v-else :name="t('souvera_mail', 'Junk mailbox is empty')">
 				<template #icon><ShieldCheck :size="64" /></template>
 			</NcEmptyContent>
 		</section>
@@ -43,11 +43,11 @@ export default {
 		async loadJunk() {
 			this.loading = true
 			try { const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/shield/quarantine')); this.junk = data.emails || [] }
-			catch {} finally { this.loading = false }
+			catch (e) { console.error('Failed to load spam', e) } finally { this.loading = false }
 		},
 		async report(emailId, action) {
 			try { await axios.post(generateUrl('/apps/souvera_mail/api/v2/shield/report'), { emailId, action }); await this.loadJunk() }
-			catch {}
+			catch (e) { console.error('Failed to report spam', e) }
 		},
 	},
 }

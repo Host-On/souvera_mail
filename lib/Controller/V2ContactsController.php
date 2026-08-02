@@ -8,7 +8,7 @@ use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
-use OCP\IContactsManager;
+use OCP\Contacts\IManager;
 use OCP\IRequest;
 
 class V2ContactsController extends Controller
@@ -16,7 +16,7 @@ class V2ContactsController extends Controller
     public function __construct(
         string $appName,
         IRequest $request,
-        private IContactsManager $contactsManager,
+        private IManager $contactsManager,
     ) {
         parent::__construct($appName, $request);
     }
