@@ -27,7 +27,7 @@
 			<div v-if="passwords.length > 0" class="password-list">
 				<div v-for="pw in passwords" :key="pw.id" class="password-row">
 					<span>{{ pw.name }} <code v-if="pw.password">{{ pw.password }}</code></span>
-					<NcButton variant="tertiary" size="small" @click="remove(pw.id)">
+					<NcButton variant="tertiary" size="small" :aria-label="t('souvera_mail', 'Delete')" @click="remove(pw.id)">
 						<template #icon><TrashCan :size="16" /></template>
 					</NcButton>
 				</div>

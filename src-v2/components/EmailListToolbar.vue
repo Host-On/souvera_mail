@@ -1,6 +1,6 @@
 <template>
 	<div class="email-list-toolbar">
-		<NcButton variant="tertiary" @click="$emit('refresh')">
+		<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Refresh')" @click="$emit('refresh')">
 			<template #icon><Refresh :size="20" /></template>
 		</NcButton>
 		<NcButton variant="primary" @click="$emit('compose')">

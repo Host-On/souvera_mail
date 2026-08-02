@@ -7,7 +7,7 @@
 					{{ sending ? t('souvera_mail', 'Sending...') : t('souvera_mail', 'Send') }}
 				</NcButton>
 				<div class="compose-header-right">
-					<NcButton variant="tertiary" @click="$emit('cancel')">
+					<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Close')" @click="$emit('cancel')">
 						<template #icon><Close :size="20" /></template>
 					</NcButton>
 				</div>
@@ -54,7 +54,7 @@
 					<div v-for="(att, idx) in attachments" :key="idx" class="attach-item">
 						<span>{{ att.name }}</span>
 						<span class="attach-size">{{ formatSize(att.data.length * 0.75) }}</span>
-						<NcButton variant="tertiary" size="small" @click="attachments.splice(idx, 1)">
+						<NcButton variant="tertiary" size="small" :aria-label="t('souvera_mail', 'Remove attachment')" @click="attachments.splice(idx, 1)">
 							<template #icon><Close :size="14" /></template>
 						</NcButton>
 					</div>

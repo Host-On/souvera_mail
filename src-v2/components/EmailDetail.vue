@@ -1,17 +1,17 @@
 <template>
 	<div class="email-detail" v-if="email">
 		<div class="email-detail__toolbar">
-			<NcButton variant="tertiary" @click="$emit('close')">
+			<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Back')" @click="$emit('close')">
 				<template #icon><ArrowLeft :size="20" /></template>
 			</NcButton>
 			<div class="email-detail__actions">
-				<NcButton variant="tertiary" @click="$emit('reply')">
+				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Reply')" @click="$emit('reply')">
 					<template #icon><Reply :size="20" /></template>
 				</NcButton>
-				<NcButton variant="tertiary" @click="$emit('forward')">
+				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Forward')" @click="$emit('forward')">
 					<template #icon><Forward :size="20" /></template>
 				</NcButton>
-				<NcButton variant="tertiary" @click="$emit('delete')">
+				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Delete')" @click="$emit('delete')">
 					<template #icon><TrashCan :size="20" /></template>
 				</NcButton>
 			</div>
