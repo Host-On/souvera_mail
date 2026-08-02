@@ -1,193 +1,134 @@
 <template>
 	<div class="mail-home">
-		<MailboxSidebar
-			:mailboxes="mailboxes"
-			:selected="selectedMailbox"
-			:loading="loadingMailboxes"
-			@select="onSelectMailbox" />
+		<div class="mail-list-panel" :style="{ width: listWidth }">
+			<EmailListToolbar
+				:selected-count="0"
+				@refresh="refreshEmails"
+				@compose="$router.push({name:'compose'})" />
 
-		<div class="mail-content" v-if="!selectedEmail">
 			<div v-if="loadingEmails" class="mail-loading">
 				<span class="icon-loading" />
-				<p>{{ t('souvera_mail', 'Loading...') }}</p>
 			</div>
 
 			<template v-else-if="emails.length > 0">
-				<div class="mail-toolbar">
-					<NcButton type="tertiary" @click="refreshEmails">
-						<template #icon><Refresh :size="20" /></template>
-					</NcButton>
-					<NcButton type="primary" @click="goCompose">
-						<template #icon><Pencil :size="20" /></template>
-						{{ t('souvera_mail', 'New') }}
-					</NcButton>
+				<div class="email-items">
+					<EmailListItem
+						v-for="email in emails"
+						:key="email.id"
+						:email="email"
+						:active="selectedEmail?.id === email.id"
+						@click="onOpenEmail(email)" />
 				</div>
-				<EmailList
-					:emails="emails"
-					:total="emailTotal"
+				<PaginationBar
 					:offset="offset"
 					:limit="limit"
+					:total="emailTotal"
 					@prev="goPrev"
-					@next="goNext"
-					@open="onOpenEmail" />
+					@next="goNext" />
 			</template>
 
 			<NcEmptyContent v-else :title="t('souvera_mail', 'No messages')">
 				<template #icon><EmailOutline :size="64" /></template>
 			</NcEmptyContent>
-
-			<div v-if="errorMsg" class="mail-error">{{ errorMsg }}</div>
 		</div>
 
-		<EmailDetail
-			v-else
-			:email="selectedEmail"
-			:html-body="emailBodyHtml"
-			:plain-body="emailBodyPlain"
-			:loading="loadingBody"
-			@close="selectedEmail = null"
-			@reply="onReply"
-			@forward="onForward"
-			@flag="toggleFlag"
-			@delete="deleteEmail" />
+		<div v-if="selectedEmail" class="mail-detail-panel">
+			<EmailDetail
+				:email="selectedEmail"
+				:html-body="emailBodyHtml"
+				:plain-body="emailBodyPlain"
+				:loading="loadingBody"
+				@close="selectedEmail = null"
+				@reply="onReply"
+				@forward="onForward"
+				@delete="deleteEmail" />
+		</div>
+
+		<NcEmptyContent v-else :title="t('souvera_mail', 'Select a message')"
+			class="mail-detail-empty">
+			<template #icon><EmailOutline :size="64" /></template>
+		</NcEmptyContent>
 	</div>
 </template>
 
 <script>
-import { NcButton, NcEmptyContent } from '@nextcloud/vue'
-import Refresh from 'vue-material-design-icons/Refresh.vue'
-import Pencil from 'vue-material-design-icons/Pencil.vue'
+import { NcEmptyContent } from '@nextcloud/vue'
 import EmailOutline from 'vue-material-design-icons/EmailOutline.vue'
 import { useJmapClient } from '../composables/useJmapClient.js'
-import MailboxSidebar from '../components/MailboxSidebar.vue'
-import EmailList from '../components/EmailList.vue'
+import EmailListToolbar from '../components/EmailListToolbar.vue'
+import EmailListItem from '../components/EmailListItem.vue'
+import PaginationBar from '../components/PaginationBar.vue'
 import EmailDetail from '../components/EmailDetail.vue'
 
-const { fetchMailboxes, fetchEmails, fetchEmailBody, toggleEmailFlag, deleteEmailApi } = useJmapClient()
+const { fetchEmails, fetchEmailBody, deleteEmailApi, markEmailRead } = useJmapClient()
 
 export default {
 	name: 'MailHomeView',
-	components: { MailboxSidebar, EmailList, EmailDetail, NcButton, NcEmptyContent, Refresh, Pencil, EmailOutline },
-		data() {
+	components: { EmailListToolbar, EmailListItem, PaginationBar, EmailDetail, NcEmptyContent, EmailOutline },
+	props: {
+		selectedMailbox: { type: String, default: '' },
+	},
+	data() {
 		return {
-			mailboxes: [],
-			selectedMailbox: '',
-			emails: [],
-			emailTotal: 0,
-			offset: 0,
-			limit: 50,
-			loadingMailboxes: true,
-			loadingEmails: false,
-			errorMsg: '',
+			emails: [], emailTotal: 0, offset: 0, limit: 50,
+			loadingEmails: false, loadingBody: false,
 			selectedEmail: null,
-			emailBodyHtml: '',
-			emailBodyPlain: '',
-			loadingBody: false,
+			emailBodyHtml: '', emailBodyPlain: '',
+			listWidth: '420px',
 		}
 	},
+	watch: {
+		selectedMailbox() { this.offset = 0; this.selectedEmail = null; this.loadEmails() },
+	},
 	async mounted() {
-		await this.loadMailboxes()
+		if (this.selectedMailbox) await this.loadEmails()
 	},
 	methods: {
-		async loadMailboxes() {
-			this.loadingMailboxes = true
-			try {
-				this.mailboxes = await fetchMailboxes()
-				const inbox = this.mailboxes.find(m => m.role === 'inbox') || this.mailboxes[0]
-				if (inbox) {
-					this.selectedMailbox = inbox.id
-					await this.loadEmails()
-				}
-			} catch (e) {
-				this.errorMsg = 'Could not load mailboxes: ' + (e.response?.data?.error || e.message || e)
-			} finally {
-				this.loadingMailboxes = false
-			}
-		},
 		async loadEmails() {
 			this.loadingEmails = true
-			this.errorMsg = ''
 			try {
-				const result = await fetchEmails(this.selectedMailbox, this.limit, this.offset)
-				this.emails = result.emails
-				this.emailTotal = result.total
-			} catch (e) {
-				this.errorMsg = 'Could not load emails'
-			} finally {
-				this.loadingEmails = false
-			}
+				const r = await fetchEmails(this.selectedMailbox, this.limit, this.offset)
+				this.emails = r.emails; this.emailTotal = r.total
+			} catch {} finally { this.loadingEmails = false }
 		},
-		async refreshEmails() {
-			this.offset = 0
-			await this.loadEmails()
-		},
-		onSelectMailbox(mailboxId) {
-			this.selectedMailbox = mailboxId
-			this.selectedEmail = null
-			this.offset = 0
-			this.loadEmails()
-		},
+		async refreshEmails() { this.offset = 0; await this.loadEmails() },
 		async onOpenEmail(email) {
 			this.selectedEmail = email
-			this.emailBodyHtml = ''
-			this.emailBodyPlain = ''
-			this.loadingBody = true
+			this.emailBodyHtml = ''; this.emailBodyPlain = ''; this.loadingBody = true
 			try {
 				const body = await fetchEmailBody(email.id)
 				this.emailBodyHtml = body.htmlBody || ''
 				this.emailBodyPlain = body.plainBody || ''
 				this.selectedEmail = { ...email, ...body }
-			} catch (e) {
-				this.errorMsg = 'Could not load email body'
-			} finally {
-				this.loadingBody = false
-			}
-		},
-		goCompose() {
-			this.$router.push({ name: 'compose' })
+				await markEmailRead(email.id, true)
+			} catch {} finally { this.loadingBody = false }
 		},
 		onReply() {
-			const data = { fromAddress: this.selectedEmail.fromAddress, subject: this.selectedEmail.subject, messageId: this.selectedEmail.messageId }
-			this.$router.push({ name: 'compose', query: { reply: JSON.stringify(data) } })
+			const d = { fromAddress: this.selectedEmail.fromAddress, subject: this.selectedEmail.subject, messageId: this.selectedEmail.messageId }
+			this.$router.push({ name: 'compose', query: { reply: JSON.stringify(d) } })
 		},
 		onForward() {
-			const data = { fromAddress: this.selectedEmail.fromAddress, subject: this.selectedEmail.subject, messageId: this.selectedEmail.messageId }
-			this.$router.push({ name: 'compose', query: { forward: JSON.stringify(data) } })
-		},
-		async toggleFlag() {
-			if (!this.selectedEmail) return
-			const newState = !this.selectedEmail.isFlagged
-			try {
-				await toggleEmailFlag(this.selectedEmail.id, newState)
-				this.selectedEmail.isFlagged = newState
-			} catch (e) { this.errorMsg = 'Flag toggle failed' }
+			const d = { fromAddress: this.selectedEmail.fromAddress, subject: this.selectedEmail.subject, messageId: this.selectedEmail.messageId }
+			this.$router.push({ name: 'compose', query: { forward: JSON.stringify(d) } })
 		},
 		async deleteEmail() {
 			if (!this.selectedEmail) return
 			try {
 				await deleteEmailApi(this.selectedEmail.id)
-				this.selectedEmail = null
-				await this.refreshEmails()
-			} catch (e) { this.errorMsg = 'Delete failed' }
+				this.selectedEmail = null; await this.refreshEmails()
+			} catch {}
 		},
-		goPrev() {
-			if (this.offset <= 0) return
-			this.offset = Math.max(0, this.offset - this.limit)
-			this.loadEmails()
-		},
-		goNext() {
-			if (this.offset + this.limit >= this.emailTotal) return
-			this.offset += this.limit
-			this.loadEmails()
-		},
+		goPrev() { if (this.offset > 0) { this.offset = Math.max(0, this.offset - this.limit); this.loadEmails() } },
+		goNext() { if (this.offset + this.limit < this.emailTotal) { this.offset += this.limit; this.loadEmails() } },
 	},
 }
 </script>
 
 <style scoped>
 .mail-home { display: flex; height: 100%; overflow: hidden; }
-.mail-content { flex: 1; overflow-y: auto; padding: 16px; }
-.mail-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px; color: var(--color-text-maxcontrast); }
-.mail-error { background: var(--color-error); color: var(--color-error-text); padding: 8px 16px; border-radius: 4px; margin-top: 8px; }
-.mail-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.mail-list-panel { flex-shrink: 0; overflow-y: auto; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; }
+.mail-detail-panel { flex: 1; overflow-y: auto; }
+.mail-detail-empty { flex: 1; }
+.mail-loading { display: flex; justify-content: center; padding: 48px; }
+.email-items { flex: 1; overflow-y: auto; }
 </style>
