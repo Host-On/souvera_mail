@@ -63,6 +63,7 @@ import Share from 'vue-material-design-icons/Share.vue'
 import MailboxItem from './components/MailboxItem.vue'
 import QuotaDonut from './components/QuotaDonut.vue'
 import { useJmapClient } from './composables/useJmapClient.js'
+import { useHotkeys } from './composables/useHotkeys.js'
 
 const { fetchMailboxes } = useJmapClient()
 const SYSTEM_ROLES = ['inbox', 'sent', 'drafts', 'archive', 'junk', 'trash']
@@ -93,6 +94,13 @@ export default {
 			if (inbox) this.selectedMailbox = inbox.id
 		} catch(e) { console.error(e) }
 		await Promise.all([this.loadQuota(), this.loadShared()])
+		this._hotkeys = useHotkeys({
+			c: () => { if (this.$route.name !== 'compose') this.$router.push({ name: 'compose' }) },
+			'G': () => { this.$router.push({ name: 'inbox' }) },
+		})
+	},
+	beforeUnmount() {
+		this._hotkeys?.destroy()
 	},
 	methods: {
 		onMailboxSelect(id) { this.selectedMailbox = id; this.$router.push({name:'inbox'}) },

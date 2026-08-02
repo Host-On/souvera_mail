@@ -6,6 +6,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import './styles/mail.css'
+import '@nextcloud/dialogs/style.css'
 
 function bootstrap() {
 	const mount = document.getElementById('souvera-mail-v2-app')

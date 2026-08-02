@@ -7,7 +7,7 @@
 				<template #icon><Magnify :size="20" /></template>
 			</NcButton>
 		</div>
-		<div v-if="searching" class="search-loading"><span class="icon-loading" /></div>
+		<div v-if="searching" class="search-loading"><EmailListSkeleton :count="3" /></div>
 		<ul v-else-if="results.length > 0" class="search-results">
 			<li v-for="r in results" :key="r.id" class="search-row">
 				<div class="search-row__header">
@@ -30,13 +30,14 @@
 <script>
 import { NcTextField, NcButton, NcEmptyContent } from '@nextcloud/vue'
 import Magnify from 'vue-material-design-icons/Magnify.vue'
+import EmailListSkeleton from '../components/EmailListSkeleton.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 
 let timer = null
 export default {
 	name: 'SearchView',
-	components: { NcTextField, NcButton, NcEmptyContent, Magnify },
+	components: { NcTextField, NcButton, NcEmptyContent, Magnify, EmailListSkeleton },
 	data() { return { q: '', results: [], searching: false } },
 	methods: {
 		formatDate(iso) { try { return new Date(iso).toLocaleDateString([], { month:'short', day:'numeric' }) } catch { return iso } },
