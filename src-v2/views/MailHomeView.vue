@@ -50,13 +50,6 @@
 			@forward="onForward"
 			@flag="toggleFlag"
 			@delete="deleteEmail" />
-
-		<ComposeEditor
-			v-if="showCompose"
-			:reply-to="replyTarget"
-			:forward-of="forwardTarget"
-			@cancel="showCompose = false; replyTarget = null; forwardTarget = null"
-			@sent="onSent" />
 	</div>
 </template>
 
@@ -69,14 +62,13 @@ import { useJmapClient } from '../composables/useJmapClient.js'
 import MailboxSidebar from '../components/MailboxSidebar.vue'
 import EmailList from '../components/EmailList.vue'
 import EmailDetail from '../components/EmailDetail.vue'
-import ComposeEditor from '../components/ComposeEditor.vue'
 
 const { fetchMailboxes, fetchEmails, fetchEmailBody, toggleEmailFlag, deleteEmailApi } = useJmapClient()
 
 export default {
 	name: 'MailHomeView',
-	components: { MailboxSidebar, EmailList, EmailDetail, ComposeEditor, NcButton, NcEmptyContent, Refresh, Pencil, EmailOutline },
-	data() {
+	components: { MailboxSidebar, EmailList, EmailDetail, NcButton, NcEmptyContent, Refresh, Pencil, EmailOutline },
+		data() {
 		return {
 			mailboxes: [],
 			selectedMailbox: '',
@@ -91,9 +83,6 @@ export default {
 			emailBodyHtml: '',
 			emailBodyPlain: '',
 			loadingBody: false,
-			showCompose: false,
-			replyTarget: null,
-			forwardTarget: null,
 		}
 	},
 	async mounted() {
@@ -158,21 +147,12 @@ export default {
 			this.$router.push({ name: 'compose' })
 		},
 		onReply() {
-			this.replyTarget = this.selectedEmail
-			this.forwardTarget = null
-			this.showCompose = true
+			const data = { fromAddress: this.selectedEmail.fromAddress, subject: this.selectedEmail.subject, messageId: this.selectedEmail.messageId }
+			this.$router.push({ name: 'compose', query: { reply: JSON.stringify(data) } })
 		},
 		onForward() {
-			this.forwardTarget = this.selectedEmail
-			this.replyTarget = null
-			this.showCompose = true
-		},
-		onSent() {
-			this.showCompose = false
-			this.replyTarget = null
-			this.forwardTarget = null
-			this.selectedEmail = null
-			this.refreshEmails()
+			const data = { fromAddress: this.selectedEmail.fromAddress, subject: this.selectedEmail.subject, messageId: this.selectedEmail.messageId }
+			this.$router.push({ name: 'compose', query: { forward: JSON.stringify(data) } })
 		},
 		async toggleFlag() {
 			if (!this.selectedEmail) return
