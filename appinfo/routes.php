@@ -310,5 +310,15 @@ return [
             'url' => '/api/v2/emails',
             'verb' => 'GET',
         ],
+        [
+            'name' => 'v2_mailbox#detail',
+            'url' => '/api/v2/emails/{id}',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'v2_mailbox#markRead',
+            'url' => '/api/v2/emails/{id}/read',
+            'verb' => 'POST',
+        ],
     ],
 ];

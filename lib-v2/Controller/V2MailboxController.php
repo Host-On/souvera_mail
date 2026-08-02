@@ -79,7 +79,6 @@ class V2MailboxController extends Controller
         $limit = \min(100, \max(1, (int) ($this->request->getParam('limit') ?? 50)));
         $offset = \max(0, (int) ($this->request->getParam('offset') ?? 0));
 
-        // Query emails in the mailbox
         $filter = $mailboxId !== '' ? ['inMailbox' => $mailboxId] : new \stdClass();
         $queryResult = $this->jmap->singleCall('Email/query', [
             'accountId' => $accountId,
@@ -98,7 +97,6 @@ class V2MailboxController extends Controller
             return new JSONResponse(['emails' => [], 'total' => 0]);
         }
 
-        // Fetch email details
         $getResult = $this->jmap->singleCall('Email/get', [
             'accountId' => $accountId,
             'ids' => $ids,
@@ -131,5 +129,105 @@ class V2MailboxController extends Controller
         }
 
         return new JSONResponse(['emails' => $emails, 'total' => $queryResult['data']['total'] ?? \count($ids)]);
+    }
+
+    /**
+     * GET /apps/souvera_mail/api/v2/emails/{id}
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function detail(string $id): JSONResponse
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+
+        $result = $this->jmap->singleCall('Email/get', [
+            'accountId' => $accountId,
+            'ids' => [$id],
+            'properties' => ['id', 'subject', 'from', 'to', 'cc', 'bcc', 'receivedAt',
+                'size', 'hasAttachment', 'keywords', 'threadId', 'preview', 'messageId',
+                'inReplyTo', 'textBody', 'htmlBody', 'attachments', 'bodyValues'],
+            'fetchTextBodyValues' => true,
+            'fetchHTMLBodyValues' => true,
+        ]);
+
+        if (isset($result['error'])) {
+            return new JSONResponse($result, 500);
+        }
+
+        $email = $result['data']['list'][0] ?? null;
+        if ($email === null) {
+            return new JSONResponse(['error' => 'Email not found'], 404);
+        }
+
+        $fromAddr = $email['from'][0]['email'] ?? '';
+        $fromName = $email['from'][0]['name'] ?? '';
+        $toAddrs = \implode(', ', \array_map(fn($a) => ($a['name'] ?? '') . ' <' . ($a['email'] ?? '') . '>', $email['to'] ?? []));
+        $keywords = $email['keywords'] ?? [];
+        $bodyValues = $email['bodyValues'] ?? [];
+        $htmlPart = $email['htmlBody'][0] ?? null;
+        $textPart = $email['textBody'][0] ?? null;
+
+        $attachments = [];
+        foreach ($email['attachments'] ?? [] as $att) {
+            $attachments[] = [
+                'blobId' => $att['blobId'] ?? '',
+                'name' => $att['name'] ?? 'attachment',
+                'type' => $att['type'] ?? 'application/octet-stream',
+                'size' => $att['size'] ?? 0,
+                'partId' => $att['partId'] ?? '',
+            ];
+        }
+
+        return new JSONResponse([
+            'email' => [
+                'id' => $email['id'] ?? '',
+                'subject' => $email['subject'] ?? '',
+                'fromAddress' => $fromAddr,
+                'fromName' => $fromName,
+                'toAddresses' => $toAddrs,
+                'receivedAt' => $email['receivedAt'] ?? '',
+                'isRead' => isset($keywords['$seen']),
+                'isFlagged' => isset($keywords['$flagged']),
+                'attachments' => $attachments,
+                'htmlBody' => $bodyValues[$htmlPart['partId'] ?? $htmlPart['blobId'] ?? ''] ?? null,
+                'plainBody' => $bodyValues[$textPart['partId'] ?? $textPart['blobId'] ?? ''] ?? null,
+                'inReplyTo' => $email['inReplyTo'][0] ?? null,
+                'messageId' => $email['messageId'][0] ?? null,
+            ],
+        ]);
+    }
+
+    /**
+     * POST /apps/souvera_mail/api/v2/emails/{id}/read
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function markRead(string $id): JSONResponse
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+
+        $isRead = $this->request->getParam('isRead', '1') === '1';
+        $update = $isRead
+            ? ['keywords/$add' => ['$seen' => true]]
+            : ['keywords/$remove' => ['$seen']];
+
+        $result = $this->jmap->call([
+            ['Email/set', [
+                'accountId' => $accountId,
+                'update' => [$id => $update],
+            ]],
+        ]);
+
+        if (isset($result['error'])) {
+            return new JSONResponse($result, 500);
+        }
+
+        return new JSONResponse(['success' => true]);
     }
 }
