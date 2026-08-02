@@ -330,5 +330,35 @@ return [
             'url' => '/api/v2/search',
             'verb' => 'GET',
         ],
+        [
+            'name' => 'v2_shield#quarantine',
+            'url' => '/api/v2/shield/quarantine',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'v2_shield#report',
+            'url' => '/api/v2/shield/report',
+            'verb' => 'POST',
+        ],
+        [
+            'name' => 'v2_settings#quota',
+            'url' => '/api/v2/settings/quota',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'v2_settings#appPasswords',
+            'url' => '/api/v2/settings/app-passwords',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'v2_settings#createAppPassword',
+            'url' => '/api/v2/settings/app-passwords',
+            'verb' => 'POST',
+        ],
+        [
+            'name' => 'v2_settings#deleteAppPassword',
+            'url' => '/api/v2/settings/app-passwords/{id}',
+            'verb' => 'DELETE',
+        ],
     ],
 ];

@@ -1,12 +1,10 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 
-import MailHomeView from './views/MailHomeView.vue'
-
 const routes = [
 	{
 		path: '/',
 		name: 'inbox',
-		component: MailHomeView,
+		component: () => import('./views/MailHomeView.vue'),
 	},
 	{
 		path: '/compose',
@@ -21,12 +19,12 @@ const routes = [
 	{
 		path: '/shield',
 		name: 'shield',
-		component: MailHomeView, // placeholder until V2ShieldController is ready
+		component: () => import('./views/ShieldView.vue'),
 	},
 	{
 		path: '/settings',
 		name: 'settings',
-		component: MailHomeView, // placeholder until SettingsView is built
+		component: () => import('./views/SettingsView.vue'),
 	},
 ]
 
