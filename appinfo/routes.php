@@ -396,6 +396,16 @@ return [
             'verb' => 'DELETE',
         ],
         [
+            'name' => 'v2_settings#preferences',
+            'url' => '/api/v2/settings/preferences',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'v2_settings#updatePreferences',
+            'url' => '/api/v2/settings/preferences',
+            'verb' => 'PUT',
+        ],
+        [
             'name' => 'v2_contacts#search',
             'url' => '/api/v2/contacts/search',
             'verb' => 'GET',
@@ -414,6 +424,26 @@ return [
             'name' => 'v2_shared#setPosition',
             'url' => '/api/v2/shared/position',
             'verb' => 'PUT',
+        ],
+        [
+            'name' => 'v2_compose#identities',
+            'url' => '/api/v2/identities',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'v2_compose#createDraft',
+            'url' => '/api/v2/drafts',
+            'verb' => 'POST',
+        ],
+        [
+            'name' => 'v2_compose#updateDraft',
+            'url' => '/api/v2/drafts/{id}',
+            'verb' => 'PUT',
+        ],
+        [
+            'name' => 'v2_compose#deleteDraft',
+            'url' => '/api/v2/drafts/{id}',
+            'verb' => 'DELETE',
         ],
     ],
 ];

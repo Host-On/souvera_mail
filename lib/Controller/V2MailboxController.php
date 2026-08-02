@@ -148,7 +148,8 @@ class V2MailboxController extends Controller
             'ids' => [$id],
             'properties' => ['id', 'subject', 'from', 'to', 'cc', 'bcc', 'receivedAt',
                 'size', 'hasAttachment', 'keywords', 'threadId', 'preview', 'messageId',
-                'inReplyTo', 'textBody', 'htmlBody', 'attachments', 'bodyValues'],
+                'inReplyTo', 'references', 'textBody', 'htmlBody', 'attachments', 'bodyValues'],
+            'bodyProperties' => ['partId', 'blobId', 'size', 'name', 'type', 'cid', 'disposition'],
             'fetchTextBodyValues' => true,
             'fetchHTMLBodyValues' => true,
         ]);
@@ -165,6 +166,8 @@ class V2MailboxController extends Controller
         $fromAddr = $email['from'][0]['email'] ?? '';
         $fromName = $email['from'][0]['name'] ?? '';
         $toAddrs = \implode(', ', \array_map(fn($a) => ($a['name'] ?? '') . ' <' . ($a['email'] ?? '') . '>', $email['to'] ?? []));
+        $toList = \array_map(fn($a) => ['name' => $a['name'] ?? '', 'email' => $a['email'] ?? ''], $email['to'] ?? []);
+        $ccList = \array_map(fn($a) => ['name' => $a['name'] ?? '', 'email' => $a['email'] ?? ''], $email['cc'] ?? []);
         $keywords = $email['keywords'] ?? [];
         $bodyValues = $email['bodyValues'] ?? [];
         $htmlPart = $email['htmlBody'][0] ?? null;
@@ -198,6 +201,8 @@ class V2MailboxController extends Controller
                 'type' => $att['type'] ?? 'application/octet-stream',
                 'size' => $att['size'] ?? 0,
                 'partId' => $att['partId'] ?? '',
+                'cid' => $att['cid'] ?? null,
+                'disposition' => $att['disposition'] ?? 'attachment',
             ];
         }
 
@@ -208,6 +213,9 @@ class V2MailboxController extends Controller
                 'fromAddress' => $fromAddr,
                 'fromName' => $fromName,
                 'toAddresses' => $toAddrs,
+                'toList' => $toList,
+                'ccList' => $ccList,
+                'references' => $email['references'][0] ?? null,
                 'receivedAt' => $email['receivedAt'] ?? '',
                 'isRead' => isset($keywords['$seen']),
                 'isFlagged' => isset($keywords['$flagged']),

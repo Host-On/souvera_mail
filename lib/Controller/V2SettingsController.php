@@ -10,6 +10,7 @@ use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IUserSession;
 
@@ -21,6 +22,7 @@ class V2SettingsController extends Controller
         private IUserSession $userSession,
         private AppPasswordService $appPasswordService,
         private QuotaService $quotaService,
+        private IConfig $config,
     ) {
         parent::__construct($appName, $request);
     }
@@ -93,5 +95,65 @@ class V2SettingsController extends Controller
         } catch (\Throwable $e) {
             return new JSONResponse(['error' => $e->getMessage()], 500);
         }
+    }
+
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function preferences(): JSONResponse
+    {
+        $user = $this->userSession->getUser();
+        if ($user === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+        $uid = $user->getUID();
+
+        return new JSONResponse([
+            'signatureHtml' => $this->getPref($uid, 'pref_signature_html', ''),
+            'signatureEnabled' => $this->getPref($uid, 'pref_signature_enabled', '0') === '1',
+            'messagesPerPage' => (int) $this->getPref($uid, 'pref_messages_per_page', '50'),
+            'readingPane' => $this->getPref($uid, 'pref_reading_pane', '1') === '1',
+            'remoteImages' => $this->getPref($uid, 'pref_remote_images', 'never'),
+            'account' => [
+                'email' => $user->getSystemEMailAddress() ?? $uid,
+                'server' => '',
+            ],
+        ]);
+    }
+
+    #[NoAdminRequired]
+    public function updatePreferences(): JSONResponse
+    {
+        $user = $this->userSession->getUser();
+        if ($user === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+        $uid = $user->getUID();
+        $body = \json_decode(\file_get_contents('php://input'), true);
+
+        $allowed = [
+            'signatureHtml' => 'pref_signature_html',
+            'signatureEnabled' => 'pref_signature_enabled',
+            'messagesPerPage' => 'pref_messages_per_page',
+            'readingPane' => 'pref_reading_pane',
+            'remoteImages' => 'pref_remote_images',
+        ];
+
+        foreach ($allowed as $field => $key) {
+            if (\array_key_exists($field, $body)) {
+                $this->setPref($uid, $key, (string) $body[$field]);
+            }
+        }
+
+        return new JSONResponse(['success' => true]);
+    }
+
+    private function getPref(string $uid, string $key, string $default): string
+    {
+        return $this->config->getUserValue($uid, 'souvera_mail', $key, $default);
+    }
+
+    private function setPref(string $uid, string $key, string $value): void
+    {
+        $this->config->setUserValue($uid, 'souvera_mail', $key, $value);
     }
 }

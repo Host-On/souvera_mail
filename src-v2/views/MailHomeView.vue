@@ -45,6 +45,7 @@
 				:mailboxes="allMailboxes"
 				@close="selectedEmail = null"
 				@reply="onReply"
+				@reply-all="onReplyAll"
 				@forward="onForward"
 				@move="onMove"
 				@delete="deleteEmail" />
@@ -126,12 +127,13 @@ export default {
 			} catch (e) { console.error('Failed to open email', e) } finally { this.loadingBody = false }
 		},
 		onReply() {
-			const d = { fromAddress: this.selectedEmail.fromAddress, subject: this.selectedEmail.subject, messageId: this.selectedEmail.messageId }
-			this.$router.push({ name: 'compose', query: { reply: JSON.stringify(d) } })
+			this.$router.push({ name: 'compose', query: { mode: 'reply', id: this.selectedEmail.id } })
+		},
+		onReplyAll() {
+			this.$router.push({ name: 'compose', query: { mode: 'replyAll', id: this.selectedEmail.id } })
 		},
 		onForward() {
-			const d = { fromAddress: this.selectedEmail.fromAddress, subject: this.selectedEmail.subject, messageId: this.selectedEmail.messageId }
-			this.$router.push({ name: 'compose', query: { forward: JSON.stringify(d) } })
+			this.$router.push({ name: 'compose', query: { mode: 'forward', id: this.selectedEmail.id } })
 		},
 		async deleteEmail() {
 			if (!this.selectedEmail) return

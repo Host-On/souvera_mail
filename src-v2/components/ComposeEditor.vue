@@ -1,166 +1,305 @@
 <template>
-	<NcModal v-model:show="visible" size="large" @close="$emit('cancel')">
-		<div class="compose-container">
-			<div class="compose-header">
-				<NcButton variant="primary" :disabled="!canSend || sending" @click="doSend">
-					<template #icon><Send :size="20" /></template>
-					{{ sending ? t('souvera_mail', 'Sending...') : t('souvera_mail', 'Send') }}
+	<NcModal v-model:show="visible" size="large" @close="onClose">
+		<div class="compose-layout">
+			<div class="compose-layout__header">
+				<h3>{{ composeTitle }}</h3>
+			</div>
+
+			<NcSelect v-if="identities.length > 1" v-model="fromIdentity"
+				:options="identities"
+				:label-outside="true"
+				:label="t('souvera_mail', 'From')"
+				class="compose-layout__from" />
+
+			<div class="compose-layout__recipients">
+				<RecipientField v-model="to" :label="t('souvera_mail', 'To') + '…'" />
+				<div class="compose-toggle-row">
+					<NcButton variant="tertiary" size="small" @click="showCc = !showCc">{{ t('souvera_mail', 'Cc') }}</NcButton>
+					<NcButton variant="tertiary" size="small" @click="showBcc = !showBcc">{{ t('souvera_mail', 'Bcc') }}</NcButton>
+				</div>
+				<RecipientField v-if="showCc || cc.length > 0" v-model="cc" :label="t('souvera_mail', 'Cc') + '…'" />
+				<RecipientField v-if="showBcc || bcc.length > 0" v-model="bcc" :label="t('souvera_mail', 'Bcc') + '…'" />
+			</div>
+
+			<NcTextField v-model="subject" class="compose-layout__subject"
+				:placeholder="t('souvera_mail', 'Subject') + '…'" />
+
+			<RichTextEditor ref="editor" v-model="bodyHtml" :placeholder="t('souvera_mail', 'Write your message…')"
+				class="compose-layout__body" />
+
+			<AttachmentList v-if="attachments.length > 0"
+				:attachments="attachments" @remove="attachments.splice($event, 1)" />
+
+			<div class="compose-layout__footer">
+				<div class="compose-layout__actions">
+					<NcButton variant="primary" :disabled="!canSend || sending" @click="doSend">
+						<template #icon><Send :size="20" /></template>
+						{{ sending ? t('souvera_mail', 'Sending…') : t('souvera_mail', 'Send') }}
+					</NcButton>
+					<NcButton variant="tertiary" @click="pickAttachment">
+						<template #icon><Paperclip :size="20" /></template>
+						{{ t('souvera_mail', 'Attach') }}
+					</NcButton>
+				</div>
+				<div class="compose-layout__status">
+					<span v-if="savedDraftId" class="draft-saved">
+						{{ t('souvera_mail', 'Draft saved') }}
+					</span>
+				</div>
+				<NcButton variant="tertiary" @click="onDiscard">
+					<template #icon><TrashCan :size="20" /></template>
+					{{ t('souvera_mail', 'Discard') }}
 				</NcButton>
-			</div>
-			<div class="compose-fields">
-				<div class="compose-field">
-					<label>{{ t('souvera_mail', 'To') }}</label>
-					<div class="compose-autocomplete-wrapper">
-						<NcTextField class="compose-input"
-							v-model="toStr"
-							:placeholder="t('souvera_mail', 'recipient@example.com')"
-							@input="onToInput" />
-						<ul v-if="contactSuggestions.length > 0" class="compose-suggestions">
-							<li v-for="c in contactSuggestions" :key="c.email" class="suggestion-item" @mousedown.prevent="selectContact(c)">
-								<span class="suggestion-name">{{ c.name }}</span>
-								<span class="suggestion-email">{{ c.email }}</span>
-							</li>
-						</ul>
-					</div>
-				</div>
-				<div class="compose-field">
-					<label>{{ t('souvera_mail', 'Subject') }}</label>
-					<NcTextField class="compose-input" v-model="subject" :placeholder="t('souvera_mail', 'Subject...')" />
-				</div>
-			</div>
-			<div class="compose-tabs">
-				<button class="compose-tab" :class="{ active: tab === 'body' }" @click="tab = 'body'">{{ t('souvera_mail', 'Message') }}</button>
-				<button class="compose-tab" :class="{ active: tab === 'attachments' }" @click="tab = 'attachments'">
-					{{ t('souvera_mail', 'Attachments') }}
-					<span v-if="attachments.length > 0" class="compose-tab-badge">{{ attachments.length }}</span>
-				</button>
-			</div>
-			<div v-show="tab === 'body'" class="compose-body-pane">
-				<textarea class="compose-body-textarea" v-model="bodyText" :placeholder="t('souvera_mail', 'Write your message...')"></textarea>
-			</div>
-			<div v-show="tab === 'attachments'" class="compose-attach-pane">
-				<NcButton variant="primary" @click="pickAttachment">
-					<template #icon><Paperclip :size="20" /></template>
-					{{ t('souvera_mail', 'Add attachment') }}
-				</NcButton>
-				<input ref="fileInput" type="file" multiple class="hidden-file-input" @change="onFilesSelected" />
-				<div v-if="attachments.length > 0" class="attach-list">
-					<div v-for="(att, idx) in attachments" :key="idx" class="attach-item">
-						<span>{{ att.name }}</span>
-						<span class="attach-size">{{ formatSize(Math.round(att.data.length * 0.75)) }}</span>
-						<NcButton variant="tertiary" size="small" :aria-label="t('souvera_mail', 'Remove attachment')" @click="attachments.splice(idx, 1)">
-							<template #icon><Close :size="14" /></template>
-						</NcButton>
-					</div>
-				</div>
-				<NcEmptyContent v-else :name="t('souvera_mail', 'No attachments')" />
 			</div>
 		</div>
+		<input ref="fileInput" type="file" multiple class="hidden-file-input" @change="onFilesSelected" />
 	</NcModal>
 </template>
 
 <script>
-import { NcModal, NcButton, NcTextField, NcEmptyContent } from '@nextcloud/vue'
+import { NcModal, NcButton, NcTextField, NcSelect } from '@nextcloud/vue'
 import Send from 'vue-material-design-icons/Send.vue'
-import Close from 'vue-material-design-icons/Close.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
+import TrashCan from 'vue-material-design-icons/TrashCan.vue'
+import RecipientField from './composer/RecipientField.vue'
+import RichTextEditor from './composer/RichTextEditor.vue'
+import AttachmentList from './composer/AttachmentList.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
+import { sanitizeMailHtml } from '../utils/mailSanitizer.js'
+import { buildReplyQuote, buildForwardBody } from '../utils/quoteBuilder.js'
 
-let searchTimer = null
+let draftTimer = null
 
 export default {
 	name: 'ComposeEditor',
-	components: { NcModal, NcButton, NcTextField, NcEmptyContent, Send, Close, Paperclip },
-	props: { replyTo: { type: Object, default: null }, forwardOf: { type: Object, default: null } },
+	components: { NcModal, NcButton, NcTextField, NcSelect, Send, Paperclip, TrashCan, RecipientField, RichTextEditor, AttachmentList },
+	props: {
+		replyTo: { type: Object, default: null },
+		forwardOf: { type: Object, default: null },
+		mode: { type: String, default: 'new' },
+		originalEmail: { type: Object, default: null },
+	},
 	emits: ['cancel', 'sent'],
 	data() {
+		const idPrefill = []
+		if (this.replyTo?.fromAddress) {
+			idPrefill.push({ name: this.replyTo.fromName || '', email: this.replyTo.fromAddress })
+		}
+		if (this.forwardOf?.fromAddress) {
+			idPrefill.push({ name: this.forwardOf.fromName || '', email: this.forwardOf.fromAddress })
+		}
+		// Deduplicate for replyAll scenario
+		const seen = new Set()
+		const toPrefill = idPrefill.filter(r => { const k = r.email.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
+
+		let ccPrefill = []
+		if (this.mode === 'replyAll' && this.originalEmail) {
+			const ownAddr = '' // filled by identities later
+			const toList = this.originalEmail.toList || []
+			const ccList = this.originalEmail.ccList || []
+			ccPrefill = [...toList, ...ccList].filter(r => r.email !== ownAddr && r.email !== (this.originalEmail.fromAddress || ''))
+		}
+
 		return {
-			visible: true, tab: 'body',
-			toStr: this.replyTo?.fromAddress || (this.forwardOf?.fromAddress || ''),
-			subject: this.replyTo?.subject ? 'Re: ' + this.replyTo.subject : (this.forwardOf?.subject ? 'Fwd: ' + this.forwardOf.subject : ''),
-			bodyText: '', fromAddr: '',
-			attachments: [], sending: false, contactSuggestions: [],
+			visible: true,
+			fromIdentity: { id: null, name: '', email: '' },
+			identities: [],
+			to: toPrefill,
+			cc: ccPrefill,
+			bcc: [],
+			showCc: ccPrefill.length > 0,
+			showBcc: false,
+			subject: this.prefillSubject(),
+			bodyHtml: '',
+			attachments: [],
+			forwardAttachments: [],
+			sending: false,
+			dirty: false,
+			savedDraftId: null,
+			discardingDraftId: null,
 		}
 	},
-	computed: { canSend() { return this.toStr.trim() !== '' && !this.sending } },
+	computed: {
+		composeTitle() {
+			if (this.mode === 'reply') return t('souvera_mail', 'Reply')
+			if (this.mode === 'replyAll') return t('souvera_mail', 'Reply all')
+			if (this.mode === 'forward') return t('souvera_mail', 'Forward')
+			return t('souvera_mail', 'New message')
+		},
+		canSend() {
+			return (this.to.length > 0 || this.cc.length > 0 || this.bcc.length > 0) && !this.sending
+		},
+	},
+	watch: {
+		to: { deep: true, handler() { this.markDirty() } },
+		cc: { deep: true, handler() { this.markDirty() } },
+		bcc: { deep: true, handler() { this.markDirty() } },
+		subject() { this.markDirty() },
+		bodyHtml() { this.markDirty() },
+	},
+	async mounted() {
+		await this.loadIdentities()
+		if (this.mode === 'reply' || this.mode === 'replyAll') {
+			this.buildReplyContent()
+		} else if (this.mode === 'forward') {
+			this.buildForwardContent()
+		}
+	},
+	beforeUnmount() { clearTimeout(draftTimer) },
 	methods: {
-		formatSize(bytes) {
-			if (!bytes) return '0 B'
-			const u = ['B', 'KB', 'MB']; let i = 0, s = bytes
-			while (s >= 1024 && i < u.length - 1) { s /= 1024; i++ }
-			return Math.round(s) + ' ' + u[i]
-		},
-		onToInput() {
-			this.contactSuggestions = []
-			clearTimeout(searchTimer)
-			const q = this.toStr.trim()
-			if (q.length < 2) return
-			searchTimer = setTimeout(async () => {
-				try {
-					const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/contacts/search'), { params: { q, limit: 8 } })
-					this.contactSuggestions = data.contacts || []
-				} catch (e) { console.error('Contact search failed', e); this.contactSuggestions = [] }
-			}, 300)
-		},
-		selectContact(contact) {
-			const parts = this.toStr.split(',').map(s => s.trim()).filter(Boolean)
-			parts.pop()
-			parts.push(contact.name ? `"${contact.name}" <${contact.email}>` : contact.email)
-			this.toStr = parts.join(', ') + ', '
-			this.contactSuggestions = []
-		},
-		pickAttachment() { this.$refs.fileInput?.click() },
-		onFilesSelected(e) {
-			for (const file of Array.from(e.target.files || [])) {
-				const reader = new FileReader()
-				reader.onload = () => { this.attachments.push({ name: file.name, type: file.type || 'application/octet-stream', data: reader.result.split(',')[1] || reader.result }) }
-				reader.readAsDataURL(file)
+		prefillSubject() {
+			if (this.replyTo?.subject) {
+				const s = this.replyTo.subject
+				return s.match(/^(Re|Fwd):\s*/i) ? s : `Re: ${s}`
 			}
-			e.target.value = ''
+			if (this.forwardOf?.subject) {
+				const s = this.forwardOf.subject
+				return s.match(/^(Fwd):\s*/i) ? s : `Fwd: ${s}`
+			}
+			return ''
+		},
+		async loadIdentities() {
+			try {
+				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/identities'))
+				const list = (data.identities || []).map(i => ({ id: i.id, label: `${i.name || ''} <${i.email}>`, name: i.name, email: i.email }))
+				this.identities = list
+				if (list.length > 0) this.fromIdentity = list[0]
+			} catch (e) {
+				console.error('Failed to load identities', e)
+			}
+		},
+		buildReplyContent() {
+			const email = this.originalEmail
+			if (!email) return
+			const body = email.htmlBody || email.plainBody || ''
+			const { html } = sanitizeMailHtml(body, { attachments: email.attachments || [], blockRemote: false })
+			const quote = buildReplyQuote(email, html)
+			this.$nextTick(() => {
+				this.$refs.editor?.insertHtml(quote)
+				this.$refs.editor?.focus()
+			})
+		},
+		buildForwardContent() {
+			const email = this.originalEmail
+			if (!email) return
+			const body = email.htmlBody || email.plainBody || ''
+			const { html } = sanitizeMailHtml(body, { attachments: email.attachments || [], blockRemote: false })
+			const quote = buildForwardBody(email, html)
+			this.forwardAttachments = (email.attachments || []).map(a => ({
+				blobId: a.blobId, name: a.name, type: a.type, size: a.size,
+			}))
+			this.$nextTick(() => {
+				this.$refs.editor?.insertHtml(quote)
+			})
+		},
+		markDirty() {
+			this.dirty = true
+			clearTimeout(draftTimer)
+			draftTimer = setTimeout(() => this.saveDraft(), 3000)
+		},
+		async saveDraft() {
+			try {
+				const payload = this.buildPayload()
+				if (this.savedDraftId) {
+					await axios.put(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId), payload)
+				} else {
+					const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/drafts'), payload)
+					this.savedDraftId = data.draftId
+				}
+			} catch (e) {
+				console.error('Draft save failed', e)
+			}
+		},
+		buildPayload() {
+			return {
+				identityId: this.fromIdentity.id,
+				to: this.to.map(r => r.email),
+				cc: this.cc.map(r => r.email),
+				bcc: this.bcc.map(r => r.email),
+				subject: this.subject,
+				bodyHtml: this.bodyHtml,
+				bodyPlain: this.bodyHtml.replace(/<[^>]+>/g, ''),
+				attachments: this.attachments.map(a => ({
+					name: a.name, type: a.type || 'application/octet-stream',
+					data: a.data || null, blobId: a.blobId || null,
+				})),
+				inReplyTo: this.replyTo?.messageId || null,
+				references: this.replyTo?.references || null,
+				draftId: this.savedDraftId,
+			}
 		},
 		async doSend() {
 			if (!this.canSend) return
 			this.sending = true
 			try {
-				await axios.post(generateUrl('/apps/souvera_mail/api/v2/send'), {
-					to: this.toStr.split(',').map(s => s.trim()).filter(Boolean),
-					subject: this.subject,
-					bodyPlain: this.bodyText,
-					attachments: this.attachments,
-					inReplyTo: this.replyTo?.messageId || null,
-				})
+				const payload = this.buildPayload()
+				if (this.forwardAttachments.length > 0) {
+					payload.attachments.push(...this.forwardAttachments)
+				}
+				await axios.post(generateUrl('/apps/souvera_mail/api/v2/send'), payload)
+				if (this.savedDraftId) {
+					try { await axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId)) } catch {}
+				}
 				this.$emit('sent')
-			} catch (e) { console.error('Send failed', e) } finally { this.sending = false }
+			} catch (e) {
+				console.error('Send failed', e)
+				alert(e.response?.data?.error || t('souvera_mail', 'Failed to send message'))
+			} finally {
+				this.sending = false
+			}
+		},
+		pickAttachment() { this.$refs.fileInput?.click() },
+		onFilesSelected(e) {
+			for (const file of Array.from(e.target.files || [])) {
+				const reader = new FileReader()
+				reader.onload = () => {
+					this.attachments.push({
+						name: file.name,
+						type: file.type || 'application/octet-stream',
+						size: file.size,
+						data: reader.result.split(',')[1] || reader.result,
+					})
+				}
+				reader.readAsDataURL(file)
+			}
+			e.target.value = ''
+		},
+		onClose() {
+			if (this.dirty) {
+				if (!confirm(t('souvera_mail', 'Discard unsaved changes?'))) return
+			}
+			this.$emit('cancel')
+		},
+		onDiscard() {
+			if (confirm(t('souvera_mail', 'Discard this message?'))) {
+				if (this.savedDraftId) {
+					this.discardingDraftId = this.savedDraftId
+					axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId)).catch(() => {})
+				}
+				this.$emit('cancel')
+			}
 		},
 	},
-	beforeUnmount() { clearTimeout(searchTimer) },
 }
 </script>
 
 <style scoped>
-.compose-container { display: flex; flex-direction: column; max-height: 85vh; }
-.compose-header { display: flex; justify-content: flex-end; padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
-.compose-fields { padding: 16px; }
-.compose-field { margin-bottom: 10px; }
-.compose-field label { display: block; font-size: 11px; color: var(--color-text-maxcontrast); margin-bottom: 3px; }
-.compose-input { width: 100%; }
-.compose-autocomplete-wrapper { position: relative; }
-.compose-suggestions { position: absolute; top: 100%; left: 0; right: 0; background: var(--color-main-background); border: 1px solid var(--color-border); border-radius: 6px; max-height: 200px; overflow-y: auto; z-index: 10; list-style: none; margin: 2px 0 0; padding: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-.suggestion-item { display: flex; justify-content: space-between; padding: 8px 12px; cursor: pointer; }
-.suggestion-item:hover { background: var(--color-background-hover); }
-.suggestion-name { font-weight: 600; }
-.suggestion-email { font-size: 12px; color: var(--color-text-maxcontrast); }
-.compose-tabs { display: flex; border-bottom: 1px solid var(--color-border); padding: 0 16px; }
-.compose-tab { padding: 8px 16px; border: none; background: none; cursor: pointer; font: inherit; color: var(--color-text-maxcontrast); border-bottom: 2px solid transparent; }
-.compose-tab.active { color: var(--color-main-text); border-bottom-color: var(--color-primary-element); }
-.compose-tab-badge { background: var(--color-primary-element); color: var(--color-primary-text); border-radius: 10px; padding: 0 6px; font-size: 11px; margin-left: 4px; }
-.compose-body-pane { flex: 1; min-height: 200px; display: flex; }
-.compose-body-textarea { flex: 1; border: none; padding: 16px; font: inherit; resize: vertical; min-height: 200px; background: var(--color-main-background); color: var(--color-main-text); }
-.compose-body-textarea:focus { outline: none; }
-.compose-attach-pane { padding: 16px; overflow-y: auto; min-height: 200px; }
-.attach-list { margin-top: 12px; }
-.attach-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--color-background-dark); border-radius: 6px; margin-bottom: 6px; }
-.attach-size { font-size: 12px; color: var(--color-text-maxcontrast); }
+.compose-layout { display: flex; flex-direction: column; max-height: 85vh; }
+.compose-layout__header { padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
+.compose-layout__header h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.compose-layout__from { padding: 8px 16px; border-bottom: 1px solid var(--color-border); }
+.compose-layout__recipients { padding: 8px 16px 0; }
+.compose-toggle-row { display: flex; gap: 4px; margin-top: 4px; }
+.compose-layout__subject { padding: 4px 16px; width: calc(100% - 32px); }
+.compose-layout__body { flex: 1; min-height: 280px; margin: 8px 16px; }
+.compose-layout__footer {
+	display: flex; align-items: center; justify-content: space-between;
+	padding: 10px 16px; border-top: 1px solid var(--color-border);
+	gap: 8px;
+}
+.compose-layout__actions { display: flex; gap: 8px; }
+.compose-layout__status { flex: 1; text-align: center; }
+.draft-saved { font-size: 12px; color: var(--color-text-maxcontrast); }
 .hidden-file-input { display: none; }
 </style>

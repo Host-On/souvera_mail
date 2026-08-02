@@ -12,6 +12,7 @@
 	padding: 48px;
 }
 
+/* TODO D.5: ersetzen durch clamp-Layout + matchMedia */
 @media (max-width: 768px) {
 	.mail-list-panel {
 		width: 100% !important;
@@ -27,9 +28,4 @@
 	.compose-overlay {
 		z-index: 2000;
 	}
-}
-
-@media (prefers-color-scheme: dark) {
-	.email-body-html { color-scheme: dark; }
-	.email-body-html img { opacity: 0.9; }
 }

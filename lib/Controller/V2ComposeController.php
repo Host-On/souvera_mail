@@ -26,6 +26,34 @@ class V2ComposeController extends Controller
     }
 
     /**
+     * GET /apps/souvera_mail/api/v2/identities
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function identities(): JSONResponse
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+
+        $result = $this->jmap->singleCall('Identity/get', ['accountId' => $accountId]);
+        $list = $result['data']['list'] ?? [];
+
+        if (empty($list)) {
+            $list = [['id' => $accountId, 'name' => '', 'email' => '']];
+        }
+
+        $identities = \array_map(fn($i) => [
+            'id' => $i['id'] ?? '',
+            'name' => $i['name'] ?? '',
+            'email' => $i['email'] ?? '',
+        ], $list);
+
+        return new JSONResponse(['identities' => $identities]);
+    }
+
+    /**
      * POST /apps/souvera_mail/api/v2/send
      */
     #[NoAdminRequired]
@@ -50,85 +78,70 @@ class V2ComposeController extends Controller
         $bodyPlain = \trim((string) ($body['bodyPlain'] ?? ''));
         $attachments = $body['attachments'] ?? [];
         $inReplyTo = $body['inReplyTo'] ?? null;
+        $references = $body['references'] ?? null;
+        $identityId = $body['identityId'] ?? null;
 
         if ($toAddr === [] && $ccAddr === [] && $bccAddr === []) {
             return new JSONResponse(['error' => 'No recipients'], 400);
         }
 
-        // Resolve user's email address (not accountId — accountId is base32).
         $user = $this->userSession->getUser();
         $userEmail = $this->userContext->resolveEmail($user->getUID());
 
-        // Resolve identity via JMAP Identity/get.
-        $identityId = $this->resolveIdentityId($accountId);
-        if ($identityId === null) {
-            return new JSONResponse(['error' => 'No JMAP identity found for this account'], 500);
+        if ($identityId === null || $identityId === '') {
+            $identityId = $this->resolveIdentityId($accountId);
+            if ($identityId === null) {
+                return new JSONResponse(['error' => 'No JMAP identity found'], 500);
+            }
         }
 
-        // Resolve Drafts mailbox.
-        $draftsId = $this->resolveMailboxId($accountId, 'drafts');
+        // Resolve Drafts + Sent mailboxes in ONE call.
+        $mailboxes = $this->resolveMailboxes($accountId);
+        $draftsId = $mailboxes['drafts'] ?? null;
+        $sentId = $mailboxes['sent'] ?? null;
         if ($draftsId === null) {
-            $draftsId = $this->resolveMailboxId($accountId, 'sent');
+            $draftsId = $sentId;
         }
 
-        // Upload attachments as blobs.
+        // Upload NEW attachments (those with data key).
         $blobIds = [];
         foreach ($attachments as $index => $att) {
-            $name = $att['name'] ?? "attachment_{$index}.bin";
-            $type = $att['type'] ?? 'application/octet-stream';
             $rawData = \base64_decode((string) ($att['data'] ?? ''), true);
             if ($rawData === false || $rawData === '') {
                 continue;
             }
+            $name = $att['name'] ?? "attachment_{$index}.bin";
+            $type = $att['type'] ?? 'application/octet-stream';
             $upload = $this->uploadBlob($accountId, $rawData, $type, $name);
             if ($upload !== null) {
                 $blobIds[] = $upload;
             }
         }
 
-        // Build Email/create object.
-        $emailObj = [
-            'subject' => $subject,
-            'from' => [['email' => $userEmail]],
-            'to' => \array_map(fn($e) => ['email' => \trim($e)], $toAddr),
-        ];
-
-        if ($draftsId !== null) {
-            $emailObj['mailboxIds'] = [$draftsId => true];
-        }
-        if ($ccAddr !== []) {
-            $emailObj['cc'] = \array_map(fn($e) => ['email' => \trim($e)], $ccAddr);
-        }
-        if ($bccAddr !== []) {
-            $emailObj['bcc'] = \array_map(fn($e) => ['email' => \trim($e)], $bccAddr);
-        }
-        if ($inReplyTo !== null) {
-            $emailObj['inReplyTo'] = [$inReplyTo];
+        // Forward-attachments (already uploaded, just blobId).
+        $fwdBlobIds = [];
+        foreach ($attachments as $att) {
+            $preExistingBlobId = $att['blobId'] ?? null;
+            if ($preExistingBlobId !== null && empty($att['data'] ?? '')) {
+                $fwdBlobIds[] = [
+                    'blobId' => $preExistingBlobId,
+                    'name' => $att['name'] ?? 'attachment',
+                    'type' => $att['type'] ?? 'application/octet-stream',
+                    'size' => $att['size'] ?? 0,
+                ];
+            }
         }
 
-        $partCount = 0;
-        if ($bodyHtml !== '') {
-            $partCount++;
-            $emailObj['htmlBody'] = [['partId' => (string) $partCount, 'type' => 'text/html']];
-            $emailObj['bodyValues'] = [(string) $partCount => ['value' => $bodyHtml]];
-        }
-        if ($bodyPlain !== '' || $bodyHtml === '') {
-            $partCount++;
-            $emailObj['textBody'] = [['partId' => (string) $partCount, 'type' => 'text/plain']];
-            $emailObj['bodyValues'] = $emailObj['bodyValues'] ?? [];
-            $emailObj['bodyValues'][(string) $partCount] = ['value' => $bodyPlain ?: $subject];
-        }
+        // Build Email/create object — saved in Drafts with draft+seen keywords.
+        $emailObj = $this->buildEmailObject(
+            $userEmail, $toAddr, $ccAddr, $bccAddr,
+            $subject, $bodyHtml, $bodyPlain,
+            \array_merge($blobIds, $fwdBlobIds),
+            $inReplyTo, $references, $draftsId
+        );
 
-        if ($blobIds !== []) {
-            $emailObj['attachments'] = \array_map(fn($b) => [
-                'blobId' => $b['blobId'],
-                'type' => $b['type'],
-                'name' => $b['name'],
-                'size' => $b['size'] ?? 0,
-            ], $blobIds);
-        }
-
-        // Create + submit in one batch.
+        // Step 1: Email/set — create in drafts, then patch to sent
+        // Step 2: EmailSubmission/set — submit and patch email to sent mailbox
         $result = $this->jmap->call([
             ['Email/set', [
                 'accountId' => $accountId,
@@ -136,7 +149,14 @@ class V2ComposeController extends Controller
             ]],
             ['EmailSubmission/set', [
                 'accountId' => $accountId,
-                'onSuccessUpdateEmail' => ['#c' . ($this->jmapCallNumForSubmission() + 0) => 'send1'],
+                'onSuccessUpdateEmail' => [
+                    '#send1' => [
+                        'keywords/$draft' => null,
+                        'keywords/$seen' => true,
+                        'mailboxIds/' . ($draftsId ?? 'drafts') => null,
+                        'mailboxIds/' . ($sentId ?? 'sent') => true,
+                    ],
+                ],
                 'create' => ['send1' => [
                     'emailId' => '#draft1',
                     'identityId' => $identityId,
@@ -150,7 +170,6 @@ class V2ComposeController extends Controller
 
         $responses = $result['responses'] ?? [];
 
-        // Check Email/set result.
         $emailResp = null;
         $submissionResp = null;
         foreach ($responses as $resp) {
@@ -171,6 +190,193 @@ class V2ComposeController extends Controller
         ]);
     }
 
+    /**
+     * POST /apps/souvera_mail/api/v2/drafts
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function createDraft(): JSONResponse
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+
+        $body = \json_decode(\file_get_contents('php://input'), true);
+        if (!\is_array($body)) {
+            return new JSONResponse(['error' => 'Invalid JSON'], 400);
+        }
+
+        $toAddr = \is_array($body['to'] ?? null) ? $body['to'] : [];
+        $ccAddr = \is_array($body['cc'] ?? null) ? $body['cc'] : [];
+        $bccAddr = \is_array($body['bcc'] ?? null) ? $body['bcc'] : [];
+        $subject = \trim((string) ($body['subject'] ?? ''));
+        $bodyHtml = \trim((string) ($body['bodyHtml'] ?? ''));
+        $bodyPlain = \trim((string) ($body['bodyPlain'] ?? ''));
+
+        $user = $this->userSession->getUser();
+        $userEmail = $this->userContext->resolveEmail($user->getUID());
+
+        $draftsId = $this->resolveMailboxId($accountId, 'drafts');
+
+        $emailObj = $this->buildEmailObject(
+            $userEmail, $toAddr, $ccAddr, $bccAddr,
+            $subject, $bodyHtml, $bodyPlain,
+            [], null, null, $draftsId
+        );
+        $emailObj['keywords'] = ['$draft' => true];
+
+        $result = $this->jmap->singleCall('Email/set', [
+            'accountId' => $accountId,
+            'create' => ['draft1' => $emailObj],
+        ]);
+
+        $created = $result['data']['created']['draft1'] ?? null;
+        return new JSONResponse([
+            'success' => true,
+            'draftId' => $created['id'] ?? '',
+        ]);
+    }
+
+    /**
+     * PUT /apps/souvera_mail/api/v2/drafts/{id}
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function updateDraft(string $id): JSONResponse
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+
+        $body = \json_decode(\file_get_contents('php://input'), true);
+        if (!\is_array($body)) {
+            return new JSONResponse(['error' => 'Invalid JSON'], 400);
+        }
+
+        $toAddr = \is_array($body['to'] ?? null) ? $body['to'] : [];
+        $ccAddr = \is_array($body['cc'] ?? null) ? $body['cc'] : [];
+        $bccAddr = \is_array($body['bcc'] ?? null) ? $body['bcc'] : [];
+        $subject = \trim((string) ($body['subject'] ?? ''));
+        $bodyHtml = \trim((string) ($body['bodyHtml'] ?? ''));
+        $bodyPlain = \trim((string) ($body['bodyPlain'] ?? ''));
+
+        $user = $this->userSession->getUser();
+        $userEmail = $this->userContext->resolveEmail($user->getUID());
+
+        $draftsId = $this->resolveMailboxId($accountId, 'drafts');
+
+        $emailObj = $this->buildEmailObject(
+            $userEmail, $toAddr, $ccAddr, $bccAddr,
+            $subject, $bodyHtml, $bodyPlain,
+            [], null, null, $draftsId
+        );
+        $emailObj['keywords'] = ['$draft' => true];
+
+        // Destroy old draft + create new (atomic replacement).
+        $result = $this->jmap->call([
+            ['Email/set', [
+                'accountId' => $accountId,
+                'destroy' => [$id],
+            ]],
+            ['Email/set', [
+                'accountId' => $accountId,
+                'create' => ['draft1' => $emailObj],
+            ]],
+        ]);
+
+        $responses = $result['responses'] ?? [];
+        $created = null;
+        foreach ($responses as $resp) {
+            if ($resp['name'] === 'Email/set') {
+                $created = $resp['args']['created']['draft1'] ?? null;
+                if ($created !== null) break;
+            }
+        }
+
+        return new JSONResponse([
+            'success' => true,
+            'draftId' => $created['id'] ?? '',
+        ]);
+    }
+
+    /**
+     * DELETE /apps/souvera_mail/api/v2/drafts/{id}
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function deleteDraft(string $id): JSONResponse
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+
+        $result = $this->jmap->singleCall('Email/set', [
+            'accountId' => $accountId,
+            'destroy' => [$id],
+        ]);
+
+        return new JSONResponse(['success' => true]);
+    }
+
+    private function buildEmailObject(
+        string $userEmail,
+        array $toAddr, array $ccAddr, array $bccAddr,
+        string $subject, string $bodyHtml, string $bodyPlain,
+        array $attachmentBlobs,
+        ?string $inReplyTo, ?string $references,
+        ?string $draftsId,
+    ): array {
+        $emailObj = [
+            'subject' => $subject,
+            'from' => [['email' => $userEmail]],
+            'to' => \array_map(fn($e) => ['email' => \trim($e)], $toAddr),
+            'keywords' => ['$draft' => true, '$seen' => true],
+        ];
+
+        if ($draftsId !== null) {
+            $emailObj['mailboxIds'] = [$draftsId => true];
+        }
+        if ($ccAddr !== []) {
+            $emailObj['cc'] = \array_map(fn($e) => ['email' => \trim($e)], $ccAddr);
+        }
+        if ($bccAddr !== []) {
+            $emailObj['bcc'] = \array_map(fn($e) => ['email' => \trim($e)], $bccAddr);
+        }
+        if ($inReplyTo !== null) {
+            $emailObj['inReplyTo'] = [$inReplyTo];
+        }
+        if ($references !== null) {
+            $emailObj['references'] = [$references];
+        }
+
+        $partCount = 0;
+        if ($bodyHtml !== '') {
+            $partCount++;
+            $emailObj['htmlBody'] = [['partId' => (string) $partCount, 'type' => 'text/html']];
+            $emailObj['bodyValues'] = [(string) $partCount => ['value' => $bodyHtml]];
+        }
+        if ($bodyPlain !== '' || $bodyHtml === '') {
+            $partCount++;
+            $emailObj['textBody'] = [['partId' => (string) $partCount, 'type' => 'text/plain']];
+            $emailObj['bodyValues'] = $emailObj['bodyValues'] ?? [];
+            $emailObj['bodyValues'][(string) $partCount] = ['value' => $bodyPlain ?: $subject];
+        }
+
+        if ($attachmentBlobs !== []) {
+            $emailObj['attachments'] = \array_map(fn($b) => [
+                'blobId' => $b['blobId'],
+                'type' => $b['type'],
+                'name' => $b['name'],
+                'size' => $b['size'] ?? 0,
+            ], $attachmentBlobs);
+        }
+
+        return $emailObj;
+    }
+
     private function resolveIdentityId(string $accountId): ?string
     {
         $result = $this->jmap->singleCall('Identity/get', ['accountId' => $accountId]);
@@ -178,7 +384,7 @@ class V2ComposeController extends Controller
         if (\count($list) > 0) {
             return $list[0]['id'] ?? null;
         }
-        return $accountId; // fallback: use accountId as identityId
+        return $accountId;
     }
 
     private function resolveMailboxId(string $accountId, string $role): ?string
@@ -190,6 +396,20 @@ class V2ComposeController extends Controller
             }
         }
         return null;
+    }
+
+    /** @return array{drafts:?string, sent:?string} */
+    private function resolveMailboxes(string $accountId): array
+    {
+        $result = $this->jmap->singleCall('Mailbox/get', ['accountId' => $accountId]);
+        $drafts = null;
+        $sent = null;
+        foreach ($result['data']['list'] ?? [] as $mb) {
+            $role = $mb['role'] ?? '';
+            if ($role === 'drafts') $drafts = $mb['id'];
+            if ($role === 'sent') $sent = $mb['id'];
+        }
+        return ['drafts' => $drafts, 'sent' => $sent];
     }
 
     private function uploadBlob(string $accountId, string $data, string $type, string $name): ?array
@@ -214,13 +434,5 @@ class V2ComposeController extends Controller
             'name' => $name,
             'size' => $uploaded['size'] ?? \strlen($data),
         ];
-    }
-
-    /** Called before singleCall so it knows the next callId counter value. */
-    private function jmapCallNumForSubmission(): int
-    {
-        // Reflect the callId used in the first call of the batch.
-        // Not ideal, but we just need the relative index.
-        return 0;
     }
 }
