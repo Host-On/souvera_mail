@@ -22,7 +22,9 @@
 		</NcAppNavigation>
 
 		<NcAppContent>
-			<router-view />
+			<router-view v-slot="{ Component }">
+				<component :is="Component" />
+			</router-view>
 		</NcAppContent>
 	</NcContent>
 </template>
@@ -35,11 +37,8 @@ import Magnify from 'vue-material-design-icons/Magnify.vue'
 import Cog from 'vue-material-design-icons/Cog.vue'
 import Shield from 'vue-material-design-icons/Shield.vue'
 import QuotaDonut from './components/QuotaDonut.vue'
-import { usePush } from './composables/usePush.js'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
-
-const push = usePush()
 
 export default {
 	name: 'MailV2App',
@@ -64,11 +63,6 @@ export default {
 	},
 	async mounted() {
 		await this.loadQuota()
-		push.on('quotaChanged', () => this.loadQuota())
-		push.connect()
-	},
-	beforeUnmount() {
-		push.cleanup()
 	},
 	methods: {
 		navigate(id) { this.$router.push({ name: id }) },
@@ -82,7 +76,3 @@ export default {
 	},
 }
 </script>
-
-<style>
-/* CSS injected by the bundle via vue-loader scope; no external stylesheet needed */
-</style>

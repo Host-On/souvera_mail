@@ -321,6 +321,16 @@ return [
             'verb' => 'POST',
         ],
         [
+            'name' => 'v2_mailbox#flagEmail',
+            'url' => '/api/v2/emails/{id}/flag',
+            'verb' => 'POST',
+        ],
+        [
+            'name' => 'v2_mailbox#delete',
+            'url' => '/api/v2/emails/{id}',
+            'verb' => 'DELETE',
+        ],
+        [
             'name' => 'v2_compose#send',
             'url' => '/api/v2/send',
             'verb' => 'POST',

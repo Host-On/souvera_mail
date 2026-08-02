@@ -230,4 +230,77 @@ class V2MailboxController extends Controller
 
         return new JSONResponse(['success' => true]);
     }
+
+    /**
+     * POST /apps/souvera_mail/api/v2/emails/{id}/flag
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function flagEmail(string $id): JSONResponse
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+
+        $body = \json_decode(\file_get_contents('php://input'), true);
+        $isFlagged = (bool) ($body['isFlagged'] ?? false);
+        $update = $isFlagged
+            ? ['keywords/$add' => ['$flagged' => true]]
+            : ['keywords/$remove' => ['$flagged']];
+
+        $result = $this->jmap->call([
+            ['Email/set', [
+                'accountId' => $accountId,
+                'update' => [$id => $update],
+            ]],
+        ]);
+
+        if (isset($result['error'])) {
+            return new JSONResponse($result, 500);
+        }
+
+        return new JSONResponse(['success' => true]);
+    }
+
+    /**
+     * DELETE /apps/souvera_mail/api/v2/emails/{id}
+     * Moves to Trash mailbox (soft-delete).
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function delete(string $id): JSONResponse
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+
+        // Find the Trash mailbox ID.
+        $mbResult = $this->jmap->singleCall('Mailbox/get', ['accountId' => $accountId]);
+        $trashId = null;
+        foreach ($mbResult['data']['list'] ?? [] as $mb) {
+            if (($mb['role'] ?? '') === 'trash') {
+                $trashId = $mb['id'];
+                break;
+            }
+        }
+
+        $update = $trashId !== null
+            ? ['mailboxIds' => [$trashId => true]]
+            : ['keywords/$add' => ['$deleted' => true]];
+
+        $result = $this->jmap->call([
+            ['Email/set', [
+                'accountId' => $accountId,
+                'update' => [$id => $update],
+            ]],
+        ]);
+
+        if (isset($result['error'])) {
+            return new JSONResponse($result, 500);
+        }
+
+        return new JSONResponse(['success' => true]);
+    }
 }
