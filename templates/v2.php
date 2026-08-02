@@ -7,7 +7,7 @@
  */
 
 \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
-\OCP\Util::addStyle('souvera_mail', 'mail');
+// CSS is scoped inside the Vue bundle — no addStyle needed.
 ?>
 
 <div id="souvera-mail-v2-app">

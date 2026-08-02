@@ -260,8 +260,8 @@ class PageController extends Controller
     /** Renders the Vue-3 v2 client (feature-flagged). */
     private function renderV2(): TemplateResponse
     {
+        $this->navigationManager->setActiveEntry('souvera_mail');
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
-        \OCP\Util::addStyle('souvera_mail', 'main');
         return new TemplateResponse('souvera_mail', 'v2', []);
     }
 }

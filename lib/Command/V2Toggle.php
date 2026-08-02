@@ -16,8 +16,8 @@ use Symfony\Component\Console\Output\OutputInterface;
  * touch v1 code.
  *
  * Usage:
- *   occ souvera_mail:v2:enable   → activates v2
- *   occ souvera_mail:v2:disable  → falls back to SnappyMail (v1)
+ *   occ souvera_mail:v2:toggle enable   → activates v2
+ *   occ souvera_mail:v2:toggle disable  → falls back to SnappyMail (v1)
  */
 class V2Toggle extends Command
 {
