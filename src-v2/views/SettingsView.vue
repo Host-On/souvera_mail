@@ -13,21 +13,21 @@
 
 		<section class="settings-section">
 			<h3>{{ t('souvera_mail', 'App passwords') }}</h3>
-			<NcButton type="primary" @click="showCreate = true">
+			<NcButton variant="primary" @click="showCreate = true">
 				<template #icon><Plus :size="20" /></template>
 				{{ t('souvera_mail', 'New app password') }}
 			</NcButton>
 
 			<div v-if="showCreate" class="create-row">
 				<NcTextField v-model:value="newName" :placeholder="t('souvera_mail', 'Name (e.g. Android, iOS)')" />
-				<NcButton type="primary" @click="create" :disabled="newName.trim() === ''">{{ t('souvera_mail', 'Create') }}</NcButton>
-				<NcButton type="tertiary" @click="showCreate = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+				<NcButton variant="primary" @click="create" :disabled="newName.trim() === ''">{{ t('souvera_mail', 'Create') }}</NcButton>
+				<NcButton variant="tertiary" @click="showCreate = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
 			</div>
 
 			<div v-if="passwords.length > 0" class="password-list">
 				<div v-for="pw in passwords" :key="pw.id" class="password-row">
 					<span>{{ pw.name }} <code v-if="pw.password">{{ pw.password }}</code></span>
-					<NcButton type="tertiary" size="small" @click="remove(pw.id)">
+					<NcButton variant="tertiary" size="small" @click="remove(pw.id)">
 						<template #icon><TrashCan :size="16" /></template>
 					</NcButton>
 				</div>

@@ -2,12 +2,12 @@
 	<div class="compose-overlay">
 		<div class="compose-modal">
 			<div class="compose-header">
-				<NcButton type="primary" :disabled="!canSend || sending" @click="doSend">
+				<NcButton variant="primary" :disabled="!canSend || sending" @click="doSend">
 					<template #icon><Send :size="20" /></template>
 					{{ sending ? t('souvera_mail', 'Sending...') : t('souvera_mail', 'Send') }}
 				</NcButton>
 				<div class="compose-header-right">
-					<NcButton type="tertiary" @click="$emit('cancel')">
+					<NcButton variant="tertiary" @click="$emit('cancel')">
 						<template #icon><Close :size="20" /></template>
 					</NcButton>
 				</div>
@@ -45,7 +45,7 @@
 			</div>
 
 			<div v-show="tab === 'attachments'" class="compose-attach-pane">
-				<NcButton type="tertiary" @click="pickAttachment">
+				<NcButton variant="tertiary" @click="pickAttachment">
 					<template #icon><Paperclip :size="20" /></template>
 					{{ t('souvera_mail', 'Add attachment') }}
 				</NcButton>
@@ -54,7 +54,7 @@
 					<div v-for="(att, idx) in attachments" :key="idx" class="attach-item">
 						<span>{{ att.name }}</span>
 						<span class="attach-size">{{ formatSize(att.data.length * 0.75) }}</span>
-						<NcButton type="tertiary" size="small" @click="attachments.splice(idx, 1)">
+						<NcButton variant="tertiary" size="small" @click="attachments.splice(idx, 1)">
 							<template #icon><Close :size="14" /></template>
 						</NcButton>
 					</div>

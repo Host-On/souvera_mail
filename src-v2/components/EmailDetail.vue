@@ -1,17 +1,17 @@
 <template>
 	<div class="email-detail" v-if="email">
 		<div class="email-detail__toolbar">
-			<NcButton type="tertiary" @click="$emit('close')">
+			<NcButton variant="tertiary" @click="$emit('close')">
 				<template #icon><ArrowLeft :size="20" /></template>
 			</NcButton>
 			<div class="email-detail__actions">
-				<NcButton type="tertiary" @click="$emit('reply')">
+				<NcButton variant="tertiary" @click="$emit('reply')">
 					<template #icon><Reply :size="20" /></template>
 				</NcButton>
-				<NcButton type="tertiary" @click="$emit('forward')">
+				<NcButton variant="tertiary" @click="$emit('forward')">
 					<template #icon><Forward :size="20" /></template>
 				</NcButton>
-				<NcButton type="tertiary" @click="$emit('delete')">
+				<NcButton variant="tertiary" @click="$emit('delete')">
 					<template #icon><TrashCan :size="20" /></template>
 				</NcButton>
 			</div>
@@ -32,7 +32,7 @@
 		<div v-if="email.attachments && email.attachments.length > 0" class="email-detail__attachments">
 			<h4>{{ t('souvera_mail', 'Attachments') }} ({{ email.attachments.length }})</h4>
 			<div class="attachment-chips">
-				<NcButton v-for="att in email.attachments" :key="att.blobId" type="tertiary">
+				<NcButton v-for="att in email.attachments" :key="att.blobId" variant="tertiary">
 					<template #icon><Paperclip :size="16" /></template>
 					{{ att.name }} ({{ formatSize(att.size) }})
 				</NcButton>

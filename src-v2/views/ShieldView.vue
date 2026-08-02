@@ -12,10 +12,10 @@
 						<span class="junk-subject">{{ email.subject || '(no subject)' }}</span>
 					</div>
 					<div class="junk-actions">
-						<NcButton type="tertiary" size="small" @click="report(email.id, 'notspam')">
+						<NcButton variant="tertiary" size="small" @click="report(email.id, 'notspam')">
 							{{ t('souvera_mail', 'Not spam') }}
 						</NcButton>
-						<NcButton type="tertiary" size="small" @click="report(email.id, 'spam')">
+						<NcButton variant="tertiary" size="small" @click="report(email.id, 'spam')">
 							{{ t('souvera_mail', 'Spam') }}
 						</NcButton>
 					</div>

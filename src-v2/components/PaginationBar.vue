@@ -1,11 +1,11 @@
 <template>
 	<div class="pagination-bar">
-		<NcButton type="tertiary" :disabled="offset <= 0" @click="$emit('prev')">
+		<NcButton variant="tertiary" :disabled="offset <= 0" @click="$emit('prev')">
 			<template #icon><ChevronLeft :size="18" /></template>
 			{{ t('souvera_mail', 'Newer') }}
 		</NcButton>
 		<span class="pagination-bar__info">{{ offset + 1 }}–{{ Math.min(offset + limit, total) }} / {{ total }}</span>
-		<NcButton type="tertiary" :disabled="offset + limit >= total" @click="$emit('next')">
+		<NcButton variant="tertiary" :disabled="offset + limit >= total" @click="$emit('next')">
 			{{ t('souvera_mail', 'Older') }}
 			<template #icon><ChevronRight :size="18" /></template>
 		</NcButton>

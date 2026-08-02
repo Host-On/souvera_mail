@@ -1,9 +1,9 @@
 <template>
 	<div class="email-list-toolbar">
-		<NcButton type="tertiary" @click="$emit('refresh')">
+		<NcButton variant="tertiary" @click="$emit('refresh')">
 			<template #icon><Refresh :size="20" /></template>
 		</NcButton>
-		<NcButton type="primary" @click="$emit('compose')">
+		<NcButton variant="primary" @click="$emit('compose')">
 			<template #icon><Pencil :size="20" /></template>
 			{{ t('souvera_mail', 'New') }}
 		</NcButton>

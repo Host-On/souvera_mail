@@ -1,12 +1,12 @@
 <template>
 	<NcContent app-name="souvera_mail">
 		<NcAppNavigation>
-			<template #list>
-				<NcButton type="primary" class="compose-btn" @click="$router.push({name:'compose'})">
-					<template #icon><Pencil :size="20" /></template>
-					{{ t('souvera_mail', 'New message') }}
-				</NcButton>
+			<NcButton variant="primary" class="compose-btn" @click="$router.push({name:'compose'})">
+				<template #icon><Pencil :size="20" /></template>
+				{{ t('souvera_mail', 'New message') }}
+			</NcButton>
 
+			<template #list>
 				<NcAppNavigationCaption :name="t('souvera_mail', 'Mailboxes')" />
 
 				<MailboxItem

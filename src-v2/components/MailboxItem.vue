@@ -1,17 +1,17 @@
 <template>
-	<div class="mailbox-item">
-		<NcAppNavigationItem
-			:name="mailbox.name"
-			:active="active"
-			:allow-collapse="children.length > 0"
-			:open="open"
-			:count="mailbox.unread > 0 ? mailbox.unread : undefined"
-			@click="$emit('select', mailbox.id)"
-			@update:open="open = $event">
-			<template #icon>
-				<component :is="icon" :size="20" />
-			</template>
-		</NcAppNavigationItem>
+	<NcAppNavigationItem
+		:name="mailbox.name"
+		:active="active"
+		:allow-collapse="children.length > 0"
+		:open="open"
+		@click="$emit('select', mailbox.id)"
+		@update:open="open = $event">
+		<template #icon>
+			<component :is="icon" :size="20" />
+		</template>
+		<template #counter v-if="mailbox.unread > 0">
+			<NcCounterBubble>{{ mailbox.unread }}</NcCounterBubble>
+		</template>
 
 		<template v-if="open && children.length > 0">
 			<MailboxItem
@@ -23,12 +23,11 @@
 				:depth="depth + 1"
 				@select="$emit('select', $event)" />
 		</template>
-	</div>
+	</NcAppNavigationItem>
 </template>
 
 <script>
-import { NcAppNavigationItem } from '@nextcloud/vue'
-import MailboxItem from './MailboxItem.vue'
+import { NcAppNavigationItem, NcCounterBubble } from '@nextcloud/vue'
 import Inbox from 'vue-material-design-icons/Inbox.vue'
 import Send from 'vue-material-design-icons/Send.vue'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
@@ -45,7 +44,7 @@ const ROLE_ICONS = {
 
 export default {
 	name: 'MailboxItem',
-	components: { NcAppNavigationItem, MailboxItem },
+	components: { NcAppNavigationItem, NcCounterBubble },
 	props: {
 		mailbox: { type: Object, required: true },
 		allMailboxes: { type: Array, default: () => [] },

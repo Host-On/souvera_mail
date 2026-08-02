@@ -3,7 +3,7 @@
 		<div class="search-bar">
 			<NcTextField v-model:value="q" :placeholder="t('souvera_mail', 'Search emails...')"
 				class="search-input" @keyup.enter="doSearch" />
-			<NcButton type="primary" @click="doSearch" :disabled="q.trim() === ''">
+			<NcButton variant="primary" @click="doSearch" :disabled="q.trim() === ''">
 				<template #icon><Magnify :size="20" /></template>
 			</NcButton>
 		</div>
