@@ -267,7 +267,9 @@ class PageController extends Controller
         } catch (\Throwable) {
             $lang = 'en';
         }
-        \OCP\Util::addTranslations('souvera_mail', $lang);
+        // Load translation file via addScript (copied from l10n/ → js/ during build)
+        $langShort = substr($lang, 0, 2);
+        \OCP\Util::addScript('souvera_mail', 'l10n-' . $langShort);
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
         return new TemplateResponse('souvera_mail', 'v2', []);
     }

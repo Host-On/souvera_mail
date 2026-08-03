@@ -21,9 +21,9 @@
 
 <script>
 import { NcNoteCard, NcButton } from '@nextcloud/vue'
-import { sanitizeMailHtml, unblockRemoteImages } from '../utils/mailSanitizer.js'
+import { sanitizeMailHtml } from '../utils/mailSanitizer.js'
 
-const BASE_CSS = `:root{color-scheme:light}html,body{margin:0;padding:0}body{padding:16px;background:#fff;color:#222;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;word-break:break-word;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}blockquote{margin:0 0 0 8px;padding-left:12px;border-left:2px solid #c9c9c9;color:#555}a{color:#0b6cbd}`
+const BASE_CSS = `:root{color-scheme:light}html,body{margin:0;padding:0}body{padding:16px;background:#fff;color:#222;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;word-break:break-word;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}blockquote{margin:0 0 0 8px;padding-left:12px;border-left:2px solid #c9c9c9;color:#555}a{color:#0b6cbd}td[height],table[height]{height:auto!important}`
 
 export default {
 	name: 'HtmlMailFrame',
@@ -37,22 +37,26 @@ export default {
 	data() {
 		return {
 			remoteAllowed: this.defaultAllowRemote,
+			displayHtml: '',
 			blockedCount: 0,
 			frameHeight: 0,
 			resizeObserver: null,
 		}
 	},
-	computed: {
-		srcdoc() {
+	watch: {
+		html: { immediate: true, handler: 'rebuildContent' },
+		remoteAllowed: { handler: 'rebuildContent' },
+		attachments: { handler: 'rebuildContent' },
+	},
+	methods: {
+		rebuildContent() {
 			const { html, blockedCount } = sanitizeMailHtml(this.html, {
 				attachments: this.attachments,
 				blockRemote: !this.remoteAllowed,
 			})
 			this.blockedCount = blockedCount
-			return `<!doctype html><head><meta charset="utf-8"><base target="_blank"><style>${BASE_CSS}</style></head><body>${html}</body>`
+			this.displayHtml = html
 		},
-	},
-	methods: {
 		loadRemoteImages() {
 			this.remoteAllowed = true
 		},
@@ -71,14 +75,12 @@ export default {
 			this.resizeObserver.observe(doc.documentElement)
 			if (doc.body) this.resizeObserver.observe(doc.body)
 
-			// Initial height
 			const el = doc.documentElement
 			const body = doc.body
 			if (el && body) {
 				this.frameHeight = Math.max(el.scrollHeight, body.scrollHeight, 200)
 			}
 
-			// Click interception for mailto and anchor links
 			doc.addEventListener('click', (e) => {
 				const a = e.target.closest('a')
 				if (a) {
@@ -90,6 +92,11 @@ export default {
 					}
 				}
 			})
+		},
+	},
+	computed: {
+		srcdoc() {
+			return `<!doctype html><head><meta charset="utf-8"><base target="_blank"><style>${BASE_CSS}</style></head><body>${this.displayHtml}</body>`
 		},
 	},
 	beforeUnmount() {
