@@ -5,20 +5,20 @@
 				<h3>{{ composeTitle }}</h3>
 			</div>
 
-			<div v-if="identities.length > 1" class="compose-field">
+			<div v-if="identities.length > 1" class="compose-field compose-field--from">
 				<label class="compose-field__label">{{ t('souvera_mail', 'From') }}</label>
 				<NcSelect v-model="fromIdentity" :options="identities" label="label" />
 			</div>
 
 			<div class="compose-field">
 				<label class="compose-field__label">{{ t('souvera_mail', 'To') }}</label>
-				<RecipientField v-model="to" />
+				<RecipientField v-model="to" :placeholder="t('souvera_mail', 'To') + '…'" />
 				<div class="compose-toggle-row">
-					<NcButton variant="tertiary" size="small" @click="showCc = !showCc">{{ t('souvera_mail', 'Cc') }}</NcButton>
-					<NcButton variant="tertiary" size="small" @click="showBcc = !showBcc">{{ t('souvera_mail', 'Bcc') }}</NcButton>
+					<button class="toggle-btn" :class="{ 'toggle-btn--active': showCc }" @click="showCc = !showCc">{{ t('souvera_mail', 'Cc') }}</button>
+					<button class="toggle-btn" :class="{ 'toggle-btn--active': showBcc }" @click="showBcc = !showBcc">{{ t('souvera_mail', 'Bcc') }}</button>
 				</div>
-				<RecipientField v-if="showCc || cc.length > 0" v-model="cc" />
-				<RecipientField v-if="showBcc || bcc.length > 0" v-model="bcc" />
+				<RecipientField v-if="showCc || cc.length > 0" v-model="cc" :placeholder="t('souvera_mail', 'Cc') + '…'" />
+				<RecipientField v-if="showBcc || bcc.length > 0" v-model="bcc" :placeholder="t('souvera_mail', 'Bcc') + '…'" />
 			</div>
 
 			<div class="compose-field">
@@ -290,18 +290,26 @@ export default {
 </script>
 
 <style scoped>
-.compose-layout { display: flex; flex-direction: column; max-height: 85vh; overflow: hidden; }
+.compose-layout { display: flex; flex-direction: column; height: 85vh; max-height: 85vh; overflow: hidden; }
 
 .compose-layout__header { padding: 12px 20px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
 .compose-layout__header h3 { margin: 0; font-size: 16px; font-weight: 600; }
 
 .compose-field {
-	padding: 12px 20px;
+	padding: 10px 20px;
 	border-bottom: 1px solid var(--color-border);
 	flex-shrink: 0;
 }
 
-/* Match all form inputs to RecipientField chips: same border, radius, background */
+/* #1: From NcSelect — max-width, hide internal search when value selected */
+.compose-field--from :deep(.vs__dropdown-toggle) { max-width: 400px; }
+.compose-field--from :deep(.vs__search),
+.compose-field--from :deep(.vs__selected-options input) {
+	width: 0 !important; flex-basis: 0 !important; padding: 0 !important; margin: 0 !important;
+	border: 0 !important; min-width: 0 !important;
+}
+
+/* Shared form element style */
 .compose-field :deep(.vs__dropdown-toggle),
 .compose-field :deep(.v-select .vs__dropdown-toggle),
 .compose-field :deep(.native-select),
@@ -317,16 +325,20 @@ export default {
 	font-size: 14px;
 }
 
+/* #5: Editor fills full modal size */
 .compose-field--body {
 	padding: 0;
-	flex: 1; min-height: 250px;
+	flex: 1 1 auto;
+	min-height: 250px;
 	overflow: hidden;
 	display: flex; flex-direction: column;
+	min-width: 0;
 }
 .compose-field--body :deep(.richtext-editor) {
 	border: 0 !important;
 	border-radius: 0 !important;
 	flex: 1; height: auto;
+	display: flex; flex-direction: column;
 }
 .compose-field--body :deep(.richtext-editor__toolbar) {
 	border-bottom: 1px solid var(--color-border);
@@ -341,6 +353,7 @@ export default {
 .compose-field--body :deep(.ProseMirror) {
 	min-height: 200px;
 	outline: none;
+	width: 100%;
 }
 
 .compose-field__label {
@@ -353,7 +366,23 @@ export default {
 	margin-bottom: 6px;
 }
 
-.compose-toggle-row { display: flex; gap: 4px; margin-top: 8px; }
+/* #3: Cc/Bcc pill buttons */
+.compose-toggle-row { display: flex; gap: 6px; margin-top: 8px; }
+.toggle-btn {
+	padding: 3px 10px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large);
+	background: transparent;
+	color: var(--color-text-maxcontrast);
+	font: inherit; font-size: 12px;
+	cursor: pointer;
+}
+.toggle-btn:hover { background: var(--color-background-hover); }
+.toggle-btn--active {
+	background: var(--color-primary-element-light);
+	border-color: var(--color-primary-element);
+	color: var(--color-primary-element);
+}
 
 .compose-layout__footer {
 	display: flex; align-items: center; justify-content: space-between;

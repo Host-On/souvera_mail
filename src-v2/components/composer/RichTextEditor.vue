@@ -137,11 +137,16 @@ export default {
 	background: var(--color-main-background);
 }
 .richtext-editor__toolbar {
-	display: flex; gap: 2px; padding: 6px 8px;
+	display: flex; align-items: center; gap: 2px;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-background-hover);
 	flex-wrap: wrap; flex-shrink: 0;
 }
 .richtext-editor__separator {
-	width: 1px; background: var(--color-border); margin: 2px 4px;
+	width: 1px; height: 20px;
+	background: var(--color-border);
+	margin: 0 6px;
 }
 .richtext-editor__btn--active {
 	background: var(--color-background-hover) !important;
