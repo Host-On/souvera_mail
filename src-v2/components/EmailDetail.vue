@@ -261,12 +261,17 @@ export default {
 .email-detail { padding: 20px; }
 .email-detail__toolbar {
 	display: flex; justify-content: space-between; align-items: center;
-	padding: 8px 12px; margin: -20px -20px 16px -20px;
-	background: var(--color-background-hover);
+	padding: 8px 12px; margin: -20px -20px 0 -20px;
+	background: var(--color-background-dark);
 	border-bottom: 1px solid var(--color-border);
 }
 .email-detail__actions { display: flex; gap: 4px; }
-.email-detail__header { margin-bottom: 20px; }
+.email-detail__header {
+	margin: 0 -20px 16px -20px;
+	padding: 14px 20px;
+	background: var(--color-background-hover);
+	border-bottom: 1px solid var(--color-border);
+}
 .email-detail__header h2 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
 .email-detail__from { margin-bottom: 4px; }
 .email-detail__addr { color: var(--color-text-maxcontrast); margin-left: 6px; font-weight: 400; }

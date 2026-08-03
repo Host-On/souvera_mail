@@ -58,7 +58,12 @@ export default {
 </script>
 
 <style scoped>
-.email-list-toolbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--color-border); }
+.email-list-toolbar {
+	display: flex; justify-content: space-between; align-items: center;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-background-dark);
+}
 .email-list-toolbar__left { display: flex; align-items: center; gap: 2px; }
 .selected-count { font-size: 13px; color: var(--color-primary-element); font-weight: 500; margin: 0 4px; }
 </style>
