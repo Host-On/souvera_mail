@@ -261,10 +261,11 @@ class PageController extends Controller
     private function renderV2(): TemplateResponse
     {
         $this->navigationManager->setActiveEntry('souvera_mail');
-        // Resolve language and load the translation file INLINE so OC.L10N
-        // is registered BEFORE the Vue app evaluates window.t().
+        // Pass l10n as template param so the v2.php template embeds it directly
+        // BEFORE the Vue mount point — guarantees OC.L10N.register() runs first.
+        $l10nScript = '';
         try {
-            $lang = \OC::$server->get(\OCP\IL10N::class)->getLanguageCode(); // short iso code
+            $lang = \OC::$server->get(\OCP\IL10N::class)->getLanguageCode();
         } catch (\Throwable) {
             $lang = 'en';
         }
@@ -273,14 +274,12 @@ class PageController extends Controller
         if ($appPath !== null) {
             $l10nPath = $appPath . '/l10n/' . $langShort . '.js';
             if (\file_exists($l10nPath)) {
-                \OCP\Util::addHeader(
-                    'script',
-                    ['nonce' => \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonceManager::class)->getNonce()],
-                    \file_get_contents($l10nPath)
-                );
+                $l10nScript = \file_get_contents($l10nPath);
             }
         }
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
-        return new TemplateResponse('souvera_mail', 'v2', []);
+        return new TemplateResponse('souvera_mail', 'v2', [
+            'l10nScript' => $l10nScript,
+        ]);
     }
 }
