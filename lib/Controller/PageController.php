@@ -261,9 +261,9 @@ class PageController extends Controller
     private function renderV2(): TemplateResponse
     {
         $this->navigationManager->setActiveEntry('souvera_mail');
-        // Pass l10n as template param so the v2.php template embeds it directly
-        // BEFORE the Vue mount point — guarantees OC.L10N.register() runs first.
-        $l10nScript = '';
+        // Pass raw JSON translations directly to the Vue app — bypasses
+        // Nextcloud's OC.L10N which has proven unreliable for custom apps.
+        $translations = '{}';
         try {
             $lang = \OC::$server->get(\OCP\IL10N::class)->getLanguageCode();
         } catch (\Throwable) {
@@ -272,14 +272,20 @@ class PageController extends Controller
         $langShort = \substr($lang, 0, 2);
         $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath('souvera_mail');
         if ($appPath !== null) {
-            $l10nPath = $appPath . '/l10n/' . $langShort . '.js';
-            if (\file_exists($l10nPath)) {
-                $l10nScript = \file_get_contents($l10nPath);
+            $jsonPath = $appPath . '/l10n/' . $langShort . '.json';
+            if (\file_exists($jsonPath)) {
+                $raw = \file_get_contents($jsonPath);
+                if ($raw !== false) {
+                    $parsed = \json_decode($raw, true);
+                    if (\is_array($parsed) && isset($parsed['translations'])) {
+                        $translations = \json_encode($parsed['translations'], \JSON_UNESCAPED_UNICODE);
+                    }
+                }
             }
         }
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
         return new TemplateResponse('souvera_mail', 'v2', [
-            'l10nScript' => $l10nScript,
+            'translations' => $translations,
         ]);
     }
 }

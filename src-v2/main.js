@@ -12,17 +12,21 @@ function bootstrap() {
 	const mount = document.getElementById('souvera-mail-v2-app')
 	if (!mount) return
 
-	const app = createApp(App)
+	// Use embedded JSON translations directly — bypasses Nextcloud's
+	// unreliable OC.L10N system for custom apps.
+	const translations = window._souvera_mail_translations || {}
+	function appT(app, msg) {
+		return translations[msg] || msg
+	}
 
-	const tFn = window.t || ((app, msg) => msg)
-	const nFn = window.n || ((app, singular, plural, count) => count === 1 ? singular : plural)
-	app.config.globalProperties.t = tFn
-	app.config.globalProperties.n = nFn
+	const app = createApp(App)
+	app.config.globalProperties.t = appT
+	app.config.globalProperties.n = window.n || ((app, singular, plural, count) => count === 1 ? singular : plural)
 	app.config.globalProperties.OC = typeof OC !== 'undefined' ? OC : null
 	app.mixin({
 		methods: {
-			t(...args) { return tFn(...args) },
-			n(...args) { return nFn(...args) },
+			t(...args) { return appT(...args) },
+			n(...args) { return (window.n || ((a, s, p, c) => c === 1 ? s : p))(...args) },
 		},
 	})
 
