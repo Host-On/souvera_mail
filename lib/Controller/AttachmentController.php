@@ -40,6 +40,7 @@ class AttachmentController extends Controller
 
         $body = \json_decode(\file_get_contents('php://input'), true);
         $name = (string) ($body['name'] ?? 'attachment');
+        $targetPath = \trim((string) ($body['targetPath'] ?? ''), '/');
         $accountId = $body['accountId'] ?? null;
 
         if (empty($accountId)) {
@@ -73,9 +74,14 @@ class AttachmentController extends Controller
             }
 
             $userFolder = $this->rootFolder->getUserFolder($user->getUID());
-            $safeName = $this->safeFileName($name, $userFolder);
-
-            $file = $userFolder->newFile($safeName, $data);
+            $targetFolder = $userFolder;
+            if ($targetPath !== '') {
+                $targetFolder = $userFolder->nodeExists($targetPath)
+                    ? $userFolder->get($targetPath)
+                    : $userFolder->newFolder($targetPath);
+            }
+            $safeName = $this->safeFileName($name, $targetFolder);
+            $file = $targetFolder->newFile($safeName, $data);
 
             return new JSONResponse([
                 'success' => true,
