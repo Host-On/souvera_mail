@@ -243,8 +243,8 @@ class V2MailboxController extends Controller
         $body = \json_decode(\file_get_contents('php://input'), true);
         $isRead = (bool) ($body['isRead'] ?? true);
         $update = $isRead
-            ? ['keywords/$add' => ['$seen' => true]]
-            : ['keywords/$remove' => ['$seen']];
+            ? ['keywords/$seen' => true]
+            : ['keywords/$seen' => null];
 
         $result = $this->jmap->call([
             ['Email/set', [
@@ -275,8 +275,8 @@ class V2MailboxController extends Controller
         $body = \json_decode(\file_get_contents('php://input'), true);
         $isFlagged = (bool) ($body['isFlagged'] ?? false);
         $update = $isFlagged
-            ? ['keywords/$add' => ['$flagged' => true]]
-            : ['keywords/$remove' => ['$flagged']];
+            ? ['keywords/$flagged' => true]
+            : ['keywords/$flagged' => null];
 
         $result = $this->jmap->call([
             ['Email/set', [
