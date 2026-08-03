@@ -47,7 +47,6 @@ export default {
 	},
 	watch: {
 		html: { immediate: true, handler: 'rebuildContent' },
-		remoteAllowed: { handler: 'rebuildContent' },
 		attachments: { handler: 'rebuildContent' },
 	},
 	methods: {

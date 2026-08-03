@@ -14,8 +14,14 @@ function bootstrap() {
 
 	// Translations are injected by addHeader with CSP nonce before the app loads.
 	const translations = window._souvera_mail_translations || {}
-	function appT(app, msg) {
-		return translations[msg] || msg
+	function appT(app, msg, vars) {
+		let result = translations[msg] || msg
+		if (vars && typeof vars === 'object') {
+			for (const key of Object.keys(vars)) {
+				result = result.replace('{' + key + '}', String(vars[key]))
+			}
+		}
+		return result
 	}
 
 	const app = createApp(App)
