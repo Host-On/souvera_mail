@@ -15,9 +15,12 @@
 
 				<template v-if="sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
-					<MailboxItem v-for="mp in sharedMailboxRoots" :key="'sh-'+mp.id"
-						:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
-						@select="onSharedSelect" />
+					<template v-for="group in sharedAccountGroups" :key="group.accountId">
+						<NcAppNavigationCaption :name="group.accountName" />
+						<MailboxItem v-for="mp in group.roots" :key="mp.id"
+							:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
+							@select="onSharedSelect" />
+					</template>
 				</template>
 
 				<template v-if="userFolders.length > 0">
@@ -29,9 +32,12 @@
 
 				<template v-if="!sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
-					<MailboxItem v-for="mp in sharedMailboxRoots" :key="'sh2-'+mp.id"
-						:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
-						@select="onSharedSelect" />
+					<template v-for="group in sharedAccountGroups" :key="'low-'+group.accountId">
+						<NcAppNavigationCaption :name="group.accountName" />
+						<MailboxItem v-for="mp in group.roots" :key="mp.id"
+							:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
+							@select="onSharedSelect" />
+					</template>
 				</template>
 			</template>
 
@@ -90,6 +96,21 @@ export default {
 		userFolders() { return this.mailboxes.filter(m => !SYSTEM_ROLES.includes(m.role)) },
 		userFolderRoots() { return this.userFolders.filter(m => !m.parentId || !this.userFolders.find(p => p.id === m.parentId)) },
 		sharedMailboxRoots() { return this.sharedMailboxes.filter(m => !m.parentId || !this.sharedMailboxes.find(p => p.id === m.parentId)) },
+		sharedAccountGroups() {
+			const map = new Map()
+			for (const m of this.sharedMailboxes) {
+				const aid = m._accountId || ''
+				if (!map.has(aid)) {
+					const acc = this.sharedFolders.find(f => f.id === aid)
+					map.set(aid, { accountId: aid, accountName: acc?.name || aid, roots: [] })
+				}
+			}
+			for (const m of this.sharedMailboxRoots) {
+				const aid = m._accountId || ''
+				if (map.has(aid)) map.get(aid).roots.push(m)
+			}
+			return [...map.values()]
+		},
 	},
 	async mounted() {
 		try {
