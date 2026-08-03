@@ -36,8 +36,8 @@ export default {
 		}
 	},
 	async mounted() {
-		const id = q.id
-		const accountId = q.accountId
+		const id = this.$route.query.id
+		const accountId = this.$route.query.accountId
 		if (id) {
 			try {
 				const body = await fetchEmailBody(id, accountId)

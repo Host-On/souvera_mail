@@ -204,8 +204,10 @@ export default {
 			const { html } = sanitizeMailHtml(body, { attachments: email.attachments || [], blockRemote: false })
 			const quote = buildReplyQuote(email, html)
 			this.$nextTick(() => {
-				this.$refs.editor?.insertHtml(quote)
-				this.$refs.editor?.focus()
+				setTimeout(() => {
+					this.$refs.editor?.insertHtml(quote)
+					this.$refs.editor?.focus()
+				}, 100)
 			})
 		},
 		buildForwardContent() {
@@ -218,7 +220,9 @@ export default {
 				blobId: a.blobId, name: a.name, type: a.type, size: a.size,
 			}))
 			this.$nextTick(() => {
-				this.$refs.editor?.insertHtml(quote)
+				setTimeout(() => {
+					this.$refs.editor?.insertHtml(quote)
+				}, 100)
 			})
 		},
 		markDirty() {
