@@ -52,7 +52,7 @@ export default {
 <style scoped>
 .bimi-logo { display: inline-flex; align-items: center; margin-right: 8px; flex-shrink: 0; }
 .bimi-logo__img {
-	width: 24px; height: 24px; border-radius: 4px;
+	width: 24px; height: 24px; border-radius: 50%;
 	object-fit: contain; background: #fff;
 	border: 1px solid var(--color-border);
 }
