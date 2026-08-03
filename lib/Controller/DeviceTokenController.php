@@ -8,6 +8,7 @@ use OCA\SouveraMail\Service\DeviceTokenService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\IRequest;
 use Psr\Log\LoggerInterface;
@@ -59,11 +60,17 @@ class DeviceTokenController extends Controller
     }
 
     #[NoAdminRequired]
-    public function register(string $fcmToken = '', string $platform = 'android'): DataResponse
+    #[NoCSRFRequired]
+    public function register(): DataResponse
     {
         if ($this->userId === null) {
             return $this->error('unauthenticated', Http::STATUS_UNAUTHORIZED);
         }
+
+        $body = \json_decode(\file_get_contents('php://input'), true);
+        $fcmToken = \trim((string) ($body['fcmToken'] ?? ''));
+        $platform = \trim((string) ($body['platform'] ?? 'android'));
+
         try {
             $created = $this->devices->register($this->userId, $fcmToken, $platform);
             return new DataResponse(['status' => 'ok'] + $created, Http::STATUS_CREATED);
@@ -79,6 +86,7 @@ class DeviceTokenController extends Controller
     }
 
     #[NoAdminRequired]
+    #[NoCSRFRequired]
     public function unregister(int $id = 0): DataResponse
     {
         if ($this->userId === null) {
