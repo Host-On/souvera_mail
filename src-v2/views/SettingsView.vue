@@ -251,6 +251,8 @@ export default {
 		async setVerticalLayout(val) {
 			this.verticalLayout = val
 			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { verticalLayout: val }) } catch {}
+			// Reload to apply layout change immediately
+			window.location.reload()
 		},
 		async saveSig() {
 			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { signatureHtml: this.sigHtml, signatureEnabled: this.sigEnabled }) } catch {}
