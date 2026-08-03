@@ -1,13 +1,5 @@
 <template>
 	<div class="html-mail-frame">
-		<NcNoteCard v-if="blockedCount > 0 && !remoteAllowed"
-			type="info">
-			{{ t('souvera_mail', 'External images blocked ({count})', { count: blockedCount }) }}
-			<NcButton class="html-mail-frame__load-btn" @click="loadRemoteImages">
-				{{ t('souvera_mail', 'Load images') }}
-			</NcButton>
-		</NcNoteCard>
-
 		<iframe
 			:key="frameKey"
 			ref="frame"
@@ -21,20 +13,19 @@
 </template>
 
 <script>
-import { NcNoteCard, NcButton } from '@nextcloud/vue'
 import { sanitizeMailHtml } from '../utils/mailSanitizer.js'
 
 const BASE_CSS = `:root{color-scheme:light}html,body{margin:0;padding:0}body{padding:16px;background:#fff;color:#222;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;word-break:break-word;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}blockquote{margin:0 0 0 8px;padding-left:12px;border-left:2px solid #c9c9c9;color:#555}a{color:#0b6cbd}td[height],table[height]{height:auto!important}`
 
 export default {
 	name: 'HtmlMailFrame',
-	components: { NcNoteCard, NcButton },
+	components: {},
 	props: {
 		html: { type: String, required: true },
 		attachments: { type: Array, default: () => [] },
 		defaultAllowRemote: { type: Boolean, default: false },
 	},
-	emits: ['mailto'],
+	emits: ['mailto', 'blocked'],
 	data() {
 		return {
 			remoteAllowed: this.defaultAllowRemote,
@@ -58,6 +49,9 @@ export default {
 			this.blockedCount = blockedCount
 			this.displayHtml = html
 			this.frameKey++
+			if (blockedCount > 0 && !this.remoteAllowed) {
+				this.$emit('blocked', blockedCount)
+			}
 		},
 		loadRemoteImages() {
 			this.remoteAllowed = true
@@ -132,7 +126,6 @@ export default {
 </script>
 
 <style scoped>
-.html-mail-frame__load-btn { margin-top: 8px; }
 .html-mail-frame__iframe {
 	width: 100%;
 	border: 0;

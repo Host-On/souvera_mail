@@ -65,9 +65,14 @@
 						</NcButton>
 					</div>
 				</div>
+				<NcNoteCard v-if="blockedCount > 0 && !remoteAllowed" type="info" class="email-detail__blocked">
+					{{ t('souvera_mail', 'External images blocked ({count})', { count: blockedCount }) }}
+					<NcButton size="small" @click="remoteAllowed = true">
+						{{ t('souvera_mail', 'Load images') }}
+					</NcButton>
+				</NcNoteCard>
 			</div>
 		</div>
-
 		<NcDialog v-if="showFolderPicker" :open="true"
 			:name="t('souvera_mail', 'Choose folder')"
 			size="normal" @close="showFolderPicker = false">
@@ -124,7 +129,8 @@
 			<HtmlMailFrame v-if="htmlBody"
 				:html="htmlBody"
 				:attachments="email.attachments || []"
-				@mailto="$emit('mailto', $event)" />
+				@mailto="$emit('mailto', $event)"
+				@blocked="onBlocked" />
 			<div v-else-if="plainBody" class="email-body-text">{{ plainBody }}</div>
 			<div v-else-if="loading" class="email-detail__loading">
 				<span class="icon-loading" />
@@ -168,7 +174,7 @@ export default {
 		mailboxes: { type: Array, default: () => [] },
 	},
 	emits: ['close', 'reply', 'replyAll', 'forward', 'delete', 'move', 'mailto'],
-	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false } },
+	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: false } },
 	computed: {
 		filePath() {
 			const p = this.folderPath.replace(/^\//, '')
@@ -200,6 +206,9 @@ export default {
 		},
 		moveTo(mailboxId) {
 			this.$emit('move', mailboxId)
+		},
+		onBlocked(count) {
+			this.blockedCount = count
 		},
 		startSaveToFiles(att) {
 			this.pendingAtt = att
@@ -292,6 +301,7 @@ export default {
 .email-body-text { white-space: pre-wrap; }
 .email-detail__loading { display: flex; justify-content: center; padding: 48px; }
 .email-detail__empty { color: var(--color-text-maxcontrast); text-align: center; padding: 48px; }
+.email-detail__blocked { margin-top: 10px; }
 .folder-picker { display: flex; flex-direction: column; min-height: 300px; max-height: 55vh; }
 .folder-picker__breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-bottom: 8px; }
 .folder-picker__sep { color: var(--color-text-maxcontrast); padding: 0 2px; }
