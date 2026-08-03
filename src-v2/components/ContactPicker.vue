@@ -1,5 +1,5 @@
 <template>
-	<NcDialog :open="true" :name="t('souvera_mail', 'Contacts')" size="normal" @close="$emit('close')">
+	<NcDialog v-model:open="dialogOpen" :name="t('souvera_mail', 'Contacts')" size="normal" @close="$emit('close')">
 		<div class="contact-picker">
 			<div class="contact-picker__search">
 				<NcTextField v-model="query" :placeholder="t('souvera_mail', 'Search contacts…')"
@@ -52,6 +52,7 @@ export default {
 	emits: ['close', 'select'],
 	data() {
 		return {
+			dialogOpen: true,
 			query: '',
 			contacts: [],
 			selected: [],
