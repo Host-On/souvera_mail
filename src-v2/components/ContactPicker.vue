@@ -1,5 +1,5 @@
 <template>
-	<NcModal v-if="dialogOpen" size="normal" @close="$emit('close')">
+	<NcModal v-if="dialogOpen" size="normal" :name="t('souvera_mail', 'Contacts')" @close="$emit('close')">
 		<div class="contact-picker" style="padding:20px">
 			<h2>{{ t('souvera_mail', 'Contacts') }}</h2>
 			<div class="contact-picker__search">
@@ -24,9 +24,9 @@
 					</div>
 				</div>
 			</div>
-			<div v-if="addedRecipients.length > 0" class="contact-picker__selected">
-				<span class="contact-picker__selected-label">{{ selected.length }} {{ t('souvera_mail', 'selected') }}</span>
-			</div>
+		<div v-if="selected.length > 0" class="contact-picker__selected">
+			<span class="contact-picker__selected-label">{{ selected.length }} {{ t('souvera_mail', 'selected') }}</span>
+		</div>
 			<div class="contact-picker__footer">
 				<NcButton variant="primary" @click="confirmSelection">
 					{{ t('souvera_mail', 'Add selected') }}
