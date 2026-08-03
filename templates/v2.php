@@ -2,24 +2,12 @@
 /**
  * souvera_mail v2 — Template
  *
- * Mountpunkt für die neue Vue-3-App (souvera_mail-v2.js).
- * SnappyMail (v1) läuft parallel unter dem existierenden Template.
+ * Mountpunkt für die Vue-3-App (souvera_mail-v2.js).
  */
 
-/**
- * souvera_mail v2 — Template
- *
- * Mountpunkt für die neue Vue-3-App (souvera_mail-v2.js).
- * SnappyMail (v1) läuft parallel unter dem existierenden Template.
- */
-
-\OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
-// CSS is scoped inside the Vue bundle — no addStyle needed.
-
-// Embed translations as inline script with CSP nonce from the response.
-if (!empty($translations) && !empty($cspNonce)): ?>
-<script nonce="<?php p($cspNonce); ?>">window._souvera_mail_translations = <?php echo $translations; ?>;</script>
-<?php endif;
+// Translations are loaded via external souvera_mail-l10n.js (registered
+// in renderV2() BEFORE souvera_mail-v2.js, so window._souvera_mail_translations
+// is always set when the Vue app boots).
 ?>
 <div id="souvera-mail-v2-app" style="width:100%;height:100%;background:var(--color-main-background)">
 	<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%">
