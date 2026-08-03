@@ -49,20 +49,28 @@
 					</NcButton>
 				</div>
 				<div class="attachment-chips">
-					<div v-for="att in email.attachments" :key="att.blobId" class="attachment-chip">
-						<a :href="buildBlobUrl(att.blobId, att.name)" download
-							:title="t('souvera_mail', 'Download file')">
-							<NcButton variant="tertiary">
-								<template #icon><Download :size="16" /></template>
-								{{ att.name }} ({{ formatSize(att.size) }})
+					<div v-for="att in email.attachments" :key="att.blobId" class="attachment-chip"
+						:class="{ 'attachment-chip--many': email.attachments.length > 3 }">
+						<div class="attachment-chip__actions">
+							<NcButton variant="tertiary" size="small"
+								:title="t('souvera_mail', 'Download file')"
+								:aria-label="t('souvera_mail', 'Download file')"
+								@click.stop="downloadAtt(att)">
+								<template #icon><Download :size="14" /></template>
 							</NcButton>
-						</a>
-						<NcButton variant="tertiary" size="small"
-							:title="t('souvera_mail', 'Save to Files')"
-							:aria-label="t('souvera_mail', 'Save to Files')"
-							@click="startSaveToFiles(att)">
-							<template #icon><ContentSave :size="16" /></template>
-						</NcButton>
+							<NcButton variant="tertiary" size="small"
+								:title="t('souvera_mail', 'Save to Files')"
+								:aria-label="t('souvera_mail', 'Save to Files')"
+								@click.stop="startSaveToFiles(att)">
+								<template #icon><ContentSave :size="14" /></template>
+							</NcButton>
+						</div>
+						<span class="attachment-chip__name" @click="previewAtt(att)"
+							:title="t('souvera_mail', 'Preview')">
+							<Paperclip :size="14" />
+							<span class="attachment-chip__text">{{ att.name }}</span>
+							<span class="attachment-chip__size">{{ formatSize(att.size) }}</span>
+						</span>
 					</div>
 				</div>
 				<NcNoteCard v-if="blockedCount > 0 && !remoteAllowed" type="info" class="email-detail__blocked">
@@ -210,6 +218,15 @@ export default {
 		onBlocked(count) {
 			this.blockedCount = count
 		},
+		downloadAtt(att) {
+			const url = buildBlobUrl(att.blobId, att.name)
+			window.open(url, '_blank')
+		},
+		previewAtt(att) {
+			if (att.type && att.type.startsWith('image/')) {
+				window.open(buildBlobUrl(att.blobId, att.name), '_blank')
+			}
+		},
 		startSaveToFiles(att) {
 			this.pendingAtt = att
 			this.pendingAll = false
@@ -296,7 +313,21 @@ export default {
 .email-detail__attachments-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .email-detail__attachments-header h4 { margin: 0; font-size: 13px; color: var(--color-text-maxcontrast); }
 .attachment-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.attachment-chip { display: flex; align-items: center; gap: 4px; }
+.attachment-chip {
+	display: flex; align-items: center; gap: 6px;
+	padding: 6px 10px; border: 1px solid var(--color-border);
+	border-radius: var(--border-radius);
+	background: var(--color-main-background);
+}
+.attachment-chip--many { padding: 3px 6px; font-size: 12px; }
+.attachment-chip--many .attachment-chip__text { max-width: 120px; }
+.attachment-chip__actions { display: flex; gap: 2px; flex-shrink: 0; }
+.attachment-chip__name {
+	display: flex; align-items: center; gap: 4px;
+	cursor: pointer; min-width: 0;
+}
+.attachment-chip__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; font-size: 13px; }
+.attachment-chip__size { font-size: 11px; color: var(--color-text-maxcontrast); white-space: nowrap; margin-left: 4px; }
 .email-detail__body { line-height: 1.7; word-break: break-word; margin: 0 -20px; }
 .email-body-text { white-space: pre-wrap; }
 .email-detail__loading { display: flex; justify-content: center; padding: 48px; }
