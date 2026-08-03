@@ -129,9 +129,12 @@ export default {
 	methods: {
 		async loadEmails() {
 			this.loadingEmails = true
-			const mbox = this.allMailboxes.find(m => m.id === this.selectedMailbox)
-			const accountId = mbox?._accountId || null
-			try { const r = await fetchEmails(this.selectedMailbox, this.limit, this.offset, accountId); this.emails = r.emails; this.emailTotal = r.total } catch (e) { console.error('Failed to load emails', e) } finally { this.loadingEmails = false }
+			let accountId = null
+			let mailboxId = this.selectedMailbox
+			if (mailboxId && mailboxId.includes('|')) {
+				[accountId, mailboxId] = mailboxId.split('|')
+			}
+			try { const r = await fetchEmails(mailboxId, this.limit, this.offset, accountId); this.emails = r.emails; this.emailTotal = r.total } catch (e) { console.error('Failed to load emails', e) } finally { this.loadingEmails = false }
 		},
 		async refreshEmails() { this.checkedIds = []; this.offset = 0; await this.loadEmails() },
 		toggleCheck(id) {

@@ -54,7 +54,11 @@ export default {
 	emits: ['select'],
 	data() { return { open: false } },
 	computed: {
-		active() { return this.selected === this.mailbox.id },
+		active() {
+			if (!this.selected) return false
+			return this.selected === this.mailbox.id
+				|| this.selected === (this.mailbox._accountId + '|' + this.mailbox.id)
+		},
 		icon() { return ROLE_ICONS[this.mailbox.role] || Folder },
 		children() {
 			return this.allMailboxes.filter(m => m.parentId === this.mailbox.id)

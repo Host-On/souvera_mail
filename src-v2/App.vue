@@ -18,8 +18,8 @@
 					<template v-for="group in sharedAccountGroups" :key="group.accountId">
 						<NcAppNavigationCaption :name="group.accountName" />
 						<MailboxItem v-for="mp in group.roots" :key="mp.id"
-							:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
-							@select="onSharedSelect" />
+							:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="sharedSelected(mp)" :depth="0"
+							@select="onSharedSelect(mp._accountId, $event)" />
 					</template>
 				</template>
 
@@ -35,8 +35,8 @@
 					<template v-for="group in sharedAccountGroups" :key="'low-'+group.accountId">
 						<NcAppNavigationCaption :name="group.accountName" />
 						<MailboxItem v-for="mp in group.roots" :key="mp.id"
-							:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
-							@select="onSharedSelect" />
+							:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="sharedSelected(mp)" :depth="0"
+							@select="onSharedSelect(mp._accountId, $event)" />
 					</template>
 				</template>
 			</template>
@@ -133,9 +133,12 @@ export default {
 	},
 	methods: {
 		onMailboxSelect(id) { this.selectedMailbox = id; this.$router.push({name:'inbox'}) },
-		onSharedSelect(id) {
-			this.selectedMailbox = id
+		onSharedSelect(accountId, mailboxId) {
+			this.selectedMailbox = accountId + '|' + mailboxId
 			this.$router.push({ name: 'inbox' })
+		},
+		sharedSelected(mp) {
+			return this.selectedMailbox === (mp._accountId + '|' + mp.id)
 		},
 		openArchive() {
 			window.location.href = this.OC?.generateUrl?.('/apps/souvera_mailarchiv') || '/index.php/apps/souvera_mailarchiv'
