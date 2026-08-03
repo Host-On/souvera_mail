@@ -135,7 +135,11 @@ export default {
 		onMailboxSelect(id) { this.selectedMailbox = id; this.$router.push({name:'inbox'}) },
 		onSharedSelect(accountId, mailboxId) {
 			this.selectedMailbox = accountId + '|' + mailboxId
-			this.$router.push({ name: 'inbox' })
+			if (this.$route.name === 'inbox') {
+				this.$router.replace({ name: 'inbox', query: { t: String(Date.now()) } })
+			} else {
+				this.$router.push({ name: 'inbox' })
+			}
 		},
 		sharedSelected(mp) {
 			return this.selectedMailbox === (mp._accountId + '|' + mp.id)
