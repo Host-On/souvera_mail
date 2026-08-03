@@ -159,15 +159,18 @@ export default {
 	flex: 1;
 	width: 100%;
 	min-height: v-bind(minHeight);
-	padding: 10px 20px;
+	padding: 8px 16px;
 	font-size: 14px; line-height: 1.6;
 	overflow-y: auto;
+	overflow-x: hidden;
 	border: none;
 }
 .richtext-editor__content :deep(.ProseMirror) {
 	outline: none;
 	min-height: v-bind(minHeight);
 	width: 100%;
+	word-break: break-word;
+	overflow-wrap: break-word;
 }
 .richtext-editor__content :deep(.ProseMirror p.is-editor-empty:first-child::before) {
 	content: attr(data-placeholder);
