@@ -192,4 +192,21 @@ export default {
 
 <style scoped>
 .compose-btn { margin: 8px; width: calc(100% - 16px); }
+
+/* Shared account sub-headers — visually distinct from top-level sections */
+:deep(.app-navigation-caption) + :deep(.app-navigation-caption) {
+	margin-top: 2px;
+	padding-left: 16px;
+	font-size: 13px;
+	opacity: 0.8;
+}
+:deep(.app-navigation-caption) + :deep(.app-navigation-caption)::before {
+	content: '';
+	display: inline-block;
+	width: 6px; height: 6px;
+	border-radius: 50%;
+	background: var(--color-border);
+	margin-right: 6px;
+	vertical-align: middle;
+}
 </style>
