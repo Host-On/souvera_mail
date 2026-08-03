@@ -7,8 +7,15 @@
 
 			<div v-if="identities.length > 1" class="compose-field compose-field--from">
 				<label class="compose-field__label">{{ t('souvera_mail', 'From') }}</label>
-				<NcSelect v-model="fromIdentity" :options="identities" label="label"
-					:searchable="false" :clearable="false" />
+				<select v-model="fromIdentityId" class="native-select">
+					<option v-for="identity in identities" :key="identity.id" :value="identity.id">
+						{{ identity.label }}
+					</option>
+				</select>
+			</div>
+			<div v-else-if="identities.length === 1" class="compose-field compose-field--from">
+				<label class="compose-field__label">{{ t('souvera_mail', 'From') }}</label>
+				<div class="compose-field__static-text">{{ identities[0].label }}</div>
 			</div>
 
 			<div class="compose-field">
@@ -109,7 +116,7 @@ export default {
 
 		return {
 			visible: true,
-			fromIdentity: { id: null, name: '', email: '' },
+			fromIdentityId: null,
 			identities: [],
 			to: toPrefill,
 			cc: ccPrefill,
@@ -170,7 +177,7 @@ export default {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/identities'))
 				const list = (data.identities || []).map(i => ({ id: i.id, label: `${i.name || ''} <${i.email}>`, name: i.name, email: i.email }))
 				this.identities = list
-				if (list.length > 0) this.fromIdentity = list[0]
+				if (list.length > 0) this.fromIdentityId = list[0].id
 			} catch (e) {
 				console.error('Failed to load identities', e)
 			}
@@ -219,7 +226,7 @@ export default {
 		},
 		buildPayload() {
 			return {
-				identityId: this.fromIdentity.id,
+				identityId: this.fromIdentityId,
 				to: this.to.map(r => r.email),
 				cc: this.cc.map(r => r.email),
 				bcc: this.bcc.map(r => r.email),
@@ -315,7 +322,7 @@ export default {
 .compose-field :deep(.v-select .vs__dropdown-toggle),
 .compose-field :deep(.native-select),
 .compose-field :deep(.input-field),
-.compose-field :deep(input:not([type=file])) {
+.compose-field :deep(input:not([type=file]):not(.recipient-field__input)) {
 	border: 1px solid var(--color-border) !important;
 	border-radius: var(--border-radius-large) !important;
 	background: var(--color-main-background);
@@ -324,6 +331,16 @@ export default {
 	width: 100% !important;
 	box-sizing: border-box !important;
 	font-size: 14px;
+}
+
+.compose-field :deep(.recipient-field__input) {
+	border: none !important;
+	background: transparent !important;
+	width: auto !important;
+	min-width: 60px !important;
+	min-height: 0 !important;
+	padding: 4px 0 !important;
+	flex: 1 !important;
 }
 
 /* #5: Editor fills full modal size */
@@ -348,6 +365,24 @@ export default {
 	text-transform: uppercase;
 	letter-spacing: 0.5px;
 	margin-bottom: 6px;
+}
+
+.native-select {
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large);
+	background: var(--color-main-background);
+	color: var(--color-main-text);
+	min-height: 40px;
+	padding: 6px 12px;
+	width: 100%;
+	box-sizing: border-box;
+	font-size: 14px;
+	font: inherit;
+}
+.compose-field__static-text {
+	padding: 6px 0;
+	font-size: 14px;
+	color: var(--color-main-text);
 }
 
 /* #3: Cc/Bcc pill buttons */
