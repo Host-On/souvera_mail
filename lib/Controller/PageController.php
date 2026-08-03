@@ -269,13 +269,16 @@ class PageController extends Controller
             $lang = 'en';
         }
         $langShort = \substr($lang, 0, 2);
-        $l10nPath = \OC_App::getAppPath('souvera_mail') . '/l10n/' . $langShort . '.js';
-        if (\file_exists($l10nPath)) {
-            \OCP\Util::addHeader(
-                'script',
-                ['nonce' => \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonceManager::class)->getNonce()],
-                \file_get_contents($l10nPath)
-            );
+        $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath('souvera_mail');
+        if ($appPath !== null) {
+            $l10nPath = $appPath . '/l10n/' . $langShort . '.js';
+            if (\file_exists($l10nPath)) {
+                \OCP\Util::addHeader(
+                    'script',
+                    ['nonce' => \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonceManager::class)->getNonce()],
+                    \file_get_contents($l10nPath)
+                );
+            }
         }
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
         return new TemplateResponse('souvera_mail', 'v2', []);
