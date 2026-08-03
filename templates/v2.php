@@ -9,8 +9,8 @@
 \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
 // CSS is scoped inside the Vue bundle — no addStyle needed.
 ?>
-<div id="souvera-mail-v2-app" style="height:100%">
-	<div style="display:flex;align-items:center;justify-content:center;height:100%">
+<div id="souvera-mail-v2-app" style="width:100%;height:100%;background:var(--color-main-background)">
+	<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%">
 		<div style="text-align:center;color:var(--color-text-maxcontrast)">
 			<div class="icon-loading" style="display:inline-block;width:32px;height:32px"></div>
 			<p style="margin-top:12px;font-size:14px"><?php p($l->t('Loading Mail v2...')); ?></p>
