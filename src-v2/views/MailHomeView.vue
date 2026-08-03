@@ -140,6 +140,7 @@ export default {
 	beforeUnmount() {
 		this._hotkeys?.destroy()
 		this.stopAutoRefresh()
+		if (this._audioCtx) { this._audioCtx.close(); this._audioCtx = null }
 	},
 	methods: {
 		async loadEmails() {
@@ -150,9 +151,10 @@ export default {
 				[accountId, mailboxId] = mailboxId.split('|')
 			}
 			const prevIds = this.emails.map(e => e.id)
+			const prevTotal = this.emailTotal
 			try { const r = await fetchEmails(mailboxId, this.limit, this.offset, accountId, this.searchQuery, this.filterType); this.emails = r.emails; this.emailTotal = r.total } catch (e) { console.error('Failed to load emails', e) } finally { this.loadingEmails = false }
-			// Play sound if new emails arrived
-			if (prevIds.length > 0) {
+			// Play sound only when there are genuinely new emails (not page/filter changes)
+			if (prevIds.length > 0 && this.emailTotal > prevTotal) {
 				const newIds = this.emails.map(e => e.id).filter(id => !prevIds.includes(id))
 				if (newIds.length > 0) this.playNewMailSound()
 			}
@@ -277,19 +279,21 @@ export default {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
 				const sound = data.notificationSound || 'none'
 				if (sound === 'none') return
-				const ctx = new (window.AudioContext || window.webkitAudioContext)()
-				const osc = ctx.createOscillator()
+				if (!this._audioCtx) {
+					this._audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+				}
+				const ctx = this._audioCtx
+				if (ctx.state === 'suspended') await ctx.resume()
 				const gain = ctx.createGain()
-				osc.connect(gain); gain.connect(ctx.destination)
+				gain.connect(ctx.destination)
 				gain.gain.value = 0.15
 				if (sound === 'chime') {
-					osc.frequency.value = 880; osc.type = 'sine'
-					osc.start(); osc.stop(ctx.currentTime + 0.15)
-					setTimeout(() => { const o2 = ctx.createOscillator(); o2.connect(gain); o2.frequency.value = 1100; o2.type = 'sine'; o2.start(); o2.stop(ctx.currentTime + 0.2) }, 150)
+					const o1 = ctx.createOscillator(); o1.connect(gain); o1.frequency.value = 880; o1.type = 'sine'; o1.start(); o1.stop(ctx.currentTime + 0.15)
+					const o2 = ctx.createOscillator(); o2.connect(gain); o2.frequency.value = 1100; o2.type = 'sine'; o2.start(ctx.currentTime + 0.15); o2.stop(ctx.currentTime + 0.35)
 				} else if (sound === 'bell') {
-					osc.frequency.value = 660; osc.type = 'triangle'
-					osc.start(); gain.gain.setTargetAtTime(0, ctx.currentTime + 0.3, 0.05); osc.stop(ctx.currentTime + 0.5)
+					const o1 = ctx.createOscillator(); o1.connect(gain); o1.frequency.value = 660; o1.type = 'triangle'; o1.start(); gain.gain.setTargetAtTime(0, ctx.currentTime + 0.3, 0.05); o1.stop(ctx.currentTime + 0.5)
 				}
+				setTimeout(() => { try { gain.disconnect() } catch {} }, 1000)
 			} catch {}
 		},
 	},

@@ -270,7 +270,9 @@ export default {
 			window.location.reload()
 		},
 		async onSoundChange(val) {
-			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { notificationSound: val.value }) } catch {}
+			if (val?.value) {
+				try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { notificationSound: val.value }) } catch {}
+			}
 		},
 		async saveSig() {
 			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { signatureHtml: this.sigHtml, signatureEnabled: this.sigEnabled }) } catch {}
