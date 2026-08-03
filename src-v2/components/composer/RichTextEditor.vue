@@ -132,16 +132,12 @@ export default {
 
 <style scoped>
 .richtext-editor {
-	border: 1px solid var(--color-border);
-	border-radius: var(--border-radius-large);
-	overflow: hidden;
-	background: var(--color-main-background);
 	display: flex; flex-direction: column;
 	height: 100%;
+	background: var(--color-main-background);
 }
 .richtext-editor__toolbar {
 	display: flex; gap: 2px; padding: 6px 8px;
-	border-bottom: 1px solid var(--color-border);
 	flex-wrap: wrap; flex-shrink: 0;
 }
 .richtext-editor__separator {

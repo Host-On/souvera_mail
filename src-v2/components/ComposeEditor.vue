@@ -300,10 +300,18 @@ export default {
 	border-bottom: 1px solid var(--color-border);
 	flex-shrink: 0;
 }
-.compose-field :deep(.v-select),
-.compose-field :deep(input),
-.compose-field :deep(textarea) {
+
+/* Match all form inputs to RecipientField chips: same border, radius, background */
+.compose-field :deep(.v-select .vs__dropdown-toggle),
+.compose-field :deep(.native-select),
+.compose-field :deep(input:not([type=file])) {
+	border: 1px solid var(--color-border) !important;
+	border-radius: var(--border-radius-large) !important;
+	background: var(--color-main-background);
+	min-height: 40px;
+	padding: 6px 12px;
 	width: 100%; box-sizing: border-box;
+	font-size: 14px;
 }
 
 .compose-field--body {
@@ -313,13 +321,14 @@ export default {
 	display: flex; flex-direction: column;
 }
 .compose-field--body :deep(.richtext-editor) {
+	border: 0 !important;
+	border-radius: 0 !important;
 	flex: 1; height: auto;
-	border: none; border-radius: 0;
 }
 .compose-field--body :deep(.richtext-editor__toolbar) {
-	border-top: 1px solid var(--color-border);
 	border-bottom: 1px solid var(--color-border);
 	padding: 6px 20px;
+	flex-shrink: 0;
 }
 .compose-field--body :deep(.richtext-editor__content) {
 	flex: 1; min-height: 200px;
