@@ -119,7 +119,7 @@ class V2MailboxController extends Controller
         foreach ($getResult['data']['list'] ?? [] as $email) {
             $fromList = $email['from'] ?? [];
             $fromAddr = $fromList[0]['email'] ?? '';
-            $fromName = $fromList[0]['name'] ?? '';
+            $fromName = $this->decodeMimeHeader($fromList[0]['name'] ?? '');
             $keywords = $email['keywords'] ?? [];
             $emails[] = [
                 'id' => $email['id'] ?? '',
@@ -172,7 +172,7 @@ class V2MailboxController extends Controller
         }
 
         $fromAddr = $email['from'][0]['email'] ?? '';
-        $fromName = $email['from'][0]['name'] ?? '';
+        $fromName = $this->decodeMimeHeader($email['from'][0]['name'] ?? '');
         $toAddrs = \implode(', ', \array_map(fn($a) => ($a['name'] ?? '') . ' <' . ($a['email'] ?? '') . '>', $email['to'] ?? []));
         $toList = \array_map(fn($a) => ['name' => $a['name'] ?? '', 'email' => $a['email'] ?? ''], $email['to'] ?? []);
         $ccList = \array_map(fn($a) => ['name' => $a['name'] ?? '', 'email' => $a['email'] ?? ''], $email['cc'] ?? []);
@@ -406,5 +406,18 @@ class V2MailboxController extends Controller
         $accountId = $this->request->getParam('accountId');
         if (!empty($accountId)) return $accountId;
         return $this->jmap->getCurrentAccountId();
+    }
+
+    /**
+     * Decodes MIME-encoded header values like =?UTF-8?B?...?= or =?UTF-8?Q?....?=.
+     * Falls back to the raw input if decoding fails or the string isn't encoded.
+     */
+    private function decodeMimeHeader(string $raw): string
+    {
+        if ($raw === '' || !\str_contains($raw, '=?')) {
+            return $raw;
+        }
+        $decoded = @\iconv_mime_decode($raw, 0, 'UTF-8');
+        return ($decoded !== false) ? $decoded : $raw;
     }
 }
