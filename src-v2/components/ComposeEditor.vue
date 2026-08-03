@@ -303,6 +303,7 @@ export default {
 				name: att.name,
 				type: att.type,
 				size: att.size,
+				fromCloud: true,
 			})
 		},
 		onClose() {

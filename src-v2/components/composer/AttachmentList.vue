@@ -2,6 +2,7 @@
 	<div class="mail-attachment-list">
 		<div v-for="(att, idx) in attachments" :key="idx" class="mail-attachment-list__item">
 			<Paperclip :size="16" />
+			<Cloud v-if="att.fromCloud" :size="14" />
 			<span class="mail-attachment-list__name">{{ att.name }}</span>
 			<span class="mail-attachment-list__size">{{ formatSize(att.size || Math.round((att.data?.length || 0) * 0.75)) }}</span>
 			<NcButton variant="tertiary" size="small"
@@ -17,10 +18,11 @@
 import { NcButton } from '@nextcloud/vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import Close from 'vue-material-design-icons/Close.vue'
+import Cloud from 'vue-material-design-icons/Cloud.vue'
 
 export default {
 	name: 'AttachmentList',
-	components: { NcButton, Paperclip, Close },
+	components: { NcButton, Paperclip, Close, Cloud },
 	props: { attachments: { type: Array, default: () => [] } },
 	emits: ['remove'],
 	methods: {
