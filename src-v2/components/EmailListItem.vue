@@ -6,13 +6,13 @@
 			'email-list-item--checked': checked,
 		}"
 		@click="$emit('click')">
-		<div class="email-list-item__check" @click.stop="$emit('check')">
-			<div class="checkbox-box" :class="{ 'checkbox-box--checked': checked }">
-				<Check v-if="checked" :size="14" />
-			</div>
-		</div>
-		<div class="email-list-item__avatar">
+		<div class="email-list-item__avatar" @click.stop="$emit('check')">
 			<NcAvatar :display-name="email.fromName || email.fromAddress" :size="40" />
+			<div class="avatar-check-overlay" :class="{ 'avatar-check-overlay--visible': checked }">
+				<div class="checkbox-box" :class="{ 'checkbox-box--checked': checked }">
+					<Check v-if="checked" :size="14" />
+				</div>
+			</div>
 		</div>
 		<div class="email-list-item__body">
 			<div class="email-list-item__line1">
@@ -56,7 +56,7 @@ export default {
 
 <style scoped>
 .email-list-item {
-	display: flex; align-items: flex-start; gap: 4px;
+	display: flex; align-items: flex-start; gap: 10px;
 	padding: 8px 12px; cursor: pointer;
 	border-bottom: 1px solid var(--color-border);
 	transition: background 0.15s;
@@ -68,12 +68,21 @@ export default {
 	background: var(--color-primary-element-light);
 	box-shadow: inset 3px 0 0 var(--color-primary-element);
 }
-.email-list-item__check {
-	flex-shrink: 0; margin-top: 10px; padding: 2px;
+.email-list-item__avatar {
+	position: relative; flex-shrink: 0; margin-top: 2px;
 }
+.avatar-check-overlay {
+	position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+	background: rgba(0,0,0,0.35);
+	border-radius: 50%;
+	display: flex; align-items: center; justify-content: center;
+	opacity: 0; transition: opacity 0.15s;
+}
+.email-list-item:hover .avatar-check-overlay { opacity: 1; }
+.avatar-check-overlay--visible { opacity: 1; }
 .checkbox-box {
 	width: 18px; height: 18px;
-	border: 2px solid var(--color-border); border-radius: 3px;
+	border: 2px solid #fff; border-radius: 3px;
 	display: flex; align-items: center; justify-content: center;
 	transition: all 0.15s;
 }
@@ -82,7 +91,6 @@ export default {
 	background: var(--color-primary-element);
 	color: var(--color-primary-text);
 }
-.email-list-item__avatar { flex-shrink: 0; margin-top: 2px; }
 .email-list-item__body { flex: 1; min-width: 0; overflow: hidden; }
 .email-list-item__line1, .email-list-item__line2 {
 	display: flex; justify-content: space-between; align-items: baseline;
