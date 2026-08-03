@@ -118,7 +118,12 @@ export default {
 
 <style scoped>
 .email-detail { padding: 20px; }
-.email-detail__toolbar { display: flex; justify-content: space-between; margin-bottom: 16px; }
+.email-detail__toolbar {
+	display: flex; justify-content: space-between; align-items: center;
+	padding: 8px 12px; margin: -20px -20px 16px -20px;
+	background: var(--color-background-hover);
+	border-bottom: 1px solid var(--color-border);
+}
 .email-detail__actions { display: flex; gap: 4px; }
 .email-detail__header { margin-bottom: 20px; }
 .email-detail__header h2 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
