@@ -3,11 +3,9 @@
 		<NcNoteCard v-if="blockedCount > 0 && !remoteAllowed"
 			type="info">
 			{{ t('souvera_mail', 'External images blocked ({count})', { count: blockedCount }) }}
-			<template #actions>
-				<NcButton @click="loadRemoteImages">
-					{{ t('souvera_mail', 'Load images') }}
-				</NcButton>
-			</template>
+			<NcButton class="html-mail-frame__load-btn" @click="loadRemoteImages">
+				{{ t('souvera_mail', 'Load images') }}
+			</NcButton>
 		</NcNoteCard>
 
 		<iframe
@@ -101,6 +99,7 @@ export default {
 </script>
 
 <style scoped>
+.html-mail-frame__load-btn { margin-top: 8px; }
 .html-mail-frame__iframe {
 	width: 100%;
 	border: 0;

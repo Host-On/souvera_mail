@@ -4,7 +4,7 @@
 
 		<NcSettingsSection :name="t('souvera_mail', 'Account')">
 			<div class="settings-info">
-				<div><strong>{{ t('souvera_mail', 'Email') }}:</strong> {{ prefs.account.email || '—' }}</div>
+				<div><strong>{{ t('souvera_mail', 'Email') }}:</strong> {{ prefsComp.account.email || '—' }}</div>
 			</div>
 			<div class="quota-row" v-if="quotaUsed > 0 || quotaUnlimited">
 				<QuotaDonut :used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
@@ -15,12 +15,12 @@
 
 		<NcSettingsSection :name="t('souvera_mail', 'Signature')">
 			<div class="settings-row">
-				<NcCheckboxRadioSwitch :model-value="prefs.signatureEnabled"
+				<NcCheckboxRadioSwitch :model-value="prefsComp.signatureEnabled"
 					@update:modelValue="sigEnabled = $event; saveSig()">
 					{{ t('souvera_mail', 'Append signature') }}
 				</NcCheckboxRadioSwitch>
 			</div>
-			<div v-if="sigEnabled || prefs.signatureEnabled" class="settings-row">
+			<div v-if="sigEnabled || prefsComp.signatureEnabled" class="settings-row">
 				<textarea class="signature-textarea" v-model="sigHtml"
 					:placeholder="t('souvera_mail', '--\nYour signature')"
 					rows="5"
@@ -35,17 +35,17 @@
 			<div class="settings-row">
 				<label>{{ t('souvera_mail', 'Messages per page') }}</label>
 				<NcSelect v-model="msgsPerPage" :options="pageSizeOptions"
-					@update:modelValue="val => { prefs.messagesPerPage = val; savePref({ messagesPerPage: val }) }" />
+					@update:modelValue="val => { prefsComp.messagesPerPage = val; savePref({ messagesPerPage: val }) }" />
 			</div>
 			<div class="settings-row">
-				<NcCheckboxRadioSwitch :model-value="prefs.readingPane"
-					@update:modelValue="val => { prefs.readingPane = val; savePref({ readingPane: val }) }">
+				<NcCheckboxRadioSwitch :model-value="prefsComp.readingPane"
+					@update:modelValue="val => { prefsComp.readingPane = val; savePref({ readingPane: val }) }">
 					{{ t('souvera_mail', 'Show reading pane') }}
 				</NcCheckboxRadioSwitch>
 			</div>
 			<div class="settings-row">
-				<NcCheckboxRadioSwitch :model-value="prefs.remoteImages === 'always'"
-					@update:modelValue="val => { prefs.remoteImages = val ? 'always' : 'never'; savePref({ remoteImages: prefs.remoteImages }) }">
+				<NcCheckboxRadioSwitch :model-value="prefsComp.remoteImages === 'always'"
+					@update:modelValue="val => { prefsComp.remoteImages = val ? 'always' : 'never'; savePref({ remoteImages: prefsComp.remoteImages }) }">
 					{{ t('souvera_mail', 'Always load external images') }}
 				</NcCheckboxRadioSwitch>
 				<p class="settings-muted">{{ t('souvera_mail', 'External images can be used to track you. Enable only if needed.') }}</p>
@@ -105,7 +105,7 @@ export default {
 	data() {
 		return {
 			quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, passwords: [], showCreate: false, newName: '', sharedAbove: true,
-			prefs,
+			errorPrefs: false, loadingPrefs: true,
 			pageSizeOptions: [
 				{ value: 25, label: '25' },
 				{ value: 50, label: '50' },
@@ -117,11 +117,22 @@ export default {
 			sigDirty: false,
 		}
 	},
+	computed: {
+		prefsComp() { return prefs },
+	},
 	async mounted() {
-		await Promise.all([this.loadQuota(), this.loadPasswords(), this.loadShared(), loadPrefs()])
-		this.sigHtml = this.prefs.signatureHtml || ''
-		this.sigEnabled = this.prefs.signatureEnabled
-		const pp = this.pageSizeOptions.find(o => o.value === this.prefs.messagesPerPage)
+		try {
+			await Promise.all([this.loadQuota(), this.loadPasswords(), this.loadShared(), loadPrefs()])
+			this.loadingPrefs = false
+		} catch (e) {
+			console.error('Settings init failed', e)
+			this.errorPrefs = true
+			this.loadingPrefs = false
+		}
+		const s = this.prefsComp
+		this.sigHtml = s.signatureHtml || ''
+		this.sigEnabled = s.signatureEnabled
+		const pp = this.pageSizeOptions.find(o => o.value === s.messagesPerPage)
 		if (pp) this.msgsPerPage = pp
 	},
 	methods: {

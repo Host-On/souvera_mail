@@ -292,7 +292,8 @@ export default {
 .compose-layout__recipients { padding: 8px 16px 0; }
 .compose-toggle-row { display: flex; gap: 4px; margin-top: 4px; }
 .compose-layout__subject { padding: 4px 16px; width: calc(100% - 32px); }
-.compose-layout__body { flex: 1; min-height: 280px; margin: 8px 16px; }
+.compose-layout__subject :deep(input) { font-size: 15px; font-weight: 500; }
+.compose-layout__body { flex: 1; min-height: 280px; margin: 8px 16px !important; overflow: hidden; }
 .compose-layout__footer {
 	display: flex; align-items: center; justify-content: space-between;
 	padding: 10px 16px; border-top: 1px solid var(--color-border);

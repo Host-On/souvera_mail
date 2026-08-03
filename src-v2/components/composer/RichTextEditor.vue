@@ -136,11 +136,13 @@ export default {
 	border-radius: var(--border-radius-large);
 	overflow: hidden;
 	background: var(--color-main-background);
+	display: flex; flex-direction: column;
+	height: 100%;
 }
 .richtext-editor__toolbar {
 	display: flex; gap: 2px; padding: 6px 8px;
 	border-bottom: 1px solid var(--color-border);
-	flex-wrap: wrap;
+	flex-wrap: wrap; flex-shrink: 0;
 }
 .richtext-editor__separator {
 	width: 1px; background: var(--color-border); margin: 2px 4px;
@@ -150,10 +152,12 @@ export default {
 	color: var(--color-primary-element) !important;
 }
 .richtext-editor__content {
+	flex: 1;
 	min-height: v-bind(minHeight);
 	padding: 12px 16px;
 	font-size: 14px;
 	line-height: 1.6;
+	overflow-y: auto;
 }
 .richtext-editor__content :deep(.ProseMirror) { outline: none; min-height: v-bind(minHeight); }
 .richtext-editor__content :deep(.ProseMirror p.is-editor-empty:first-child::before) {
