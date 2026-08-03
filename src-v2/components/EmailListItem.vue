@@ -82,7 +82,7 @@ export default {
 .avatar-check-overlay--visible { opacity: 1; }
 .checkbox-box {
 	width: 18px; height: 18px;
-	border: 2px solid var(--color-main-background); border-radius: 3px;
+	border: 2px solid #fff; border-radius: 3px;
 	display: flex; align-items: center; justify-content: center;
 	transition: all 0.15s;
 }
