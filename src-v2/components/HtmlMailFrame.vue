@@ -9,6 +9,7 @@
 		</NcNoteCard>
 
 		<iframe
+			:key="frameKey"
 			ref="frame"
 			:srcdoc="srcdoc"
 			class="html-mail-frame__iframe"
@@ -40,6 +41,7 @@ export default {
 			displayHtml: '',
 			blockedCount: 0,
 			frameHeight: 0,
+			frameKey: 0,
 			resizeObserver: null,
 		}
 	},
@@ -56,6 +58,7 @@ export default {
 			})
 			this.blockedCount = blockedCount
 			this.displayHtml = html
+			this.frameKey++
 		},
 		loadRemoteImages() {
 			this.remoteAllowed = true
