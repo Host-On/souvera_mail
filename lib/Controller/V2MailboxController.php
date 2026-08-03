@@ -37,7 +37,7 @@ class V2MailboxController extends Controller
     {
         $accountId = $this->request->getParam('accountId');
         if (empty($accountId)) {
-            $accountId = $this->jmap->getCurrentAccountId();
+            $accountId = $this->resolveAccountId();
         }
         if ($accountId === null) {
             return new JSONResponse(['error' => 'Not authenticated'], 401);
@@ -77,7 +77,7 @@ class V2MailboxController extends Controller
     {
         $accountId = $this->request->getParam('accountId');
         if (empty($accountId)) {
-            $accountId = $this->jmap->getCurrentAccountId();
+            $accountId = $this->resolveAccountId();
         }
         if ($accountId === null) {
             return new JSONResponse(['error' => 'Not authenticated'], 401);
@@ -140,13 +140,13 @@ class V2MailboxController extends Controller
     }
 
     /**
-     * GET /apps/souvera_mail/api/v2/emails/{id}
+     * GET /apps/souvera_mail/api/v2/emails/{id}?accountId=...
      */
     #[NoAdminRequired]
     #[NoCSRFRequired]
     public function detail(string $id): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
+        $accountId = $this->resolveAccountId();
         if ($accountId === null) {
             return new JSONResponse(['error' => 'Not authenticated'], 401);
         }
@@ -243,7 +243,7 @@ class V2MailboxController extends Controller
     #[NoCSRFRequired]
     public function markRead(string $id): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
+        $accountId = $this->resolveAccountId();
         if ($accountId === null) {
             return new JSONResponse(['error' => 'Not authenticated'], 401);
         }
@@ -275,7 +275,7 @@ class V2MailboxController extends Controller
     #[NoCSRFRequired]
     public function flagEmail(string $id): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
+        $accountId = $this->resolveAccountId();
         if ($accountId === null) {
             return new JSONResponse(['error' => 'Not authenticated'], 401);
         }
@@ -308,7 +308,7 @@ class V2MailboxController extends Controller
     #[NoCSRFRequired]
     public function delete(string $id): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
+        $accountId = $this->resolveAccountId();
         if ($accountId === null) {
             return new JSONResponse(['error' => 'Not authenticated'], 401);
         }
@@ -363,7 +363,7 @@ class V2MailboxController extends Controller
     #[NoCSRFRequired]
     public function downloadBlob(string $id, string $name): \OCP\AppFramework\Http\Response
     {
-        $accountId = $this->jmap->getCurrentAccountId();
+        $accountId = $this->resolveAccountId();
         if ($accountId === null) {
             return new JSONResponse(['error' => 'Not authenticated'], 401);
         }
@@ -384,7 +384,7 @@ class V2MailboxController extends Controller
     #[NoAdminRequired]
     public function move(string $id): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
+        $accountId = $this->resolveAccountId();
         if ($accountId === null) {
             return new JSONResponse(['error' => 'Not authenticated'], 401);
         }
@@ -398,6 +398,13 @@ class V2MailboxController extends Controller
         ]);
         return isset($result['error'])
             ? new JSONResponse($result, 500)
-            : new JSONResponse(['success' => true]);
+             : new JSONResponse(['success' => true]);
+    }
+
+    private function resolveAccountId(): ?string
+    {
+        $accountId = $this->request->getParam('accountId');
+        if (!empty($accountId)) return $accountId;
+        return $this->jmap->getCurrentAccountId();
     }
 }

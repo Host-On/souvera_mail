@@ -36,10 +36,11 @@ export default {
 		}
 	},
 	async mounted() {
-		const id = this.$route.query.id
+		const id = q.id
+		const accountId = q.accountId
 		if (id) {
 			try {
-				const body = await fetchEmailBody(id)
+				const body = await fetchEmailBody(id, accountId)
 				if (this.replyEmail) {
 					this.originalEmail = { ...this.replyEmail, ...body }
 				} else if (this.forwardEmail) {

@@ -24,25 +24,29 @@ export function useJmapClient() {
 		return { emails: data.emails ?? [], total: data.total ?? 0 }
 	}
 
-	async function fetchEmailBody(id) {
-		const { data } = await axios.get(base + '/api/v2/emails/' + id)
+	async function fetchEmailBody(id, accountId) {
+		const params = {}
+		if (accountId) params.accountId = accountId
+		const { data } = await axios.get(base + '/api/v2/emails/' + id, { params })
 		return data.email ?? {}
 	}
 
-	async function markEmailRead(id, isRead = true) {
-		await axios.post(base + '/api/v2/emails/' + id + '/read', { isRead: isRead ? 1 : 0 })
+	async function markEmailRead(id, isRead = true, accountId) {
+		await axios.post(base + '/api/v2/emails/' + id + '/read', { isRead: isRead ? 1 : 0 }, { params: accountId ? { accountId } : {} })
 	}
 
-	async function toggleEmailFlag(id, isFlagged) {
-		await axios.post(base + '/api/v2/emails/' + id + '/flag', { isFlagged })
+	async function toggleEmailFlag(id, isFlagged, accountId) {
+		await axios.post(base + '/api/v2/emails/' + id + '/flag', { isFlagged }, { params: accountId ? { accountId } : {} })
 	}
 
-	async function moveEmail(id, mailboxId) {
-		await axios.post(base + '/api/v2/emails/' + id + '/move', { mailboxId })
+	async function moveEmail(id, mailboxId, accountId) {
+		await axios.post(base + '/api/v2/emails/' + id + '/move', { mailboxId }, { params: accountId ? { accountId } : {} })
 	}
 
-	async function deleteEmailApi(id) {
-		await axios.delete(base + '/api/v2/emails/' + id)
+	async function deleteEmailApi(id, accountId) {
+		const params = {}
+		if (accountId) params.accountId = accountId
+		await axios.delete(base + '/api/v2/emails/' + id, { params })
 	}
 
 	return { fetchMailboxes, fetchEmails, fetchEmailBody, markEmailRead, toggleEmailFlag, moveEmail, deleteEmailApi }

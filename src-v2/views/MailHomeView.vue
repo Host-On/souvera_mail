@@ -99,6 +99,12 @@ export default {
 		}
 	},
 	computed: {
+		currentAccountId() {
+			if (this.selectedMailbox && this.selectedMailbox.includes('|')) {
+				return this.selectedMailbox.split('|')[0]
+			}
+			return null
+		},
 		selectAllState() {
 			if (this.checkedIds.length === 0) return false
 			if (this.checkedIds.length === this.emails.length) return true
@@ -136,6 +142,9 @@ export default {
 			}
 			try { const r = await fetchEmails(mailboxId, this.limit, this.offset, accountId); this.emails = r.emails; this.emailTotal = r.total } catch (e) { console.error('Failed to load emails', e) } finally { this.loadingEmails = false }
 		},
+		getAccountId() {
+			return this.currentAccountId
+		},
 		async refreshEmails() { this.checkedIds = []; this.offset = 0; await this.loadEmails() },
 		toggleCheck(id) {
 			const idx = this.checkedIds.indexOf(id)
@@ -148,28 +157,28 @@ export default {
 		},
 		async bulkMarkRead() {
 			for (const id of this.checkedIds) {
-				try { await markEmailRead(id, true) } catch (e) { console.error('Failed to mark read', e) }
+				try { await markEmailRead(id, true, this.currentAccountId) } catch (e) { console.error('Failed to mark read', e) }
 			}
 			this.checkedIds = []
 			await this.loadEmails()
 		},
 		async bulkMarkUnread() {
 			for (const id of this.checkedIds) {
-				try { await markEmailRead(id, false) } catch (e) { console.error('Failed to mark unread', e) }
+				try { await markEmailRead(id, false, this.currentAccountId) } catch (e) { console.error('Failed to mark unread', e) }
 			}
 			this.checkedIds = []
 			await this.loadEmails()
 		},
 		async bulkDelete() {
 			for (const id of this.checkedIds) {
-				try { await deleteEmailApi(id) } catch (e) { console.error('Failed to delete', e) }
+				try { await deleteEmailApi(id, this.currentAccountId) } catch (e) { console.error('Failed to delete', e) }
 			}
 			this.checkedIds = []
 			await this.loadEmails()
 		},
 		async bulkMoveTo(mailboxId) {
 			for (const id of this.checkedIds) {
-				try { await moveEmail(id, mailboxId) } catch (e) { console.error('Failed to move', e) }
+				try { await moveEmail(id, mailboxId, this.currentAccountId) } catch (e) { console.error('Failed to move', e) }
 			}
 			this.checkedIds = []
 			await this.loadEmails()
@@ -178,42 +187,42 @@ export default {
 			this.selectedEmail = email
 			this.emailBodyHtml = ''; this.emailBodyPlain = ''; this.loadingBody = true
 			try {
-				const body = await fetchEmailBody(email.id)
+				const body = await fetchEmailBody(email.id, this.currentAccountId)
 				this.emailBodyHtml = body.htmlBody || ''; this.emailBodyPlain = body.plainBody || ''
 				this.selectedEmail = { ...email, ...body }
 				if (!email.isRead) {
-					await markEmailRead(email.id, true)
+					await markEmailRead(email.id, true, this.currentAccountId)
 					const listItem = this.emails.find(e => e.id === email.id)
 					if (listItem) listItem.isRead = true
 				}
 			} catch (e) { console.error('Failed to open email', e) } finally { this.loadingBody = false }
 		},
 		onReply() {
-			this.$router.push({ name: 'compose', query: { mode: 'reply', id: this.selectedEmail.id } })
+			this.$router.push({ name: 'compose', query: { mode: 'reply', id: this.selectedEmail.id, accountId: this.currentAccountId || undefined } })
 		},
 		onReplyAll() {
-			this.$router.push({ name: 'compose', query: { mode: 'replyAll', id: this.selectedEmail.id } })
+			this.$router.push({ name: 'compose', query: { mode: 'replyAll', id: this.selectedEmail.id, accountId: this.currentAccountId || undefined } })
 		},
 		onForward() {
-			this.$router.push({ name: 'compose', query: { mode: 'forward', id: this.selectedEmail.id } })
+			this.$router.push({ name: 'compose', query: { mode: 'forward', id: this.selectedEmail.id, accountId: this.currentAccountId || undefined } })
 		},
 		onMailto(event) {
 			this.$router.push({ name: 'compose', query: { to: event.to } })
 		},
 		async deleteEmail() {
 			if (!this.selectedEmail) return
-			try { await deleteEmailApi(this.selectedEmail.id); this.selectedEmail = null; await this.refreshEmails() } catch (e) { console.error('Failed to delete email', e) }
+			try { await deleteEmailApi(this.selectedEmail.id, this.currentAccountId); this.selectedEmail = null; await this.refreshEmails() } catch (e) { console.error('Failed to delete email', e) }
 		},
 		async onMove(mailboxId) {
 			if (!this.selectedEmail) return
-			try { await moveEmail(this.selectedEmail.id, mailboxId); this.selectedEmail = null; await this.refreshEmails() } catch (e) { console.error('Failed to move email', e) }
+			try { await moveEmail(this.selectedEmail.id, mailboxId, this.currentAccountId); this.selectedEmail = null; await this.refreshEmails() } catch (e) { console.error('Failed to move email', e) }
 		},
 		async toggleFlag(emailId) {
 			const email = this.emails.find(e => e.id === emailId)
 			if (!email) return
 			const newFlag = !email.isFlagged
 			email.isFlagged = newFlag
-			try { await toggleEmailFlag(emailId, newFlag) } catch (e) { console.error('Failed to toggle flag', e); email.isFlagged = !newFlag }
+			try { await toggleEmailFlag(emailId, newFlag, this.currentAccountId) } catch (e) { console.error('Failed to toggle flag', e); email.isFlagged = !newFlag }
 		},
 		goPrev() { if (this.offset > 0) { this.offset = Math.max(0, this.offset - this.limit); this.loadEmails() } },
 		goNext() { if (this.offset + this.limit < this.emailTotal) { this.offset += this.limit; this.loadEmails() } },
