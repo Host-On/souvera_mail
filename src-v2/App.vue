@@ -48,15 +48,16 @@
 					<template #icon><Archive :size="20" /></template>
 				</NcAppNavigationItem>
 				<NcAppNavigationItem :name="t('souvera_mail', 'Settings')"
-					:active="currentRoute === 'settings'"
-					@click="$router.push({name:'settings'})">
+					:active="showSettings"
+					@click="showSettings = true; $router.push({name:'inbox'})">
 					<template #icon><Cog :size="20" /></template>
 				</NcAppNavigationItem>
 			</template>
 		</NcAppNavigation>
 
 	<NcAppContent>
-		<router-view v-slot="{ Component }">
+		<SettingsView v-if="showSettings" />
+		<router-view v-else v-slot="{ Component }">
 			<component :is="Component" :key="$route.fullPath" v-bind="routeProps" />
 		</router-view>
 	</NcAppContent>
@@ -71,6 +72,7 @@ import Share from 'vue-material-design-icons/Share.vue'
 import Archive from 'vue-material-design-icons/Archive.vue'
 import MailboxItem from './components/MailboxItem.vue'
 import QuotaDonut from './components/QuotaDonut.vue'
+import SettingsView from './views/SettingsView.vue'
 import { useJmapClient } from './composables/useJmapClient.js'
 import { useHotkeys } from './composables/useHotkeys.js'
 
@@ -80,9 +82,9 @@ const ROLE_ORDER = { inbox:0, drafts:1, sent:2, archive:3, junk:4, trash:5 }
 
 export default {
 	name: 'MailV2App',
-	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, MailboxItem, QuotaDonut },
+	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, MailboxItem, QuotaDonut, SettingsView },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, showSettings: false }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },
@@ -132,9 +134,10 @@ export default {
 		return false
 	},
 	methods: {
-		onMailboxSelect(id) { this.selectedMailbox = id; this.$router.push({name:'inbox'}) },
+		onMailboxSelect(id) { this.selectedMailbox = id; this.showSettings = false; this.$router.push({name:'inbox'}) },
 		onSharedSelect(accountId, mailboxId) {
 			this.selectedMailbox = accountId + '|' + mailboxId
+			this.showSettings = false
 			if (this.$route.name === 'inbox') {
 				this.$router.replace({ name: 'inbox', query: { t: String(Date.now()) } })
 			} else {
