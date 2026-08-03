@@ -73,6 +73,11 @@ export default {
 <style scoped>
 .sender-avatar { display: inline-flex; align-items: center; flex-shrink: 0; }
 .sender-avatar__img {
+	width: v-bind(size + 'px'); height: v-bind(size + 'px');
 	border-radius: 50%; object-fit: cover;
+}
+.sender-avatar__bimi :deep(img) {
+	width: v-bind(size + 'px'); height: v-bind(size + 'px');
+	border-radius: 50%; object-fit: contain;
 }
 </style>
