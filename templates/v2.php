@@ -10,8 +10,8 @@
 // CSS is scoped inside the Vue bundle — no addStyle needed.
 
 // Embed l10n inline BEFORE the mount point — guarantees OC.L10N.register() runs first.
-if (!empty($_['l10nScript'])): ?>
-<script><?php echo $_['l10nScript']; ?></script>
+if (!empty($l10nScript)): ?>
+<script><?php echo $l10nScript; ?></script>
 <?php endif; ?>
 <div id="souvera-mail-v2-app" style="height:100%">
 	<div id="app-content">
