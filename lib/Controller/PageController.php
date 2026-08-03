@@ -261,8 +261,6 @@ class PageController extends Controller
     private function renderV2(): TemplateResponse
     {
         $this->navigationManager->setActiveEntry('souvera_mail');
-        // Inline the translation JSON with CSP nonce — Nextcloud's
-        // addHeader handles the nonce correctly for inline scripts.
         $translations = '{}';
         try {
             $lang = \OC::$server->get(\OCP\IL10N::class)->getLanguageCode();
@@ -279,16 +277,13 @@ class PageController extends Controller
                     $parsed = \json_decode($raw, true);
                     if (\is_array($parsed) && isset($parsed['translations'])) {
                         $translations = \json_encode($parsed['translations'], \JSON_UNESCAPED_UNICODE);
-                        \OCP\Util::addHeader(
-                            'script',
-                            ['nonce' => \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonceManager::class)->getNonce()],
-                            'window._souvera_mail_translations = ' . $translations . ';'
-                        );
                     }
                 }
             }
         }
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
-        return new TemplateResponse('souvera_mail', 'v2', []);
+        return new TemplateResponse('souvera_mail', 'v2', [
+            'translations' => $translations,
+        ]);
     }
 }
