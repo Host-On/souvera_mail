@@ -11,7 +11,7 @@
 
 // Embed translations as JSON — consumed by main.js bootstrap.
 if (!empty($translations)): ?>
-<script>window._souvera_mail_translations = <?php echo $translations; ?>;</script>
+<script nonce="<?php p(\OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonceManager::class)->getNonce()); ?>">window._souvera_mail_translations = <?php echo $translations; ?>;</script>
 <?php endif; ?>
 <div id="souvera-mail-v2-app" style="height:100%">
 	<div style="display:flex;align-items:center;justify-content:center;height:100%">
