@@ -33,13 +33,25 @@
 				</h2>
 				<div class="settings-card__body">
 					<div class="setting-row">
-						<div>
-							<span class="setting-label">{{ t('souvera_mail', 'Layout') }}</span>
-						</div>
-						<NcCheckboxRadioSwitch :model-value="verticalLayout" type="switch"
-							@update:modelValue="setVerticalLayout">
-							{{ t('souvera_mail', 'List above, detail below') }}
-						</NcCheckboxRadioSwitch>
+						<span class="setting-label">{{ t('souvera_mail', 'Layout') }}</span>
+					</div>
+					<div class="layout-options">
+						<label class="layout-option" :class="{ 'layout-option--active': !verticalLayout }"
+							@click="setVerticalLayout(false)">
+							<div class="layout-preview layout-preview--horizontal">
+								<div class="layout-preview__sidebar"></div>
+								<div class="layout-preview__detail"></div>
+							</div>
+							<span class="layout-option__label">{{ t('souvera_mail', 'Side by side') }}</span>
+						</label>
+						<label class="layout-option" :class="{ 'layout-option--active': verticalLayout }"
+							@click="setVerticalLayout(true)">
+							<div class="layout-preview layout-preview--vertical">
+								<div class="layout-preview__sidebar"></div>
+								<div class="layout-preview__detail"></div>
+							</div>
+							<span class="layout-option__label">{{ t('souvera_mail', 'List above, detail below') }}</span>
+						</label>
 					</div>
 					<div class="setting-row">
 						<div>
@@ -275,6 +287,36 @@ export default {
 .setting-label { font-size: 14px; font-weight: 500; }
 .setting-value { font-size: 14px; color: var(--color-text-maxcontrast); }
 .setting-select { min-width: 180px; }
+
+.layout-options { display: flex; gap: 12px; }
+.layout-option {
+	flex: 1; cursor: pointer;
+	border: 2px solid var(--color-border);
+	border-radius: var(--border-radius-large);
+	padding: 12px;
+	text-align: center;
+	transition: border-color 0.2s;
+}
+.layout-option:hover { border-color: var(--color-primary-element); }
+.layout-option--active {
+	border-color: var(--color-primary-element);
+	background: var(--color-primary-element-light);
+}
+.layout-preview {
+	height: 60px; margin-bottom: 8px;
+	border-radius: var(--border-radius);
+	overflow: hidden; display: flex;
+}
+.layout-preview--horizontal { flex-direction: row; }
+.layout-preview--horizontal .layout-preview__sidebar { width: 35%; background: var(--color-background-dark); border-right: 2px solid var(--color-border); }
+.layout-preview--horizontal .layout-preview__detail { flex: 1; background: var(--color-main-background); border: 1px solid var(--color-border); border-left: none; }
+
+.layout-preview--vertical { flex-direction: column; }
+.layout-preview--vertical .layout-preview__sidebar { height: 35%; background: var(--color-background-dark); border-bottom: 2px solid var(--color-border); }
+.layout-preview--vertical .layout-preview__detail { flex: 1; background: var(--color-main-background); border: 1px solid var(--color-border); border-top: none; }
+
+.layout-option__label { font-size: 12px; font-weight: 500; color: var(--color-text-maxcontrast); }
+.layout-option--active .layout-option__label { color: var(--color-primary-element); font-weight: 600; }
 
 .settings-muted { color: var(--color-text-maxcontrast); font-size: 12px; margin: 4px 0 0; }
 .shared-position-row { display: flex; flex-direction: column; gap: 6px; }
