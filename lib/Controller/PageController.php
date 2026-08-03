@@ -25,7 +25,6 @@ class PageController extends Controller
         private EngineHelper $engineHelper,
         private IURLGenerator $urlGenerator,
         private ?string $userId,
-        private \OCP\IConfig $config,
     ) {
         parent::__construct($appName, $request);
     }

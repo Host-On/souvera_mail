@@ -95,7 +95,6 @@ All write commands accept `--json` and `--dry-run`.
 		<command>OCA\SouveraMail\Command\External\Revoke</command>
 		<command>OCA\SouveraMail\Command\Push\Test</command>
 		<command>OCA\SouveraMail\Command\DevopsChannel</command>
-		<command>OCA\SouveraMail\Command\V2Toggle</command>
 	</commands>
 	<background-jobs>
 		<job>OCA\SouveraMail\Cron\MigrationPoller</job>
