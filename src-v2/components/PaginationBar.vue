@@ -1,11 +1,11 @@
 <template>
 	<div class="pagination-bar">
-		<button class="pagination-btn" :disabled="offset <= 0" @click="$emit('prev')">
+		<button class="pagination-btn" :disabled="offset <= 0" @click="onPrev">
 			<ChevronLeft :size="18" />
 			{{ t('souvera_mail', 'Newer') }}
 		</button>
 		<span class="pagination-bar__info">{{ offset + 1 }}–{{ Math.min(offset + limit, total) }} / {{ total }}</span>
-		<button class="pagination-btn" :disabled="offset + limit >= total" @click="$emit('next')">
+		<button class="pagination-btn" :disabled="offset + limit >= total" @click="onNext">
 			{{ t('souvera_mail', 'Older') }}
 			<ChevronRight :size="18" />
 		</button>
@@ -25,6 +25,10 @@ export default {
 		total: { type: Number, default: 0 },
 	},
 	emits: ['prev', 'next'],
+	methods: {
+		onPrev() { this.$emit('prev') },
+		onNext() { this.$emit('next') },
+	},
 }
 </script>
 
