@@ -108,6 +108,7 @@ class AttachmentController extends Controller
 
         $body = \json_decode(\file_get_contents('php://input'), true);
         $attachments = $body['attachments'] ?? [];
+        $targetPath = \trim((string) ($body['targetPath'] ?? ''), '/');
         $accountId = $body['accountId'] ?? null;
 
         if (empty($accountId)) {
@@ -119,6 +120,12 @@ class AttachmentController extends Controller
 
         $saved = [];
         $userFolder = $this->rootFolder->getUserFolder($user->getUID());
+        $targetFolder = $userFolder;
+        if ($targetPath !== '') {
+            $targetFolder = $userFolder->nodeExists($targetPath)
+                ? $userFolder->get($targetPath)
+                : $userFolder->newFolder($targetPath);
+        }
 
         foreach ($attachments as $att) {
             $blobId = $att['blobId'] ?? '';
@@ -139,8 +146,8 @@ class AttachmentController extends Controller
                 }
                 if ($data === '') continue;
 
-                $safeName = $this->safeFileName($name, $userFolder);
-                $file = $userFolder->newFile($safeName, $data);
+                $safeName = $this->safeFileName($name, $targetFolder);
+                $file = $targetFolder->newFile($safeName, $data);
                 $saved[] = ['name' => $safeName, 'path' => $userFolder->getRelativePath($file->getPath())];
             } catch (\Throwable) {
                 continue;
