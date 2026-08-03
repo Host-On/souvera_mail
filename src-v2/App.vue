@@ -1,14 +1,16 @@
 <template>
 	<NcContent app-name="souvera_mail">
 		<NcAppNavigation>
-			<NcButton variant="primary" class="compose-btn" @click="$router.push({name:'compose'})">
-				<template #icon><Pencil :size="20" /></template>
-				{{ t('souvera_mail', 'New message') }}
-			</NcButton>
-			<NcButton variant="tertiary" class="compose-btn" @click="showContactPicker = true">
-				<template #icon><Contacts :size="20" /></template>
-				{{ t('souvera_mail', 'Contacts') }}
-			</NcButton>
+			<div class="compose-row">
+				<NcButton variant="primary" class="compose-btn" @click="$router.push({name:'compose'})">
+					<template #icon><Pencil :size="20" /></template>
+					{{ t('souvera_mail', 'New message') }}
+				</NcButton>
+				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Contacts')"
+					@click="showContactPicker = true">
+					<template #icon><Contacts :size="20" /></template>
+				</NcButton>
+			</div>
 
 			<template #list>
 				<NcAppNavigationCaption :name="t('souvera_mail', 'Mailboxes')" />
@@ -202,7 +204,9 @@ export default {
 </script>
 
 <style scoped>
-.compose-btn { margin: 8px; width: calc(100% - 16px); }
+.compose-row { display: flex; gap: 4px; margin: 8px; }
+.compose-btn { flex: 1; }
+.compose-row :deep(button[aria-label="Contacts"]) { min-width: 44px; padding: 0; }
 
 /* Shared account sub-headers — visually distinct from top-level sections */
 :deep(.app-navigation-caption) + :deep(.app-navigation-caption) {
