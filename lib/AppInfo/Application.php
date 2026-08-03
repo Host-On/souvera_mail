@@ -44,7 +44,7 @@ use OCP\IUserSession;
 use OCP\User\Events\BeforeUserLoggedOutEvent;
 use OCP\User\Events\UserLoggedInEvent;
 
-class Application extends App implements IBootstrap
+if (!\class_exists(Application::class, false)) {class Application extends App implements IBootstrap
 {
     public const APP_ID = 'souvera_mail';
 
@@ -217,3 +217,5 @@ class Application extends App implements IBootstrap
         // entry has been removed here to avoid the double-entry.
     }
 }
+
+} // class_exists guard
