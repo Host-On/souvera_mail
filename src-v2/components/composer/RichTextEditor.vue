@@ -131,14 +131,17 @@ export default {
 </script>
 
 <style scoped>
+.richtext-editor, .richtext-editor * { box-sizing: border-box; }
+
 .richtext-editor {
 	display: flex; flex-direction: column;
-	height: 100%;
+	width: 100%; height: 100%;
 	background: var(--color-main-background);
+	border: none;
 }
 .richtext-editor__toolbar {
 	display: flex; align-items: center; gap: 2px;
-	padding: 8px 12px;
+	padding: 8px 20px;
 	border-bottom: 1px solid var(--color-border);
 	background: var(--color-background-hover);
 	flex-wrap: wrap; flex-shrink: 0;
@@ -154,13 +157,18 @@ export default {
 }
 .richtext-editor__content {
 	flex: 1;
+	width: 100%;
 	min-height: v-bind(minHeight);
-	padding: 12px 16px;
-	font-size: 14px;
-	line-height: 1.6;
+	padding: 16px 20px;
+	font-size: 14px; line-height: 1.6;
 	overflow-y: auto;
+	border: none;
 }
-.richtext-editor__content :deep(.ProseMirror) { outline: none; min-height: v-bind(minHeight); }
+.richtext-editor__content :deep(.ProseMirror) {
+	outline: none;
+	min-height: v-bind(minHeight);
+	width: 100%;
+}
 .richtext-editor__content :deep(.ProseMirror p.is-editor-empty:first-child::before) {
 	content: attr(data-placeholder);
 	color: var(--color-text-maxcontrast);

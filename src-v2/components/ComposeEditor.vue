@@ -7,7 +7,8 @@
 
 			<div v-if="identities.length > 1" class="compose-field compose-field--from">
 				<label class="compose-field__label">{{ t('souvera_mail', 'From') }}</label>
-				<NcSelect v-model="fromIdentity" :options="identities" label="label" />
+				<NcSelect v-model="fromIdentity" :options="identities" label="label"
+					:searchable="false" :clearable="false" />
 			</div>
 
 			<div class="compose-field">
@@ -327,7 +328,8 @@ export default {
 
 /* #5: Editor fills full modal size */
 .compose-field--body {
-	padding: 0;
+	padding: 0; margin: 0;
+	border: none; border-bottom: none;
 	flex: 1 1 auto;
 	min-height: 250px;
 	overflow: hidden;
@@ -335,25 +337,7 @@ export default {
 	min-width: 0;
 }
 .compose-field--body :deep(.richtext-editor) {
-	border: 0 !important;
-	border-radius: 0 !important;
 	flex: 1; height: auto;
-	display: flex; flex-direction: column;
-}
-.compose-field--body :deep(.richtext-editor__toolbar) {
-	border-bottom: 1px solid var(--color-border);
-	padding: 6px 20px;
-	flex-shrink: 0;
-}
-.compose-field--body :deep(.richtext-editor__content) {
-	flex: 1; min-height: 200px;
-	padding: 12px 20px;
-	overflow-y: auto;
-}
-.compose-field--body :deep(.ProseMirror) {
-	min-height: 200px;
-	outline: none;
-	width: 100%;
 }
 
 .compose-field__label {
