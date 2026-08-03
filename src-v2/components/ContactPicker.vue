@@ -1,6 +1,7 @@
 <template>
-	<NcDialog v-model:open="dialogOpen" :name="t('souvera_mail', 'Contacts')" size="normal" @close="$emit('close')">
-		<div class="contact-picker">
+	<NcModal v-if="dialogOpen" size="normal" @close="$emit('close')">
+		<div class="contact-picker" style="padding:20px">
+			<h2>{{ t('souvera_mail', 'Contacts') }}</h2>
 			<div class="contact-picker__search">
 				<NcTextField v-model="query" :placeholder="t('souvera_mail', 'Search contacts…')"
 					@update:modelValue="doSearch" />
@@ -35,11 +36,11 @@
 				</NcButton>
 			</div>
 		</div>
-	</NcDialog>
+	</NcModal>
 </template>
 
 <script>
-import { NcDialog, NcButton, NcTextField, NcAvatar } from '@nextcloud/vue'
+import { NcModal, NcButton, NcTextField, NcAvatar } from '@nextcloud/vue'
 import Plus from 'vue-material-design-icons/Plus.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
@@ -48,7 +49,7 @@ let timer = null
 
 export default {
 	name: 'ContactPicker',
-	components: { NcDialog, NcButton, NcTextField, NcAvatar, Plus },
+	components: { NcModal, NcButton, NcTextField, NcAvatar, Plus },
 	emits: ['close', 'select'],
 	data() {
 		return {
