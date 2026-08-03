@@ -84,14 +84,14 @@ export default {
 	name: 'MailV2App',
 	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, MailboxItem, QuotaDonut, SettingsView },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, showSettings: false }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, showSettings: false, isVertical: false }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },
 		systemFolders() { return this.mailboxes.filter(m => SYSTEM_ROLES.includes(m.role)).sort((a,b) => (ROLE_ORDER[a.role]??99) - (ROLE_ORDER[b.role]??99)) },
 		routeProps() {
 			if (this.$route.name === 'inbox') {
-				return { selectedMailbox: this.selectedMailbox, allMailboxes: [...this.mailboxes, ...this.sharedMailboxes] }
+				return { selectedMailbox: this.selectedMailbox, allMailboxes: [...this.mailboxes, ...this.sharedMailboxes], verticalLayout: this.isVertical }
 			}
 			return {}
 		},
@@ -120,7 +120,7 @@ export default {
 			const inbox = this.mailboxes.find(m => m.role === 'inbox') || this.mailboxes[0]
 			if (inbox) this.selectedMailbox = inbox.id
 		} catch(e) { console.error(e) }
-		await Promise.all([this.loadQuota(), this.loadShared()])
+		await Promise.all([this.loadQuota(), this.loadShared(), this.loadLayout()])
 		this._hotkeys = useHotkeys({
 			c: () => { if (this.$route.name !== 'compose') this.$router.push({ name: 'compose' }) },
 			'G': () => { this.$router.push({ name: 'inbox' }) },
@@ -177,6 +177,14 @@ export default {
 					this.sharedMailboxes = allSharedMboxes
 				}
 			} catch (e) { console.error('Failed to load shared', e) }
+		},
+		async loadLayout() {
+			try {
+				const { default: axios } = await import('@nextcloud/axios')
+				const { generateUrl } = await import('@nextcloud/router')
+				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
+				this.isVertical = data.verticalLayout || false
+			} catch (e) { console.error('Failed to load layout pref', e) }
 		},
 	},
 }

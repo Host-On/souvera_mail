@@ -1,5 +1,5 @@
 <template>
-	<div class="mail-home">
+	<div class="mail-home" :class="{ 'mail-home--vertical': verticalLayout }">
 		<div class="mail-list-panel" :style="{ width: listWidth }">
 			<EmailListToolbar
 				:selected-count="checkedIds.length"
@@ -87,6 +87,7 @@ export default {
 	props: {
 		selectedMailbox: { type: String, default: '' },
 		allMailboxes: { type: Array, default: () => [] },
+		verticalLayout: { type: Boolean, default: false },
 	},
 	data() {
 		return {
@@ -240,6 +241,10 @@ export default {
 
 <style scoped>
 .mail-home { display: flex; height: 100%; overflow: hidden; }
+.mail-home--vertical { flex-direction: column; }
+.mail-home--vertical .mail-list-panel { width: 100% !important; flex-shrink: 0; max-height: 45%; }
+.mail-home--vertical .mail-detail-panel { flex: 1; overflow-y: auto; }
+.mail-home--vertical .mail-detail-empty { flex: 1; }
 .mail-list-panel { flex-shrink: 0; overflow-y: auto; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; }
 .mail-detail-panel { flex: 1; overflow-y: auto; }
 .mail-detail-empty { flex: 1; }

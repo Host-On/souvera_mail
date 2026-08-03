@@ -34,6 +34,15 @@
 				<div class="settings-card__body">
 					<div class="setting-row">
 						<div>
+							<span class="setting-label">{{ t('souvera_mail', 'Layout') }}</span>
+						</div>
+						<NcCheckboxRadioSwitch :model-value="verticalLayout" type="switch"
+							@update:modelValue="setVerticalLayout">
+							{{ t('souvera_mail', 'List above, detail below') }}
+						</NcCheckboxRadioSwitch>
+					</div>
+					<div class="setting-row">
+						<div>
 							<span class="setting-label">{{ t('souvera_mail', 'External images') }}</span>
 							<p class="settings-muted">{{ t('souvera_mail', 'Remote content can be used to track you.') }}</p>
 						</div>
@@ -168,6 +177,7 @@ export default {
 				{ value: 100, label: '100' },
 			],
 			messagesPerPageOption: { value: 50, label: '50' },
+			verticalLayout: false,
 		}
 	},
 	mounted() {
@@ -186,6 +196,7 @@ export default {
 				this.sigHtml = p.signatureHtml || ''
 				this.sigEnabled = p.signatureEnabled || false
 				if (p.remoteImages === 'always') this.remoteImagesOption = this.remoteImageOptions[1]
+				this.verticalLayout = p.verticalLayout || false
 				const pp = this.pageSizeOptions.find(o => o.value === p.messagesPerPage)
 				if (pp) this.messagesPerPageOption = pp
 			} catch {}
@@ -206,6 +217,10 @@ export default {
 		async setSharedPosition(above) {
 			this.sharedAbove = above
 			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/shared/position'), { position: above ? 'above' : 'below' }) } catch {}
+		},
+		async setVerticalLayout(val) {
+			this.verticalLayout = val
+			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { verticalLayout: val }) } catch {}
 		},
 		async saveSig() {
 			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { signatureHtml: this.sigHtml, signatureEnabled: this.sigEnabled }) } catch {}
