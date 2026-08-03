@@ -460,5 +460,15 @@ return [
             'url' => '/api/v2/attachments/save-all',
             'verb' => 'POST',
         ],
+        [
+            'name' => 'files#list',
+            'url' => '/api/v2/files/list',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'files#attach',
+            'url' => '/api/v2/files/attach',
+            'verb' => 'POST',
+        ],
     ],
 ];

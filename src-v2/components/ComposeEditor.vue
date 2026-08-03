@@ -55,10 +55,14 @@
 						<template #icon><Send :size="20" /></template>
 						{{ sending ? t('souvera_mail', 'Sending…') : t('souvera_mail', 'Send') }}
 					</NcButton>
-					<NcButton variant="tertiary" @click="pickAttachment">
-						<template #icon><Paperclip :size="20" /></template>
-						{{ t('souvera_mail', 'Attach') }}
-					</NcButton>
+				<NcButton variant="tertiary" @click="pickAttachment">
+					<template #icon><Paperclip :size="20" /></template>
+					{{ t('souvera_mail', 'Attach') }}
+				</NcButton>
+				<NcButton variant="tertiary" @click="showCloudPicker = true">
+					<template #icon><Cloud :size="20" /></template>
+					{{ t('souvera_mail', 'From Cloud') }}
+				</NcButton>
 				</div>
 				<div class="compose-layout__status">
 					<span v-if="savedDraftId" class="draft-saved">
@@ -72,6 +76,7 @@
 			</div>
 		</div>
 		<input ref="fileInput" type="file" multiple class="hidden-file-input" @change="onFilesSelected" />
+		<CloudFilePicker v-if="showCloudPicker" @close="showCloudPicker = false" @attach="onCloudFileAttached" />
 	</NcModal>
 </template>
 
@@ -80,10 +85,12 @@ import { NcModal, NcButton, NcTextField, NcSelect } from '@nextcloud/vue'
 import Send from 'vue-material-design-icons/Send.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
+import Cloud from 'vue-material-design-icons/Cloud.vue'
 import ChevronDown from 'vue-material-design-icons/ChevronDown.vue'
 import RecipientField from './composer/RecipientField.vue'
 import RichTextEditor from './composer/RichTextEditor.vue'
 import AttachmentList from './composer/AttachmentList.vue'
+import CloudFilePicker from './CloudFilePicker.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { sanitizeMailHtml } from '../utils/mailSanitizer.js'
@@ -93,7 +100,7 @@ let draftTimer = null
 
 export default {
 	name: 'ComposeEditor',
-	components: { NcModal, NcButton, NcTextField, NcSelect, Send, Paperclip, TrashCan, ChevronDown, RecipientField, RichTextEditor, AttachmentList },
+	components: { NcModal, NcButton, NcTextField, NcSelect, Send, Paperclip, TrashCan, ChevronDown, Cloud, RecipientField, RichTextEditor, AttachmentList, CloudFilePicker },
 	props: {
 		replyTo: { type: Object, default: null },
 		forwardOf: { type: Object, default: null },
@@ -136,6 +143,7 @@ export default {
 			forwardAttachments: [],
 			sending: false,
 			dirty: false,
+			showCloudPicker: false,
 			savedDraftId: null,
 			discardingDraftId: null,
 		}
@@ -284,6 +292,14 @@ export default {
 				reader.readAsDataURL(file)
 			}
 			e.target.value = ''
+		},
+		onCloudFileAttached(att) {
+			this.attachments.push({
+				blobId: att.blobId,
+				name: att.name,
+				type: att.type,
+				size: att.size,
+			})
 		},
 		onClose() {
 			if (this.dirty) {
