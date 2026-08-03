@@ -1,5 +1,5 @@
 <template>
-	<NcModal v-if="dialogOpen" size="large" :name="t('souvera_mail', 'Contacts')" @close="$emit('close')">
+	<NcModal v-model:show="dialogOpen" size="large" :name="t('souvera_mail', 'Contacts')" @close="$emit('close')">
 		<div class="contact-picker">
 			<div class="contact-picker__search">
 				<NcTextField v-model="query" :placeholder="t('souvera_mail', 'Search contacts…')"
