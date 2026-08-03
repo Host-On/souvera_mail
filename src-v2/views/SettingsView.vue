@@ -16,13 +16,12 @@
 					<div class="setting-row">
 						<span class="setting-label">{{ t('souvera_mail', 'Storage') }}</span>
 						<span class="setting-value">
-							<template v-if="quotaUsed > 0 || quotaUnlimited">
-								{{ formatSize(quotaUsed) }} / {{ quotaUnlimited ? '∞' : formatSize(quotaTotal) }}
-							</template>
-							<span v-else class="settings-muted">{{ t('souvera_mail', 'Unlimited') }}</span>
+							<template v-if="quotaUnlimited">{{ t('souvera_mail', 'Unlimited') }}</template>
+							<template v-else-if="quotaTotal > 0">{{ formatSize(quotaUsed) }} / {{ formatSize(quotaTotal) }}</template>
+							<span v-else class="settings-muted">{{ t('souvera_mail', 'No quota information available') }}</span>
 						</span>
 					</div>
-					<QuotaDonut v-if="quotaUsed > 0 || quotaUnlimited"
+					<QuotaDonut v-if="quotaUnlimited || quotaTotal > 0"
 						:used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
 				</div>
 			</div>
@@ -109,9 +108,10 @@
 					</div>
 					<div v-if="passwords.length > 0" class="password-list">
 						<div v-for="pw in passwords" :key="pw.id" class="password-row">
-							<span class="password-name">{{ pw.name }}</span>
-							<code v-if="pw.password" class="password-value">{{ pw.password }}</code>
-							<span v-else class="settings-muted">{{ t('souvera_mail', 'Shown once') }}</span>
+							<div>
+								<div class="password-name">{{ pw.description || pw.name }}</div>
+								<div class="settings-muted">{{ pw.createdAt ? fmtDate(pw.createdAt) : '' }}</div>
+							</div>
 							<NcButton variant="tertiary" size="small"
 								:aria-label="t('souvera_mail', 'Delete')" @click="remove(pw.id)">
 								<template #icon><TrashCan :size="16" /></template>
@@ -196,8 +196,9 @@ export default {
 			while (s >= 1024 && i < u.length - 1) { s /= 1024; i++ }
 			return Math.round(s * 10) / 10 + ' ' + u[i]
 		},
+		fmtDate(ts) { return ts ? new Date(ts).toLocaleDateString() : '' },
 		async create() {
-			try { const r = await axios.post(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'), { name: this.newName }); this.passwords.push(r.data); this.showCreate = false; this.newName = '' } catch {}
+			try { const r = await axios.post(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'), { name: this.newName }); this.passwords.push({ id: r.data.id, description: this.newName, createdAt: new Date().toISOString() }); this.showCreate = false; this.newName = '' } catch {}
 		},
 		async remove(id) {
 			try { await axios.delete(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords/' + id)); this.passwords = this.passwords.filter(p => p.id !== id) } catch {}
