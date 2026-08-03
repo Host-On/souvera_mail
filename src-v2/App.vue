@@ -39,6 +39,10 @@
 
 			<template #footer>
 				<QuotaDonut v-if="quotaTotal > 0" :used="quotaUsed" :total="quotaTotal" />
+				<NcAppNavigationItem :name="t('souvera_mail', 'Mail archive')"
+					@click="openArchive">
+					<template #icon><Archive :size="20" /></template>
+				</NcAppNavigationItem>
 				<NcAppNavigationItem :name="t('souvera_mail', 'Settings')"
 					:active="currentRoute === 'settings'"
 					@click="$router.push({name:'settings'})">
@@ -60,6 +64,7 @@ import { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption
 import Pencil from 'vue-material-design-icons/Pencil.vue'
 import Cog from 'vue-material-design-icons/Cog.vue'
 import Share from 'vue-material-design-icons/Share.vue'
+import Archive from 'vue-material-design-icons/Archive.vue'
 import MailboxItem from './components/MailboxItem.vue'
 import QuotaDonut from './components/QuotaDonut.vue'
 import { useJmapClient } from './composables/useJmapClient.js'
@@ -71,7 +76,7 @@ const ROLE_ORDER = { inbox:0, drafts:1, sent:2, archive:3, junk:4, trash:5 }
 
 export default {
 	name: 'MailV2App',
-	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, MailboxItem, QuotaDonut },
+	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, MailboxItem, QuotaDonut },
 	data() {
 		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0 }
 	},
@@ -105,6 +110,9 @@ export default {
 	methods: {
 		onMailboxSelect(id) { this.selectedMailbox = id; this.$router.push({name:'inbox'}) },
 		onSharedSelect(accountId) { this.selectedMailbox = accountId; this.$router.push({name:'inbox'}) },
+		openArchive() {
+			window.location.href = this.OC?.generateUrl?.('/apps/souvera_mailarchiv') || '/index.php/apps/souvera_mailarchiv'
+		},
 		async loadQuota() {
 			try {
 				const { default: axios } = await import('@nextcloud/axios')
