@@ -2,57 +2,37 @@
 	<div class="settings-view">
 		<h1>{{ t('souvera_mail', 'Settings') }}</h1>
 
-		<NcSettingsSection :name="t('souvera_mail', 'Account')">
+		<section class="settings-section">
+			<h3>{{ t('souvera_mail', 'Account') }}</h3>
 			<div class="settings-info">
-				<div><strong>{{ t('souvera_mail', 'Email') }}:</strong> {{ prefsComp.account.email || '—' }}</div>
+				<div><strong>{{ t('souvera_mail', 'Email') }}:</strong> {{ accountEmail }}</div>
 			</div>
 			<div class="quota-row" v-if="quotaUsed > 0 || quotaUnlimited">
 				<QuotaDonut :used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
 				<span>{{ formatSize(quotaUsed) }} / {{ quotaUnlimited ? '∞' : formatSize(quotaTotal) }}</span>
 			</div>
 			<p v-else class="settings-muted">{{ t('souvera_mail', 'No quota information available') }}</p>
-		</NcSettingsSection>
+		</section>
 
-		<NcSettingsSection :name="t('souvera_mail', 'Signature')">
+		<section class="settings-section">
+			<h3>{{ t('souvera_mail', 'Signature') }}</h3>
 			<div class="settings-row">
-				<NcCheckboxRadioSwitch :model-value="prefsComp.signatureEnabled"
-					@update:modelValue="sigEnabled = $event; saveSig()">
+				<NcCheckboxRadioSwitch :model-value="sigEnabled"
+					@update:modelValue="sigEnabled = $event">
 					{{ t('souvera_mail', 'Append signature') }}
 				</NcCheckboxRadioSwitch>
 			</div>
-			<div v-if="sigEnabled || prefsComp.signatureEnabled" class="settings-row">
+			<div v-if="sigEnabled" class="settings-row">
 				<textarea class="signature-textarea" v-model="sigHtml"
-					:placeholder="t('souvera_mail', '--\nYour signature')"
-					rows="5"
-					@blur="saveSig" />
+					:placeholder="t('souvera_mail', '--\nYour signature')" rows="5" />
 			</div>
-			<NcButton variant="primary" @click="saveSig" :disabled="!sigDirty">
+			<NcButton variant="primary" @click="saveSig">
 				{{ t('souvera_mail', 'Save signature') }}
 			</NcButton>
-		</NcSettingsSection>
+		</section>
 
-		<NcSettingsSection :name="t('souvera_mail', 'Appearance')">
-			<div class="settings-row">
-				<label>{{ t('souvera_mail', 'Messages per page') }}</label>
-				<NcSelect v-model="msgsPerPage" :options="pageSizeOptions"
-					@update:modelValue="val => { prefsComp.messagesPerPage = val; savePref({ messagesPerPage: val }) }" />
-			</div>
-			<div class="settings-row">
-				<NcCheckboxRadioSwitch :model-value="prefsComp.readingPane"
-					@update:modelValue="val => { prefsComp.readingPane = val; savePref({ readingPane: val }) }">
-					{{ t('souvera_mail', 'Show reading pane') }}
-				</NcCheckboxRadioSwitch>
-			</div>
-			<div class="settings-row">
-				<NcCheckboxRadioSwitch :model-value="prefsComp.remoteImages === 'always'"
-					@update:modelValue="val => { prefsComp.remoteImages = val ? 'always' : 'never'; savePref({ remoteImages: prefsComp.remoteImages }) }">
-					{{ t('souvera_mail', 'Always load external images') }}
-				</NcCheckboxRadioSwitch>
-				<p class="settings-muted">{{ t('souvera_mail', 'External images can be used to track you. Enable only if needed.') }}</p>
-			</div>
-		</NcSettingsSection>
-
-		<NcSettingsSection :name="t('souvera_mail', 'Shared folders')">
+		<section class="settings-section">
+			<h3>{{ t('souvera_mail', 'Shared folders') }}</h3>
 			<p class="settings-muted">{{ t('souvera_mail', 'Shared folders are mailboxes that other users have granted you access to.') }}</p>
 			<div class="shared-position-row">
 				<NcCheckboxRadioSwitch :model-value="sharedAbove" type="radio"
@@ -64,9 +44,10 @@
 					{{ t('souvera_mail', 'Show shared folders below own folders') }}
 				</NcCheckboxRadioSwitch>
 			</div>
-		</NcSettingsSection>
+		</section>
 
-		<NcSettingsSection :name="t('souvera_mail', 'App passwords')">
+		<section class="settings-section">
+			<h3>{{ t('souvera_mail', 'App passwords') }}</h3>
 			<NcButton variant="primary" @click="showCreate = true">
 				<template #icon><Plus :size="20" /></template>
 				{{ t('souvera_mail', 'New app password') }}
@@ -84,108 +65,87 @@
 					</NcButton>
 				</div>
 			</div>
-		</NcSettingsSection>
+		</section>
 	</div>
 </template>
 
 <script>
-import { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSettingsSection, NcSelect } from '@nextcloud/vue'
+import { NcButton, NcTextField, NcCheckboxRadioSwitch } from '@nextcloud/vue'
 import Plus from 'vue-material-design-icons/Plus.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
 import QuotaDonut from '../components/QuotaDonut.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
-import { usePreferences } from '../composables/usePreferences.js'
-
-const { state: prefs, load: loadPrefs, save: savePref } = usePreferences()
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSettingsSection, NcSelect, Plus, TrashCan, QuotaDonut },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, Plus, TrashCan, QuotaDonut },
 	data() {
 		return {
-			quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, passwords: [], showCreate: false, newName: '', sharedAbove: true,
-			errorPrefs: false, loadingPrefs: true,
-			pageSizeOptions: [
-				{ value: 25, label: '25' },
-				{ value: 50, label: '50' },
-				{ value: 100, label: '100' },
-			],
-			msgsPerPage: { value: 50, label: '50' },
-			sigHtml: '',
-			sigEnabled: false,
-			sigDirty: false,
+			accountEmail: '',
+			quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false,
+			passwords: [], showCreate: false, newName: '',
+			sharedAbove: true,
+			sigHtml: '', sigEnabled: false,
 		}
 	},
-	computed: {
-		prefsComp() { return prefs },
-	},
-	async mounted() {
-		try {
-			await Promise.all([this.loadQuota(), this.loadPasswords(), this.loadShared(), loadPrefs()])
-			this.loadingPrefs = false
-		} catch (e) {
-			console.error('Settings init failed', e)
-			this.errorPrefs = true
-			this.loadingPrefs = false
-		}
-		const s = this.prefsComp
-		this.sigHtml = s.signatureHtml || ''
-		this.sigEnabled = s.signatureEnabled
-		const pp = this.pageSizeOptions.find(o => o.value === s.messagesPerPage)
-		if (pp) this.msgsPerPage = pp
+	mounted() {
+		this.loadAll()
 	},
 	methods: {
+		async loadAll() {
+			try {
+				const { data: q } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/quota'))
+				this.quotaUsed = q.used || 0; this.quotaTotal = q.total || 0; this.quotaUnlimited = q.unlimited ?? false
+			} catch (e) { console.error('quota', e) }
+
+			try {
+				const { data: p } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'))
+				this.passwords = p.passwords || []
+			} catch (e) { console.error('passwords', e) }
+
+			try {
+				const { data: s } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/shared'))
+				this.sharedAbove = s.position === 'above'
+			} catch (e) { console.error('shared', e) }
+
+			try {
+				const { data: pref } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
+				this.accountEmail = (pref.account && pref.account.email) || ''
+				this.sigHtml = pref.signatureHtml || ''
+				this.sigEnabled = pref.signatureEnabled || false
+			} catch (e) { console.error('prefs', e) }
+		},
 		formatSize(bytes) {
 			if (!bytes) return '0 B'; const u = ['B','KB','MB','GB']; let i=0,s=bytes
 			while(s>=1024 && i<u.length-1){s/=1024;i++}
 			return Math.round(s*10)/10 + ' ' + u[i]
 		},
-		async loadQuota() {
-			try {
-				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/quota'))
-				this.quotaUsed = data.used||0; this.quotaTotal = data.total||0; this.quotaUnlimited = data.unlimited ?? false
-			} catch (e) { console.error('Failed to load quota', e) }
-		},
-		async loadPasswords() {
-			try {
-				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'))
-				this.passwords = data.passwords||[]
-			} catch (e) { console.error('Failed to load passwords', e) }
-		},
 		async create() {
 			try {
 				const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'), { name: this.newName })
 				this.passwords.push(data); this.showCreate=false; this.newName=''
-			} catch (e) { console.error('Failed to create password', e) }
+			} catch (e) { console.error('create', e) }
 		},
 		async remove(id) {
 			try {
 				await axios.delete(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords/' + id))
 				this.passwords = this.passwords.filter(p => p.id !== id)
-			} catch (e) { console.error('Failed to remove password', e) }
-		},
-		async loadShared() {
-			try {
-				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/shared'))
-				this.sharedAbove = data.position === 'above'
-			} catch (e) { console.error('Failed to load shared', e) }
+			} catch (e) { console.error('remove', e) }
 		},
 		async setSharedPosition(above) {
 			this.sharedAbove = above
 			try {
 				await axios.put(generateUrl('/apps/souvera_mail/api/v2/shared/position'), { position: above ? 'above' : 'below' })
-			} catch (e) { console.error('Failed to set shared position', e) }
+			} catch (e) { console.error('setSharedPosition', e) }
 		},
-		savePref,
 		async saveSig() {
-			this.sigDirty = false
-			await savePref({ signatureHtml: this.sigHtml, signatureEnabled: this.sigEnabled })
+			try {
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), {
+					signatureHtml: this.sigHtml, signatureEnabled: this.sigEnabled,
+				})
+			} catch (e) { console.error('saveSig', e) }
 		},
-	},
-	watch: {
-		sigHtml() { this.sigDirty = true },
-		sigEnabled() { this.sigDirty = true },
 	},
 }
 </script>
@@ -193,9 +153,10 @@ export default {
 <style scoped>
 .settings-view { padding: 24px; max-width: 720px; margin: 0 auto; }
 .settings-view h1 { margin: 0 0 24px; font-size: 20px; }
+.settings-section { margin-bottom: 32px; }
+.settings-section h3 { margin: 0 0 12px; font-size: 14px; color: var(--color-text-maxcontrast); }
 .settings-info { margin-bottom: 12px; font-size: 14px; }
 .settings-row { margin-bottom: 12px; }
-.settings-row label { display: block; font-size: 13px; color: var(--color-text-maxcontrast); margin-bottom: 4px; }
 .settings-muted { color: var(--color-text-maxcontrast); font-size: 12px; }
 .quota-row { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
 .shared-position-row { display: flex; flex-direction: column; gap: 6px; }
