@@ -22,7 +22,6 @@
 						:email="email"
 						:active="selectedEmail?.id === email.id"
 						:checked="checkedIds.includes(email.id)"
-						:selection-mode="checkedIds.length > 0"
 						@click="onOpenEmail(email)"
 						@check="toggleCheck(email.id)"
 						@flag="toggleFlag(email.id)" />
