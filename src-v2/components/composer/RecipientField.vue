@@ -119,9 +119,12 @@ export default {
 .recipient-field { position: relative; }
 .recipient-field__chips {
 	display: flex; flex-wrap: wrap; gap: 4px;
-	padding: 6px 0;
-	min-height: 36px;
+	padding: 6px 10px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large);
+	min-height: 40px;
 	align-items: center;
+	background: var(--color-main-background);
 }
 .recipient-field__input {
 	flex: 1; min-width: 120px;

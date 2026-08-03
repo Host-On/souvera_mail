@@ -301,11 +301,14 @@ export default {
 .compose-field--body {
 	padding: 0 20px;
 	flex: 1; min-height: 280px;
-	overflow: hidden;
+	overflow-y: auto;
 	display: flex; flex-direction: column;
 }
 .compose-field--body :deep(.richtext-editor) {
-	border: none; border-radius: 0; flex: 1;
+	border: none; border-radius: 0; flex: 1; height: auto;
+}
+.compose-field--body :deep(.richtext-editor__content) {
+	min-height: 250px;
 }
 
 .compose-field__label {
