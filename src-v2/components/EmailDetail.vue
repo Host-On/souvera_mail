@@ -42,16 +42,27 @@
 		</div>
 
 		<div v-if="email.attachments && email.attachments.length > 0" class="email-detail__attachments">
-			<h4>{{ t('souvera_mail', 'Attachments') }} ({{ email.attachments.length }})</h4>
+			<div class="email-detail__attachments-header">
+				<h4>{{ t('souvera_mail', 'Attachments') }} ({{ email.attachments.length }})</h4>
+				<NcButton variant="tertiary" size="small" @click="saveAllToFiles" :disabled="savingAll">
+					<template #icon><FolderDownload :size="16" /></template>
+					{{ savingAll ? t('souvera_mail', 'Saving…') : t('souvera_mail', 'Save all to Files') }}
+				</NcButton>
+			</div>
 			<div class="attachment-chips">
-				<a v-for="att in email.attachments" :key="att.blobId"
-					:href="buildBlobUrl(att.blobId, att.name)"
-					class="attachment-link" download>
-					<NcButton variant="tertiary">
-						<template #icon><Paperclip :size="16" /></template>
-						{{ att.name }} ({{ formatSize(att.size) }})
+				<div v-for="att in email.attachments" :key="att.blobId" class="attachment-chip">
+					<a :href="buildBlobUrl(att.blobId, att.name)" download>
+						<NcButton variant="tertiary">
+							<template #icon><Paperclip :size="16" /></template>
+							{{ att.name }} ({{ formatSize(att.size) }})
+						</NcButton>
+					</a>
+					<NcButton variant="tertiary" size="small"
+						:aria-label="t('souvera_mail', 'Save to Files')"
+						@click="saveToFiles(att)">
+						<template #icon><ContentSave :size="16" /></template>
 					</NcButton>
-				</a>
+				</div>
 			</div>
 		</div>
 
@@ -81,13 +92,17 @@ import TrashCan from 'vue-material-design-icons/TrashCan.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import FolderMove from 'vue-material-design-icons/FolderMove.vue'
 import Folder from 'vue-material-design-icons/Folder.vue'
+import FolderDownload from 'vue-material-design-icons/FolderDownload.vue'
+import ContentSave from 'vue-material-design-icons/ContentSave.vue'
 import HtmlMailFrame from './HtmlMailFrame.vue'
 import BimiLogo from './BimiLogo.vue'
 import { buildBlobUrl } from '../utils/mailSanitizer.js'
+import axios from '@nextcloud/axios'
+import { generateUrl } from '@nextcloud/router'
 
 export default {
 	name: 'EmailDetail',
-	components: { NcButton, NcActions, NcActionButton, ArrowLeft, Reply, ReplyAll, Forward, TrashCan, Paperclip, FolderMove, Folder, HtmlMailFrame, BimiLogo },
+	components: { NcButton, NcActions, NcActionButton, ArrowLeft, Reply, ReplyAll, Forward, TrashCan, Paperclip, FolderMove, Folder, FolderDownload, ContentSave, HtmlMailFrame, BimiLogo },
 	props: {
 		email: { type: Object, default: null },
 		htmlBody: { type: String, default: '' },
@@ -96,7 +111,7 @@ export default {
 		mailboxes: { type: Array, default: () => [] },
 	},
 	emits: ['close', 'reply', 'replyAll', 'forward', 'delete', 'move', 'mailto'],
-	data() { return {} },
+	data() { return { savingAll: false } },
 	computed: {
 		moveMailboxes() {
 			return this.mailboxes.filter(m => m.role !== 'trash' && m.role !== 'junk')
@@ -113,6 +128,30 @@ export default {
 		},
 		moveTo(mailboxId) {
 			this.$emit('move', mailboxId)
+		},
+		async saveToFiles(att) {
+			try {
+				await axios.post(generateUrl('/apps/souvera_mail/api/v2/attachments/' + att.blobId + '/save'), {
+					name: att.name,
+				})
+				alert(this.t('souvera_mail', 'Saved to Files'))
+			} catch (e) {
+				console.error('Save to Files failed', e)
+				alert(e.response?.data?.error || this.t('souvera_mail', 'Failed to save'))
+			}
+		},
+		async saveAllToFiles() {
+			this.savingAll = true
+			try {
+				const attachments = this.email.attachments.map(a => ({ blobId: a.blobId, name: a.name }))
+				await axios.post(generateUrl('/apps/souvera_mail/api/v2/attachments/save-all'), { attachments })
+				alert(this.t('souvera_mail', 'All attachments saved to Files'))
+			} catch (e) {
+				console.error('Save all failed', e)
+				alert(e.response?.data?.error || this.t('souvera_mail', 'Failed to save'))
+			} finally {
+				this.savingAll = false
+			}
 		},
 	},
 }
@@ -133,8 +172,10 @@ export default {
 .email-detail__addr { color: var(--color-text-maxcontrast); margin-left: 6px; font-weight: 400; }
 .email-detail__meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--color-text-maxcontrast); }
 .email-detail__attachments { margin-bottom: 20px; }
-.email-detail__attachments h4 { margin: 0 0 8px; font-size: 13px; color: var(--color-text-maxcontrast); }
+.email-detail__attachments-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.email-detail__attachments-header h4 { margin: 0; font-size: 13px; color: var(--color-text-maxcontrast); }
 .attachment-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.attachment-chip { display: flex; align-items: center; gap: 4px; }
 .email-detail__body { line-height: 1.7; word-break: break-word; }
 .email-body-text { white-space: pre-wrap; }
 .email-detail__loading { display: flex; justify-content: center; padding: 48px; }

@@ -450,5 +450,15 @@ return [
             'url' => '/api/v2/bimi',
             'verb' => 'GET',
         ],
+        [
+            'name' => 'attachment#saveToFiles',
+            'url' => '/api/v2/attachments/{blobId}/save',
+            'verb' => 'POST',
+        ],
+        [
+            'name' => 'attachment#saveAll',
+            'url' => '/api/v2/attachments/save-all',
+            'verb' => 'POST',
+        ],
     ],
 ];
