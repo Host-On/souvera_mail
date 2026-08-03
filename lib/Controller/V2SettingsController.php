@@ -123,6 +123,7 @@ class V2SettingsController extends Controller
     }
 
     #[NoAdminRequired]
+    #[NoCSRFRequired]
     public function updatePreferences(): JSONResponse
     {
         $user = $this->userSession->getUser();
