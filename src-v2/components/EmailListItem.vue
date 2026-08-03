@@ -7,14 +7,13 @@
 		}"
 		@click="$emit('click')">
 		<div class="email-list-item__avatar" @click.stop="$emit('check')">
-			<NcAvatar :display-name="email.fromName || email.fromAddress" :size="40" />
+			<SenderAvatar :email="email.fromAddress || ''" :name="email.fromName || email.fromAddress" :size="40" />
 			<div class="avatar-check-overlay" :class="{ 'avatar-check-overlay--visible': checked }">
 				<div class="checkbox-box" :class="{ 'checkbox-box--checked': checked }">
 					<Check v-if="checked" :size="14" />
 				</div>
 			</div>
 		</div>
-		<BimiLogo class="email-list-item__bimi" :email="email.fromAddress" />
 		<div class="email-list-item__body">
 			<div class="email-list-item__line1">
 				<span class="email-list-item__sender">
@@ -42,11 +41,11 @@ import { NcAvatar, NcDateTime } from '@nextcloud/vue'
 import Check from 'vue-material-design-icons/Check.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import Star from 'vue-material-design-icons/Star.vue'
-import BimiLogo from './BimiLogo.vue'
+import SenderAvatar from './SenderAvatar.vue'
 
 export default {
 	name: 'EmailListItem',
-	components: { NcAvatar, NcDateTime, Check, Paperclip, Star, BimiLogo },
+	components: { NcAvatar, NcDateTime, Check, Paperclip, Star, SenderAvatar },
 	props: {
 		email: { type: Object, required: true },
 		active: { type: Boolean, default: false },

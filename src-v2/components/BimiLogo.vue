@@ -16,6 +16,7 @@ export default {
 	props: {
 		email: { type: String, required: true },
 	},
+	emits: ['loaded'],
 	data() {
 		return { logoUrl: null }
 	},
@@ -37,6 +38,7 @@ export default {
 				})
 				cache.set(domain, data.logoUrl)
 				this.logoUrl = data.logoUrl
+				if (data.logoUrl) this.$emit('loaded')
 			} catch {}
 		},
 		onError() {
