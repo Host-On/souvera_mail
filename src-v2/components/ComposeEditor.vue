@@ -290,25 +290,41 @@ export default {
 </script>
 
 <style scoped>
-.compose-layout { display: flex; flex-direction: column; max-height: 85vh; }
-.compose-layout__header { padding: 12px 20px; border-bottom: 1px solid var(--color-border); }
+.compose-layout { display: flex; flex-direction: column; max-height: 85vh; overflow: hidden; }
+
+.compose-layout__header { padding: 12px 20px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
 .compose-layout__header h3 { margin: 0; font-size: 16px; font-weight: 600; }
 
 .compose-field {
 	padding: 12px 20px;
 	border-bottom: 1px solid var(--color-border);
+	flex-shrink: 0;
 }
+.compose-field :deep(.v-select),
+.compose-field :deep(input),
+.compose-field :deep(textarea) {
+	width: 100%; box-sizing: border-box;
+}
+
 .compose-field--body {
-	padding: 0 20px;
-	flex: 1; min-height: 280px;
-	overflow-y: auto;
+	padding: 0;
+	flex: 1; min-height: 250px;
+	overflow: hidden;
 	display: flex; flex-direction: column;
 }
 .compose-field--body :deep(.richtext-editor) {
-	border: none; border-radius: 0; flex: 1; height: auto;
+	flex: 1; height: auto;
+	border: none; border-radius: 0;
+}
+.compose-field--body :deep(.richtext-editor__toolbar) {
+	border-top: 1px solid var(--color-border);
+	border-bottom: 1px solid var(--color-border);
+	padding: 6px 20px;
 }
 .compose-field--body :deep(.richtext-editor__content) {
-	min-height: 250px;
+	flex: 1; min-height: 200px;
+	padding: 12px 20px;
+	overflow-y: auto;
 }
 
 .compose-field__label {
@@ -326,7 +342,7 @@ export default {
 .compose-layout__footer {
 	display: flex; align-items: center; justify-content: space-between;
 	padding: 10px 20px; border-top: 1px solid var(--color-border);
-	gap: 8px;
+	gap: 8px; flex-shrink: 0;
 }
 .compose-layout__actions { display: flex; gap: 8px; }
 .compose-layout__status { flex: 1; text-align: center; }
