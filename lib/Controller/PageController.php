@@ -261,8 +261,8 @@ class PageController extends Controller
     private function renderV2(): TemplateResponse
     {
         $this->navigationManager->setActiveEntry('souvera_mail');
-        // Pass raw JSON translations directly to the Vue app — bypasses
-        // Nextcloud's OC.L10N which has proven unreliable for custom apps.
+        // Inline the translation JSON with CSP nonce — Nextcloud's
+        // addHeader handles the nonce correctly for inline scripts.
         $translations = '{}';
         try {
             $lang = \OC::$server->get(\OCP\IL10N::class)->getLanguageCode();
@@ -272,20 +272,23 @@ class PageController extends Controller
         $langShort = \substr($lang, 0, 2);
         $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath('souvera_mail');
         if ($appPath !== null) {
-            $jsonPath = $appPath . '/l10n/' . $langShort . '.json';
-            if (\file_exists($jsonPath)) {
-                $raw = \file_get_contents($jsonPath);
+            $l10nPath = $appPath . '/l10n/' . $langShort . '.json';
+            if (\file_exists($l10nPath)) {
+                $raw = \file_get_contents($l10nPath);
                 if ($raw !== false) {
                     $parsed = \json_decode($raw, true);
                     if (\is_array($parsed) && isset($parsed['translations'])) {
                         $translations = \json_encode($parsed['translations'], \JSON_UNESCAPED_UNICODE);
+                        \OCP\Util::addHeader(
+                            'script',
+                            ['nonce' => \OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonceManager::class)->getNonce()],
+                            'window._souvera_mail_translations = ' . $translations . ';'
+                        );
                     }
                 }
             }
         }
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
-        return new TemplateResponse('souvera_mail', 'v2', [
-            'translations' => $translations,
-        ]);
+        return new TemplateResponse('souvera_mail', 'v2', []);
     }
 }

@@ -12,12 +12,8 @@ function bootstrap() {
 	const mount = document.getElementById('souvera-mail-v2-app')
 	if (!mount) return
 
-	// Read translations from mount point data attribute — CSP-proof.
-	let translations = {}
-	try {
-		const raw = mount.getAttribute('data-translations')
-		if (raw) translations = JSON.parse(raw)
-	} catch {}
+	// Translations are injected by addHeader with CSP nonce before the app loads.
+	const translations = window._souvera_mail_translations || {}
 	function appT(app, msg) {
 		return translations[msg] || msg
 	}
