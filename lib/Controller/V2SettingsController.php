@@ -113,6 +113,8 @@ class V2SettingsController extends Controller
             'messagesPerPage' => (int) $this->getPref($uid, 'pref_messages_per_page', '50'),
             'readingPane' => $this->getPref($uid, 'pref_reading_pane', '1') === '1',
             'remoteImages' => $this->getPref($uid, 'pref_remote_images', 'never'),
+            'verticalLayout' => $this->getPref($uid, 'pref_vertical_layout', '0') === '1',
+            'autoRefresh' => (int) $this->getPref($uid, 'pref_auto_refresh', '0'),
             'account' => [
                 'email' => $user->getSystemEMailAddress() ?? $uid,
                 'server' => '',
@@ -136,6 +138,8 @@ class V2SettingsController extends Controller
             'messagesPerPage' => 'pref_messages_per_page',
             'readingPane' => 'pref_reading_pane',
             'remoteImages' => 'pref_remote_images',
+            'verticalLayout' => 'pref_vertical_layout',
+            'autoRefresh' => 'pref_auto_refresh',
         ];
 
         foreach ($allowed as $field => $key) {
