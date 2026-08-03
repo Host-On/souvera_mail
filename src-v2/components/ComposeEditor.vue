@@ -324,12 +324,10 @@ export default {
 	border: 0 !important; min-width: 0 !important;
 }
 
-/* Shared form element style */
+/* Shared form element style — only for elements without Nextcloud's own design */
 .compose-field :deep(.vs__dropdown-toggle),
 .compose-field :deep(.v-select .vs__dropdown-toggle),
-.compose-field :deep(.native-select),
-.compose-field :deep(.input-field),
-.compose-field :deep(input:not([type=file]):not(.recipient-field__input)) {
+.compose-field :deep(.native-select) {
 	border: 1px solid var(--color-border) !important;
 	border-radius: var(--border-radius-large) !important;
 	background: var(--color-main-background);
@@ -338,6 +336,11 @@ export default {
 	width: 100% !important;
 	box-sizing: border-box !important;
 	font-size: 14px;
+}
+
+/* NcTextField (Subject) — already has Nextcloud styling, just ensure full width */
+.compose-field :deep(.input-field) {
+	width: 100% !important;
 }
 
 .compose-field :deep(.recipient-field__input) {

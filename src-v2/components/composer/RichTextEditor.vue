@@ -159,7 +159,7 @@ export default {
 	flex: 1;
 	width: 100%;
 	min-height: v-bind(minHeight);
-	padding: 16px 20px;
+	padding: 10px 20px;
 	font-size: 14px; line-height: 1.6;
 	overflow-y: auto;
 	border: none;
