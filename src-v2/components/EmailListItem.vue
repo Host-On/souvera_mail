@@ -14,6 +14,7 @@
 				</div>
 			</div>
 		</div>
+		<BimiLogo class="email-list-item__bimi" :email="email.fromAddress" />
 		<div class="email-list-item__body">
 			<div class="email-list-item__line1">
 				<span class="email-list-item__sender">
@@ -41,10 +42,11 @@ import { NcAvatar, NcDateTime } from '@nextcloud/vue'
 import Check from 'vue-material-design-icons/Check.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import Star from 'vue-material-design-icons/Star.vue'
+import BimiLogo from './BimiLogo.vue'
 
 export default {
 	name: 'EmailListItem',
-	components: { NcAvatar, NcDateTime, Check, Paperclip, Star },
+	components: { NcAvatar, NcDateTime, Check, Paperclip, Star, BimiLogo },
 	props: {
 		email: { type: Object, required: true },
 		active: { type: Boolean, default: false },

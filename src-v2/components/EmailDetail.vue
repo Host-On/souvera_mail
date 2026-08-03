@@ -273,7 +273,10 @@ export default {
 	border-bottom: 1px solid var(--color-border);
 }
 .email-detail__header h2 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
-.email-detail__from { margin-bottom: 4px; }
+.email-detail__from {
+	margin-bottom: 4px;
+	display: flex; align-items: center; gap: 4px;
+}
 .email-detail__addr { color: var(--color-text-maxcontrast); margin-left: 6px; font-weight: 400; }
 .email-detail__meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--color-text-maxcontrast); }
 .email-detail__attachments {
