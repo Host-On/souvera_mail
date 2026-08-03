@@ -261,7 +261,8 @@ class PageController extends Controller
     private function renderV2(): TemplateResponse
     {
         $this->navigationManager->setActiveEntry('souvera_mail');
-        $translations = '{}';
+        // Write translations as an external JS file — completely bypasses
+        // CSP inline-script restrictions because it's loaded via <script src>.
         try {
             $lang = \OC::$server->get(\OCP\IL10N::class)->getLanguageCode();
         } catch (\Throwable) {
@@ -271,19 +272,22 @@ class PageController extends Controller
         $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath('souvera_mail');
         if ($appPath !== null) {
             $l10nPath = $appPath . '/l10n/' . $langShort . '.json';
+            $outPath = $appPath . '/js/souvera_mail-l10n.js';
             if (\file_exists($l10nPath)) {
                 $raw = \file_get_contents($l10nPath);
                 if ($raw !== false) {
                     $parsed = \json_decode($raw, true);
                     if (\is_array($parsed) && isset($parsed['translations'])) {
-                        $translations = \json_encode($parsed['translations'], \JSON_UNESCAPED_UNICODE);
+                        $js = 'window._souvera_mail_translations = ' . \json_encode($parsed['translations'], \JSON_UNESCAPED_UNICODE) . ';';
+                        @\file_put_contents($outPath, $js);
                     }
                 }
             }
+            if (\file_exists($outPath)) {
+                \OCP\Util::addScript('souvera_mail', 'souvera_mail-l10n');
+            }
         }
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
-        return new TemplateResponse('souvera_mail', 'v2', [
-            'translations' => $translations,
-        ]);
+        return new TemplateResponse('souvera_mail', 'v2', []);
     }
 }

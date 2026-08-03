@@ -8,9 +8,6 @@
 
 \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
 // CSS is scoped inside the Vue bundle — no addStyle needed.
-if (!empty($translations)): ?>
-<script>window._souvera_mail_translations = <?php echo $translations; ?>;</script>
-<?php endif;
 ?>
 <div id="souvera-mail-v2-app" style="height:100%">
 	<div style="display:flex;align-items:center;justify-content:center;height:100%">
