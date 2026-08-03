@@ -7,15 +7,21 @@
 
 			<div v-if="identities.length > 1" class="compose-field compose-field--from">
 				<label class="compose-field__label">{{ t('souvera_mail', 'From') }}</label>
-				<select v-model="fromIdentityId" class="native-select">
-					<option v-for="identity in identities" :key="identity.id" :value="identity.id">
-						{{ identity.label }}
-					</option>
-				</select>
+				<div class="compose-field__select-wrap">
+					<select v-model="fromIdentityId" class="native-select">
+						<option v-for="identity in identities" :key="identity.id" :value="identity.id">
+							{{ identity.label }}
+						</option>
+					</select>
+					<ChevronDown :size="18" class="compose-field__select-icon" />
+				</div>
 			</div>
 			<div v-else-if="identities.length === 1" class="compose-field compose-field--from">
 				<label class="compose-field__label">{{ t('souvera_mail', 'From') }}</label>
-				<div class="compose-field__static-text">{{ identities[0].label }}</div>
+				<div class="compose-field__select-wrap">
+					<div class="compose-field__static-text">{{ identities[0].label }}</div>
+					<ChevronDown :size="18" class="compose-field__select-icon" />
+				</div>
 			</div>
 
 			<div class="compose-field">
@@ -74,6 +80,7 @@ import { NcModal, NcButton, NcTextField, NcSelect } from '@nextcloud/vue'
 import Send from 'vue-material-design-icons/Send.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
+import ChevronDown from 'vue-material-design-icons/ChevronDown.vue'
 import RecipientField from './composer/RecipientField.vue'
 import RichTextEditor from './composer/RichTextEditor.vue'
 import AttachmentList from './composer/AttachmentList.vue'
@@ -86,7 +93,7 @@ let draftTimer = null
 
 export default {
 	name: 'ComposeEditor',
-	components: { NcModal, NcButton, NcTextField, NcSelect, Send, Paperclip, TrashCan, RecipientField, RichTextEditor, AttachmentList },
+	components: { NcModal, NcButton, NcTextField, NcSelect, Send, Paperclip, TrashCan, ChevronDown, RecipientField, RichTextEditor, AttachmentList },
 	props: {
 		replyTo: { type: Object, default: null },
 		forwardOf: { type: Object, default: null },
@@ -354,7 +361,18 @@ export default {
 	min-width: 0;
 }
 .compose-field--body :deep(.richtext-editor) {
-	flex: 1; height: auto;
+	flex: 1 1 auto;
+	height: auto;
+	min-height: 0 !important;
+	border: none !important;
+}
+.compose-field--body :deep(.richtext-editor__content) {
+	border: none !important;
+	min-height: 0 !important;
+}
+.compose-field--body :deep(.ProseMirror) {
+	border: none !important;
+	min-height: 0 !important;
 }
 
 .compose-field__label {
@@ -367,20 +385,34 @@ export default {
 	margin-bottom: 6px;
 }
 
+.compose-field__select-wrap {
+	position: relative;
+}
+.compose-field__select-icon {
+	position: absolute;
+	right: 12px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--color-text-maxcontrast);
+	pointer-events: none;
+}
 .native-select {
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-large);
 	background: var(--color-main-background);
 	color: var(--color-main-text);
 	min-height: 40px;
-	padding: 6px 12px;
+	padding: 6px 36px 6px 12px;
 	width: 100%;
 	box-sizing: border-box;
 	font-size: 14px;
 	font: inherit;
+	appearance: none;
+	-webkit-appearance: none;
+	-moz-appearance: none;
 }
 .compose-field__static-text {
-	padding: 6px 0;
+	padding: 6px 36px 6px 0;
 	font-size: 14px;
 	color: var(--color-main-text);
 }
