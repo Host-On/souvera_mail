@@ -411,6 +411,11 @@ return [
             'verb' => 'GET',
         ],
         [
+            'name' => 'v2_contacts#listAll',
+            'url' => '/api/v2/contacts/list',
+            'verb' => 'GET',
+        ],
+        [
             'name' => 'v2_mailbox#downloadBlob',
             'url' => '/api/v2/blobs/{id}/{name}',
             'verb' => 'GET',

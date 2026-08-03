@@ -22,8 +22,41 @@ class V2ContactsController extends Controller
     }
 
     /**
-     * GET /apps/souvera_mail/api/v2/contacts/search?q=term&limit=20
+     * GET /apps/souvera_mail/api/v2/contacts/list?limit=50&offset=0
      */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function listAll(): JSONResponse
+    {
+        $limit = \min(200, \max(1, (int) ($this->request->getParam('limit') ?? 100)));
+        $offset = \max(0, (int) ($this->request->getParam('offset') ?? 0));
+
+        $this->contactsManager->registerAll();
+        $results = $this->contactsManager->search('', ['FN', 'EMAIL'], ['types' => true], $limit, $offset);
+
+        $contacts = [];
+        foreach ($results as $contact) {
+            $name = $contact['FN'] ?? '';
+            $emails = $contact['EMAIL'] ?? [];
+            if (!\is_array($emails)) $emails = [$emails];
+            $emailList = [];
+            foreach ($emails as $email) {
+                $addr = \is_array($email) ? ($email['value'] ?? '') : (string) $email;
+                if ($addr !== '') {
+                    $emailList[] = $addr;
+                }
+            }
+            if ($emailList !== []) {
+                $contacts[] = [
+                    'name' => $name,
+                    'emails' => $emailList,
+                    'primaryEmail' => $emailList[0],
+                ];
+            }
+        }
+
+        return new JSONResponse(['contacts' => $contacts, 'total' => \count($contacts)]);
+    }
     #[NoAdminRequired]
     #[NoCSRFRequired]
     public function search(): JSONResponse

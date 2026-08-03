@@ -5,6 +5,10 @@
 				<template #icon><Pencil :size="20" /></template>
 				{{ t('souvera_mail', 'New message') }}
 			</NcButton>
+			<NcButton variant="tertiary" class="compose-btn" @click="showContactPicker = true">
+				<template #icon><Contacts :size="20" /></template>
+				{{ t('souvera_mail', 'Contacts') }}
+			</NcButton>
 
 			<template #list>
 				<NcAppNavigationCaption :name="t('souvera_mail', 'Mailboxes')" />
@@ -62,6 +66,7 @@
 		</router-view>
 	</NcAppContent>
 	</NcContent>
+	<ContactPicker v-if="showContactPicker" @close="showContactPicker = false" @select="onContactsSelected" />
 </template>
 
 <script>
@@ -70,9 +75,11 @@ import Pencil from 'vue-material-design-icons/Pencil.vue'
 import Cog from 'vue-material-design-icons/Cog.vue'
 import Share from 'vue-material-design-icons/Share.vue'
 import Archive from 'vue-material-design-icons/Archive.vue'
+import Contacts from 'vue-material-design-icons/Contacts.vue'
 import MailboxItem from './components/MailboxItem.vue'
 import QuotaDonut from './components/QuotaDonut.vue'
 import SettingsView from './views/SettingsView.vue'
+import ContactPicker from './components/ContactPicker.vue'
 import { useJmapClient } from './composables/useJmapClient.js'
 import { useHotkeys } from './composables/useHotkeys.js'
 
@@ -82,9 +89,9 @@ const ROLE_ORDER = { inbox:0, drafts:1, sent:2, archive:3, junk:4, trash:5 }
 
 export default {
 	name: 'MailV2App',
-	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, MailboxItem, QuotaDonut, SettingsView },
+	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, Contacts, MailboxItem, QuotaDonut, SettingsView, ContactPicker },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, showSettings: false, isVertical: false }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, showSettings: false, isVertical: false, showContactPicker: false }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },
@@ -149,6 +156,10 @@ export default {
 		},
 		openArchive() {
 			window.location.href = this.OC?.generateUrl?.('/apps/souvera_mailarchiv') || '/index.php/apps/souvera_mailarchiv'
+		},
+		onContactsSelected(recipients) {
+			const q = recipients.map(r => r.name ? `"${r.name}" <${r.email}>` : r.email).join(',')
+			this.$router.push({ name: 'compose', query: { to: q } })
 		},
 		async loadQuota() {
 			try {
