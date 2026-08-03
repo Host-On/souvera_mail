@@ -68,7 +68,7 @@
 		</router-view>
 	</NcAppContent>
 	</NcContent>
-	<ContactPicker v-if="showContactPicker" @close="showContactPicker = false" @select="onContactsSelected" />
+	<ContactPicker v-if="showContactPicker" @close="showContactPicker = false" @select="onContactsSelected" @compose="onContactsCompose" />
 </template>
 
 <script>
@@ -162,6 +162,11 @@ export default {
 		onContactsSelected(recipients) {
 			const q = recipients.map(r => r.name ? `"${r.name}" <${r.email}>` : r.email).join(',')
 			this.$router.push({ name: 'compose', query: { to: q } })
+		},
+		onContactsCompose(recipients) {
+			const to = recipients.map(r => r.email).join(',')
+			const names = recipients.map(r => r.name ? `${r.name} <${r.email}>` : r.email).join(',')
+			this.$router.push({ name: 'compose', query: { to: names } })
 		},
 		async loadQuota() {
 			try {
