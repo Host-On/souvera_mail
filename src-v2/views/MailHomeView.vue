@@ -176,7 +176,11 @@ export default {
 				const body = await fetchEmailBody(email.id)
 				this.emailBodyHtml = body.htmlBody || ''; this.emailBodyPlain = body.plainBody || ''
 				this.selectedEmail = { ...email, ...body }
-				await markEmailRead(email.id, true)
+				if (!email.isRead) {
+					await markEmailRead(email.id, true)
+					const listItem = this.emails.find(e => e.id === email.id)
+					if (listItem) listItem.isRead = true
+				}
 			} catch (e) { console.error('Failed to open email', e) } finally { this.loadingBody = false }
 		},
 		onReply() {

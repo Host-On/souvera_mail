@@ -1,5 +1,5 @@
 <template>
-	<div v-if="total > 0" class="quota-donut">
+	<div v-if="total > 0 || unlimited" class="quota-donut">
 		<svg viewBox="0 0 36 36" class="quota-donut__svg">
 			<circle cx="18" cy="18" r="15.5" fill="none"
 				stroke="var(--color-border)" stroke-width="4" />
@@ -12,7 +12,7 @@
 				transform="rotate(-90 18 18)"
 				class="quota-donut__arc" />
 		</svg>
-		<div class="quota-donut__label">{{ percent }}%</div>
+		<div class="quota-donut__label">{{ label }}</div>
 	</div>
 </template>
 
@@ -22,8 +22,12 @@ export default {
 	props: {
 		used: { type: Number, default: 0 },
 		total: { type: Number, default: 1 },
+		unlimited: { type: Boolean, default: false },
 	},
 	computed: {
+		label() {
+			return this.unlimited ? '∞' : this.percent + '%'
+		},
 		percent() {
 			return Math.round((this.used / this.total) * 100)
 		},

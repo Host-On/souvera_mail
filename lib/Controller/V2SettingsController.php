@@ -40,7 +40,7 @@ class V2SettingsController extends Controller
                 return new JSONResponse(['used' => 0, 'total' => 0]);
             }
             $data = $this->quotaService->getForUser($user->getUID());
-            return new JSONResponse(['used' => $data['used'] ?? 0, 'total' => $data['total'] ?? 0]);
+            return new JSONResponse(['used' => $data['used'] ?? 0, 'total' => $data['total'] ?? 0, 'unlimited' => $data['unlimited'] ?? false]);
         } catch (\Throwable $e) {
             return new JSONResponse(['used' => 0, 'total' => 0, 'error' => $e->getMessage()]);
         }

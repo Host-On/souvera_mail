@@ -276,7 +276,7 @@ OC.L10N.register(
         "Welcome to Souvera Mail" : "Willkommen bei Souvera Mail",
         "When a worker would pick up the job, it will fail to log in and the import will not run." : "Sobald ein Worker den Job aufgreifen würde, scheitert er am Login und der Import läuft nicht.",
         "Without a mailbox of your own it fails even if the config is correct for users." : "Ohne eigenes Postfach schlägt er fehl, auch wenn die Konfiguration für Nutzer korrekt ist.",
-        "Write your message..." : "Schreibe deine Nachricht...",
+        "Write your message…" : "Schreibe deine Nachricht…",
         "Yes, cancel now" : "Ja, jetzt abbrechen",
         "Yesterday" : "Gestern",
         "You" : "Du",

@@ -6,9 +6,9 @@
 			<div class="settings-info">
 				<div><strong>{{ t('souvera_mail', 'Email') }}:</strong> {{ prefs.account.email || '—' }}</div>
 			</div>
-			<div class="quota-row" v-if="quotaTotal > 0">
-				<QuotaDonut :used="quotaUsed" :total="quotaTotal" />
-				<span>{{ formatSize(quotaUsed) }} / {{ formatSize(quotaTotal) }}</span>
+			<div class="quota-row" v-if="quotaUsed > 0 || quotaUnlimited">
+				<QuotaDonut :used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
+				<span>{{ formatSize(quotaUsed) }} / {{ quotaUnlimited ? '∞' : formatSize(quotaTotal) }}</span>
 			</div>
 			<p v-else class="settings-muted">{{ t('souvera_mail', 'No quota information available') }}</p>
 		</NcSettingsSection>
@@ -104,7 +104,7 @@ export default {
 	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSettingsSection, NcSelect, Plus, TrashCan, QuotaDonut },
 	data() {
 		return {
-			quotaUsed: 0, quotaTotal: 0, passwords: [], showCreate: false, newName: '', sharedAbove: true,
+			quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, passwords: [], showCreate: false, newName: '', sharedAbove: true,
 			prefs,
 			pageSizeOptions: [
 				{ value: 25, label: '25' },
@@ -133,7 +133,7 @@ export default {
 		async loadQuota() {
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/quota'))
-				this.quotaUsed = data.used||0; this.quotaTotal = data.total||0
+				this.quotaUsed = data.used||0; this.quotaTotal = data.total||0; this.quotaUnlimited = data.unlimited ?? false
 			} catch (e) { console.error('Failed to load quota', e) }
 		},
 		async loadPasswords() {

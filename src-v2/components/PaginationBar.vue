@@ -29,6 +29,11 @@ export default {
 </script>
 
 <style scoped>
-.pagination-bar { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--color-border); }
-.pagination-bar__info { font-size: 12px; color: var(--color-text-maxcontrast); }
+.pagination-bar {
+	display: flex; justify-content: space-between; align-items: center;
+	gap: 8px; padding: 10px 16px;
+	border-top: 1px solid var(--color-border);
+	background: var(--color-main-background);
+}
+.pagination-bar__info { font-size: 13px; color: var(--color-text-maxcontrast); white-space: nowrap; }
 </style>

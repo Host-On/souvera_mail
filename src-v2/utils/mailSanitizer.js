@@ -90,14 +90,19 @@ export function sanitizeMailHtml(html, { attachments = [], blockRemote = true } 
 	if (blockRemote) {
 		const hook = function (node) {
 			if (!node) return
-			if (node.tagName === 'IMG' || node.tagName === 'SOURCE') {
-				const src = node.getAttribute('src') || ''
-				if (/^https?:\/\//i.test(src)) {
-					node.setAttribute('data-blocked-src', src)
-					node.setAttribute('src', BLANK_GIF)
-					blockedCount++
+		if (node.tagName === 'IMG' || node.tagName === 'SOURCE') {
+			const src = node.getAttribute('src') || ''
+			if (/^https?:\/\//i.test(src)) {
+				node.setAttribute('data-blocked-src', src)
+				node.setAttribute('src', BLANK_GIF)
+				node.removeAttribute('width')
+				node.removeAttribute('height')
+				if (node.hasAttribute('style')) {
+					node.setAttribute('style', node.getAttribute('style').replace(/(width|height)\s*:\s*[^;]+;?/gi, ''))
 				}
+				blockedCount++
 			}
+		}
 			if (node.tagName === 'TD' || node.tagName === 'TABLE' || node.tagName === 'BODY') {
 				const bg = node.getAttribute('background') || ''
 				if (/^https?:\/\//i.test(bg)) {

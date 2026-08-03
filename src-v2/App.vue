@@ -38,7 +38,7 @@
 			</template>
 
 			<template #footer>
-				<QuotaDonut v-if="quotaTotal > 0" :used="quotaUsed" :total="quotaTotal" />
+				<QuotaDonut v-if="quotaUsed > 0 || quotaUnlimited" :used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
 				<NcAppNavigationItem :name="t('souvera_mail', 'Mail archive')"
 					@click="openArchive">
 					<template #icon><Archive :size="20" /></template>
@@ -78,7 +78,7 @@ export default {
 	name: 'MailV2App',
 	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, MailboxItem, QuotaDonut },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0 }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },
@@ -118,7 +118,7 @@ export default {
 				const { default: axios } = await import('@nextcloud/axios')
 				const { generateUrl } = await import('@nextcloud/router')
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/quota'))
-				this.quotaUsed = data.used ?? 0; this.quotaTotal = data.total ?? 0
+				this.quotaUsed = data.used ?? 0; this.quotaTotal = data.total ?? 0; this.quotaUnlimited = data.unlimited ?? false
 			} catch (e) { console.error('Failed to load quota', e) }
 		},
 		async loadShared() {

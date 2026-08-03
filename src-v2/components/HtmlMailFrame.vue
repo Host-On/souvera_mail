@@ -14,6 +14,7 @@
 			ref="frame"
 			:srcdoc="srcdoc"
 			class="html-mail-frame__iframe"
+			:style="{ height: frameHeight + 'px' }"
 			:sandbox="'allow-same-origin allow-popups allow-popups-to-escape-sandbox'"
 			@load="onFrameLoad"
 		/>

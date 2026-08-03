@@ -7,8 +7,8 @@
 
 			<NcSelect v-if="identities.length > 1" v-model="fromIdentity"
 				:options="identities"
-				:label-outside="true"
-				:label="t('souvera_mail', 'From')"
+				label="label"
+				:input-label="t('souvera_mail', 'From')"
 				class="compose-layout__from" />
 
 			<div class="compose-layout__recipients">
