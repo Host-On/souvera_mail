@@ -445,5 +445,10 @@ return [
             'url' => '/api/v2/drafts/{id}',
             'verb' => 'DELETE',
         ],
+        [
+            'name' => 'bimi#resolve',
+            'url' => '/api/v2/bimi',
+            'verb' => 'GET',
+        ],
     ],
 ];

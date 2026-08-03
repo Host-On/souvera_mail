@@ -31,6 +31,7 @@
 		<div class="email-detail__header">
 			<h2>{{ email.subject || t('souvera_mail', '(no subject)') }}</h2>
 			<div class="email-detail__from">
+				<BimiLogo :email="email.fromAddress" />
 				<strong>{{ email.fromName || email.fromAddress }}</strong>
 				<span class="email-detail__addr">&lt;{{ email.fromAddress }}&gt;</span>
 			</div>
@@ -81,11 +82,12 @@ import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import FolderMove from 'vue-material-design-icons/FolderMove.vue'
 import Folder from 'vue-material-design-icons/Folder.vue'
 import HtmlMailFrame from './HtmlMailFrame.vue'
+import BimiLogo from './BimiLogo.vue'
 import { buildBlobUrl } from '../utils/mailSanitizer.js'
 
 export default {
 	name: 'EmailDetail',
-	components: { NcButton, NcActions, NcActionButton, ArrowLeft, Reply, ReplyAll, Forward, TrashCan, Paperclip, FolderMove, Folder, HtmlMailFrame },
+	components: { NcButton, NcActions, NcActionButton, ArrowLeft, Reply, ReplyAll, Forward, TrashCan, Paperclip, FolderMove, Folder, HtmlMailFrame, BimiLogo },
 	props: {
 		email: { type: Object, default: null },
 		htmlBody: { type: String, default: '' },

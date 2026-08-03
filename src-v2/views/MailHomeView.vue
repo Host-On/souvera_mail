@@ -211,7 +211,9 @@ export default {
 		},
 		async deleteEmail() {
 			if (!this.selectedEmail) return
-			try { await deleteEmailApi(this.selectedEmail.id, this.currentAccountId); this.selectedEmail = null; await this.refreshEmails() } catch (e) { console.error('Failed to delete email', e) }
+			try { await deleteEmailApi(this.selectedEmail.id, this.currentAccountId) } catch (e) { console.error('Failed to delete email', e) }
+			this.selectedEmail = null; this.emailBodyHtml = ''; this.emailBodyPlain = ''
+			await this.refreshEmails()
 		},
 		async onMove(mailboxId) {
 			if (!this.selectedEmail) return
