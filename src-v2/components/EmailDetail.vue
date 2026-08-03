@@ -52,13 +52,14 @@
 			<div class="attachment-chips">
 				<div v-for="att in email.attachments" :key="att.blobId" class="attachment-chip">
 					<a :href="buildBlobUrl(att.blobId, att.name)" download
-						:title="t('souvera_mail', 'Download')">
+						:title="t('souvera_mail', 'Download file')">
 						<NcButton variant="tertiary">
 							<template #icon><Download :size="16" /></template>
 							{{ att.name }} ({{ formatSize(att.size) }})
 						</NcButton>
 					</a>
 					<NcButton variant="tertiary" size="small"
+						:title="t('souvera_mail', 'Save to Files')"
 						:aria-label="t('souvera_mail', 'Save to Files')"
 						@click="startSaveToFiles(att)">
 						<template #icon><ContentSave :size="16" /></template>
