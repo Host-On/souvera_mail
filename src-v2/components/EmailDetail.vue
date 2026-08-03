@@ -39,31 +39,31 @@
 				<span v-if="email.toAddresses">{{ t('souvera_mail', 'To:') }} {{ email.toAddresses }}</span>
 				<span>{{ formatDateTime(email.receivedAt) }}</span>
 			</div>
-		</div>
 
-		<div v-if="email.attachments && email.attachments.length > 0" class="email-detail__attachments">
-			<div class="email-detail__attachments-header">
-				<h4>{{ t('souvera_mail', 'Attachments') }} ({{ email.attachments.length }})</h4>
-				<NcButton variant="tertiary" size="small" @click="openSaveAllPicker" :disabled="savingAll">
-					<template #icon><FolderDownload :size="16" /></template>
-					{{ savingAll ? t('souvera_mail', 'Saving…') : t('souvera_mail', 'Save all to Files') }}
-				</NcButton>
-			</div>
-			<div class="attachment-chips">
-				<div v-for="att in email.attachments" :key="att.blobId" class="attachment-chip">
-					<a :href="buildBlobUrl(att.blobId, att.name)" download
-						:title="t('souvera_mail', 'Download file')">
-						<NcButton variant="tertiary">
-							<template #icon><Download :size="16" /></template>
-							{{ att.name }} ({{ formatSize(att.size) }})
-						</NcButton>
-					</a>
-					<NcButton variant="tertiary" size="small"
-						:title="t('souvera_mail', 'Save to Files')"
-						:aria-label="t('souvera_mail', 'Save to Files')"
-						@click="startSaveToFiles(att)">
-						<template #icon><ContentSave :size="16" /></template>
+			<div v-if="email.attachments && email.attachments.length > 0" class="email-detail__attachments">
+				<div class="email-detail__attachments-header">
+					<h4>{{ t('souvera_mail', 'Attachments') }} ({{ email.attachments.length }})</h4>
+					<NcButton variant="tertiary" size="small" @click="openSaveAllPicker" :disabled="savingAll">
+						<template #icon><FolderDownload :size="16" /></template>
+						{{ savingAll ? t('souvera_mail', 'Saving…') : t('souvera_mail', 'Save all to Files') }}
 					</NcButton>
+				</div>
+				<div class="attachment-chips">
+					<div v-for="att in email.attachments" :key="att.blobId" class="attachment-chip">
+						<a :href="buildBlobUrl(att.blobId, att.name)" download
+							:title="t('souvera_mail', 'Download file')">
+							<NcButton variant="tertiary">
+								<template #icon><Download :size="16" /></template>
+								{{ att.name }} ({{ formatSize(att.size) }})
+							</NcButton>
+						</a>
+						<NcButton variant="tertiary" size="small"
+							:title="t('souvera_mail', 'Save to Files')"
+							:aria-label="t('souvera_mail', 'Save to Files')"
+							@click="startSaveToFiles(att)">
+							<template #icon><ContentSave :size="16" /></template>
+						</NcButton>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -276,7 +276,11 @@ export default {
 .email-detail__from { margin-bottom: 4px; }
 .email-detail__addr { color: var(--color-text-maxcontrast); margin-left: 6px; font-weight: 400; }
 .email-detail__meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--color-text-maxcontrast); }
-.email-detail__attachments { margin-bottom: 20px; }
+.email-detail__attachments {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--color-border);
+}
 .email-detail__attachments-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .email-detail__attachments-header h4 { margin: 0; font-size: 13px; color: var(--color-text-maxcontrast); }
 .attachment-chips { display: flex; flex-wrap: wrap; gap: 6px; }
