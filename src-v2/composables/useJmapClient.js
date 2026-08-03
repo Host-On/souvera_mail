@@ -16,10 +16,12 @@ export function useJmapClient() {
 		return data.mailboxes ?? []
 	}
 
-	async function fetchEmails(mailboxId, limit = 50, offset = 0, accountId) {
+	async function fetchEmails(mailboxId, limit = 50, offset = 0, accountId, searchQuery, filterType) {
 		const params = { limit, offset }
 		if (mailboxId) params.mailbox = mailboxId
 		if (accountId) params.accountId = accountId
+		if (searchQuery) params.q = searchQuery
+		if (filterType) params.filter = filterType
 		const { data } = await axios.get(base + '/api/v2/emails', { params })
 		return { emails: data.emails ?? [], total: data.total ?? 0 }
 	}

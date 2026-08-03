@@ -11,7 +11,10 @@
 				@mark-unread="bulkMarkUnread"
 				@bulk-delete="bulkDelete"
 				@move-to="bulkMoveTo"
-				@toggle-select-all="toggleSelectAll" />
+				@toggle-select-all="toggleSelectAll"
+				:search-query="searchQuery"
+				@update:search="onSearch"
+				@update:filter="onFilter" />
 
 			<EmailListSkeleton v-if="loadingEmails" />
 			<template v-else-if="emails.length > 0">
@@ -98,6 +101,8 @@ export default {
 			emailBodyHtml: '', emailBodyPlain: '',
 			listWidth: 'clamp(320px, 33%, 460px)',
 			checkedIds: [],
+			searchQuery: '',
+			filterType: 'all',
 		}
 	},
 	computed: {
@@ -144,7 +149,17 @@ export default {
 			if (mailboxId && mailboxId.includes('|')) {
 				[accountId, mailboxId] = mailboxId.split('|')
 			}
-			try { const r = await fetchEmails(mailboxId, this.limit, this.offset, accountId); this.emails = r.emails; this.emailTotal = r.total } catch (e) { console.error('Failed to load emails', e) } finally { this.loadingEmails = false }
+			try { const r = await fetchEmails(mailboxId, this.limit, this.offset, accountId, this.searchQuery, this.filterType); this.emails = r.emails; this.emailTotal = r.total } catch (e) { console.error('Failed to load emails', e) } finally { this.loadingEmails = false }
+		},
+		onSearch(q) {
+			this.searchQuery = q
+			this.offset = 0
+			this.loadEmails()
+		},
+		onFilter(type) {
+			this.filterType = type
+			this.offset = 0
+			this.loadEmails()
 		},
 		getAccountId() {
 			return this.currentAccountId

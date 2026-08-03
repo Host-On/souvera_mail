@@ -86,11 +86,19 @@ class V2MailboxController extends Controller
         $mailboxId = \trim((string) ($this->request->getParam('mailbox') ?? ''));
         $limit = \min(100, \max(1, (int) ($this->request->getParam('limit') ?? 50)));
         $offset = \max(0, (int) ($this->request->getParam('offset') ?? 0));
+        $searchQuery = \trim((string) ($this->request->getParam('q') ?? ''));
+        $filterType = \trim((string) ($this->request->getParam('filter') ?? 'all'));
 
-        $filter = $mailboxId !== '' ? ['inMailbox' => $mailboxId] : new \stdClass();
+        $filter = [];
+        if ($mailboxId !== '') $filter['inMailbox'] = $mailboxId;
+        if ($searchQuery !== '') $filter['text'] = $searchQuery;
+        if ($filterType === 'unread') $filter['isUnread'] = true;
+        if ($filterType === 'flagged') $filter['isFlagged'] = true;
+        if ($filterType === 'attachments') $filter['hasAttachment'] = true;
+
         $queryResult = $this->jmap->singleCall('Email/query', [
             'accountId' => $accountId,
-            'filter' => $filter,
+            'filter' => $filter !== [] ? $filter : new \stdClass(),
             'sort' => [['property' => 'receivedAt', 'isAscending' => false]],
             'position' => $offset,
             'limit' => $limit,
