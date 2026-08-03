@@ -56,6 +56,14 @@
 						<NcSelect v-model="messagesPerPageOption" :options="pageSizeOptions"
 							label="label" class="setting-select" />
 					</div>
+					<div class="setting-row">
+						<div>
+							<span class="setting-label">{{ t('souvera_mail', 'Auto-refresh') }}</span>
+							<p class="settings-muted">{{ t('souvera_mail', 'Periodically check for new mail. Disabled when set to 0.') }}</p>
+						</div>
+						<NcSelect v-model="autoRefreshOption" :options="autoRefreshOptions"
+							label="label" class="setting-select" />
+					</div>
 				</div>
 			</div>
 
@@ -178,6 +186,14 @@ export default {
 			],
 			messagesPerPageOption: { value: 50, label: '50' },
 			verticalLayout: false,
+			autoRefreshOptions: [
+				{ value: 0, label: 'Off' },
+				{ value: 30, label: '30s' },
+				{ value: 60, label: '1m' },
+				{ value: 120, label: '2m' },
+				{ value: 300, label: '5m' },
+			],
+			autoRefreshOption: { value: 0, label: 'Off' },
 		}
 	},
 	mounted() {
@@ -197,6 +213,8 @@ export default {
 				this.sigEnabled = p.signatureEnabled || false
 				if (p.remoteImages === 'always') this.remoteImagesOption = this.remoteImageOptions[1]
 				this.verticalLayout = p.verticalLayout || false
+				const ar = this.autoRefreshOptions.find(o => o.value === (p.autoRefresh || 0))
+				if (ar) this.autoRefreshOption = ar
 				const pp = this.pageSizeOptions.find(o => o.value === p.messagesPerPage)
 				if (pp) this.messagesPerPageOption = pp
 			} catch {}

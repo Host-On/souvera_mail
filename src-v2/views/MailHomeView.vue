@@ -78,6 +78,8 @@ import EmailListSkeleton from '../components/EmailListSkeleton.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import EmailDetail from '../components/EmailDetail.vue'
 import { useHotkeys } from '../composables/useHotkeys.js'
+import axios from '@nextcloud/axios'
+import { generateUrl } from '@nextcloud/router'
 
 const { fetchEmails, fetchEmailBody, deleteEmailApi, moveEmail, markEmailRead, toggleEmailFlag } = useJmapClient()
 
@@ -129,9 +131,11 @@ export default {
 			Delete: () => { if (this.selectedEmail) this.deleteEmail() },
 			Escape: () => { this.selectedEmail = null; this.checkedIds = [] },
 		})
+		this.startAutoRefresh()
 	},
 	beforeUnmount() {
 		this._hotkeys?.destroy()
+		this.stopAutoRefresh()
 	},
 	methods: {
 		async loadEmails() {
@@ -234,6 +238,19 @@ export default {
 			const idx = this.emails.findIndex(e => e.id === this.selectedEmail.id)
 			const next = Math.max(0, Math.min(this.emails.length - 1, idx + dir))
 			if (this.emails[next]) this.onOpenEmail(this.emails[next])
+		},
+		async startAutoRefresh() {
+			this.stopAutoRefresh()
+			try {
+				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
+				const interval = (data.autoRefresh || 0) * 1000
+				if (interval > 0) {
+					this._autoRefreshTimer = setInterval(() => { this.loadEmails() }, interval)
+				}
+			} catch {}
+		},
+		stopAutoRefresh() {
+			if (this._autoRefreshTimer) { clearInterval(this._autoRefreshTimer); this._autoRefreshTimer = null }
 		},
 	},
 }
