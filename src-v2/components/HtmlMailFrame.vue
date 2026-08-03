@@ -24,6 +24,7 @@ export default {
 		html: { type: String, required: true },
 		attachments: { type: Array, default: () => [] },
 		defaultAllowRemote: { type: Boolean, default: false },
+		remoteAllowed: { type: Boolean, default: false },
 	},
 	emits: ['mailto', 'blocked'],
 	data() {
@@ -39,6 +40,11 @@ export default {
 	watch: {
 		html: { immediate: true, handler: 'rebuildContent' },
 		attachments: { handler: 'rebuildContent' },
+		remoteAllowed: {
+			handler: function(val) {
+				if (val) this.loadRemoteImages()
+			},
+		},
 	},
 	methods: {
 		rebuildContent() {

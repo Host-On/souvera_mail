@@ -137,6 +137,7 @@
 			<HtmlMailFrame v-if="htmlBody"
 				:html="htmlBody"
 				:attachments="email.attachments || []"
+				:remote-allowed="remoteAllowed"
 				@mailto="$emit('mailto', $event)"
 				@blocked="onBlocked" />
 			<div v-else-if="plainBody" class="email-body-text">{{ plainBody }}</div>
