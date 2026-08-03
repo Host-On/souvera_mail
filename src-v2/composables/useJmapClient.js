@@ -9,14 +9,17 @@ import { generateUrl } from '@nextcloud/router'
 export function useJmapClient() {
 	const base = generateUrl('/apps/souvera_mail')
 
-	async function fetchMailboxes() {
-		const { data } = await axios.get(base + '/api/v2/mailboxes')
+	async function fetchMailboxes(accountId) {
+		const params = {}
+		if (accountId) params.accountId = accountId
+		const { data } = await axios.get(base + '/api/v2/mailboxes', { params })
 		return data.mailboxes ?? []
 	}
 
-	async function fetchEmails(mailboxId, limit = 50, offset = 0) {
+	async function fetchEmails(mailboxId, limit = 50, offset = 0, accountId) {
 		const params = { limit, offset }
 		if (mailboxId) params.mailbox = mailboxId
+		if (accountId) params.accountId = accountId
 		const { data } = await axios.get(base + '/api/v2/emails', { params })
 		return { emails: data.emails ?? [], total: data.total ?? 0 }
 	}

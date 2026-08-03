@@ -15,10 +15,9 @@
 
 				<template v-if="sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
-					<NcAppNavigationItem v-for="sh in sharedFolders" :key="'sh-'+sh.id"
-						:name="sh.name" @click="onSharedSelect(sh.id)">
-						<template #icon><Share :size="20" /></template>
-					</NcAppNavigationItem>
+					<MailboxItem v-for="mp in sharedMailboxRoots" :key="'sh-'+mp.id"
+						:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
+						@select="onSharedSelect" />
 				</template>
 
 				<template v-if="userFolders.length > 0">
@@ -30,10 +29,9 @@
 
 				<template v-if="!sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
-					<NcAppNavigationItem v-for="sh in sharedFolders" :key="'sh2-'+sh.id"
-						:name="sh.name" @click="onSharedSelect(sh.id)">
-						<template #icon><Share :size="20" /></template>
-					</NcAppNavigationItem>
+					<MailboxItem v-for="mp in sharedMailboxRoots" :key="'sh2-'+mp.id"
+						:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
+						@select="onSharedSelect" />
 				</template>
 			</template>
 
@@ -78,19 +76,20 @@ export default {
 	name: 'MailV2App',
 	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, MailboxItem, QuotaDonut },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },
 		systemFolders() { return this.mailboxes.filter(m => SYSTEM_ROLES.includes(m.role)).sort((a,b) => (ROLE_ORDER[a.role]??99) - (ROLE_ORDER[b.role]??99)) },
 		routeProps() {
 			if (this.$route.name === 'inbox') {
-				return { selectedMailbox: this.selectedMailbox, allMailboxes: this.mailboxes }
+				return { selectedMailbox: this.selectedMailbox, allMailboxes: [...this.mailboxes, ...this.sharedMailboxes] }
 			}
 			return {}
 		},
 		userFolders() { return this.mailboxes.filter(m => !SYSTEM_ROLES.includes(m.role)) },
 		userFolderRoots() { return this.userFolders.filter(m => !m.parentId || !this.userFolders.find(p => p.id === m.parentId)) },
+		sharedMailboxRoots() { return this.sharedMailboxes.filter(m => !m.parentId || !this.sharedMailboxes.find(p => p.id === m.parentId)) },
 	},
 	async mounted() {
 		try {
@@ -109,7 +108,10 @@ export default {
 	},
 	methods: {
 		onMailboxSelect(id) { this.selectedMailbox = id; this.$router.push({name:'inbox'}) },
-		onSharedSelect(accountId) { this.selectedMailbox = accountId; this.$router.push({name:'inbox'}) },
+		onSharedSelect(id) {
+			this.selectedMailbox = id
+			this.$router.push({ name: 'inbox' })
+		},
 		openArchive() {
 			window.location.href = this.OC?.generateUrl?.('/apps/souvera_mailarchiv') || '/index.php/apps/souvera_mailarchiv'
 		},
@@ -128,6 +130,17 @@ export default {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/shared'))
 				this.sharedFolders = data.shared || []
 				this.sharedAbove = data.position === 'above'
+				// Fetch mailboxes for each shared account
+				if (this.sharedFolders.length > 0) {
+					const allSharedMboxes = []
+					for (const sh of this.sharedFolders) {
+						try {
+							const mboxes = await fetchMailboxes(sh.id)
+							allSharedMboxes.push(...mboxes)
+						} catch (e) { console.error('Failed to load shared mailboxes for', sh.id, e) }
+					}
+					this.sharedMailboxes = allSharedMboxes
+				}
 			} catch (e) { console.error('Failed to load shared', e) }
 		},
 	},

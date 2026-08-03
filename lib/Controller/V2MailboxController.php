@@ -29,12 +29,16 @@ class V2MailboxController extends Controller
 
     /**
      * GET /apps/souvera_mail/api/v2/mailboxes
+     * Optional query parameter: ?accountId=<sharedAccountId> for shared folders.
      */
     #[NoAdminRequired]
     #[NoCSRFRequired]
     public function list(): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
+        $accountId = $this->request->getParam('accountId');
+        if (empty($accountId)) {
+            $accountId = $this->jmap->getCurrentAccountId();
+        }
         if ($accountId === null) {
             return new JSONResponse(['error' => 'Not authenticated'], 401);
         }
@@ -57,6 +61,7 @@ class V2MailboxController extends Controller
                 'total' => $mb['totalEmails'] ?? 0,
                 'unread' => $mb['unreadEmails'] ?? 0,
                 'parentId' => $mb['parentId'] ?? null,
+                '_accountId' => $accountId,
             ];
         }
 
@@ -70,7 +75,10 @@ class V2MailboxController extends Controller
     #[NoCSRFRequired]
     public function emails(): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
+        $accountId = $this->request->getParam('accountId');
+        if (empty($accountId)) {
+            $accountId = $this->jmap->getCurrentAccountId();
+        }
         if ($accountId === null) {
             return new JSONResponse(['error' => 'Not authenticated'], 401);
         }
