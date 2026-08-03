@@ -5,27 +5,32 @@
 				<h3>{{ composeTitle }}</h3>
 			</div>
 
-			<NcSelect v-if="identities.length > 1" v-model="fromIdentity"
-				:options="identities"
-				label="label"
-				:input-label="t('souvera_mail', 'From')"
-				class="compose-layout__from" />
+			<div v-if="identities.length > 1" class="compose-field">
+				<label class="compose-field__label">{{ t('souvera_mail', 'From') }}</label>
+				<NcSelect v-model="fromIdentity" :options="identities" label="label" />
+			</div>
 
-			<div class="compose-layout__recipients">
-				<RecipientField v-model="to" :label="t('souvera_mail', 'To') + '…'" />
+			<div class="compose-field">
+				<label class="compose-field__label">{{ t('souvera_mail', 'To') }}</label>
+				<RecipientField v-model="to" />
 				<div class="compose-toggle-row">
 					<NcButton variant="tertiary" size="small" @click="showCc = !showCc">{{ t('souvera_mail', 'Cc') }}</NcButton>
 					<NcButton variant="tertiary" size="small" @click="showBcc = !showBcc">{{ t('souvera_mail', 'Bcc') }}</NcButton>
 				</div>
-				<RecipientField v-if="showCc || cc.length > 0" v-model="cc" :label="t('souvera_mail', 'Cc') + '…'" />
-				<RecipientField v-if="showBcc || bcc.length > 0" v-model="bcc" :label="t('souvera_mail', 'Bcc') + '…'" />
+				<RecipientField v-if="showCc || cc.length > 0" v-model="cc" />
+				<RecipientField v-if="showBcc || bcc.length > 0" v-model="bcc" />
 			</div>
 
-			<NcTextField v-model="subject" class="compose-layout__subject"
-				:placeholder="t('souvera_mail', 'Subject') + '…'" />
+			<div class="compose-field">
+				<label class="compose-field__label">{{ t('souvera_mail', 'Subject') }}</label>
+				<NcTextField v-model="subject"
+					:placeholder="t('souvera_mail', 'Subject') + '…'" />
+			</div>
 
-			<RichTextEditor ref="editor" v-model="bodyHtml" :placeholder="t('souvera_mail', 'Write your message…')"
-				class="compose-layout__body" />
+			<div class="compose-field compose-field--body">
+				<RichTextEditor ref="editor" v-model="bodyHtml"
+					:placeholder="t('souvera_mail', 'Write your message…')" />
+			</div>
 
 			<AttachmentList v-if="attachments.length > 0"
 				:attachments="attachments" @remove="attachments.splice($event, 1)" />
@@ -286,17 +291,38 @@ export default {
 
 <style scoped>
 .compose-layout { display: flex; flex-direction: column; max-height: 85vh; }
-.compose-layout__header { padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
+.compose-layout__header { padding: 12px 20px; border-bottom: 1px solid var(--color-border); }
 .compose-layout__header h3 { margin: 0; font-size: 16px; font-weight: 600; }
-.compose-layout__from { padding: 8px 16px; border-bottom: 1px solid var(--color-border); }
-.compose-layout__recipients { padding: 8px 16px 0; }
-.compose-toggle-row { display: flex; gap: 4px; margin-top: 4px; }
-.compose-layout__subject { padding: 4px 16px; width: calc(100% - 32px); }
-.compose-layout__subject :deep(input) { font-size: 15px; font-weight: 500; }
-.compose-layout__body { flex: 1; min-height: 280px; margin: 8px 16px !important; overflow: hidden; }
+
+.compose-field {
+	padding: 12px 20px;
+	border-bottom: 1px solid var(--color-border);
+}
+.compose-field--body {
+	padding: 0 20px;
+	flex: 1; min-height: 280px;
+	overflow: hidden;
+	display: flex; flex-direction: column;
+}
+.compose-field--body :deep(.richtext-editor) {
+	border: none; border-radius: 0; flex: 1;
+}
+
+.compose-field__label {
+	display: block;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--color-text-maxcontrast);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	margin-bottom: 6px;
+}
+
+.compose-toggle-row { display: flex; gap: 4px; margin-top: 8px; }
+
 .compose-layout__footer {
 	display: flex; align-items: center; justify-content: space-between;
-	padding: 10px 16px; border-top: 1px solid var(--color-border);
+	padding: 10px 20px; border-top: 1px solid var(--color-border);
 	gap: 8px;
 }
 .compose-layout__actions { display: flex; gap: 8px; }
