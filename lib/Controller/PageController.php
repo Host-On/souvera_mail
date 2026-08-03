@@ -35,10 +35,7 @@ class PageController extends Controller
     #[NoCSRFRequired]
     public function index(string $target = '')
     {
-        if ($this->config->getAppValue('souvera_mail', 'v2_enabled', '0') === '1') {
-            return $this->renderV2();
-        }
-        return $this->renderMailApp(false);
+        return $this->renderV2();
     }
 
     /**
@@ -60,7 +57,7 @@ class PageController extends Controller
     #[NoCSRFRequired]
     public function embed()
     {
-        return $this->renderMailApp(true);
+        return $this->renderV2();
     }
 
     /**
