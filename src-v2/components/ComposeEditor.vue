@@ -81,7 +81,7 @@
 </template>
 
 <script>
-import { NcModal, NcButton, NcTextField, NcSelect } from '@nextcloud/vue'
+import { NcModal, NcButton, NcTextField } from '@nextcloud/vue'
 import Send from 'vue-material-design-icons/Send.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
@@ -100,7 +100,7 @@ let draftTimer = null
 
 export default {
 	name: 'ComposeEditor',
-	components: { NcModal, NcButton, NcTextField, NcSelect, Send, Paperclip, TrashCan, ChevronDown, Cloud, RecipientField, RichTextEditor, AttachmentList, CloudFilePicker },
+	components: { NcModal, NcButton, NcTextField, Send, Paperclip, TrashCan, ChevronDown, Cloud, RecipientField, RichTextEditor, AttachmentList, CloudFilePicker },
 	props: {
 		replyTo: { type: Object, default: null },
 		forwardOf: { type: Object, default: null },
@@ -336,7 +336,7 @@ export default {
 	flex-shrink: 0;
 }
 
-/* #1: From NcSelect — max-width, hide internal search when value selected */
+/* #1: From field — max-width */
 .compose-field--from :deep(.vs__dropdown-toggle) { max-width: 400px; }
 .compose-field--from :deep(.vs__search),
 .compose-field--from :deep(.vs__selected-options input) {
