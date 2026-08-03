@@ -258,7 +258,7 @@ export default {
 </script>
 
 <style scoped>
-.email-detail { padding: 20px; }
+.email-detail { padding: 20px 20px 0 20px; }
 .email-detail__toolbar {
 	display: flex; justify-content: space-between; align-items: center;
 	padding: 8px 12px; margin: -20px -20px 0 -20px;
