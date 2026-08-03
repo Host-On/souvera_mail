@@ -302,15 +302,18 @@ export default {
 }
 
 /* Match all form inputs to RecipientField chips: same border, radius, background */
+.compose-field :deep(.vs__dropdown-toggle),
 .compose-field :deep(.v-select .vs__dropdown-toggle),
 .compose-field :deep(.native-select),
+.compose-field :deep(.input-field),
 .compose-field :deep(input:not([type=file])) {
 	border: 1px solid var(--color-border) !important;
 	border-radius: var(--border-radius-large) !important;
 	background: var(--color-main-background);
 	min-height: 40px;
 	padding: 6px 12px;
-	width: 100%; box-sizing: border-box;
+	width: 100% !important;
+	box-sizing: border-box !important;
 	font-size: 14px;
 }
 
@@ -334,6 +337,10 @@ export default {
 	flex: 1; min-height: 200px;
 	padding: 12px 20px;
 	overflow-y: auto;
+}
+.compose-field--body :deep(.ProseMirror) {
+	min-height: 200px;
+	outline: none;
 }
 
 .compose-field__label {
