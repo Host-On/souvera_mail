@@ -127,6 +127,40 @@
 				</div>
 			</div>
 
+		<div class="settings-card">
+				<h2 class="settings-card__title">
+					<Folder :size="20" />
+					{{ t('souvera_mail', 'Folders') }}
+				</h2>
+				<div class="settings-card__body">
+					<NcButton variant="primary" @click="showCreateFolder = true">
+						<template #icon><Plus :size="20" /></template>
+						{{ t('souvera_mail', 'New folder') }}
+					</NcButton>
+					<div v-if="showCreateFolder" class="create-row">
+						<NcTextField v-model="newFolderName" :placeholder="t('souvera_mail', 'Folder name')" />
+						<NcButton variant="primary" @click="createFolder" :disabled="newFolderName.trim() === ''">{{ t('souvera_mail', 'Create') }}</NcButton>
+						<NcButton variant="tertiary" @click="showCreateFolder = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+					</div>
+					<div v-if="userFoldersList.length > 0" class="folder-list">
+						<div v-for="f in userFoldersList" :key="f.id" class="folder-row">
+							<span>{{ f.name }}</span>
+							<div class="folder-row__actions">
+								<NcButton variant="tertiary" size="small"
+									:aria-label="t('souvera_mail', 'Rename')" @click="startRenameFolder(f)">
+									<template #icon><Pencil :size="14" /></template>
+								</NcButton>
+								<NcButton variant="tertiary" size="small"
+									:aria-label="t('souvera_mail', 'Delete')" @click="deleteFolder(f.id)">
+									<template #icon><TrashCan :size="14" /></template>
+								</NcButton>
+							</div>
+						</div>
+					</div>
+					<NcEmptyContent v-else-if="loadedFolders" :name="t('souvera_mail', 'No custom folders')" />
+				</div>
+			</div>
+
 			<div class="settings-card">
 				<h2 class="settings-card__title">
 					<Key :size="20" />
@@ -172,6 +206,7 @@ import Palette from 'vue-material-design-icons/Palette.vue'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
 import ShareVariant from 'vue-material-design-icons/ShareVariant.vue'
 import Key from 'vue-material-design-icons/Key.vue'
+import Folder from 'vue-material-design-icons/Folder.vue'
 import QuotaDonut from '../components/QuotaDonut.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
@@ -185,7 +220,7 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, QuotaDonut },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, QuotaDonut },
 	data() {
 		return {
 			accountEmail: '',
@@ -220,6 +255,10 @@ export default {
 				{ value: 'bell', label: 'Bell' },
 			],
 			soundOption: { value: 'none', label: 'None' },
+			userFoldersList: [],
+			showCreateFolder: false,
+			newFolderName: '',
+			loadedFolders: false,
 		}
 	},
 	mounted() {
@@ -232,6 +271,7 @@ export default {
 			try { const r = await API.quota(); this.quotaUsed = r.data.used || 0; this.quotaTotal = r.data.total || 0; this.quotaUnlimited = r.data.unlimited || false } catch {}
 			try { const r = await API.passwords(); this.passwords = r.data.passwords || [] } catch {}
 			try { const r = await API.shared(); this.sharedAbove = r.data.position === 'above' } catch {}
+			try { const r = await axios.get(generateUrl('/apps/souvera_mail/api/v2/mailboxes')); this.userFoldersList = (r.data.mailboxes || []).filter(m => !['inbox','sent','drafts','archive','junk','trash'].includes(m.role)) } catch {} finally { this.loadedFolders = true }
 			try {
 				const r = await API.prefs(); const p = r.data
 				this.accountEmail = (p.account && p.account.email) || ''
@@ -273,6 +313,31 @@ export default {
 			if (val?.value) {
 				try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { notificationSound: val.value }) } catch {}
 			}
+		},
+		async createFolder() {
+			const name = this.newFolderName.trim()
+			if (!name) return
+			try {
+				const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/mailboxes'), { name })
+				this.userFoldersList.push({ id: data.id, name })
+				this.showCreateFolder = false; this.newFolderName = ''
+			} catch (e) { console.error('Folder create failed', e) }
+		},
+		async startRenameFolder(f) {
+			const name = prompt(t('souvera_mail', 'New name'), f.name)
+			if (name && name.trim() && name.trim() !== f.name) {
+				try {
+					await axios.put(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + f.id), { name: name.trim() })
+					f.name = name.trim()
+				} catch (e) { console.error('Folder rename failed', e) }
+			}
+		},
+		async deleteFolder(id) {
+			if (!confirm(t('souvera_mail', 'Delete this folder?'))) return
+			try {
+				await axios.delete(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + id))
+				this.userFoldersList = this.userFoldersList.filter(f => f.id !== id)
+			} catch (e) { console.error('Folder delete failed', e) }
 		},
 		async saveSig() {
 			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { signatureHtml: this.sigHtml, signatureEnabled: this.sigEnabled }) } catch {}
@@ -361,4 +426,7 @@ export default {
 	background: var(--color-main-background); color: var(--color-main-text);
 	box-sizing: border-box;
 }
+.folder-list { display: flex; flex-direction: column; gap: 4px; }
+.folder-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: var(--border-radius); }
+.folder-row__actions { display: flex; gap: 2px; }
 </style>
