@@ -62,6 +62,30 @@ export default {
 		},
 		loadRemoteImages() {
 			this.remoteAllowed = true
+			this.blockedCount = 0
+			const doc = this.$refs.frame?.contentDocument
+			if (!doc) { this.frameKey++; return }
+			const imgs = doc.querySelectorAll('[data-blocked-src]')
+			imgs.forEach(img => {
+				const src = img.getAttribute('data-blocked-src')
+				if (src) {
+					img.setAttribute('src', src)
+					img.removeAttribute('data-blocked-src')
+					img.removeAttribute('width')
+					img.removeAttribute('height')
+					if (img.hasAttribute('style')) {
+						img.setAttribute('style', img.getAttribute('style').replace(/(width|height)\s*:\s*[^;]+;?/gi, ''))
+					}
+				}
+			})
+			const bgs = doc.querySelectorAll('[data-blocked-bg]')
+			bgs.forEach(el => {
+				const bg = el.getAttribute('data-blocked-bg')
+				if (bg) {
+					el.setAttribute('background', bg)
+					el.removeAttribute('data-blocked-bg')
+				}
+			})
 		},
 		onFrameLoad() {
 			const doc = this.$refs.frame?.contentDocument
