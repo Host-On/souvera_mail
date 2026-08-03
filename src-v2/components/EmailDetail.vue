@@ -288,7 +288,7 @@ export default {
 .email-detail__attachments-header h4 { margin: 0; font-size: 13px; color: var(--color-text-maxcontrast); }
 .attachment-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .attachment-chip { display: flex; align-items: center; gap: 4px; }
-.email-detail__body { line-height: 1.7; word-break: break-word; }
+.email-detail__body { line-height: 1.7; word-break: break-word; margin: 0 -20px; }
 .email-body-text { white-space: pre-wrap; }
 .email-detail__loading { display: flex; justify-content: center; padding: 48px; }
 .email-detail__empty { color: var(--color-text-maxcontrast); text-align: center; padding: 48px; }
