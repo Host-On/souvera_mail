@@ -357,8 +357,7 @@ export default {
 /* NcTextField (Subject) — already has Nextcloud styling, just ensure full width */
 .compose-field :deep(.input-field) {
 	width: 100% !important;
-	border: 1px solid var(--color-border) !important;
-	border-radius: var(--border-radius-large) !important;
+	--input-border-color: var(--color-border);
 }
 
 .compose-field :deep(.recipient-field__input) {

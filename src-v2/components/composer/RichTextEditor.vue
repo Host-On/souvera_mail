@@ -45,7 +45,7 @@
 				<template #icon><FormatClear :size="18" /></template>
 			</NcButton>
 		</div>
-		<editor-content :editor="editor" class="richtext-editor__content" />
+		<editor-content :editor="editor" class="richtext-editor__content" @click="focusEditor" />
 	</div>
 	<div v-else class="richtext-editor__loading">
 		<span class="icon-loading" />
@@ -112,6 +112,11 @@ export default {
 	},
 	methods: {
 		focus() { this.editor?.commands.focus() },
+		focusEditor() {
+			if (this.editor && !this.editor.isFocused) {
+				this.editor.commands.focus('end')
+			}
+		},
 		insertHtml(html) {
 			this.editor?.chain().focus().insertContent(html).run()
 		},
