@@ -34,10 +34,10 @@ class V2SettingsController extends Controller
         try {
             $user = $this->userSession->getUser();
             if ($user === null) {
-                return new JSONResponse(['used' => 0, 'total' => 0]);
+                return new JSONResponse(['used' => 0, 'total' => 0, 'unlimited' => false]);
             }
             if (!$this->quotaService->isAvailable()) {
-                return new JSONResponse(['used' => 0, 'total' => 0]);
+                return new JSONResponse(['used' => 0, 'total' => 0, 'unlimited' => false]);
             }
             $data = $this->quotaService->getForUser($user->getUID());
             return new JSONResponse(['used' => $data['used'] ?? 0, 'total' => $data['total'] ?? 0, 'unlimited' => $data['unlimited'] ?? false]);
