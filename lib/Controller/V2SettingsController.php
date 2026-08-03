@@ -115,6 +115,7 @@ class V2SettingsController extends Controller
             'remoteImages' => $this->getPref($uid, 'pref_remote_images', 'never'),
             'verticalLayout' => $this->getPref($uid, 'pref_vertical_layout', '0') === '1',
             'autoRefresh' => (int) $this->getPref($uid, 'pref_auto_refresh', '0'),
+            'notificationSound' => $this->getPref($uid, 'pref_notification_sound', 'none'),
             'account' => [
                 'email' => $user->getSystemEMailAddress() ?? $uid,
                 'server' => '',
@@ -141,6 +142,7 @@ class V2SettingsController extends Controller
             'remoteImages' => 'pref_remote_images',
             'verticalLayout' => 'pref_vertical_layout',
             'autoRefresh' => 'pref_auto_refresh',
+            'notificationSound' => 'pref_notification_sound',
         ];
 
         foreach ($allowed as $field => $key) {

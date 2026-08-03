@@ -76,6 +76,14 @@
 						<NcSelect v-model="autoRefreshOption" :options="autoRefreshOptions"
 							label="label" class="setting-select" />
 					</div>
+					<div class="setting-row">
+						<div>
+							<span class="setting-label">{{ t('souvera_mail', 'Notification sound') }}</span>
+						</div>
+						<NcSelect v-model="soundOption" :options="soundOptions"
+							label="label" class="setting-select"
+							@update:modelValue="onSoundChange" />
+					</div>
 				</div>
 			</div>
 
@@ -206,6 +214,12 @@ export default {
 				{ value: 300, label: '5m' },
 			],
 			autoRefreshOption: { value: 0, label: 'Off' },
+			soundOptions: [
+				{ value: 'none', label: 'None' },
+				{ value: 'chime', label: 'Chime' },
+				{ value: 'bell', label: 'Bell' },
+			],
+			soundOption: { value: 'none', label: 'None' },
 		}
 	},
 	mounted() {
@@ -227,6 +241,8 @@ export default {
 				this.verticalLayout = p.verticalLayout || false
 				const ar = this.autoRefreshOptions.find(o => o.value === (p.autoRefresh || 0))
 				if (ar) this.autoRefreshOption = ar
+				const so = this.soundOptions.find(o => o.value === (p.notificationSound || 'none'))
+				if (so) this.soundOption = so
 				const pp = this.pageSizeOptions.find(o => o.value === p.messagesPerPage)
 				if (pp) this.messagesPerPageOption = pp
 			} catch {}
@@ -251,8 +267,10 @@ export default {
 		async setVerticalLayout(val) {
 			this.verticalLayout = val
 			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { verticalLayout: val }) } catch {}
-			// Reload to apply layout change immediately
 			window.location.reload()
+		},
+		async onSoundChange(val) {
+			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { notificationSound: val.value }) } catch {}
 		},
 		async saveSig() {
 			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { signatureHtml: this.sigHtml, signatureEnabled: this.sigEnabled }) } catch {}

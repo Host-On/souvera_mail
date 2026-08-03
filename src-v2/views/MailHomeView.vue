@@ -149,7 +149,13 @@ export default {
 			if (mailboxId && mailboxId.includes('|')) {
 				[accountId, mailboxId] = mailboxId.split('|')
 			}
+			const prevIds = this.emails.map(e => e.id)
 			try { const r = await fetchEmails(mailboxId, this.limit, this.offset, accountId, this.searchQuery, this.filterType); this.emails = r.emails; this.emailTotal = r.total } catch (e) { console.error('Failed to load emails', e) } finally { this.loadingEmails = false }
+			// Play sound if new emails arrived
+			if (prevIds.length > 0) {
+				const newIds = this.emails.map(e => e.id).filter(id => !prevIds.includes(id))
+				if (newIds.length > 0) this.playNewMailSound()
+			}
 		},
 		onSearch(q) {
 			this.searchQuery = q
@@ -265,6 +271,26 @@ export default {
 		},
 		stopAutoRefresh() {
 			if (this._autoRefreshTimer) { clearInterval(this._autoRefreshTimer); this._autoRefreshTimer = null }
+		},
+		async playNewMailSound() {
+			try {
+				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
+				const sound = data.notificationSound || 'none'
+				if (sound === 'none') return
+				const ctx = new (window.AudioContext || window.webkitAudioContext)()
+				const osc = ctx.createOscillator()
+				const gain = ctx.createGain()
+				osc.connect(gain); gain.connect(ctx.destination)
+				gain.gain.value = 0.15
+				if (sound === 'chime') {
+					osc.frequency.value = 880; osc.type = 'sine'
+					osc.start(); osc.stop(ctx.currentTime + 0.15)
+					setTimeout(() => { const o2 = ctx.createOscillator(); o2.connect(gain); o2.frequency.value = 1100; o2.type = 'sine'; o2.start(); o2.stop(ctx.currentTime + 0.2) }, 150)
+				} else if (sound === 'bell') {
+					osc.frequency.value = 660; osc.type = 'triangle'
+					osc.start(); gain.gain.setTargetAtTime(0, ctx.currentTime + 0.3, 0.05); osc.stop(ctx.currentTime + 0.5)
+				}
+			} catch {}
 		},
 	},
 }
