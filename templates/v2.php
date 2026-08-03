@@ -9,11 +9,13 @@
 \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
 // CSS is scoped inside the Vue bundle — no addStyle needed.
 
-// Embed translations as JSON — consumed by main.js bootstrap.
-if (!empty($translations)): ?>
-<script nonce="<?php p(\OCP\Server::get(\OC\Security\CSP\ContentSecurityPolicyNonceManager::class)->getNonce()); ?>">window._souvera_mail_translations = <?php echo $translations; ?>;</script>
-<?php endif; ?>
-<div id="souvera-mail-v2-app" style="height:100%">
+// Embed translations as data attribute on mount point — CSP-proof.
+$translationsAttr = '';
+if (!empty($translations)):
+    $translationsAttr = ' data-translations="' . htmlspecialchars($translations, ENT_QUOTES, 'UTF-8') . '"';
+endif;
+?>
+<div id="souvera-mail-v2-app" style="height:100%"<?php echo $translationsAttr; ?>>
 	<div style="display:flex;align-items:center;justify-content:center;height:100%">
 		<div style="text-align:center;color:var(--color-text-maxcontrast)">
 			<div class="icon-loading" style="display:inline-block;width:32px;height:32px"></div>
