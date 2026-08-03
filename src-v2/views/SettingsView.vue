@@ -4,14 +4,12 @@
 
 		<section class="settings-section">
 			<h3>{{ t('souvera_mail', 'Account') }}</h3>
-			<div class="settings-info">
-				<div><strong>{{ t('souvera_mail', 'Email') }}:</strong> {{ accountEmail }}</div>
-			</div>
+			<div class="settings-info">{{ accountEmail || t('souvera_mail', 'Loading…') }}</div>
 			<div class="quota-row" v-if="quotaUsed > 0 || quotaUnlimited">
 				<QuotaDonut :used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
 				<span>{{ formatSize(quotaUsed) }} / {{ quotaUnlimited ? '∞' : formatSize(quotaTotal) }}</span>
 			</div>
-			<p v-else class="settings-muted">{{ t('souvera_mail', 'No quota information available') }}</p>
+			<p v-else-if="loaded" class="settings-muted">{{ t('souvera_mail', 'No quota information available') }}</p>
 		</section>
 
 		<section class="settings-section">
@@ -24,7 +22,7 @@
 			</div>
 			<div v-if="sigEnabled" class="settings-row">
 				<textarea class="signature-textarea" v-model="sigHtml"
-					:placeholder="t('souvera_mail', '--\nYour signature')" rows="5" />
+					:placeholder="t('souvera_mail', '--\\nYour signature')" rows="5" />
 			</div>
 			<NcButton variant="primary" @click="saveSig">
 				{{ t('souvera_mail', 'Save signature') }}
@@ -77,6 +75,13 @@ import QuotaDonut from '../components/QuotaDonut.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 
+const API = {
+	quota: () => axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/quota')),
+	passwords: () => axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords')),
+	shared: () => axios.get(generateUrl('/apps/souvera_mail/api/v2/shared')),
+	prefs: () => axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences')),
+}
+
 export default {
 	name: 'SettingsView',
 	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, Plus, TrashCan, QuotaDonut },
@@ -87,64 +92,35 @@ export default {
 			passwords: [], showCreate: false, newName: '',
 			sharedAbove: true,
 			sigHtml: '', sigEnabled: false,
+			loaded: false,
 		}
 	},
-	mounted() {
-		this.loadAll()
+	async mounted() {
+		this.quotaUnlimited = false
+		try { const r = await API.quota(); this.quotaUsed = r.data.used || 0; this.quotaTotal = r.data.total || 0; this.quotaUnlimited = r.data.unlimited || false } catch {}
+		try { const r = await API.passwords(); this.passwords = r.data.passwords || [] } catch {}
+		try { const r = await API.shared(); this.sharedAbove = r.data.position === 'above' } catch {}
+		try { const r = await API.prefs(); const p = r.data; this.accountEmail = (p.account && p.account.email) || ''; this.sigHtml = p.signatureHtml || ''; this.sigEnabled = p.signatureEnabled || false } catch {}
+		this.loaded = true
 	},
 	methods: {
-		async loadAll() {
-			try {
-				const { data: q } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/quota'))
-				this.quotaUsed = q.used || 0; this.quotaTotal = q.total || 0; this.quotaUnlimited = q.unlimited ?? false
-			} catch (e) { console.error('quota', e) }
-
-			try {
-				const { data: p } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'))
-				this.passwords = p.passwords || []
-			} catch (e) { console.error('passwords', e) }
-
-			try {
-				const { data: s } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/shared'))
-				this.sharedAbove = s.position === 'above'
-			} catch (e) { console.error('shared', e) }
-
-			try {
-				const { data: pref } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
-				this.accountEmail = (pref.account && pref.account.email) || ''
-				this.sigHtml = pref.signatureHtml || ''
-				this.sigEnabled = pref.signatureEnabled || false
-			} catch (e) { console.error('prefs', e) }
-		},
 		formatSize(bytes) {
-			if (!bytes) return '0 B'; const u = ['B','KB','MB','GB']; let i=0,s=bytes
-			while(s>=1024 && i<u.length-1){s/=1024;i++}
-			return Math.round(s*10)/10 + ' ' + u[i]
+			if (!bytes) return '0 B'; const u = ['B','KB','MB','GB']; let i = 0, s = bytes
+			while (s >= 1024 && i < u.length - 1) { s /= 1024; i++ }
+			return Math.round(s * 10) / 10 + ' ' + u[i]
 		},
 		async create() {
-			try {
-				const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'), { name: this.newName })
-				this.passwords.push(data); this.showCreate=false; this.newName=''
-			} catch (e) { console.error('create', e) }
+			try { const r = await axios.post(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'), { name: this.newName }); this.passwords.push(r.data); this.showCreate = false; this.newName = '' } catch {}
 		},
 		async remove(id) {
-			try {
-				await axios.delete(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords/' + id))
-				this.passwords = this.passwords.filter(p => p.id !== id)
-			} catch (e) { console.error('remove', e) }
+			try { await axios.delete(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords/' + id)); this.passwords = this.passwords.filter(p => p.id !== id) } catch {}
 		},
 		async setSharedPosition(above) {
 			this.sharedAbove = above
-			try {
-				await axios.put(generateUrl('/apps/souvera_mail/api/v2/shared/position'), { position: above ? 'above' : 'below' })
-			} catch (e) { console.error('setSharedPosition', e) }
+			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/shared/position'), { position: above ? 'above' : 'below' }) } catch {}
 		},
 		async saveSig() {
-			try {
-				await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), {
-					signatureHtml: this.sigHtml, signatureEnabled: this.sigEnabled,
-				})
-			} catch (e) { console.error('saveSig', e) }
+			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { signatureHtml: this.sigHtml, signatureEnabled: this.sigEnabled }) } catch {}
 		},
 	},
 }
@@ -156,7 +132,6 @@ export default {
 .settings-section { margin-bottom: 32px; }
 .settings-section h3 { margin: 0 0 12px; font-size: 14px; color: var(--color-text-maxcontrast); }
 .settings-info { margin-bottom: 12px; font-size: 14px; }
-.settings-row { margin-bottom: 12px; }
 .settings-muted { color: var(--color-text-maxcontrast); font-size: 12px; }
 .quota-row { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
 .shared-position-row { display: flex; flex-direction: column; gap: 6px; }

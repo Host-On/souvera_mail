@@ -49,11 +49,11 @@
 			</template>
 		</NcAppNavigation>
 
-		<NcAppContent>
-			<router-view v-slot="{ Component }">
-				<component :is="Component" v-bind="routeProps" />
-			</router-view>
-		</NcAppContent>
+	<NcAppContent>
+		<router-view v-slot="{ Component }">
+			<component :is="Component" :key="$route.fullPath" v-bind="routeProps" />
+		</router-view>
+	</NcAppContent>
 	</NcContent>
 </template>
 
@@ -105,6 +105,10 @@ export default {
 	},
 	beforeUnmount() {
 		this._hotkeys?.destroy()
+	},
+	errorCaptured(err, instance, info) {
+		console.error('App: child component error', err, info)
+		return false
 	},
 	methods: {
 		onMailboxSelect(id) { this.selectedMailbox = id; this.$router.push({name:'inbox'}) },
