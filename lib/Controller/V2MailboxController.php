@@ -105,6 +105,17 @@ class V2MailboxController extends Controller
             return new JSONResponse(['emails' => [], 'total' => 0]);
         }
 
+        // JMAP Email/query may not include 'total'. If missing, estimate
+        // from position + count. If we got exactly $limit results, assume
+        // there are more (add 1 to enable the next-page button).
+        $total = $queryResult['data']['total'] ?? null;
+        if ($total === null) {
+            $total = $offset + \count($ids);
+            if (\count($ids) >= $limit) {
+                $total++;
+            }
+        }
+
         $getResult = $this->jmap->singleCall('Email/get', [
             'accountId' => $accountId,
             'ids' => $ids,
@@ -136,7 +147,7 @@ class V2MailboxController extends Controller
             ];
         }
 
-        return new JSONResponse(['emails' => $emails, 'total' => $queryResult['data']['total'] ?? \count($ids)]);
+        return new JSONResponse(['emails' => $emails, 'total' => $total]);
     }
 
     /**
