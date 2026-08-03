@@ -10,8 +10,10 @@
 			<div v-if="loading" class="cloud-picker__loading"><span class="icon-loading" /></div>
 			<div v-else class="cloud-picker__list">
 				<div v-for="f in files" :key="f.name" class="cloud-picker__item"
-					:class="{ 'cloud-picker__item--selected': selectedPath === (currentPath + '/' + f.name) }"
+					:class="{ 'cloud-picker__item--selected': isSelected(f) }"
 					@click="selectItem(f)">
+					<NcCheckboxRadioSwitch :model-value="isSelected(f)"
+						@update:modelValue="toggleSelect(f)" @click.stop />
 					<FolderOpen v-if="f.type === 'dir'" :size="20" />
 					<File v-else :size="20" />
 					<span class="cloud-picker__name">{{ f.name }}</span>
@@ -20,8 +22,12 @@
 				<NcEmptyContent v-if="files.length === 0" :name="t('souvera_mail', 'Empty folder')" />
 			</div>
 			<div class="cloud-picker__footer">
-				<NcButton variant="primary" :disabled="!selectedPath" @click="attachSelected">
-					{{ t('souvera_mail', 'Attach') }}
+				<span v-if="selectedPaths.size > 0" class="cloud-picker__count">
+					{{ t('souvera_mail', '{count} selected', { count: selectedPaths.size }) }}
+				</span>
+				<NcButton variant="primary" :disabled="selectedPaths.size === 0" @click="attachSelected">
+					<template #icon><Paperclip :size="16" /></template>
+					{{ t('souvera_mail', 'Attach selected') }}
 				</NcButton>
 				<NcButton variant="tertiary" @click="$emit('close')">
 					{{ t('souvera_mail', 'Cancel') }}
@@ -32,21 +38,22 @@
 </template>
 
 <script>
-import { NcDialog, NcButton, NcEmptyContent } from '@nextcloud/vue'
+import { NcDialog, NcButton, NcEmptyContent, NcCheckboxRadioSwitch } from '@nextcloud/vue'
 import FolderOpen from 'vue-material-design-icons/FolderOpen.vue'
 import File from 'vue-material-design-icons/File.vue'
+import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 
 export default {
 	name: 'CloudFilePicker',
-	components: { NcDialog, NcButton, NcEmptyContent, FolderOpen, File },
+	components: { NcDialog, NcButton, NcEmptyContent, NcCheckboxRadioSwitch, FolderOpen, File, Paperclip },
 	emits: ['close', 'attach'],
 	data() {
 		return {
 			files: [],
-			currentPath: '/',
-			selectedPath: '',
+			currentPath: '',
+			selectedPaths: new Set(),
 			loading: false,
 		}
 	},
@@ -66,7 +73,7 @@ export default {
 	methods: {
 		async load(path) {
 			this.currentPath = path
-			this.selectedPath = ''
+			this.selectedPaths.clear()
 			this.loading = true
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/files/list'), { params: { path } })
@@ -74,30 +81,42 @@ export default {
 			} catch { this.files = [] }
 			finally { this.loading = false }
 		},
+		isSelected(f) {
+			return this.selectedPaths.has(this.currentPath.replace(/\/$/, '') + '/' + f.name)
+		},
+		toggleSelect(f) {
+			if (f.type === 'dir') return
+			const key = this.currentPath.replace(/\/$/, '') + '/' + f.name
+			if (this.selectedPaths.has(key)) {
+				this.selectedPaths.delete(key)
+			} else {
+				this.selectedPaths.add(key)
+			}
+		},
 		selectItem(f) {
 			if (f.type === 'dir') {
 				this.load(this.currentPath.replace(/\/$/, '') + '/' + f.name)
 			} else {
-				this.selectedPath = this.currentPath.replace(/\/$/, '') + '/' + f.name
+				this.toggleSelect(f)
 			}
 		},
 		navigate(path) {
 			this.load(path)
 		},
 		async attachSelected() {
-			if (!this.selectedPath) return
-			try {
-				const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/files/attach'), {
-					filePath: this.selectedPath,
-				})
-				this.$emit('attach', {
-					blobId: data.blobId,
-					name: data.name,
-					type: data.type,
-					size: data.size,
-				})
-				this.$emit('close')
-			} catch {}
+			if (this.selectedPaths.size === 0) return
+			for (const filePath of this.selectedPaths) {
+				try {
+					const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/files/attach'), { filePath })
+					this.$emit('attach', {
+						blobId: data.blobId,
+						name: data.name,
+						type: data.type,
+						size: data.size,
+					})
+				} catch (e) { console.error('Attach failed', filePath, e) }
+			}
+			this.$emit('close')
 		},
 		fmtSize(bytes) {
 			if (!bytes) return ''
@@ -123,5 +142,6 @@ export default {
 .cloud-picker__item--selected { background: var(--color-primary-element-light); }
 .cloud-picker__name { flex: 1; font-size: 13px; }
 .cloud-picker__size { font-size: 12px; color: var(--color-text-maxcontrast); }
-.cloud-picker__footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+.cloud-picker__footer { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+.cloud-picker__count { flex: 1; font-size: 13px; color: var(--color-primary-element); font-weight: 500; }
 </style>
