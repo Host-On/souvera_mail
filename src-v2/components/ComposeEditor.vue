@@ -384,7 +384,9 @@ export default {
 			try {
 				const payload = this.buildPayload()
 				if (this.savedDraftId) {
-					await axios.put(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId), payload)
+					const { data } = await axios.put(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId), payload)
+					// Keep the id in sync (e.g. after a vanished-draft fallback create).
+					if (data?.draftId) this.savedDraftId = data.draftId
 				} else {
 					const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/drafts'), payload)
 					this.savedDraftId = data.draftId
