@@ -43,10 +43,13 @@
 
 			<div class="compose-field compose-field--body">
 				<RichTextEditor ref="editor" v-model="bodyHtml"
-					:placeholder="t('souvera_mail', 'Write your message…')" />
-				<div v-if="showSignaturePreview" class="compose-signature" @click.stop>
-					<div class="compose-signature__content" v-html="signaturePreviewHtml"></div>
-				</div>
+					:placeholder="t('souvera_mail', 'Write your message…')">
+					<template #footer>
+						<div v-if="showSignaturePreview" class="compose-signature" @click.stop>
+							<div class="compose-signature__content" v-html="signaturePreviewHtml"></div>
+						</div>
+					</template>
+				</RichTextEditor>
 			</div>
 
 			<AttachmentList v-if="attachments.length > 0"
@@ -626,18 +629,13 @@ export default {
 /* Signature preview below the editor — visible like Thunderbird, but not
    part of the editable document (attached verbatim at send time). */
 .compose-signature {
-	margin: 0 16px 12px;
+	margin-top: 16px;
 	padding: 8px 12px;
 	border: 1px dashed var(--color-border);
 	border-radius: var(--border-radius);
 	background: var(--color-background-dark);
 	pointer-events: none;
 	user-select: none;
-	/* Large signatures must not squeeze the text editor — cap the height
-	   and scroll within the preview instead. */
-	flex-shrink: 0;
-	max-height: 180px;
-	overflow-y: auto;
 	overflow-x: hidden;
 }
 .compose-signature__content {
