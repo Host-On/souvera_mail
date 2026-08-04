@@ -64,7 +64,7 @@ trait SelfUpdateTrait
             $branch = trim((string) $config->getAppValue($appId, 'devops.branch', 'main'));
 
             if ($channel === 'dev') {
-                $result = $this->downloadBranch($appId, $appPath, $branch);
+                $result = $this->downloadBranch($appId, $appPath, $branch, $installed);
             } else {
                 $latest = $this->latestReleaseTag();
                 if ($latest === null) {
@@ -74,7 +74,7 @@ trait SelfUpdateTrait
                     $config->setAppValue($appId, 'devops.last_check', (string) time());
                     return ['up_to_date' => true, 'installed' => $installed, 'latest' => $latest];
                 }
-                $result = $this->downloadTag($appId, $appPath, $latest);
+                $result = $this->downloadTag($appId, $appPath, $latest, $installed);
             }
 
             // Only write the timestamp after a successful check (or real update).
@@ -116,7 +116,7 @@ trait SelfUpdateTrait
         return ltrim((string) $data['tag_name'], 'v');
     }
 
-    private function downloadBranch(string $appId, string $appPath, string $branch): array
+    private function downloadBranch(string $appId, string $appPath, string $branch, string $installedVersion): array
     {
         $repo = $this->getRepo();
         if ($repo === '') {
@@ -135,7 +135,7 @@ trait SelfUpdateTrait
         }
 
         $url = "https://api.github.com/repos/$repo/zipball/$branch";
-        $result = $this->downloadAndApply($appId, $appPath, $url);
+        $result = $this->downloadAndApply($appId, $appPath, $url, $installedVersion);
         if (empty($result['error'])) {
             \OCP\Server::get(\OCP\IConfig::class)
                 ->setAppValue($appId, 'devops.last_sha', $latestSha);
@@ -143,7 +143,7 @@ trait SelfUpdateTrait
         return $result;
     }
 
-    private function downloadTag(string $appId, string $appPath, string $tag): array
+    private function downloadTag(string $appId, string $appPath, string $tag, string $installedVersion): array
     {
         $repo = $this->getRepo();
         if ($repo === '') {
@@ -156,7 +156,7 @@ trait SelfUpdateTrait
             $rawTag = (string) $data['tag_name'];
         }
         $url = "https://api.github.com/repos/$repo/zipball/" . ($rawTag !== '' ? $rawTag : "v$tag");
-        return $this->downloadAndApply($appId, $appPath, $url);
+        return $this->downloadAndApply($appId, $appPath, $url, $installedVersion);
     }
 
     /**
@@ -171,7 +171,7 @@ trait SelfUpdateTrait
         return (string) $data['sha'];
     }
 
-    private function downloadAndApply(string $appId, string $appPath, string $url): array
+    private function downloadAndApply(string $appId, string $appPath, string $url, ?string $installedVersion = null): array
     {
         $token = $this->readToken();
         if ($token === '') {
@@ -234,6 +234,30 @@ trait SelfUpdateTrait
         }
         $sourceDir = $dirs[0];
 
+        // Downgrade guard: verify the version of the EXTRACTED code BEFORE
+        // touching the installed app. If the archive does not actually
+        // contain a newer version (stale cache, wrong tag, mix-up) — or its
+        // version cannot be verified at all — abort (fail closed).
+        $extractedVersion = $this->readAppVersion($sourceDir);
+        if ($installedVersion !== null) {
+            if ($extractedVersion === null) {
+                $this->rmdirRecursive($extractDir);
+                return [
+                    'error' => 'Cannot verify extracted app version — update aborted',
+                    'installed_version' => $installedVersion,
+                ];
+            }
+            if (version_compare($extractedVersion, $installedVersion, '<=')) {
+                $this->rmdirRecursive($extractDir);
+                return [
+                    'error' => "Downgrade blocked: extracted app version {$extractedVersion} "
+                        . "is not newer than installed version {$installedVersion}",
+                    'extracted_version' => $extractedVersion,
+                    'installed_version' => $installedVersion,
+                ];
+            }
+        }
+
         // Atomic swap: backup current → extract new → enable → keep or rollback.
         $backupDir = $appPath . '.bak';
         if (is_dir($backupDir)) {
@@ -269,6 +293,23 @@ trait SelfUpdateTrait
         $this->rmdirRecursive($backupDir);
         $this->rmdirRecursive($extractDir);
         return $enableResult;
+    }
+
+    private function readAppVersion(string $appDir): ?string
+    {
+        $infoPath = $appDir . '/appinfo/info.xml';
+        if (!\is_file($infoPath)) {
+            return null;
+        }
+        $raw = @\file_get_contents($infoPath);
+        if ($raw === false) {
+            return null;
+        }
+        if (\preg_match('/<version>([^<]+)<\/version>/', $raw, $m) === 1) {
+            $v = \trim((string) ($m[1] ?? ''));
+            return $v !== '' ? $v : null;
+        }
+        return null;
     }
 
     private function enableApp(string $appId): array
