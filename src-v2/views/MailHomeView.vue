@@ -202,8 +202,11 @@ export default {
 				// requests must never hide the list or keep the skeleton up
 				if (seq === this._loadSeq) this.loadingEmails = false
 			}
-			// Play sound only when there are genuinely new emails (not page/filter changes)
-			if (prevIds.length > 0 && this.emailTotal > prevTotal) {
+			// Play sound and notify ONLY during auto-refresh, never on
+			// manual folder switch, filter, pagination, or initial load.
+			const wasAutoRefresh = this._isAutoRefresh
+			this._isAutoRefresh = false
+			if (wasAutoRefresh && prevIds.length > 0 && this.emailTotal > prevTotal) {
 				const newIds = this.emails.map(e => e.id).filter(id => !prevIds.includes(id))
 				if (newIds.length > 0) {
 					this.playNewMailSound()
@@ -382,12 +385,13 @@ export default {
 				this._soundPref = data.notificationSound || 'none'
 				this._autoRefreshTimer = setInterval(() => {
 					clearTimeout(this._searchTimer)
+					this._isAutoRefresh = true
 					this.loadEmails()
 				}, interval)
 			} catch {
-				// Fallback: poll every 60 seconds even if prefs aren't reachable
 				this._autoRefreshTimer = setInterval(() => {
 					clearTimeout(this._searchTimer)
+					this._isAutoRefresh = true
 					this.loadEmails()
 				}, 60000)
 			}
