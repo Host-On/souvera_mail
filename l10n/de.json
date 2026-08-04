@@ -425,7 +425,8 @@
     "Marked as read": "Als gelesen markiert",
     "Marked as unread": "Als ungelesen markiert",
     "Messages deleted": "Nachrichten gelöscht",
-    "Messages moved": "Nachrichten verschoben"
+    "Messages moved": "Nachrichten verschoben",
+    "Failed to load contacts": "Kontakte konnten nicht geladen werden"
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

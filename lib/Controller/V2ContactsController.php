@@ -31,7 +31,8 @@ class V2ContactsController extends Controller
         $limit = \min(200, \max(1, (int) ($this->request->getParam('limit') ?? 100)));
         $offset = \max(0, (int) ($this->request->getParam('offset') ?? 0));
 
-        $this->contactsManager->registerAll();
+        // NOTE: IManager has no registerAll() — calling it fataled the
+        // endpoint (HTTP 500) and the picker silently showed nothing.
         $results = $this->contactsManager->search('', ['FN', 'EMAIL'], ['types' => true], $limit, $offset);
 
         $contacts = [];
@@ -68,7 +69,6 @@ class V2ContactsController extends Controller
             return new JSONResponse(['contacts' => []]);
         }
 
-        $this->contactsManager->registerAll();
         $results = $this->contactsManager->search($query, ['FN', 'EMAIL'], ['types' => true], $limit);
 
         $contacts = [];
