@@ -304,6 +304,7 @@ export default {
 	margin-bottom: 4px;
 	display: flex; align-items: center; gap: 4px;
 }
+.email-detail__from :deep(.bimi-logo__img) { margin-right: 8px; }
 .email-detail__addr { color: var(--color-text-maxcontrast); margin-left: 6px; font-weight: 400; }
 .email-detail__meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--color-text-maxcontrast); }
 .email-detail__attachments {

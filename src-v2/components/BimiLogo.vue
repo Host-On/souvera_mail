@@ -1,8 +1,6 @@
 <template>
-	<span v-if="logoUrl" class="bimi-logo">
-		<img :src="logoUrl" :alt="t('souvera_mail', 'Verified sender')" class="bimi-logo__img"
-			@error="onError" />
-	</span>
+	<img v-if="logoUrl" :src="logoUrl" :alt="t('souvera_mail', 'Verified sender')" class="bimi-logo__img"
+		@error="onError" />
 </template>
 
 <script>
@@ -15,45 +13,65 @@ export default {
 	name: 'BimiLogo',
 	props: {
 		email: { type: String, required: true },
+		size: { type: Number, default: 24 },
 	},
-	emits: ['loaded'],
+	emits: ['loaded', 'failed'],
 	data() {
 		return { logoUrl: null }
+	},
+	computed: {
+		domain() {
+			if (!this.email) return ''
+			const parts = this.email.split('@')
+			return parts.length === 2 ? parts[1] : ''
+		},
 	},
 	mounted() {
 		this.resolve()
 	},
 	methods: {
 		async resolve() {
-			if (!this.email) return
-			const domain = this.email.split('@')[1]
-			if (!domain) return
-			if (cache.has(domain)) {
-				this.logoUrl = cache.get(domain)
+			if (!this.domain) {
+				this.$emit('failed')
+				return
+			}
+			if (cache.has(this.domain)) {
+				this.applyLogo(cache.get(this.domain))
 				return
 			}
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/bimi'), {
-					params: { domain },
+					params: { domain: this.domain },
 				})
-				cache.set(domain, data.logoUrl)
-				this.logoUrl = data.logoUrl
-				if (data.logoUrl) this.$emit('loaded')
-			} catch {}
+				cache.set(this.domain, data.logoUrl || null)
+				this.applyLogo(data.logoUrl || null)
+			} catch {
+				this.applyLogo(null)
+			}
+		},
+		applyLogo(url) {
+			if (url) {
+				this.logoUrl = url
+				this.$emit('loaded', url)
+			} else {
+				this.logoUrl = null
+				this.$emit('failed')
+			}
 		},
 		onError() {
-			cache.set(this.email.split('@')[1], null)
+			cache.set(this.domain, null)
 			this.logoUrl = null
+			this.$emit('failed')
 		},
 	},
 }
 </script>
 
 <style scoped>
-.bimi-logo { display: inline-flex; align-items: center; margin-right: 8px; flex-shrink: 0; }
 .bimi-logo__img {
-	width: 24px; height: 24px; border-radius: 50%;
-	object-fit: contain; background: #fff;
-	border: 1px solid var(--color-border);
+	width: v-bind(size + 'px'); height: v-bind(size + 'px');
+	border-radius: 50%; object-fit: cover;
+	background: #fff; border: 1px solid var(--color-border);
+	display: inline-flex; flex-shrink: 0;
 }
 </style>
