@@ -12,6 +12,7 @@ use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use OCP\IUserSession;
+use Psr\Log\LoggerInterface;
 
 class V2ComposeController extends Controller
 {
@@ -21,6 +22,7 @@ class V2ComposeController extends Controller
         private V2JmapProxy $jmap,
         private StalwartUserContext $userContext,
         private IUserSession $userSession,
+        private LoggerInterface $logger,
     ) {
         parent::__construct($appName, $request);
     }
@@ -178,11 +180,21 @@ class V2ComposeController extends Controller
         }
 
         $created = $emailResp['args']['created']['draft1'] ?? null;
+        $submitted = $submissionResp['args']['created']['send1'] ?? null;
         if ($created === null) {
+            $this->logger->warning(
+                'Souvera Mail: Email/set reported no created draft1. '
+                . 'Email/set args: ' . \json_encode($emailResp['args'] ?? null, JSON_UNESCAPED_SLASHES)
+                . ' | EmailSubmission/set args: ' . \json_encode($submissionResp['args'] ?? null, JSON_UNESCAPED_SLASHES),
+                ['app' => 'souvera_mail']
+            );
+        }
+        if ($created === null && $submitted === null) {
             return new JSONResponse(['error' => 'Email creation failed', 'detail' => $emailResp['args'] ?? []], 500);
         }
-
-        $submitted = $submissionResp['args']['created']['send1'] ?? null;
+        // If the submission succeeded the mail IS sent — report success even
+        // when the intermediate draft create did not report a created id
+        // (e.g. Stalwart may treat draft+immediate-submit as a direct send).
         return new JSONResponse([
             'success' => true,
             'draftId' => $created['id'] ?? '',
