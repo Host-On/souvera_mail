@@ -12,6 +12,9 @@
 				@bulk-delete="bulkDelete"
 				@move-to="bulkMoveTo"
 				@toggle-select-all="toggleSelectAll"
+				@select-all="selectAll"
+				@mark-all-read="markAllRead"
+				@mark-all-unread="markAllUnread"
 				:search-query="searchQuery"
 				:filter="filterType"
 				:two-row="!verticalLayout"
@@ -226,6 +229,15 @@ export default {
 		toggleSelectAll() {
 			if (this.selectAllState === true) this.checkedIds = []
 			else this.checkedIds = this.emails.map(e => e.id)
+		},
+		selectAll() { this.checkedIds = this.emails.map(e => e.id) },
+		async markAllRead() {
+			this.checkedIds = this.emails.map(e => e.id)
+			await this.bulkMarkRead()
+		},
+		async markAllUnread() {
+			this.checkedIds = this.emails.map(e => e.id)
+			await this.bulkMarkUnread()
 		},
 		async bulkMarkRead() {
 			for (const id of this.checkedIds) {

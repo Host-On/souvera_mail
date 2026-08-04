@@ -4,6 +4,19 @@
 			<NcCheckboxRadioSwitch :model-value="selectAllState"
 				:indeterminate="selectAllState === 'indeterminate'"
 				@update:modelValue="$emit('toggleSelectAll')" />
+			<NcActions v-if="selectedCount === 0" class="email-list-toolbar__quick-actions"
+				:aria-label="t('souvera_mail', 'More actions')">
+				<template #icon><DotsHorizontal :size="18" /></template>
+				<NcActionButton :name="t('souvera_mail', 'Select all')" @click="$emit('selectAll')">
+					<template #icon><CheckAll :size="16" /></template>
+				</NcActionButton>
+				<NcActionButton :name="t('souvera_mail', 'Mark all as read')" @click="$emit('markAllRead')">
+					<template #icon><EmailOpen :size="16" /></template>
+				</NcActionButton>
+				<NcActionButton :name="t('souvera_mail', 'Mark all as unread')" @click="$emit('markAllUnread')">
+					<template #icon><EmailOutline :size="16" /></template>
+				</NcActionButton>
+			</NcActions>
 			<template v-if="selectedCount > 0">
 				<span class="selected-count">{{ selectedCount }} {{ t('souvera_mail', 'selected') }}</span>
 				<NcButton variant="tertiary" @click="$emit('markRead')">
@@ -68,11 +81,13 @@ import Folder from 'vue-material-design-icons/Folder.vue'
 import Filter from 'vue-material-design-icons/Filter.vue'
 import Star from 'vue-material-design-icons/Star.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
+import DotsHorizontal from 'vue-material-design-icons/DotsHorizontal.vue'
+import CheckAll from 'vue-material-design-icons/CheckAll.vue'
 import { mailboxDisplayName } from '../utils/mailboxNames.js'
 
 export default {
 	name: 'EmailListToolbar',
-	components: { NcButton, NcActions, NcActionButton, NcCheckboxRadioSwitch, NcTextField, Refresh, Pencil, EmailOpen, EmailOutline, TrashCan, FolderMove, Folder, Filter, Star, Paperclip },
+	components: { NcButton, NcActions, NcActionButton, NcCheckboxRadioSwitch, NcTextField, Refresh, Pencil, EmailOpen, EmailOutline, TrashCan, FolderMove, Folder, Filter, Star, Paperclip, DotsHorizontal, CheckAll },
 	props: {
 		selectedCount: { type: Number, default: 0 },
 		selectAllState: { type: [Boolean, String], default: false },
@@ -83,7 +98,7 @@ export default {
 		// for narrow side-by-side list panels.
 		twoRow: { type: Boolean, default: false },
 	},
-	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter'],
+	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter', 'selectAll', 'markAllRead', 'markAllUnread'],
 	computed: {
 		activeFilterMenuName() {
 			const active = this.filterOptions.find(f => f.value === this.filter)
