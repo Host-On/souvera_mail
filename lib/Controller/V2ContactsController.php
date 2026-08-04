@@ -33,7 +33,13 @@ class V2ContactsController extends Controller
 
         // NOTE: IManager has no registerAll() — calling it fataled the
         // endpoint (HTTP 500) and the picker silently showed nothing.
-        $results = $this->contactsManager->search('', ['FN', 'EMAIL'], ['types' => true], $limit, $offset);
+        // limit/offset are OPTIONS (the search() signature has 3 params;
+        // positional limit/offset would raise an ArgumentCountError).
+        $results = $this->contactsManager->search('', ['FN', 'EMAIL'], [
+            'types' => true,
+            'limit' => $limit,
+            'offset' => $offset,
+        ]);
 
         $contacts = [];
         foreach ($results as $contact) {
@@ -69,7 +75,10 @@ class V2ContactsController extends Controller
             return new JSONResponse(['contacts' => []]);
         }
 
-        $results = $this->contactsManager->search($query, ['FN', 'EMAIL'], ['types' => true], $limit);
+        $results = $this->contactsManager->search($query, ['FN', 'EMAIL'], [
+            'types' => true,
+            'limit' => $limit,
+        ]);
 
         $contacts = [];
         foreach ($results as $contact) {

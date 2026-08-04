@@ -38,7 +38,7 @@
 					{{ selected.length }} {{ t('souvera_mail', 'selected') }}
 				</div>
 				<div class="contact-picker__chips">
-					<NcChip v-for="(r, i) in selected" :key="i"
+					<NcChip v-for="(r, i) in selected" :key="r.email"
 						:text="r.name ? r.name + ' &lt;' + r.email + '&gt;' : r.email"
 						:closeable="true" @close="selected.splice(i, 1)" />
 				</div>
