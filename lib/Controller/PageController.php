@@ -285,7 +285,8 @@ class PageController extends Controller
                     $raw = \file_get_contents($l10nPath);
                     if ($raw !== false) {
                         $parsed = \json_decode($raw, true);
-                        if (\is_array($parsed) && isset($parsed['translations'])) {
+                        if (\is_array($parsed) && isset($parsed['translations'])
+                            && \is_array($parsed['translations']) && \count($parsed['translations']) > 0) {
                             $translations = $parsed['translations'];
                             break;
                         }

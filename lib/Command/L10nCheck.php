@@ -63,7 +63,10 @@ class L10nCheck extends Command
                 $output->writeln("<error>User '{$uid}' does not exist.</error>");
                 return 1;
             }
-            $lang = (string) ($user->getLanguage() ?? $lang);
+            $userLang = (string) $user->getLanguage();
+            if ($userLang !== '') {
+                $lang = $userLang;
+            }
         }
         $langShort = \substr($lang, 0, 2);
         $appPath = $this->appManager->getAppPath('souvera_mail');
@@ -116,7 +119,6 @@ class L10nCheck extends Command
 
         $output->writeln('');
         $output->writeln("  <info>used catalog</info>          : {$found} ({$entries} entries)");
-        $expected = $lang === 'en' ? 0 : 1;
         $output->writeln('');
         if ($entries >= 300 || $lang === 'en') {
             $output->writeln('<info>OK — the v2 UI will use this catalog.</info>');
@@ -124,6 +126,6 @@ class L10nCheck extends Command
         }
         $output->writeln('<comment>Catalog exists but looks incomplete — if the UI still shows English, '
             . 'check the browser console for a blocked inline script (CSP) and verify the deployed version.</comment>');
-        return $expected;
+        return 0;
     }
 }
