@@ -219,7 +219,7 @@ export default {
 </script>
 
 <style scoped>
-.compose-row { display: flex; gap: 4px; margin: 8px; }
+.compose-row { display: flex; gap: 4px; margin: 8px; position: sticky; top: 0; background: var(--color-main-background); z-index: 2; }
 .compose-btn { flex: 1; }
 .compose-row :deep(button[aria-label="Contacts"]) { min-width: 44px; padding: 0; }
 
