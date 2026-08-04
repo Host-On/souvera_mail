@@ -432,7 +432,8 @@
     "Start migration assistant": "Migrations-Assistent starten",
     "Select all": "Alle auswählen",
     "Mark all as read": "Alle als gelesen markieren",
-    "Mark all as unread": "Alle als ungelesen markieren"
+    "Mark all as unread": "Alle als ungelesen markieren",
+    "Import already completed": "Import bereits abgeschlossen"
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

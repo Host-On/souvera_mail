@@ -159,9 +159,10 @@
 				</h2>
 				<div class="settings-card__body">
 					<p class="settings-muted">{{ t('souvera_mail', 'Import your old emails from another provider.') }}</p>
-					<NcButton variant="primary" @click="openMigration">
+					<NcButton variant="primary" @click="openMigration"
+						:disabled="migrationCompleted">
 						<template #icon><Import :size="20" /></template>
-						{{ t('souvera_mail', 'Start migration assistant') }}
+						{{ migrationCompleted ? t('souvera_mail', 'Import already completed') : t('souvera_mail', 'Start migration assistant') }}
 					</NcButton>
 				</div>
 			</div>
@@ -305,6 +306,7 @@ export default {
 			],
 			signaturePositionOption: { value: 'above', label: 'Above the quoted text' },
 			loaded: false,
+			migrationCompleted: false,
 			remoteImageOptions: [
 				{ value: 'never', label: this.t ? this.t('souvera_mail', 'Ask before loading') : 'Ask before loading' },
 				{ value: 'always', label: this.t ? this.t('souvera_mail', 'Always load') : 'Always load' },
@@ -352,6 +354,7 @@ export default {
 			try { const r = await API.quota(); this.quotaUsed = r.data.used || 0; this.quotaTotal = r.data.total || 0; this.quotaUnlimited = r.data.unlimited || false } catch {}
 			try { const r = await API.passwords(); this.passwords = r.data.passwords || [] } catch {}
 			try { const r = await API.shared(); this.sharedAbove = r.data.position === 'above' } catch {}
+			try { const r = await axios.get(generateUrl('/apps/souvera_mail/migration/welcome-state')); this.migrationCompleted = r.data?.state?.lastJob?.state === 'completed' } catch {}
 			try { const r = await axios.get(generateUrl('/apps/souvera_mail/api/v2/mailboxes')); this.userFoldersList = (r.data.mailboxes || []).filter(m => !['inbox','sent','drafts','archive','junk','trash'].includes(m.role)) } catch {} finally { this.loadedFolders = true }
 			try {
 				const r = await API.prefs(); const p = r.data
