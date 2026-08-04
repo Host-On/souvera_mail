@@ -44,9 +44,9 @@ export default {
 			return `${filled} ${circum - filled}`
 		},
 		donutColor() {
-			if (this.percent > 90) return 'var(--color-error)'
-			if (this.percent > 70) return 'var(--color-warning)'
-			return 'var(--color-success)'
+			// Souvera brand blue (#0082c9) — the fill is always brand-coloured
+			// regardless of the Nextcloud theme.
+			return '#0082c9'
 		},
 	},
 }
