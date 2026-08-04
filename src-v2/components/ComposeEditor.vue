@@ -172,16 +172,13 @@ export default {
 		bodyHtml() { if (!this._suppressDirty) this.markDirty() },
 		// originalEmail arrives asynchronously (ComposeView fetches the body
 		// after mount) — build the reply/forward content and prefill the
-		// subject as soon as it becomes available.
+		// subject as soon as it becomes available. The build waits for the
+		// preferences (signature, positions) to be loaded.
 		originalEmail: {
 			immediate: true,
 			handler() {
 				if (this.originalEmail) {
-					if (this.mode === 'reply' || this.mode === 'replyAll') {
-						this.buildReplyContent()
-					} else if (this.mode === 'forward') {
-						this.buildForwardContent()
-					}
+					if (this._prefsLoaded) this.buildReplyOrForward()
 					if (this.subject === '' && (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward')) {
 						this.subject = this.prefillSubject()
 					}
@@ -192,7 +189,10 @@ export default {
 	async mounted() {
 		await this.loadIdentities()
 		await this.loadPreferences()
-		if (this.mode === 'new' && this.signatureEnabled && this.signatureHtml) {
+		this._prefsLoaded = true
+		if (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward') {
+			this.buildReplyOrForward()
+		} else if (this.signatureEnabled && this.signatureHtml) {
 			this.insertSignature()
 		}
 	},
@@ -233,7 +233,10 @@ export default {
 			this._suppressDirty = true
 			this.$nextTick(() => {
 				setTimeout(() => {
-					if (this.bodyHtml !== '') return
+					if (this.bodyHtml !== '') {
+						this._suppressDirty = false
+						return
+					}
 					this.$refs.editor?.setContent(html)
 					if (cursor === 'end') this.$refs.editor?.setCursorAtEnd()
 					else this.$refs.editor?.setCursorAtStart()
@@ -241,6 +244,13 @@ export default {
 					this.$nextTick(() => { this._suppressDirty = false })
 				}, 100)
 			})
+		},
+		buildReplyOrForward() {
+			if (this.mode === 'forward') {
+				this.buildForwardContent()
+			} else if (this.mode === 'reply' || this.mode === 'replyAll') {
+				this.buildReplyContent()
+			}
 		},
 		async loadIdentities() {
 			try {
@@ -287,7 +297,11 @@ export default {
 			this.forwardAttachments = (email.attachments || []).map(a => ({
 				blobId: a.blobId, name: a.name, type: a.type, size: a.size,
 			}))
-			this.initContent(`<p></p>${quote}${sig ? `<p></p>${sig}` : ''}`, 'start')
+			const parts = ['<p></p>']
+			if (sig && this.signaturePosition === 'above') parts.push(sig)
+			parts.push(quote)
+			if (sig && this.signaturePosition === 'below') parts.push(sig)
+			this.initContent(parts.join(''), 'start')
 		},
 		markDirty() {
 			this.dirty = true

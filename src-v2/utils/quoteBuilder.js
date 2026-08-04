@@ -22,7 +22,8 @@ function formatFrom(email) {
 
 export function buildReplyQuote(email, sanitizedHtml) {
 	const date = email.receivedAt ? new Date(email.receivedAt).toLocaleString() : ''
-	const from = formatFrom(email)
+	// Raw value — @nextcloud/l10n translate() escapes the {from} variable itself.
+	const from = email.fromName ? `${email.fromName} <${email.fromAddress}>` : (email.fromAddress || '')
 	const body = bodyOrDefault(email, sanitizedHtml)
 
 	return `<p></p><p></p>`
