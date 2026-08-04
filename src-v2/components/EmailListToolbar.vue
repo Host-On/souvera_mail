@@ -1,7 +1,7 @@
 <template>
 	<div class="email-list-toolbar" :class="{ 'email-list-toolbar--tworow': twoRow }">
 		<div class="email-list-toolbar__left">
-			<NcCheckboxRadioSwitch :model-value="selectAllState"
+			<NcCheckboxRadioSwitch class="email-list-toolbar__check" :model-value="selectAllState"
 				:indeterminate="selectAllState === 'indeterminate'"
 				@update:modelValue="$emit('toggleSelectAll')" />
 			<NcActions v-if="selectedCount === 0" class="email-list-toolbar__quick-actions"
@@ -128,19 +128,32 @@ export default {
 .email-list-toolbar__search { flex: 1; max-width: 300px; min-width: 100px; margin: 0 8px; }
 .selected-count { font-size: 13px; color: var(--color-primary-element); font-weight: 500; margin: 0 4px; }
 
-/* Two-row mode (side-by-side list panel) — EXACTLY two lines:
-   row 1 = checkbox + search, row 2 = filter (left) + compose (right). */
-.email-list-toolbar--tworow { position: relative; flex-wrap: wrap; row-gap: 6px; }
-.email-list-toolbar--tworow .email-list-toolbar__left { flex: 1 1 100%; }
-.email-list-toolbar--tworow .email-list-toolbar__search {
-	flex: 1 1 auto; max-width: none; min-width: 120px;
+/* Two-row mode (side-by-side list panel) — EXACTLY two lines with
+   CSS grid, no flex-wrap guesswork. */
+.email-list-toolbar--tworow { position: relative; }
+.email-list-toolbar--tworow .email-list-toolbar__left {
+	flex: 1 1 100%;
+	display: grid;
+	grid-template-columns: auto auto 1fr;
+	grid-template-rows: auto auto;
+	align-items: center;
+	column-gap: 4px; row-gap: 6px;
 }
+/* Row 1: checkbox, quick-actions, search */
+.email-list-toolbar--tworow .email-list-toolbar__check { grid-column: 1; grid-row: 1; }
+.email-list-toolbar--tworow .email-list-toolbar__quick-actions { grid-column: 2; grid-row: 1; }
+.email-list-toolbar--tworow .email-list-toolbar__search {
+	grid-column: 3; grid-row: 1;
+	max-width: none; min-width: 0;
+	margin: 0;
+}
+/* Row 2: filter (spans all three columns) */
 .email-list-toolbar--tworow .email-list-toolbar__filter {
-	flex-basis: 100%;           /* forces the filter into row 2 */
-	margin-right: 100px;        /* leave room for the compose button */
+	grid-column: 1 / 4; grid-row: 2;
+	margin-right: 100px;  /* room for the absolutely-placed compose button */
 }
 .email-list-toolbar--tworow .email-list-toolbar__compose {
-	position: absolute;         /* pinned right in row 2 */
+	position: absolute;
 	right: 12px;
 	bottom: 6px;
 }
