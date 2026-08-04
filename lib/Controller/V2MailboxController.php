@@ -19,6 +19,21 @@ use OCP\IRequest;
  */
 class V2MailboxController extends Controller
 {
+    /**
+     * Standard system mailboxes every account should have. When one is
+     * missing (e.g. provisioning created the account without a Sent
+     * folder), it is created automatically so the UI always shows all
+     * standard folders. Display names are localized client-side by role.
+     */
+    private const DEFAULT_ROLE_MAILBOXES = [
+        'inbox' => 'Inbox',
+        'drafts' => 'Drafts',
+        'sent' => 'Sent',
+        'archive' => 'Archive',
+        'junk' => 'Junk',
+        'trash' => 'Trash',
+    ];
+
     public function __construct(
         string $appName,
         IRequest $request,
@@ -53,16 +68,49 @@ class V2MailboxController extends Controller
 
         $list = $result['data']['list'] ?? [];
         $mailboxes = [];
+        $existingRoles = [];
         foreach ($list as $mb) {
+            $role = $mb['role'] ?? null;
+            if (\is_string($role) && $role !== '') {
+                $existingRoles[$role] = true;
+            }
             $mailboxes[] = [
                 'id' => $mb['id'] ?? '',
                 'name' => $mb['name'] ?? '?',
-                'role' => $mb['role'] ?? null,
+                'role' => $role,
                 'total' => $mb['totalEmails'] ?? 0,
                 'unread' => $mb['unreadEmails'] ?? 0,
                 'parentId' => $mb['parentId'] ?? null,
                 '_accountId' => $accountId,
             ];
+        }
+
+        // Self-healing: create missing standard mailboxes (e.g. "Sent").
+        $create = [];
+        foreach (self::DEFAULT_ROLE_MAILBOXES as $role => $name) {
+            if (!isset($existingRoles[$role])) {
+                $create['mb_' . $role] = ['name' => $name, 'role' => $role];
+            }
+        }
+        if ($create !== []) {
+            $set = $this->jmap->singleCall('Mailbox/set', [
+                'accountId' => $accountId,
+                'create' => $create,
+            ]);
+            if (!isset($set['error'])) {
+                foreach ($set['data']['created'] ?? [] as $key => $created) {
+                    $role = \str_starts_with((string) $key, 'mb_') ? \substr((string) $key, 3) : '';
+                    $mailboxes[] = [
+                        'id' => $created['id'] ?? '',
+                        'name' => self::DEFAULT_ROLE_MAILBOXES[$role] ?? $created['id'] ?? '',
+                        'role' => $role,
+                        'total' => 0,
+                        'unread' => 0,
+                        'parentId' => null,
+                        '_accountId' => $accountId,
+                    ];
+                }
+            }
         }
 
         return new JSONResponse(['mailboxes' => $mailboxes]);
