@@ -399,7 +399,11 @@
     "Write replies": "Antworten schreiben",
     "Above the quoted text": "Über dem zitierten Text",
     "Below the quoted text": "Unter dem zitierten Text",
-    "Signature position": "Position der Signatur"
+    "Signature position": "Position der Signatur",
+    "HTML source code": "HTML-Quellcode",
+    "Show preview": "Vorschau anzeigen",
+    "Import HTML file…": "HTML-Datei importieren…",
+    "HTML source code…": "HTML-Quellcode…"
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

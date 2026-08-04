@@ -192,9 +192,10 @@ export default {
 		this._prefsLoaded = true
 		if (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward') {
 			this.buildReplyOrForward()
-		} else if (this.signatureEnabled && this.signatureHtml) {
-			this.insertSignature()
 		}
+		// Note: the signature is NOT inserted into the editor — Tiptap would
+		// normalise complex HTML (tables, images, layout). It is attached
+		// verbatim (sanitized) in buildPayload at send/draft time instead.
 	},
 	beforeUnmount() { clearTimeout(draftTimer) },
 	methods: {
@@ -221,10 +222,46 @@ export default {
 			if (!this.signatureHtml) return ''
 			return DOMPurify.sanitize(this.signatureHtml, { USE_PROFILES: { html: true } })
 		},
-		insertSignature() {
+		// Appends the (sanitized) signature. For replies the outer quote is
+		// always the first <blockquote> of the document (built by
+		// buildReplyContent before any quoted content), so 'above' inserts
+		// before it and 'below' right after it — even with nested quotes in
+		// the quoted body. Forward/new mails have no own quote: the signature
+		// goes to the end. Keeps the raw HTML intact (no Tiptap normalisation).
+		attachSignature(html) {
+			if (!this.signatureEnabled) return html
 			const sig = this.sanitizedSignature()
-			if (!sig) return
-			this.initContent(`<p></p>${sig}`, 'start')
+			if (!sig) return html
+			if (this.mode !== 'reply' && this.mode !== 'replyAll') return html + sig
+			const quote = this.findOuterQuote(html)
+			if (!quote) return html + sig
+			if (this.signaturePosition === 'below') {
+				return html.slice(0, quote.closeEndIdx) + sig + html.slice(quote.closeEndIdx)
+			}
+			return html.slice(0, quote.openIdx) + sig + html.slice(quote.openIdx)
+		},
+		// Locates the OUTER <blockquote>…</blockquote> span with correct
+		// nesting, so nested quotes inside the quoted body can never break
+		// the insertion point.
+		findOuterQuote(html) {
+			const openIdx = html.indexOf('<blockquote')
+			if (openIdx === -1) return null
+			let depth = 0
+			let i = openIdx
+			while (i < html.length) {
+				const nextOpen = html.indexOf('<blockquote', i)
+				const nextClose = html.indexOf('</blockquote>', i)
+				if (nextClose === -1) return null
+				if (nextOpen !== -1 && nextOpen < nextClose) {
+					depth++
+					i = nextOpen + '<blockquote'.length
+				} else {
+					depth--
+					i = nextClose + '</blockquote>'.length
+					if (depth === 0) return { openIdx, closeEndIdx: i }
+				}
+			}
+			return null
 		},
 		// Replaces the editor content only while it is still untouched
 		// (re-checked at execution time), and suppresses the dirty flag for
@@ -299,24 +336,14 @@ export default {
 			const body = email.htmlBody || email.plainBody || ''
 			const { html } = sanitizeMailHtml(body, { attachments: email.attachments || [], blockRemote: false })
 			const quote = buildReplyQuote(email, html)
-			const sig = this.signatureEnabled ? this.sanitizedSignature() : ''
 			const answer = '<p></p>'
-			// answer area [signature (above)] [quote] [signature (below)] — or,
-			// for replies below the quote: [sig above] [quote] [sig below] answer
-			let parts
+			// The signature is attached at send time (attachSignature), so the
+			// editor only carries the answer paragraph and the quote.
 			if (this.replyPosition === 'below') {
-				parts = []
-				if (sig && this.signaturePosition === 'above') parts.push(sig)
-				parts.push(quote)
-				if (sig && this.signaturePosition === 'below') parts.push(sig)
-				parts.push(answer)
+				this.initContent(`${quote}${answer}`, 'end')
 			} else {
-				parts = [answer]
-				if (sig && this.signaturePosition === 'above') parts.push(sig)
-				parts.push(quote)
-				if (sig && this.signaturePosition === 'below') parts.push(sig)
+				this.initContent(`${answer}${quote}`, 'start')
 			}
-			this.initContent(parts.join(''), this.replyPosition === 'below' ? 'end' : 'start')
 		},
 		buildForwardContent() {
 			const email = this.originalEmail
@@ -324,15 +351,10 @@ export default {
 			const body = email.htmlBody || email.plainBody || ''
 			const { html } = sanitizeMailHtml(body, { attachments: email.attachments || [], blockRemote: false })
 			const quote = buildForwardBody(email, html)
-			const sig = this.signatureEnabled ? this.sanitizedSignature() : ''
 			this.forwardAttachments = (email.attachments || []).map(a => ({
 				blobId: a.blobId, name: a.name, type: a.type, size: a.size,
 			}))
-			const parts = ['<p></p>']
-			if (sig && this.signaturePosition === 'above') parts.push(sig)
-			parts.push(quote)
-			if (sig && this.signaturePosition === 'below') parts.push(sig)
-			this.initContent(parts.join(''), 'start')
+			this.initContent(`<p></p>${quote}`, 'start')
 		},
 		markDirty() {
 			this.dirty = true
@@ -353,14 +375,15 @@ export default {
 			}
 		},
 		buildPayload() {
+			const bodyHtml = this.attachSignature(this.bodyHtml)
 			return {
 				identityId: this.fromIdentityId,
 				to: this.to.map(r => r.email),
 				cc: this.cc.map(r => r.email),
 				bcc: this.bcc.map(r => r.email),
 				subject: this.subject,
-				bodyHtml: this.bodyHtml,
-				bodyPlain: this.bodyHtml.replace(/<[^>]+>/g, ''),
+				bodyHtml,
+				bodyPlain: bodyHtml.replace(/<[^>]+>/g, ''),
 				attachments: this.attachments.map(a => ({
 					name: a.name, type: a.type || 'application/octet-stream',
 					data: a.data || null, blobId: a.blobId || null,
