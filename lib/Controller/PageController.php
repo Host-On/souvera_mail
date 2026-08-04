@@ -268,6 +268,11 @@ class PageController extends Controller
         // cached IL10N instance (which may resolve to the instance default).
         $translations = $this->l10nService->getCatalog($this->l10nService->resolveLanguage());
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
+        // The mail-migration assistant (provider.tools IMAP import, built for
+        // SnappyMail) also runs on the v2 client. Its mount stays hidden
+        // unless the welcome-state allows it or the open-migration event
+        // forces it open (settings entry).
+        \OCP\Util::addScript('souvera_mail', 'souvera_mail-migration-wizard');
         // The inline <script> in templates/v2.php uses the NC-provided
         // $cspNonce template variable (part of the default CSP header),
         // so no app-side ContentSecurityPolicy instance is needed here —

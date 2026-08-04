@@ -154,6 +154,20 @@
 
 			<div class="settings-card">
 				<h2 class="settings-card__title">
+					<Download :size="20" />
+					{{ t('souvera_mail', 'Email migration') }}
+				</h2>
+				<div class="settings-card__body">
+					<p class="settings-muted">{{ t('souvera_mail', 'Import your old emails from another provider.') }}</p>
+					<NcButton variant="primary" @click="openMigration">
+						<template #icon><Import :size="20" /></template>
+						{{ t('souvera_mail', 'Start migration assistant') }}
+					</NcButton>
+				</div>
+			</div>
+
+			<div class="settings-card">
+				<h2 class="settings-card__title">
 					<ShareVariant :size="20" />
 					{{ t('souvera_mail', 'Shared folders') }}
 				</h2>
@@ -255,6 +269,8 @@ import Key from 'vue-material-design-icons/Key.vue'
 import Folder from 'vue-material-design-icons/Folder.vue'
 import CodeTags from 'vue-material-design-icons/CodeTags.vue'
 import FileUpload from 'vue-material-design-icons/FileUpload.vue'
+import Download from 'vue-material-design-icons/Download.vue'
+import Import from 'vue-material-design-icons/Import.vue'
 import DOMPurify from 'dompurify'
 import QuotaDonut from '../components/QuotaDonut.vue'
 import axios from '@nextcloud/axios'
@@ -269,7 +285,7 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, QuotaDonut },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, QuotaDonut },
 	data() {
 		return {
 			accountEmail: '',
@@ -445,6 +461,12 @@ export default {
 				console.error('Failed to save signature', e)
 				showError(this.t('souvera_mail', 'Failed to save signature') + ': ' + (e.response?.data?.error || e.message))
 			}
+		},
+		openMigration() {
+			// The migration assistant (provider.tools IMAP import) is a
+			// separate bundle; the event forces it open even when it was
+			// previously dismissed.
+			window.dispatchEvent(new CustomEvent('souvera-mail:open-migration'))
 		},
 		toggleSigSource() {
 			this.showSigSource = !this.showSigSource

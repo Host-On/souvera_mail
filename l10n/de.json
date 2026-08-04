@@ -426,7 +426,10 @@
     "Marked as unread": "Als ungelesen markiert",
     "Messages deleted": "Nachrichten gelöscht",
     "Messages moved": "Nachrichten verschoben",
-    "Failed to load contacts": "Kontakte konnten nicht geladen werden"
+    "Failed to load contacts": "Kontakte konnten nicht geladen werden",
+    "Email migration": "E-Mail-Migration",
+    "Import your old emails from another provider.": "Importiere deine alten E-Mails von einem anderen Anbieter.",
+    "Start migration assistant": "Migrations-Assistent starten"
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }
