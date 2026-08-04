@@ -131,6 +131,7 @@ OC.L10N.register(
         "Mail is being transferred to Souvera Mail." : "Mails werden nach Souvera Mail übertragen.",
         "Mail storage: {used} / {total}" : "Mail-Speicher: {used} / {total}",
         "Mail storage: {used} used" : "Mail-Speicher: {used} verwendet",
+        "Mail storage: unlimited" : "Mail-Speicher: unbegrenzt",
         "Mailboxes" : "Postfächer",
         "Manage sender addresses, display names, reply-to and signatures." : "Absenderadressen, Anzeigenamen, Antwortadresse und Signaturen verwalten.",
         "ManageSieve too when filtering is enabled above." : "ManageSieve ebenfalls, wenn die Filterung oben aktiviert ist.",

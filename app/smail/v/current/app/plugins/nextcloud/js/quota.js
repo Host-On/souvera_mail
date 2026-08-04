@@ -104,11 +104,14 @@
         const numEl = el.querySelector('.quota-numbers');
 
         if (data.unlimited) {
-            // No bar for unlimited accounts — just the usage number
-            // (operator spec 2026-02-19 → option a).
+            // No bar for unlimited accounts — show "unlimited" when the
+            // server reports no usage information (usageKnown === false),
+            // otherwise just the usage number (operator spec 2026-02-19).
             el.setAttribute('data-quota-mode', 'unlimited');
             fill.style.width = '0%';
-            numEl.textContent = i18n('QUOTA/USED_LABEL', '{used} used').replace('{used}', data.formatted.used);
+            numEl.textContent = data.usageKnown === false
+                ? i18n('QUOTA/UNLIMITED_LABEL', 'Unlimited')
+                : i18n('QUOTA/USED_LABEL', '{used} used').replace('{used}', data.formatted.used);
             el.title = i18n('QUOTA/UNLIMITED_TITLE', 'No storage limit configured');
             return;
         }

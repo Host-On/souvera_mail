@@ -322,6 +322,9 @@
     "Flagged": "Markiert",
     "With attachments": "Mit Anhängen",
     "Search in mailbox…": "In Mailbox suchen…"
+,
+    "Mail storage: unlimited": "Postfach-Speicher: unbegrenzt",
+    "Unlimited": "Unbegrenzt"
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

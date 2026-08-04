@@ -9,14 +9,19 @@ use OCP\ICacheFactory;
 use Psr\Log\LoggerInterface;
 
 /**
- * Reads the current user's Stalwart mailbox disk-quota usage via a single
- * `x:Account/get` JMAP call.
+ * Reads the current user's Stalwart mailbox disk-quota usage via the
+ * standard JMAP `Quota/get` method (RFC 9425 "JMAP Quotas", capability
+ * `urn:ietf:params:jmap:quota`, permission `jmapQuotaGet`).
  *
- * Stalwart 0.16 stores per-account quotas as a `quotas` map keyed by the
- * `StorageQuota` enum — the disk-quota slot is `MaxDiskQuota` (registry
- * crate `schema/enums.rs:StorageQuota::MaxDiskQuota`, ordinal 18). Actual
- * usage is exposed as the server-set `usedDiskQuota` property (registry
- * `schema/properties.rs:UsedDiskQuota`, id 395).
+ * Stalwart implements `Quota/get` as a user-scoped method (unlike the
+ * admin-only `x:Account/get` registry object), so a plain OIDC user bearer
+ * is sufficient. Verified against upstream crates/jmap/src/quota/get.rs:
+ * the quota object carries `resourceType` ("octets"), `used`
+ * (`get_used_quota_account`) and `hardLimit` (`account.disk_quota()`);
+ * Stalwart only returns a quota object when the account has a disk quota
+ * configured (`account.disk_quota() > 0`), otherwise the list is empty —
+ * which we map to "unlimited" (with `usageKnown = false`, because a missing
+ * quota object carries no usage information at all).
  *
  * Result is cached per-user for 60 seconds so the engine UI can render the
  * pill on every mailbox switch without hammering Stalwart.
@@ -24,7 +29,8 @@ use Psr\Log\LoggerInterface;
 class QuotaService
 {
     private const CACHE_TTL_SECONDS = 60;
-    private const QUOTA_KEY_MAX_DISK = 'MaxDiskQuota';
+    private const CAPABILITY_QUOTA = 'urn:ietf:params:jmap:quota';
+    private const CAPABILITY_MAIL = 'urn:ietf:params:jmap:mail';
 
     private ICache $cache;
 
@@ -48,6 +54,7 @@ class QuotaService
      *     total: int,
      *     percentage: int,
      *     unlimited: bool,
+     *     usageKnown: bool,
      *     formatted: array{used: string, total: string}
      * }
      */
@@ -58,7 +65,7 @@ class QuotaService
         if (\is_string($cached)) {
             $decoded = \json_decode($cached, true);
             if (\is_array($decoded)) {
-                /** @var array{used: int, total: int, percentage: int, unlimited: bool, formatted: array{used: string, total: string}} */
+                /** @var array{used: int, total: int, percentage: int, unlimited: bool, usageKnown: bool, formatted: array{used: string, total: string}} */
                 return $decoded;
             }
         }
@@ -68,51 +75,68 @@ class QuotaService
 
         $response = $this->stalwart->jmapCall($bearer, [
             [
-                'x:Account/get',
+                'Quota/get',
                 [
                     'accountId' => $accountId,
-                    'ids' => [$accountId],
-                    'properties' => ['usedDiskQuota', 'quotas'],
+                    'ids' => null,
+                    'properties' => ['resourceType', 'used', 'hardLimit', 'softLimit', 'scope'],
                 ],
                 'c0',
             ],
-        ]);
+        ], [self::CAPABILITY_QUOTA, self::CAPABILITY_MAIL]);
 
-        $body = $this->stalwart->extractMethodResponse($response, 'x:Account/get');
-        $list = $body['list'] ?? [];
-        if (!\is_array($list) || $list === []) {
-            throw new \RuntimeException('Stalwart returned no account object for the current user');
+        $body = $this->stalwart->extractMethodResponse($response, 'Quota/get');
+        $list = $body['list'] ?? null;
+        if (!\is_array($list)) {
+            throw new \RuntimeException('Stalwart returned an invalid Quota/get payload');
         }
-        $acc = $list[0] ?? null;
-        if (!\is_array($acc)) {
-            throw new \RuntimeException('Stalwart account payload is not an object');
+        if ($list === []) {
+            // Stalwart returns no quota object when the account has no disk
+            // quota configured — treat that as unlimited. There is no usage
+            // information in this case, so do not claim "0 B used".
+            return $this->store($userId, 0, 0, true);
+        }
+        // RFC 9425 allows multiple quota objects in unspecified order —
+        // pick the account-wide octets quota.
+        $quota = null;
+        foreach ($list as $candidate) {
+            if (\is_array($candidate)
+                && ($candidate['resourceType'] ?? '') === 'octets'
+                && ($candidate['scope'] ?? '') === 'account') {
+                $quota = $candidate;
+                break;
+            }
+        }
+        if ($quota === null) {
+            throw new \RuntimeException('Stalwart returned no account-wide octets quota');
         }
 
-        $used = (int) ($acc['usedDiskQuota'] ?? 0);
-        $quotas = $acc['quotas'] ?? [];
-        // Stalwart's VecMap<StorageQuota,u64> serializes as a plain object
-        // with the enum-variant string as the key (verified against
-        // registry/src/schema/enums_impl.rs StorageQuota::as_str).
-        $totalRaw = 0;
-        if (\is_array($quotas) && isset($quotas[self::QUOTA_KEY_MAX_DISK])) {
-            $totalRaw = (int) $quotas[self::QUOTA_KEY_MAX_DISK];
-        }
-
+        $used = (int) ($quota['used'] ?? 0);
+        $totalRaw = (int) ($quota['hardLimit'] ?? $quota['softLimit'] ?? 0);
         $unlimited = $totalRaw <= 0;
         $percentage = ($unlimited || $used <= 0) ? 0 : (int) \min(100, \floor(($used / $totalRaw) * 100));
 
+        return $this->store($userId, $used, $totalRaw, $unlimited, $percentage);
+    }
+
+    private function store(string $userId, int $used, int $total, bool $unlimited, ?int $percentage = null): array
+    {
+        if ($percentage === null) {
+            $percentage = ($unlimited || $used <= 0) ? 0 : (int) \min(100, \floor(($used / $total) * 100));
+        }
         $result = [
             'used' => $used,
-            'total' => $totalRaw,
+            'total' => $total,
             'percentage' => $percentage,
             'unlimited' => $unlimited,
+            'usageKnown' => !$unlimited,
             'formatted' => [
                 'used' => $this->humanBytes($used),
-                'total' => $unlimited ? '∞' : $this->humanBytes($totalRaw),
+                'total' => $unlimited ? '∞' : $this->humanBytes($total),
             ],
         ];
 
-        $this->cache->set($cacheKey, (string) \json_encode($result), self::CACHE_TTL_SECONDS);
+        $this->cache->set('q.' . \sha1($userId), (string) \json_encode($result), self::CACHE_TTL_SECONDS);
         return $result;
     }
 

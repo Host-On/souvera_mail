@@ -13,6 +13,7 @@ use OCP\AppFramework\Http\JSONResponse;
 use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IUserSession;
+use Psr\Log\LoggerInterface;
 
 class V2SettingsController extends Controller
 {
@@ -23,6 +24,7 @@ class V2SettingsController extends Controller
         private AppPasswordService $appPasswordService,
         private QuotaService $quotaService,
         private IConfig $config,
+        private LoggerInterface $logger,
     ) {
         parent::__construct($appName, $request);
     }
@@ -42,6 +44,10 @@ class V2SettingsController extends Controller
             $data = $this->quotaService->getForUser($user->getUID());
             return new JSONResponse(['used' => $data['used'] ?? 0, 'total' => $data['total'] ?? 0, 'unlimited' => $data['unlimited'] ?? false]);
         } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail quota fetch failed: ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
             return new JSONResponse(['used' => 0, 'total' => 0, 'error' => $e->getMessage()]);
         }
     }
