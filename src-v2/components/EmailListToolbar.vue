@@ -1,5 +1,5 @@
 <template>
-	<div class="email-list-toolbar">
+	<div class="email-list-toolbar" :class="{ 'email-list-toolbar--tworow': twoRow }">
 		<div class="email-list-toolbar__left">
 			<NcCheckboxRadioSwitch :model-value="selectAllState"
 				:indeterminate="selectAllState === 'indeterminate'"
@@ -49,7 +49,7 @@
 				</NcActions>
 			</template>
 		</div>
-		<NcButton variant="primary" @click="$emit('compose')">
+		<NcButton variant="primary" class="email-list-toolbar__compose" @click="$emit('compose')">
 			<template #icon><Pencil :size="20" /></template>
 			{{ t('souvera_mail', 'New') }}
 		</NcButton>
@@ -79,6 +79,9 @@ export default {
 		targetMailboxes: { type: Array, default: () => [] },
 		searchQuery: { type: String, default: '' },
 		filter: { type: String, default: 'all' },
+		// twoRow: force a two-line toolbar (checkbox+search / filter+compose)
+		// for narrow side-by-side list panels.
+		twoRow: { type: Boolean, default: false },
 	},
 	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter'],
 	computed: {
@@ -109,4 +112,13 @@ export default {
 .email-list-toolbar__left { display: flex; align-items: center; flex-wrap: wrap; column-gap: 2px; row-gap: 4px; flex: 1; min-width: 0; }
 .email-list-toolbar__search { flex: 1; max-width: 300px; min-width: 100px; margin: 0 8px; }
 .selected-count { font-size: 13px; color: var(--color-primary-element); font-weight: 500; margin: 0 4px; }
+
+/* Two-row mode (side-by-side list panel): row 1 = checkbox + search,
+   row 2 = filter (left) + compose button (right). */
+.email-list-toolbar--tworow { flex-wrap: wrap; row-gap: 6px; }
+.email-list-toolbar--tworow .email-list-toolbar__left { flex: 1 1 100%; }
+.email-list-toolbar--tworow .email-list-toolbar__search {
+	flex: 1 1 auto; max-width: none; min-width: 140px;
+}
+.email-list-toolbar--tworow .email-list-toolbar__compose { margin-left: auto; }
 </style>
