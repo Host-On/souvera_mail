@@ -68,3 +68,21 @@ export default {
 	},
 }
 </script>
+
+<style scoped>
+/* The active indicator (left stripe) of NcAppNavigationItem is an
+   absolutely-positioned ::before that needs a positioned ancestor — make
+   every entry its own positioning context so the stripe reliably appears
+   for main AND shared mailboxes. */
+:deep(.app-navigation-entry) { position: relative; }
+:deep(.app-navigation-entry.active)::before {
+	content: '';
+	position: absolute;
+	inset-block: calc(var(--default-grid-baseline, 4px) * 2);
+	inset-inline-start: 0;
+	width: 3px;
+	background-color: var(--color-primary-element);
+	border-radius: 999px;
+	z-index: 1;
+}
+</style>
