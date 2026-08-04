@@ -32,7 +32,7 @@ export default {
 	},
 	computed: {
 		label() {
-			if (this.unlimited) return this.inline ? t('souvera_mail', 'Unlimited') : '∞'
+			if (this.unlimited) return this.inline ? (this.t ? this.t('souvera_mail', 'Unlimited') : 'Unlimited') : '∞'
 			return this.percent + '%'
 		},
 		percent() {
