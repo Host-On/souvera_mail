@@ -13,6 +13,7 @@ use OCP\IGroupManager;
 use OCP\INavigationManager;
 use OCP\IRequest;
 use OCP\IURLGenerator;
+use Psr\Log\LoggerInterface;
 
 class PageController extends Controller
 {
@@ -24,6 +25,7 @@ class PageController extends Controller
         private IGroupManager $groupManager,
         private EngineHelper $engineHelper,
         private IURLGenerator $urlGenerator,
+        private LoggerInterface $logger,
         private ?string $userId,
     ) {
         parent::__construct($appName, $request);
@@ -269,18 +271,45 @@ class PageController extends Controller
         } catch (\Throwable) {
             $lang = 'en';
         }
-        $langShort = \substr($lang, 0, 2);
         $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath('souvera_mail');
         if ($appPath !== null) {
-            $l10nPath = $appPath . '/l10n/' . $langShort . '.json';
-            if (\is_file($l10nPath)) {
-                $raw = \file_get_contents($l10nPath);
-                if ($raw !== false) {
-                    $parsed = \json_decode($raw, true);
-                    if (\is_array($parsed) && isset($parsed['translations'])) {
-                        $translations = $parsed['translations'];
+            // Nextcloud ships several German variants as distinct language
+            // codes (e.g. "de" and "de_DE", each with its own l10n/<code>.json).
+            // Try the full locale first, then the short form, then the legacy
+            // bundled catalog, so any NC language setting resolves.
+            $langShort = \substr($lang, 0, 2);
+            foreach ([$lang, $langShort] as $candidate) {
+                if ($candidate === '') continue;
+                $l10nPath = $appPath . '/l10n/' . $candidate . '.json';
+                if (\is_file($l10nPath)) {
+                    $raw = \file_get_contents($l10nPath);
+                    if ($raw !== false) {
+                        $parsed = \json_decode($raw, true);
+                        if (\is_array($parsed) && isset($parsed['translations'])) {
+                            $translations = $parsed['translations'];
+                            break;
+                        }
                     }
                 }
+            }
+            if ($translations === []) {
+                $legacyPath = $appPath . '/js/l10n-' . $langShort . '.json';
+                if (\is_file($legacyPath)) {
+                    $raw = \file_get_contents($legacyPath);
+                    if ($raw !== false) {
+                        $parsed = \json_decode($raw, true);
+                        if (\is_array($parsed) && isset($parsed['translations'])) {
+                            $translations = $parsed['translations'];
+                        }
+                    }
+                }
+            }
+            if ($translations === [] && $lang !== 'en') {
+                $this->logger->warning(
+                    'Souvera Mail: no translation catalog found for language "' . $lang
+                    . '" (looked in l10n/' . $lang . '.json, l10n/' . $langShort . '.json, js/l10n-' . $langShort . '.json)',
+                    ['app' => 'souvera_mail']
+                );
             }
         }
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
