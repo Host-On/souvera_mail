@@ -49,7 +49,7 @@
 
 			<template #footer>
 				<div class="app-footer">
-					<QuotaDonut v-if="quotaTotal > 0 || quotaUnlimited" :inline="true" :size="22" :used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
+					<QuotaDonut v-if="quotaTotal > 0 || quotaUnlimited" :inline="true" :light-track="true" :size="22" :used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
 					<NcAppNavigationItem :name="t('souvera_mail', 'Mail archive')"
 						@click="openArchive">
 						<template #icon><Archive :size="20" /></template>
