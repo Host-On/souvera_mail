@@ -22,7 +22,7 @@
 						</span>
 					</div>
 					<QuotaDonut v-if="quotaUnlimited || quotaTotal > 0"
-						:used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
+						:size="56" :used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
 				</div>
 			</div>
 
