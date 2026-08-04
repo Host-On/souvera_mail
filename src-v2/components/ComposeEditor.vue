@@ -222,14 +222,17 @@ export default {
 			if (!this.signatureHtml) return ''
 			return DOMPurify.sanitize(this.signatureHtml, { USE_PROFILES: { html: true } })
 		},
-		// Appends the (sanitized) signature relative to the quoted block:
-		// 'above' → right before the outer <blockquote>, 'below' → right
-		// after it; without an outer quote (new mail / forward) → at the end.
-		// Keeps the raw HTML intact (no Tiptap normalisation).
+		// Appends the (sanitized) signature. For replies the outer quote is
+		// always the first <blockquote> of the document (built by
+		// buildReplyContent before any quoted content), so 'above' inserts
+		// before it and 'below' right after it — even with nested quotes in
+		// the quoted body. Forward/new mails have no own quote: the signature
+		// goes to the end. Keeps the raw HTML intact (no Tiptap normalisation).
 		attachSignature(html) {
 			if (!this.signatureEnabled) return html
 			const sig = this.sanitizedSignature()
-			if (!sig || html.trimEnd().endsWith(sig)) return html
+			if (!sig) return html
+			if (this.mode !== 'reply' && this.mode !== 'replyAll') return html + sig
 			const quote = this.findOuterQuote(html)
 			if (!quote) return html + sig
 			if (this.signaturePosition === 'below') {
