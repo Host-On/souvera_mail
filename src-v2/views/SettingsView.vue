@@ -100,7 +100,23 @@
 					<div v-if="sigEnabled" class="setting-row setting-row--column">
 						<span class="setting-label">{{ t('souvera_mail', 'Signature') }}</span>
 						<div class="signature-editor">
-							<RichTextEditor v-model="sigHtml" :min-height="'120px'" />
+							<template v-if="showSigSource">
+								<textarea class="signature-textarea signature-textarea--source" v-model="sigHtml"
+									:placeholder="t('souvera_mail', 'HTML source code…')" rows="10" spellcheck="false" />
+							</template>
+							<RichTextEditor v-else v-model="sigHtml" :min-height="'120px'" />
+						</div>
+						<div class="signature-editor__actions">
+							<NcButton variant="tertiary" size="small" @click="toggleSigSource">
+								<template #icon><CodeTags :size="16" /></template>
+								{{ showSigSource ? t('souvera_mail', 'Show preview') : t('souvera_mail', 'HTML source code') }}
+							</NcButton>
+							<NcButton variant="tertiary" size="small" @click="pickSignatureFile">
+								<template #icon><FileUpload :size="16" /></template>
+								{{ t('souvera_mail', 'Import HTML file…') }}
+							</NcButton>
+							<input ref="signatureFileInput" type="file" accept=".html,.htm,text/html"
+								class="hidden-file-input" @change="onSignatureFileSelected" />
 						</div>
 					</div>
 					<div v-if="sigEnabled" class="setting-row">
@@ -236,6 +252,9 @@ import Pencil from 'vue-material-design-icons/Pencil.vue'
 import ShareVariant from 'vue-material-design-icons/ShareVariant.vue'
 import Key from 'vue-material-design-icons/Key.vue'
 import Folder from 'vue-material-design-icons/Folder.vue'
+import CodeTags from 'vue-material-design-icons/CodeTags.vue'
+import FileUpload from 'vue-material-design-icons/FileUpload.vue'
+import DOMPurify from 'dompurify'
 import QuotaDonut from '../components/QuotaDonut.vue'
 import RichTextEditor from '../components/composer/RichTextEditor.vue'
 import axios from '@nextcloud/axios'
@@ -250,14 +269,14 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, QuotaDonut, RichTextEditor },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, QuotaDonut, RichTextEditor },
 	data() {
 		return {
 			accountEmail: '',
 			quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false,
 			passwords: [], showCreate: false, newName: '',
 			sharedAbove: true,
-			sigHtml: '', sigEnabled: false,
+			sigHtml: '', sigEnabled: false, showSigSource: false,
 			replyPosition: 'above', signaturePosition: 'above',
 			replyPositionOptions: [
 				{ value: 'above', label: this.t ? this.t('souvera_mail', 'Above the quoted text') : 'Above the quoted text' },
@@ -400,6 +419,23 @@ export default {
 				this.signaturePosition = signaturePosition
 			} catch {}
 		},
+		toggleSigSource() {
+			this.showSigSource = !this.showSigSource
+			if (!this.showSigSource) this.saveSig()
+		},
+		pickSignatureFile() { this.$refs.signatureFileInput?.click() },
+		onSignatureFileSelected(e) {
+			const file = e.target.files?.[0]
+			e.target.value = ''
+			if (!file) return
+			const reader = new FileReader()
+			reader.onload = () => {
+				const raw = String(reader.result || '')
+				this.sigHtml = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
+				this.saveSig()
+			}
+			reader.readAsText(file)
+		},
 	},
 }
 </script>
@@ -483,6 +519,13 @@ export default {
 	overflow: hidden;
 	background: var(--color-main-background);
 }
+.signature-editor__actions {
+	display: flex; gap: 8px; margin-top: 8px;
+}
+.signature-textarea--source {
+	min-height: 200px; font-family: monospace; font-size: 12px;
+}
+.hidden-file-input { display: none; }
 .signature-textarea {
 	width: 100%; border: 1px solid var(--color-border);
 	border-radius: var(--border-radius);
