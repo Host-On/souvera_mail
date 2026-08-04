@@ -417,7 +417,10 @@ export default {
 				})
 				this.replyPosition = replyPosition
 				this.signaturePosition = signaturePosition
-			} catch {}
+			} catch (e) {
+				console.error('Failed to save signature', e)
+				alert(t('souvera_mail', 'Failed to save signature') + ': ' + (e.response?.data?.error || e.message))
+			}
 		},
 		toggleSigSource() {
 			this.showSigSource = !this.showSigSource
@@ -429,7 +432,7 @@ export default {
 			e.target.value = ''
 			if (!file) return
 			if (file.size === 0 || file.size > 2 * 1024 * 1024) {
-				console.warn('Signature file ignored (empty or larger than 2 MB)')
+				alert(t('souvera_mail', 'Signature file ignored (empty or larger than 2 MB)'))
 				return
 			}
 			const reader = new FileReader()
@@ -438,7 +441,10 @@ export default {
 				this.sigHtml = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
 				this.saveSig()
 			}
-			reader.onerror = () => console.error('Failed to read signature file')
+			reader.onerror = () => {
+				console.error('Failed to read signature file')
+				alert(t('souvera_mail', 'Failed to read signature file'))
+			}
 			reader.readAsText(file)
 		},
 	},
