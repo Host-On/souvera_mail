@@ -134,7 +134,7 @@ export default {
 			if (prev.href) {
 				this.editor.chain().focus().unsetLink().run()
 			} else {
-				const url = window.prompt(t('souvera_mail', 'URL'))
+				const url = window.prompt(this.t('souvera_mail', 'URL'))
 				if (url) {
 					this.editor.chain().focus().setLink({ href: url }).run()
 				}
