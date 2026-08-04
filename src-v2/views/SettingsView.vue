@@ -446,7 +446,8 @@ export default {
 		},
 		async saveSig() {
 			try {
-				const replyPosition = this.replyPositionOption?.value === 'below' ? 'below' : 'above'				const signaturePosition = this.signaturePositionOption?.value === 'below' ? 'below' : 'above'
+				const replyPosition = this.replyPositionOption?.value === 'below' ? 'below' : 'above'
+				const signaturePosition = this.signaturePositionOption?.value === 'below' ? 'below' : 'above'
 				await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), {
 					signatureHtml: this.sigHtml,
 					signatureEnabled: this.sigEnabled,
