@@ -45,7 +45,6 @@
 				<RichTextEditor ref="editor" v-model="bodyHtml"
 					:placeholder="t('souvera_mail', 'Write your message…')" />
 				<div v-if="showSignaturePreview" class="compose-signature" @click.stop>
-					<div class="compose-signature__separator">--</div>
 					<div class="compose-signature__content" v-html="signaturePreviewHtml"></div>
 				</div>
 			</div>
@@ -635,11 +634,6 @@ export default {
 	pointer-events: none;
 	user-select: none;
 	overflow-x: hidden;
-}
-.compose-signature__separator {
-	color: var(--color-text-maxcontrast);
-	font-size: 13px;
-	line-height: 1.4;
 }
 .compose-signature__content {
 	margin-top: 2px;
