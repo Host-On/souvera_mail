@@ -5,7 +5,7 @@
  * Mountpunkt für die Vue-3-App (souvera_mail-v2.js).
  */
 
-// Translations are loaded via external souvera_mail-l10n.js (registered
+// Translations are loaded via external souvera_mail-l10n-<lang>.js (registered
 // in renderV2() BEFORE souvera_mail-v2.js, so window._souvera_mail_translations
 // is always set when the Vue app boots).
 ?>
