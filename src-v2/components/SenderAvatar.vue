@@ -1,14 +1,17 @@
 <template>
 	<span class="sender-avatar">
-		<BimiLogo class="sender-avatar__bimi" :email="email" @loaded="onBimiLoaded" />
-		<img v-if="showGravatar && !hasBimi" class="sender-avatar__img" :src="gravatarUrl" @error="onGravatarFail" />
-		<NcAvatar v-if="!hasBimi && !showGravatar" :display-name="alt" :size="size" />
+		<BimiLogo v-if="email" class="sender-avatar__bimi" :email="email" :size="size"
+			@loaded="onBimiLoaded" @failed="onBimiFailed" />
+		<img v-if="showGravatar" class="sender-avatar__img" :src="gravatarUrl"
+			alt="" @error="onGravatarFail" />
+		<NcAvatar v-if="showInitials" :display-name="alt" :size="size" />
 	</span>
 </template>
 
 <script>
 import { NcAvatar } from '@nextcloud/vue'
 import BimiLogo from './BimiLogo.vue'
+import { md5 } from '../utils/md5.js'
 
 export default {
 	name: 'SenderAvatar',
@@ -21,9 +24,8 @@ export default {
 	emits: ['loaded'],
 	data() {
 		return {
-			hasBimi: false,
-			bimiChecked: false,
-			showGravatar: false,
+			bimiUrl: null,
+			bimiResolved: false,
 			gravatarFailed: false,
 		}
 	},
@@ -31,40 +33,32 @@ export default {
 		alt() { return this.name || this.email || '?' },
 		gravatarUrl() {
 			const clean = this.email.trim().toLowerCase()
-			// Simple MD5-like hash (not crypto-safe, fine for Gravatar)
-			let hash = ''
-			const str = clean
-			for (let i = 0; i < str.length; i++) {
-				hash += str.charCodeAt(i).toString(16)
-			}
-			return `https://www.gravatar.com/avatar/${this.simpleHash(clean)}?d=404&s=${this.size * 2}`
+			if (!clean || !clean.includes('@')) return ''
+			return `https://www.gravatar.com/avatar/${md5(clean)}?d=404&s=${this.size * 2}`
 		},
+		showBimi() { return !!this.bimiUrl },
+		showGravatar() { return this.bimiResolved && !this.bimiUrl && !!this.gravatarUrl && !this.gravatarFailed },
+		showInitials() { return !this.showBimi && !this.showGravatar },
 	},
-	mounted() {
-		// After 3s, if BIMI didn't load, try Gravatar
-		setTimeout(() => {
-			if (!this.hasBimi) {
-				this.bimiChecked = true
-				this.showGravatar = true
-			}
-		}, 3000)
+	watch: {
+		email() {
+			this.bimiUrl = null
+			this.bimiResolved = false
+			this.gravatarFailed = false
+		},
 	},
 	methods: {
-		simpleHash(str) {
-			let h = 0
-			for (let i = 0; i < str.length; i++) {
-				h = ((h << 5) - h) + str.charCodeAt(i)
-				h |= 0
-			}
-			return Math.abs(h).toString(16).padStart(8, '0')
-		},
-		onBimiLoaded() {
-			this.hasBimi = true
+		onBimiLoaded(url) {
+			this.bimiUrl = url
+			this.bimiResolved = true
 			this.$emit('loaded')
+		},
+		onBimiFailed() {
+			this.bimiUrl = null
+			this.bimiResolved = true
 		},
 		onGravatarFail() {
 			this.gravatarFailed = true
-			this.showGravatar = false
 		},
 	},
 }
@@ -75,9 +69,5 @@ export default {
 .sender-avatar__img {
 	width: v-bind(size + 'px'); height: v-bind(size + 'px');
 	border-radius: 50%; object-fit: cover;
-}
-.sender-avatar__bimi :deep(img) {
-	width: v-bind(size + 'px'); height: v-bind(size + 'px');
-	border-radius: 50%; object-fit: contain;
 }
 </style>
