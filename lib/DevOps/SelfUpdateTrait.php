@@ -26,7 +26,20 @@ trait SelfUpdateTrait
         $config = \OCP\Server::get(\OCP\IConfig::class);
         $channel = trim((string) $config->getAppValue($appId, 'devops.channel', 'stable'));
 
-        if ($channel === 'stable') {
+        $installed = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId);
+        if ($installed === '0') {
+            return ['error' => 'No version'];
+        }
+
+        // Reset detection: some deployments restore an OLD app version
+        // externally. We remember what we installed (devops.last_version);
+        // when the installed version no longer matches, the updater must
+        // run immediately (no 24h rate limit, no maintenance window) to
+        // heal the app back to the current version.
+        $lastVersion = trim((string) $config->getAppValue($appId, 'devops.last_version', ''));
+        $resetDetected = $lastVersion !== '' && $installed !== $lastVersion;
+
+        if ($channel === 'stable' && !$resetDetected) {
             // Release channel: check/install at most once per 24h and only
             // inside the maintenance window (config.php:
             // 'maintenance_window_start' => hour 0-23, window length 1h).
@@ -37,11 +50,6 @@ trait SelfUpdateTrait
             if ($last > time() - 24 * 3600) {
                 return ['skipped' => true, 'reason' => 'Rate-limited (24h)'];
             }
-        }
-
-        $installed = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId);
-        if ($installed === '0') {
-            return ['error' => 'No version'];
         }
 
         $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath($appId);
@@ -72,9 +80,15 @@ trait SelfUpdateTrait
                 }
                 if (version_compare($latest, $installed, '<=')) {
                     $config->setAppValue($appId, 'devops.last_check', (string) time());
+                    // Baseline for reset detection: what we accept as installed.
+                    $config->setAppValue($appId, 'devops.last_version', $installed);
                     return ['up_to_date' => true, 'installed' => $installed, 'latest' => $latest];
                 }
                 $result = $this->downloadTag($appId, $appPath, $latest, $installed);
+            }
+            if (empty($result['error']) && !isset($result['up_to_date'])) {
+                $config->setAppValue($appId, 'devops.last_version',
+                    \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId));
             }
 
             // Only write the timestamp after a successful check (or real update).
@@ -123,15 +137,21 @@ trait SelfUpdateTrait
             return ['error' => 'Unknown app'];
         }
 
-        // Dev channel: only download if the branch HEAD changed.
+        // Dev channel: download when the branch HEAD changed OR the
+        // installed app no longer matches what we last installed. The
+        // second check heals external resets (e.g. a deployment tool
+        // restoring an OLD app version while devops.last_sha still points
+        // at the current branch — without it the updater would wrongly
+        // report "up_to_date" although the installed code is ancient).
+        $config = \OCP\Server::get(\OCP\IConfig::class);
         $latestSha = $this->fetchBranchSha($repo, $branch);
         if ($latestSha === null) {
             return ['error' => 'Cannot fetch branch HEAD'];
         }
-        $lastSha = trim((string) \OCP\Server::get(\OCP\IConfig::class)
-            ->getAppValue($appId, 'devops.last_sha', ''));
-        if ($latestSha === $lastSha) {
-            return ['up_to_date' => true, 'sha' => $latestSha];
+        $lastSha = trim((string) $config->getAppValue($appId, 'devops.last_sha', ''));
+        $lastVersion = trim((string) $config->getAppValue($appId, 'devops.last_version', ''));
+        if ($latestSha === $lastSha && $lastVersion !== '' && $installedVersion === $lastVersion) {
+            return ['up_to_date' => true, 'sha' => $latestSha, 'version' => $installedVersion];
         }
 
         $url = "https://api.github.com/repos/$repo/zipball/$branch";
@@ -139,6 +159,11 @@ trait SelfUpdateTrait
         if (empty($result['error'])) {
             \OCP\Server::get(\OCP\IConfig::class)
                 ->setAppValue($appId, 'devops.last_sha', $latestSha);
+            // Remember which version we installed — a later reset to an
+            // OLD version must be detected and healed on the next run.
+            $newVersion = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId);
+            \OCP\Server::get(\OCP\IConfig::class)
+                ->setAppValue($appId, 'devops.last_version', $newVersion);
         }
         return $result;
     }
