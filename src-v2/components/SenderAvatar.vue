@@ -40,6 +40,13 @@ export default {
 		showGravatar() { return this.bimiResolved && !this.bimiUrl && !!this.gravatarUrl && !this.gravatarFailed },
 		showInitials() { return !this.showBimi && !this.showGravatar },
 	},
+	watch: {
+		email() {
+			this.bimiUrl = null
+			this.bimiResolved = false
+			this.gravatarFailed = false
+		},
+	},
 	methods: {
 		onBimiLoaded(url) {
 			this.bimiUrl = url
@@ -64,4 +71,3 @@ export default {
 	border-radius: 50%; object-fit: cover;
 }
 </style>
-

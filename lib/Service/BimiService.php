@@ -110,7 +110,10 @@ class BimiService
                 }
             }
 
-            if (isset($data['l']) && \filter_var($data['l'], \FILTER_VALIDATE_URL)) {
+            if (isset($data['l'])
+                && \filter_var($data['l'], \FILTER_VALIDATE_URL)
+                && \str_starts_with(\strtolower($data['l']), 'https://')
+            ) {
                 $tags = isset($data['a']) ? \explode(',', $data['a']) : [];
                 return [
                     'logo' => $data['l'],

@@ -29,25 +29,35 @@ export default {
 	mounted() {
 		this.resolve()
 	},
+	watch: {
+		email() {
+			this.resolve()
+		},
+	},
 	methods: {
 		async resolve() {
-			if (!this.domain) {
+			const domain = this.domain
+			this.logoUrl = null
+			if (!domain) {
 				this.$emit('failed')
 				return
 			}
-			if (cache.has(this.domain)) {
-				this.applyLogo(cache.get(this.domain))
+			if (cache.has(domain)) {
+				if (this.isCurrent(domain)) this.applyLogo(cache.get(domain))
 				return
 			}
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/bimi'), {
-					params: { domain: this.domain },
+					params: { domain },
 				})
-				cache.set(this.domain, data.logoUrl || null)
-				this.applyLogo(data.logoUrl || null)
+				cache.set(domain, data.logoUrl || null)
+				if (this.isCurrent(domain)) this.applyLogo(data.logoUrl || null)
 			} catch {
-				this.applyLogo(null)
+				if (this.isCurrent(domain)) this.applyLogo(null)
 			}
+		},
+		isCurrent(domain) {
+			return this.domain === domain
 		},
 		applyLogo(url) {
 			if (url) {
