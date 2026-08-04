@@ -257,9 +257,13 @@ class PageController extends Controller
     private function renderV2(): TemplateResponse
     {
         $this->navigationManager->setActiveEntry('souvera_mail');
-        // Write translations to an EXTERNAL JS file — not inline, so CSP
-        // doesn't block it. External <script src="..."> tags are always allowed.
-        $l10nWritten = false;
+        // Translations are injected INLINE into the template with the CSP
+        // nonce. The previous approach (writing js/souvera_mail-l10n-<lang>.js
+        // at runtime) was unreliable: per-request file writes race with
+        // asset caching and HTTP-cached copies kept serving stale/empty
+        // catalogs. Inline + nonce is the canonical Nextcloud pattern for
+        // small JSON payloads and cannot go stale or race.
+        $translations = [];
         try {
             $lang = \OC::$server->get(\OCP\IL10N::class)->getLanguageCode();
         } catch (\Throwable) {
@@ -269,27 +273,23 @@ class PageController extends Controller
         $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath('souvera_mail');
         if ($appPath !== null) {
             $l10nPath = $appPath . '/l10n/' . $langShort . '.json';
-            // Per-language asset file — different users in different languages
-            // must never overwrite the same file (race + wrong cache hits).
-            $outPath = $appPath . '/js/souvera_mail-l10n-' . $langShort . '.js';
-            if (\file_exists($l10nPath)) {
+            if (\is_file($l10nPath)) {
                 $raw = \file_get_contents($l10nPath);
                 if ($raw !== false) {
                     $parsed = \json_decode($raw, true);
                     if (\is_array($parsed) && isset($parsed['translations'])) {
-                        $js = 'window._souvera_mail_translations = '
-                            . \json_encode($parsed['translations'], \JSON_UNESCAPED_UNICODE) . ';';
-                        if (@\file_put_contents($outPath, $js) !== false) {
-                            $l10nWritten = true;
-                        }
+                        $translations = $parsed['translations'];
                     }
                 }
             }
         }
-        if ($l10nWritten) {
-            \OCP\Util::addScript('souvera_mail', 'souvera_mail-l10n-' . $langShort);
-        }
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
-        return new TemplateResponse('souvera_mail', 'v2', []);
+        // The inline <script> in templates/v2.php uses the NC-provided
+        // $cspNonce template variable (part of the default CSP header),
+        // so no app-side ContentSecurityPolicy instance is needed here —
+        // the engine-bound LocalCSP class must not be used on this route.
+        return new TemplateResponse('souvera_mail', 'v2', [
+            'translations' => $translations,
+        ]);
     }
 }

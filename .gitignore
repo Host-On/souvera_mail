@@ -13,6 +13,3 @@ memory/operator_access.md
 node_modules/
 yarn-error.log
 npm-debug.log
-
-# Runtime-generated translation bundle (written by PageController::renderV2)
-js/souvera_mail-l10n*.js
