@@ -2,7 +2,7 @@
 	<NcContent app-name="souvera_mail">
 		<NcAppNavigation>
 			<div class="compose-row">
-				<NcButton variant="primary" class="compose-btn" @click="$router.push({name:'compose'})">
+				<NcButton variant="primary" class="compose-btn" @click="startCompose">
 					<template #icon><Pencil :size="20" /></template>
 					{{ t('souvera_mail', 'New message') }}
 				</NcButton>
@@ -133,7 +133,7 @@ export default {
 		} catch(e) { console.error(e) }
 		await Promise.all([this.loadQuota(), this.loadShared(), this.loadLayout()])
 		this._hotkeys = useHotkeys({
-			c: () => { if (this.$route.name !== 'compose') this.$router.push({ name: 'compose' }) },
+			c: () => { this.startCompose() },
 			'G': () => { this.$router.push({ name: 'inbox' }) },
 		})
 	},
@@ -146,6 +146,14 @@ export default {
 	},
 	methods: {
 		onMailboxSelect(id) { this.selectedMailbox = id; this.showSettings = false; this.$router.push({name:'inbox'}) },
+		startCompose() {
+			// Settings replaces the router-view — hide it so the compose
+			// route actually renders.
+			this.showSettings = false
+			if (this.$route.name !== 'compose') {
+				this.$router.push({ name: 'compose' })
+			}
+		},
 		onSharedSelect(accountId, mailboxId) {
 			this.selectedMailbox = accountId + '|' + mailboxId
 			this.showSettings = false
