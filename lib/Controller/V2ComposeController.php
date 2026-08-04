@@ -152,12 +152,7 @@ class V2ComposeController extends Controller
             ['EmailSubmission/set', [
                 'accountId' => $accountId,
                 'onSuccessUpdateEmail' => [
-                    '#send1' => [
-                        'keywords/$draft' => null,
-                        'keywords/$seen' => true,
-                        'mailboxIds/' . ($draftsId ?? 'drafts') => null,
-                        'mailboxIds/' . ($sentId ?? 'sent') => true,
-                    ],
+                    '#send1' => $this->buildSentPatch($draftsId, $sentId),
                 ],
                 'create' => ['send1' => [
                     'emailId' => '#draft1',
@@ -428,6 +423,26 @@ class V2ComposeController extends Controller
         return null;
     }
 
+    /**
+     * onSuccessUpdateEmail patch — only REAL mailbox ids, never literal
+     * 'drafts'/'sent' strings (invalid ids fail silently, so the sent copy
+     * would never happen).
+     */
+    private function buildSentPatch(?string $draftsId, ?string $sentId): array
+    {
+        $patch = [
+            'keywords/$draft' => null,
+            'keywords/$seen' => true,
+        ];
+        if ($draftsId !== null) {
+            $patch['mailboxIds/' . $draftsId] = null;
+        }
+        if ($sentId !== null) {
+            $patch['mailboxIds/' . $sentId] = true;
+        }
+        return $patch;
+    }
+
     /** @return array{drafts:?string, sent:?string} */
     private function resolveMailboxes(string $accountId): array
     {
@@ -438,6 +453,30 @@ class V2ComposeController extends Controller
             $role = $mb['role'] ?? '';
             if ($role === 'drafts') $drafts = $mb['id'];
             if ($role === 'sent') $sent = $mb['id'];
+        }
+
+        // Self-healing: create missing standard mailboxes so the sent-copy
+        // patch below always targets a REAL mailbox id (a literal 'sent'
+        // string is not a valid id and silently fails).
+        $missing = [];
+        if ($drafts === null) $missing['mb_drafts'] = ['name' => 'Drafts', 'role' => 'drafts'];
+        if ($sent === null) $missing['mb_sent'] = ['name' => 'Sent', 'role' => 'sent'];
+        if ($missing !== []) {
+            $create = $this->jmap->singleCall('Mailbox/set', [
+                'accountId' => $accountId,
+                'create' => $missing,
+            ]);
+            if (!isset($create['error'])) {
+                foreach ($create['data']['created'] ?? [] as $key => $mb) {
+                    $role = \str_starts_with((string) $key, 'mb_') ? \substr((string) $key, 3) : '';
+                    if ($role === 'drafts' && $drafts === null) {
+                        $drafts = $mb['id'] ?? null;
+                    }
+                    if ($role === 'sent' && $sent === null) {
+                        $sent = $mb['id'] ?? null;
+                    }
+                }
+            }
         }
         return ['drafts' => $drafts, 'sent' => $sent];
     }
