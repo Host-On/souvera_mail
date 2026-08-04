@@ -269,7 +269,9 @@ class PageController extends Controller
         $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath('souvera_mail');
         if ($appPath !== null) {
             $l10nPath = $appPath . '/l10n/' . $langShort . '.json';
-            $outPath = $appPath . '/js/souvera_mail-l10n.js';
+            // Per-language asset file — different users in different languages
+            // must never overwrite the same file (race + wrong cache hits).
+            $outPath = $appPath . '/js/souvera_mail-l10n-' . $langShort . '.js';
             if (\file_exists($l10nPath)) {
                 $raw = \file_get_contents($l10nPath);
                 if ($raw !== false) {
@@ -285,7 +287,7 @@ class PageController extends Controller
             }
         }
         if ($l10nWritten) {
-            \OCP\Util::addScript('souvera_mail', 'souvera_mail-l10n');
+            \OCP\Util::addScript('souvera_mail', 'souvera_mail-l10n-' . $langShort);
         }
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
         return new TemplateResponse('souvera_mail', 'v2', []);
