@@ -30,7 +30,7 @@ class L10nService
 
     /**
      * The language for the v2 UI. The user's PERSONAL language setting
-     * (IUser::getLanguage — e.g. "de" for "Deutsch (Persönlich: Du)")
+     * (user preference core/lang — e.g. "de" for "Deutsch (Persönlich: Du)")
      * is authoritative. IL10N::getLanguageCode() is NOT used here: the
      * DI container may have cached an IL10N instance created with a
      * different language earlier in the request, which would silently
@@ -40,7 +40,9 @@ class L10nService
     {
         $user = $this->userSession->getUser();
         if ($user !== null) {
-            $lang = \trim((string) $user->getLanguage());
+            // OC\User\User has no getLanguage() — read the personal
+            // language preference directly (user_preferences core/lang).
+            $lang = \trim((string) $this->config->getUserValue($user->getUID(), 'core', 'lang', ''));
             if ($lang !== '') {
                 return $lang;
             }

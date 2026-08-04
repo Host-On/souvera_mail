@@ -64,7 +64,9 @@ class L10nCheck extends Command
                 $output->writeln("<error>User '{$uid}' does not exist.</error>");
                 return 1;
             }
-            $userLang = (string) $user->getLanguage();
+            $userLang = (string) $user->getUID();
+            $userLang = (string) \OCP\Server::get(\OCP\IConfig::class)
+                ->getUserValue($userLang, 'core', 'lang', '');
             if ($userLang !== '') {
                 $lang = $userLang;
             }
