@@ -48,16 +48,18 @@
 			</template>
 
 			<template #footer>
-				<QuotaDonut v-if="quotaTotal > 0 || quotaUnlimited" :inline="true" :size="22" :used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
-				<NcAppNavigationItem :name="t('souvera_mail', 'Mail archive')"
-					@click="openArchive">
-					<template #icon><Archive :size="20" /></template>
-				</NcAppNavigationItem>
-				<NcAppNavigationItem :name="t('souvera_mail', 'Settings')"
-					:active="showSettings"
-					@click="showSettings = true; $router.push({name:'inbox'})">
-					<template #icon><Cog :size="20" /></template>
-				</NcAppNavigationItem>
+				<div class="app-footer">
+					<QuotaDonut v-if="quotaTotal > 0 || quotaUnlimited" :inline="true" :size="22" :used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
+					<NcAppNavigationItem :name="t('souvera_mail', 'Mail archive')"
+						@click="openArchive">
+						<template #icon><Archive :size="20" /></template>
+					</NcAppNavigationItem>
+					<NcAppNavigationItem :name="t('souvera_mail', 'Settings')"
+						:active="showSettings"
+						@click="showSettings = true; $router.push({name:'inbox'})">
+						<template #icon><Cog :size="20" /></template>
+					</NcAppNavigationItem>
+				</div>
 			</template>
 		</NcAppNavigation>
 
@@ -213,8 +215,7 @@ export default {
 .compose-btn { flex: 1; }
 .compose-row :deep(button[aria-label="Contacts"]) { min-width: 44px; padding: 0; }
 
-/* Shared account sub-headers — clearly distinct from the top-level
-   "Mailboxes" / "Shared with me" / "Folders" captions: smaller, lighter,
+/* Shared account sub-headers — clearly distinct from the top-level   "Mailboxes" / "Shared with me" / "Folders" captions: smaller, lighter,
    indented, with a bullet. Targets the inner __name element because the
    caption component sets font-size/font-weight/color there with higher
    specificity (which is why styling the outer li never showed). */
@@ -235,5 +236,15 @@ export default {
 	color: var(--color-border-dark);
 	font-size: 10px;
 	vertical-align: 1px;
+}
+
+/* Nav footer — slightly distinct background, matching the mail detail
+   toolbar (color-background-dark + border) to visually separate it. */
+.app-footer {
+	background: var(--color-background-dark);
+	border-top: 1px solid var(--color-border);
+}
+.app-footer :deep(.app-navigation-entry__link:hover) {
+	background: var(--color-background-hover);
 }
 </style>
