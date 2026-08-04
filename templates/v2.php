@@ -9,7 +9,7 @@
  * vor dem Vue-Boot bereit (main.js liest window._souvera_mail_translations).
  */
 ?>
-<script nonce="<?php p($l10nNonce); ?>">
+<script nonce="<?php p($cspNonce); ?>">
 	window._souvera_mail_translations = <?php echo json_encode($translations ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
 </script>
 <div id="souvera-mail-v2-app" style="width:100%;height:100%;background:var(--color-main-background)">

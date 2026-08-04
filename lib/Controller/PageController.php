@@ -264,7 +264,6 @@ class PageController extends Controller
         // catalogs. Inline + nonce is the canonical Nextcloud pattern for
         // small JSON payloads and cannot go stale or race.
         $translations = [];
-        $l10nNonce = '';
         try {
             $lang = \OC::$server->get(\OCP\IL10N::class)->getLanguageCode();
         } catch (\Throwable) {
@@ -284,16 +283,13 @@ class PageController extends Controller
                 }
             }
         }
-        // The request nonce for the inline <script> — same pattern as the
-        // engine boot script (index_embed), version-safe incl. CSP fallback.
-        $csp = new ContentSecurityPolicy();
-        $l10nNonce = $csp->getEngineNonce();
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
-        $response = new TemplateResponse('souvera_mail', 'v2', [
+        // The inline <script> in templates/v2.php uses the NC-provided
+        // $cspNonce template variable (part of the default CSP header),
+        // so no app-side ContentSecurityPolicy instance is needed here —
+        // the engine-bound LocalCSP class must not be used on this route.
+        return new TemplateResponse('souvera_mail', 'v2', [
             'translations' => $translations,
-            'l10nNonce' => $l10nNonce,
         ]);
-        $response->setContentSecurityPolicy($csp);
-        return $response;
     }
 }
