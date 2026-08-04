@@ -119,8 +119,19 @@ class L10nCheck extends Command
 
         $output->writeln('');
         $output->writeln("  <info>used catalog</info>          : {$found} ({$entries} entries)");
+        if ($lang === 'en') {
+            $output->writeln('');
+            $output->writeln('<error>The Nextcloud language is English ("en") — the v2 UI shows English BY DESIGN.</error>');
+            $output->writeln('<comment>This is not a translation bug: the app resolves the installed language correctly.</comment>');
+            $output->writeln('<comment>To get German, set the language on the instance:</comment>');
+            $output->writeln('  • Instance default language:  occ config:system:set default_language --value de');
+            $output->writeln('  • Force German for everyone:  occ config:system:set forced_language --value de');
+            $output->writeln('  • Single user:                occ user:setting <uid> core lang de');
+            $output->writeln('  • Verify per user:            occ souvera_mail:l10n:check <uid>');
+            return 0;
+        }
         $output->writeln('');
-        if ($entries >= 300 || $lang === 'en') {
+        if ($entries >= 300) {
             $output->writeln('<info>OK — the v2 UI will use this catalog.</info>');
             return 0;
         }
