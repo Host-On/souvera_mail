@@ -272,6 +272,17 @@ trait SelfUpdateTrait
                     'installed_version' => $installedVersion,
                 ];
             }
+            if ($extractedVersion === $installedVersion) {
+                // Identical content — treat as up to date. The caller
+                // refreshes devops.last_sha/last_version, which also breaks
+                // the first-run loop for pre-baseline installations.
+                $this->rmdirRecursive($extractDir);
+                return [
+                    'up_to_date' => true,
+                    'extracted_version' => $extractedVersion,
+                    'installed_version' => $installedVersion,
+                ];
+            }
             if (version_compare($extractedVersion, $installedVersion, '<=')) {
                 $this->rmdirRecursive($extractDir);
                 return [
