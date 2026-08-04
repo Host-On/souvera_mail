@@ -104,7 +104,7 @@
 								<textarea class="signature-textarea signature-textarea--source" v-model="sigHtml"
 									:placeholder="t('souvera_mail', 'HTML source code…')" rows="10" spellcheck="false" />
 							</template>
-							<RichTextEditor v-else v-model="sigHtml" :min-height="'120px'" />
+							<div v-else class="signature-preview" v-html="sigPreviewHtml"></div>
 						</div>
 						<div class="signature-editor__actions">
 							<NcButton variant="tertiary" size="small" @click="toggleSigSource">
@@ -257,7 +257,6 @@ import CodeTags from 'vue-material-design-icons/CodeTags.vue'
 import FileUpload from 'vue-material-design-icons/FileUpload.vue'
 import DOMPurify from 'dompurify'
 import QuotaDonut from '../components/QuotaDonut.vue'
-import RichTextEditor from '../components/composer/RichTextEditor.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 
@@ -270,7 +269,7 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, QuotaDonut, RichTextEditor },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, QuotaDonut },
 	data() {
 		return {
 			accountEmail: '',
@@ -326,6 +325,11 @@ export default {
 		this.remoteImageOptions[0].label = this.t('souvera_mail', 'Ask before loading')
 		this.remoteImageOptions[1].label = this.t('souvera_mail', 'Always load')
 		this.loadAll()
+	},
+	computed: {
+		sigPreviewHtml() {
+			return DOMPurify.sanitize(this.sigHtml || '', { USE_PROFILES: { html: true } })
+		},
 	},
 	methods: {
 		async loadAll() {
@@ -572,6 +576,20 @@ export default {
 	min-height: 200px;
 	font-family: monospace; font-size: 12px; font-weight: normal;
 }
+/* True layout-preserving preview — renders the EXACT sanitized HTML
+   (no Tiptap normalisation, which would strip tables/images/layout). */
+.signature-preview {
+	min-height: 120px;
+	padding: 10px 14px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius);
+	background: var(--color-main-background);
+	font-size: 13px; line-height: 1.5;
+	overflow-x: hidden;
+	overflow-y: auto;
+	word-break: break-word;
+}
+.signature-preview :deep(img) { max-width: 100%; height: auto; }
 .folder-list { display: flex; flex-direction: column; gap: 4px; }
 .folder-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: var(--border-radius); }
 .folder-row__actions { display: flex; gap: 2px; }
