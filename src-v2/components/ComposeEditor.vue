@@ -223,22 +223,42 @@ export default {
 			return DOMPurify.sanitize(this.signatureHtml, { USE_PROFILES: { html: true } })
 		},
 		// Appends the (sanitized) signature relative to the quoted block:
-		// 'above' → right before <blockquote>, 'below' → right after it,
-		// no quote (new mail) → at the end. Keeps the raw HTML intact.
+		// 'above' → right before the outer <blockquote>, 'below' → right
+		// after it; without an outer quote (new mail / forward) → at the end.
+		// Keeps the raw HTML intact (no Tiptap normalisation).
 		attachSignature(html) {
 			if (!this.signatureEnabled) return html
 			const sig = this.sanitizedSignature()
-			if (!sig || html.includes(sig)) return html
-			const openIdx = html.indexOf('<blockquote')
-			const closeIdx = openIdx !== -1 ? html.indexOf('</blockquote>', openIdx) : -1
-			if (closeIdx !== -1) {
-				if (this.signaturePosition === 'below') {
-					const end = closeIdx + '</blockquote>'.length
-					return html.slice(0, end) + sig + html.slice(end)
-				}
-				return html.slice(0, openIdx) + sig + html.slice(openIdx)
+			if (!sig || html.trimEnd().endsWith(sig)) return html
+			const quote = this.findOuterQuote(html)
+			if (!quote) return html + sig
+			if (this.signaturePosition === 'below') {
+				return html.slice(0, quote.closeEndIdx) + sig + html.slice(quote.closeEndIdx)
 			}
-			return html + sig
+			return html.slice(0, quote.openIdx) + sig + html.slice(quote.openIdx)
+		},
+		// Locates the OUTER <blockquote>…</blockquote> span with correct
+		// nesting, so nested quotes inside the quoted body can never break
+		// the insertion point.
+		findOuterQuote(html) {
+			const openIdx = html.indexOf('<blockquote')
+			if (openIdx === -1) return null
+			let depth = 0
+			let i = openIdx
+			while (i < html.length) {
+				const nextOpen = html.indexOf('<blockquote', i)
+				const nextClose = html.indexOf('</blockquote>', i)
+				if (nextClose === -1) return null
+				if (nextOpen !== -1 && nextOpen < nextClose) {
+					depth++
+					i = nextOpen + '<blockquote'.length
+				} else {
+					depth--
+					i = nextClose + '</blockquote>'.length
+					if (depth === 0) return { openIdx, closeEndIdx: i }
+				}
+			}
+			return null
 		},
 		// Replaces the editor content only while it is still untouched
 		// (re-checked at execution time), and suppresses the dirty flag for
