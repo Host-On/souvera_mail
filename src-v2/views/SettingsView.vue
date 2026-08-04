@@ -59,14 +59,15 @@
 							<p class="settings-muted">{{ t('souvera_mail', 'Remote content can be used to track you.') }}</p>
 						</div>
 						<NcSelect v-model="remoteImagesOption" :options="remoteImageOptions"
-							label="label" class="setting-select" />
+							label="label" class="setting-select"
+							:clearable="false" />
 					</div>
 					<div class="setting-row">
 						<div>
 							<span class="setting-label">{{ t('souvera_mail', 'Messages per page') }}</span>
 						</div>
 						<NcSelect v-model="messagesPerPageOption" :options="pageSizeOptions"
-							label="label" class="setting-select" />
+							label="label" class="setting-select" :clearable="false" />
 					</div>
 					<div class="setting-row">
 						<div>
@@ -74,7 +75,7 @@
 							<p class="settings-muted">{{ t('souvera_mail', 'Periodically check for new mail. Disabled when set to 0.') }}</p>
 						</div>
 						<NcSelect v-model="autoRefreshOption" :options="autoRefreshOptions"
-							label="label" class="setting-select" />
+							label="label" class="setting-select" :clearable="false" />
 					</div>
 					<div class="setting-row">
 						<div>
@@ -82,7 +83,7 @@
 						</div>
 						<div class="setting-row__sound">
 							<NcSelect v-model="soundOption" :options="soundOptions"
-								label="label" class="setting-select"
+								label="label" class="setting-select" :clearable="false"
 								@update:modelValue="onSoundChange" />
 							<NcButton variant="tertiary" size="small"
 								:aria-label="t('souvera_mail', 'Preview sound')"
