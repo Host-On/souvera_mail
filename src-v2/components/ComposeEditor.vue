@@ -44,6 +44,10 @@
 			<div class="compose-field compose-field--body">
 				<RichTextEditor ref="editor" v-model="bodyHtml"
 					:placeholder="t('souvera_mail', 'Write your message…')" />
+				<div v-if="showSignaturePreview" class="compose-signature" @click.stop>
+					<div class="compose-signature__separator">--</div>
+					<div class="compose-signature__content" v-html="signaturePreviewHtml"></div>
+				</div>
 			</div>
 
 			<AttachmentList v-if="attachments.length > 0"
@@ -160,6 +164,12 @@ export default {
 		canSend() {
 			return (this.to.length > 0 || this.cc.length > 0 || this.bcc.length > 0) && !this.sending
 		},
+		showSignaturePreview() {
+			return this.signatureEnabled && !!this.signatureHtml
+		},
+		signaturePreviewHtml() {
+			return this.signatureBlock()
+		},
 	},
 	watch: {
 		to: { deep: true, handler() { this.markDirty() } },
@@ -231,7 +241,7 @@ export default {
 		// goes to the end. Keeps the raw HTML intact (no Tiptap normalisation).
 		attachSignature(html) {
 			if (!this.signatureEnabled) return html
-			const sig = this.sanitizedSignature()
+			const sig = this.signatureBlock()
 			if (!sig) return html
 			if (this.mode !== 'reply' && this.mode !== 'replyAll') return html + sig
 			const quote = this.findOuterQuote(html)
@@ -240,6 +250,14 @@ export default {
 				return html.slice(0, quote.closeEndIdx) + sig + html.slice(quote.closeEndIdx)
 			}
 			return html.slice(0, quote.openIdx) + sig + html.slice(quote.openIdx)
+		},
+		// Thunderbird-style signature block: RFC 3676 separator "--" line
+		// followed by the sanitized signature HTML. Used both for the
+		// visible preview below the editor and for attaching at send time.
+		signatureBlock() {
+			const sig = this.sanitizedSignature()
+			if (!sig) return ''
+			return `<p>--</p>${sig}`
 		},
 		// Locates the OUTER <blockquote>…</blockquote> span with correct
 		// nesting, so nested quotes inside the quoted body can never break
@@ -603,4 +621,29 @@ export default {
 .compose-layout__status { flex: 1; text-align: center; }
 .draft-saved { font-size: 12px; color: var(--color-text-maxcontrast); }
 .hidden-file-input { display: none; }
+
+/* Signature preview below the editor — visible like Thunderbird, but not
+   part of the editable document (attached verbatim at send time). */
+.compose-signature {
+	margin: 0 16px 12px;
+	padding: 8px 12px;
+	border: 1px dashed var(--color-border);
+	border-radius: var(--border-radius);
+	background: var(--color-background-dark);
+	pointer-events: none;
+	user-select: none;
+	overflow-x: hidden;
+}
+.compose-signature__separator {
+	color: var(--color-text-maxcontrast);
+	font-size: 13px;
+	line-height: 1.4;
+}
+.compose-signature__content {
+	margin-top: 2px;
+	font-size: 13px;
+	color: var(--color-text-maxcontrast);
+	line-height: 1.5;
+	overflow-wrap: break-word;
+}
 </style>
