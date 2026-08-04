@@ -633,6 +633,11 @@ export default {
 	background: var(--color-background-dark);
 	pointer-events: none;
 	user-select: none;
+	/* Large signatures must not squeeze the text editor — cap the height
+	   and scroll within the preview instead. */
+	flex-shrink: 0;
+	max-height: 180px;
+	overflow-y: auto;
 	overflow-x: hidden;
 }
 .compose-signature__content {
