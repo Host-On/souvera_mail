@@ -12,6 +12,7 @@ use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use OCP\IUserSession;
+use Psr\Log\LoggerInterface;
 
 class V2ComposeController extends Controller
 {
@@ -21,6 +22,7 @@ class V2ComposeController extends Controller
         private V2JmapProxy $jmap,
         private StalwartUserContext $userContext,
         private IUserSession $userSession,
+        private LoggerInterface $logger,
     ) {
         parent::__construct($appName, $request);
     }
@@ -173,16 +175,35 @@ class V2ComposeController extends Controller
         $emailResp = null;
         $submissionResp = null;
         foreach ($responses as $resp) {
-            if ($resp['name'] === 'Email/set') $emailResp = $resp;
-            if ($resp['name'] === 'EmailSubmission/set') $submissionResp = $resp;
+            // Keep the FIRST match per method: the envelope produces THREE
+            // responses — the explicit Email/set (created.draft1), the
+            // EmailSubmission/set (created.send1) and an IMPLICIT update-only
+            // Email/set triggered by onSuccessUpdateEmail (no "created").
+            // The implicit one must never shadow the explicit creation.
+            if ($emailResp === null && $resp['name'] === 'Email/set') $emailResp = $resp;
+            if ($submissionResp === null && $resp['name'] === 'EmailSubmission/set') $submissionResp = $resp;
         }
 
         $created = $emailResp['args']['created']['draft1'] ?? null;
-        if ($created === null) {
-            return new JSONResponse(['error' => 'Email creation failed', 'detail' => $emailResp['args'] ?? []], 500);
-        }
-
         $submitted = $submissionResp['args']['created']['send1'] ?? null;
+        $submitFailed = $submissionResp['args']['notCreated']['send1'] ?? null;
+        if ($created === null) {
+            $this->logger->warning(
+                'Souvera Mail: Email/set reported no created draft1. '
+                . 'Email/set args: ' . \json_encode($emailResp['args'] ?? null, JSON_UNESCAPED_SLASHES)
+                . ' | EmailSubmission/set args: ' . \json_encode($submissionResp['args'] ?? null, JSON_UNESCAPED_SLASHES),
+                ['app' => 'souvera_mail']
+            );
+        }
+        if ($created === null && $submitted === null) {
+            return new JSONResponse([
+                'error' => 'Email creation failed',
+                'detail' => $submitFailed !== null ? $submitFailed : ($emailResp['args'] ?? []),
+            ], 500);
+        }
+        // If the submission succeeded the mail IS sent — report success even
+        // when the intermediate draft create did not report a created id
+        // (the implicit onSuccessUpdateEmail Email/set response has none).
         return new JSONResponse([
             'success' => true,
             'draftId' => $created['id'] ?? '',
