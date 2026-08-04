@@ -129,6 +129,7 @@ class V2SettingsController extends Controller
             'account' => [
                 'email' => $user->getSystemEMailAddress() ?? $uid,
                 'server' => '',
+                'version' => \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion('souvera_mail'),
             ],
         ]);
     }
