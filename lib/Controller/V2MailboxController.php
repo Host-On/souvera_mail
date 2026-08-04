@@ -140,8 +140,10 @@ class V2MailboxController extends Controller
         $filter = [];
         if ($mailboxId !== '') $filter['inMailbox'] = $mailboxId;
         if ($searchQuery !== '') $filter['text'] = $searchQuery;
-        if ($filterType === 'unread') $filter['isUnread'] = true;
-        if ($filterType === 'flagged') $filter['isFlagged'] = true;
+        // JMAP Email/query does NOT have isUnread/isFlagged — unread status
+        // is tracked via keywords/$seen and flagged via keywords/$flagged.
+        if ($filterType === 'unread') $filter['notKeyword'] = '$seen';
+        if ($filterType === 'flagged') $filter['hasKeyword'] = '$flagged';
         if ($filterType === 'attachments') $filter['hasAttachment'] = true;
 
         $queryResult = $this->jmap->singleCall('Email/query', [
