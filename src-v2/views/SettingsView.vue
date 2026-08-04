@@ -99,7 +99,7 @@
 					</NcCheckboxRadioSwitch>
 					<div v-if="sigEnabled" class="setting-row">
 						<textarea class="signature-textarea" v-model="sigHtml"
-							:placeholder="t('souvera_mail', '--\\nYour signature')" rows="6" />
+							:placeholder="t('souvera_mail', '--\nYour signature')" rows="6" />
 					</div>
 					<NcButton v-if="sigEnabled" variant="primary" @click="saveSig">
 						{{ t('souvera_mail', 'Save signature') }}
