@@ -321,8 +321,7 @@
     "Unread": "Ungelesen",
     "Flagged": "Markiert",
     "With attachments": "Mit Anhängen",
-    "Search in mailbox…": "In Mailbox suchen…"
-,
+    "Search in mailbox…": "Im Postfach suchen…",
     "Mail storage: unlimited": "Postfach-Speicher: unbegrenzt",
     "Unlimited": "Unbegrenzt",
     "--\nYour signature": "--\nIhre Signatur",
@@ -354,7 +353,6 @@
     "External images blocked ({count})": "Externe Bilder blockiert ({count})",
     "Failed to send message": "Senden der Nachricht fehlgeschlagen",
     "Files": "Dateien",
-    "Flagged": "Markiert",
     "Folder name": "Ordnername",
     "Forwarded message": "Weitergeleitete Nachricht",
     "From Cloud": "Aus der Cloud",
@@ -387,7 +385,6 @@
     "Save to Files": "In Dateien speichern",
     "Saving…": "Wird gespeichert…",
     "Search contacts…": "Kontakte suchen…",
-    "Search in mailbox…": "Im Postfach suchen…",
     "Sending…": "Wird gesendet…",
     "Show above own folders": "Oberhalb der eigenen Ordner anzeigen",
     "Show below own folders": "Unterhalb der eigenen Ordner anzeigen",
@@ -396,10 +393,13 @@
     "To": "An",
     "URL": "URL",
     "Underline": "Unterstreichen",
-    "Unread": "Ungelesen",
     "Verified sender": "Verifizierter Absender",
-    "With attachments": "Mit Anhängen",
-    "{count} selected": "{count} ausgewählt"
+    "{count} selected": "{count} ausgewählt",
+    "Reply settings": "Antwort-Einstellungen",
+    "Write replies": "Antworten schreiben",
+    "Above the quoted text": "Über dem zitierten Text",
+    "Below the quoted text": "Unter dem zitierten Text",
+    "Signature position": "Position der Signatur"
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

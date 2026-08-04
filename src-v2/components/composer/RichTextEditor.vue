@@ -120,6 +120,15 @@ export default {
 		insertHtml(html) {
 			this.editor?.chain().focus().insertContent(html).run()
 		},
+		setContent(html) {
+			this.editor?.commands.setContent(html || '')
+		},
+		setCursorAtStart() {
+			this.editor?.commands.setTextSelection(1)
+		},
+		setCursorAtEnd() {
+			this.editor?.commands.setTextSelection(this.editor.state.doc.content.size)
+		},
 		toggleLink() {
 			const prev = this.editor.getAttributes('link')
 			if (prev.href) {

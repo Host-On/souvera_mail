@@ -93,6 +93,7 @@ import AttachmentList from './composer/AttachmentList.vue'
 import CloudFilePicker from './CloudFilePicker.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
+import DOMPurify from 'dompurify'
 import { sanitizeMailHtml } from '../utils/mailSanitizer.js'
 import { buildReplyQuote, buildForwardBody } from '../utils/quoteBuilder.js'
 
@@ -146,6 +147,10 @@ export default {
 			showCloudPicker: false,
 			savedDraftId: null,
 			discardingDraftId: null,
+			signatureHtml: '',
+			signatureEnabled: false,
+			replyPosition: 'above',
+			signaturePosition: 'above',
 		}
 	},
 	computed: {
@@ -164,28 +169,91 @@ export default {
 		cc: { deep: true, handler() { this.markDirty() } },
 		bcc: { deep: true, handler() { this.markDirty() } },
 		subject() { this.markDirty() },
-		bodyHtml() { this.markDirty() },
+		bodyHtml() { if (!this._suppressDirty) this.markDirty() },
+		// originalEmail arrives asynchronously (ComposeView fetches the body
+		// after mount) — build the reply/forward content and prefill the
+		// subject as soon as it becomes available. The build waits for the
+		// preferences (signature, positions) to be loaded.
+		originalEmail: {
+			immediate: true,
+			handler() {
+				if (this.originalEmail) {
+					if (this._prefsLoaded) this.buildReplyOrForward()
+					if (this.subject === '' && (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward')) {
+						this.subject = this.prefillSubject()
+					}
+				}
+			},
+		},
 	},
 	async mounted() {
 		await this.loadIdentities()
-		if (this.mode === 'reply' || this.mode === 'replyAll') {
-			this.buildReplyContent()
-		} else if (this.mode === 'forward') {
-			this.buildForwardContent()
+		await this.loadPreferences()
+		this._prefsLoaded = true
+		if (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward') {
+			this.buildReplyOrForward()
+		} else if (this.signatureEnabled && this.signatureHtml) {
+			this.insertSignature()
 		}
 	},
 	beforeUnmount() { clearTimeout(draftTimer) },
 	methods: {
 		prefillSubject() {
-			if (this.replyTo?.subject) {
-				const s = this.replyTo.subject
-				return s.match(/^(Re|Fwd):\s*/i) ? s : `Re: ${s}`
+			const s = this.replyTo?.subject || this.originalEmail?.subject || this.forwardOf?.subject || ''
+			if (!s) return ''
+			if (this.mode === 'forward') {
+				return s.match(/^Fwd:\s*/i) ? s : `Fwd: ${s}`
 			}
-			if (this.forwardOf?.subject) {
-				const s = this.forwardOf.subject
-				return s.match(/^(Fwd):\s*/i) ? s : `Fwd: ${s}`
+			return s.match(/^(Re|Fwd):\s*/i) ? s : `Re: ${s}`
+		},
+		async loadPreferences() {
+			try {
+				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
+				this.signatureHtml = data.signatureHtml || ''
+				this.signatureEnabled = !!data.signatureEnabled
+				this.replyPosition = data.replyPosition === 'below' ? 'below' : 'above'
+				this.signaturePosition = data.signaturePosition === 'below' ? 'below' : 'above'
+			} catch (e) {
+				console.error('Failed to load preferences', e)
 			}
-			return ''
+		},
+		sanitizedSignature() {
+			if (!this.signatureHtml) return ''
+			return DOMPurify.sanitize(this.signatureHtml, { USE_PROFILES: { html: true } })
+		},
+		insertSignature() {
+			const sig = this.sanitizedSignature()
+			if (!sig) return
+			this.initContent(`<p></p>${sig}`, 'start')
+		},
+		// Replaces the editor content only while it is still untouched
+		// (re-checked at execution time), and suppresses the dirty flag for
+		// this programmatic initialisation. The flag is only set inside the
+		// timer, so user input before it is never hidden from dirty tracking.
+		initContent(html, cursor) {
+			this.$nextTick(() => {
+				setTimeout(() => {
+					if (this.bodyHtml !== '') return
+					this._suppressDirty = true
+					try {
+						this.$refs.editor?.setContent(html)
+						if (cursor === 'end') this.$refs.editor?.setCursorAtEnd()
+						else this.$refs.editor?.setCursorAtStart()
+						this.$refs.editor?.focus()
+					} finally {
+						// Reset after the pre-flush watcher has run, so the
+						// programmatic body change is not marked dirty.
+						this.$nextTick(() => { this._suppressDirty = false })
+					}
+				}, 100)
+			})
+		},
+		buildReplyOrForward() {
+			if (this.mode === 'forward') {
+				this.buildForwardContent()
+			} else if (this.mode === 'reply' || this.mode === 'replyAll') {
+				this.buildReplyContent()
+			}
 		},
 		async loadIdentities() {
 			try {
@@ -203,12 +271,24 @@ export default {
 			const body = email.htmlBody || email.plainBody || ''
 			const { html } = sanitizeMailHtml(body, { attachments: email.attachments || [], blockRemote: false })
 			const quote = buildReplyQuote(email, html)
-			this.$nextTick(() => {
-				setTimeout(() => {
-					this.$refs.editor?.insertHtml(quote)
-					this.$refs.editor?.focus()
-				}, 100)
-			})
+			const sig = this.signatureEnabled ? this.sanitizedSignature() : ''
+			const answer = '<p></p>'
+			// answer area [signature (above)] [quote] [signature (below)] — or,
+			// for replies below the quote: [sig above] [quote] [sig below] answer
+			let parts
+			if (this.replyPosition === 'below') {
+				parts = []
+				if (sig && this.signaturePosition === 'above') parts.push(sig)
+				parts.push(quote)
+				if (sig && this.signaturePosition === 'below') parts.push(sig)
+				parts.push(answer)
+			} else {
+				parts = [answer]
+				if (sig && this.signaturePosition === 'above') parts.push(sig)
+				parts.push(quote)
+				if (sig && this.signaturePosition === 'below') parts.push(sig)
+			}
+			this.initContent(parts.join(''), this.replyPosition === 'below' ? 'end' : 'start')
 		},
 		buildForwardContent() {
 			const email = this.originalEmail
@@ -216,14 +296,15 @@ export default {
 			const body = email.htmlBody || email.plainBody || ''
 			const { html } = sanitizeMailHtml(body, { attachments: email.attachments || [], blockRemote: false })
 			const quote = buildForwardBody(email, html)
+			const sig = this.signatureEnabled ? this.sanitizedSignature() : ''
 			this.forwardAttachments = (email.attachments || []).map(a => ({
 				blobId: a.blobId, name: a.name, type: a.type, size: a.size,
 			}))
-			this.$nextTick(() => {
-				setTimeout(() => {
-					this.$refs.editor?.insertHtml(quote)
-				}, 100)
-			})
+			const parts = ['<p></p>']
+			if (sig && this.signaturePosition === 'above') parts.push(sig)
+			parts.push(quote)
+			if (sig && this.signaturePosition === 'below') parts.push(sig)
+			this.initContent(parts.join(''), 'start')
 		},
 		markDirty() {
 			this.dirty = true

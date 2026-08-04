@@ -97,13 +97,42 @@
 						@update:modelValue="sigEnabled = $event">
 						{{ t('souvera_mail', 'Append signature to messages') }}
 					</NcCheckboxRadioSwitch>
-					<div v-if="sigEnabled" class="setting-row">
-						<textarea class="signature-textarea" v-model="sigHtml"
-							:placeholder="t('souvera_mail', '--\nYour signature')" rows="6" />
+					<div v-if="sigEnabled" class="setting-row setting-row--column">
+						<span class="setting-label">{{ t('souvera_mail', 'Signature') }}</span>
+						<div class="signature-editor">
+							<RichTextEditor v-model="sigHtml" :min-height="'120px'" />
+						</div>
 					</div>
-					<NcButton v-if="sigEnabled" variant="primary" @click="saveSig">
-						{{ t('souvera_mail', 'Save signature') }}
-					</NcButton>
+					<div v-if="sigEnabled" class="setting-row">
+						<div>
+							<span class="setting-label">{{ t('souvera_mail', 'Signature position') }}</span>
+						</div>
+						<NcSelect v-model="signaturePositionOption" :options="signaturePositionOptions" :clearable="false"
+							label="label" class="setting-select"
+							@update:modelValue="saveSig" />
+					</div>
+					<div v-if="sigEnabled" class="setting-row">
+						<NcButton variant="primary" @click="saveSig">
+							{{ t('souvera_mail', 'Save signature') }}
+						</NcButton>
+					</div>
+				</div>
+			</div>
+
+			<div class="settings-card">
+				<h2 class="settings-card__title">
+					<Pencil :size="20" />
+					{{ t('souvera_mail', 'Reply settings') }}
+				</h2>
+				<div class="settings-card__body">
+					<div class="setting-row">
+						<div>
+							<span class="setting-label">{{ t('souvera_mail', 'Write replies') }}</span>
+						</div>
+						<NcSelect v-model="replyPositionOption" :options="replyPositionOptions" :clearable="false"
+							label="label" class="setting-select"
+							@update:modelValue="saveSig" />
+					</div>
 				</div>
 			</div>
 
@@ -208,6 +237,7 @@ import ShareVariant from 'vue-material-design-icons/ShareVariant.vue'
 import Key from 'vue-material-design-icons/Key.vue'
 import Folder from 'vue-material-design-icons/Folder.vue'
 import QuotaDonut from '../components/QuotaDonut.vue'
+import RichTextEditor from '../components/composer/RichTextEditor.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 
@@ -220,7 +250,7 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, QuotaDonut },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, QuotaDonut, RichTextEditor },
 	data() {
 		return {
 			accountEmail: '',
@@ -228,6 +258,17 @@ export default {
 			passwords: [], showCreate: false, newName: '',
 			sharedAbove: true,
 			sigHtml: '', sigEnabled: false,
+			replyPosition: 'above', signaturePosition: 'above',
+			replyPositionOptions: [
+				{ value: 'above', label: this.t ? this.t('souvera_mail', 'Above the quoted text') : 'Above the quoted text' },
+				{ value: 'below', label: this.t ? this.t('souvera_mail', 'Below the quoted text') : 'Below the quoted text' },
+			],
+			replyPositionOption: { value: 'above', label: 'Above the quoted text' },
+			signaturePositionOptions: [
+				{ value: 'above', label: this.t ? this.t('souvera_mail', 'Above the quoted text') : 'Above the quoted text' },
+				{ value: 'below', label: this.t ? this.t('souvera_mail', 'Below the quoted text') : 'Below the quoted text' },
+			],
+			signaturePositionOption: { value: 'above', label: 'Above the quoted text' },
 			loaded: false,
 			remoteImageOptions: [
 				{ value: 'never', label: this.t ? this.t('souvera_mail', 'Ask before loading') : 'Ask before loading' },
@@ -277,6 +318,12 @@ export default {
 				this.accountEmail = (p.account && p.account.email) || ''
 				this.sigHtml = p.signatureHtml || ''
 				this.sigEnabled = p.signatureEnabled || false
+				this.replyPosition = p.replyPosition === 'below' ? 'below' : 'above'
+				this.signaturePosition = p.signaturePosition === 'below' ? 'below' : 'above'
+				const rp = this.replyPositionOptions.find(o => o.value === this.replyPosition)
+				if (rp) this.replyPositionOption = rp
+				const sp = this.signaturePositionOptions.find(o => o.value === this.signaturePosition)
+				if (sp) this.signaturePositionOption = sp
 				if (p.remoteImages === 'always') this.remoteImagesOption = this.remoteImageOptions[1]
 				this.verticalLayout = p.verticalLayout || false
 				const ar = this.autoRefreshOptions.find(o => o.value === (p.autoRefresh || 0))
@@ -340,7 +387,18 @@ export default {
 			} catch (e) { console.error('Folder delete failed', e) }
 		},
 		async saveSig() {
-			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { signatureHtml: this.sigHtml, signatureEnabled: this.sigEnabled }) } catch {}
+			try {
+				const replyPosition = this.replyPositionOption?.value === 'below' ? 'below' : 'above'
+				const signaturePosition = this.signaturePositionOption?.value === 'below' ? 'below' : 'above'
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), {
+					signatureHtml: this.sigHtml,
+					signatureEnabled: this.sigEnabled,
+					replyPosition,
+					signaturePosition,
+				})
+				this.replyPosition = replyPosition
+				this.signaturePosition = signaturePosition
+			} catch {}
 		},
 	},
 }
@@ -418,6 +476,13 @@ export default {
 }
 .password-name { font-weight: 500; font-size: 13px; }
 .password-value { font-size: 12px; font-family: monospace; word-break: break-all; }
+.setting-row--column { flex-direction: column; align-items: stretch; }
+.signature-editor {
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius);
+	overflow: hidden;
+	background: var(--color-main-background);
+}
 .signature-textarea {
 	width: 100%; border: 1px solid var(--color-border);
 	border-radius: var(--border-radius);
