@@ -390,7 +390,7 @@ export default {
 			} catch (e) { console.error('Folder create failed', e) }
 		},
 		async startRenameFolder(f) {
-			const name = prompt(t('souvera_mail', 'New name'), f.name)
+			const name = prompt(this.t('souvera_mail', 'New name'), f.name)
 			if (name && name.trim() && name.trim() !== f.name) {
 				try {
 					await axios.put(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + f.id), { name: name.trim() })
@@ -399,7 +399,7 @@ export default {
 			}
 		},
 		async deleteFolder(id) {
-			if (!confirm(t('souvera_mail', 'Delete this folder?'))) return
+			if (!confirm(this.t('souvera_mail', 'Delete this folder?'))) return
 			try {
 				await axios.delete(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + id))
 				this.userFoldersList = this.userFoldersList.filter(f => f.id !== id)
@@ -417,7 +417,10 @@ export default {
 				})
 				this.replyPosition = replyPosition
 				this.signaturePosition = signaturePosition
-			} catch {}
+			} catch (e) {
+				console.error('Failed to save signature', e)
+				alert(this.t('souvera_mail', 'Failed to save signature') + ': ' + (e.response?.data?.error || e.message))
+			}
 		},
 		toggleSigSource() {
 			this.showSigSource = !this.showSigSource
@@ -429,7 +432,7 @@ export default {
 			e.target.value = ''
 			if (!file) return
 			if (file.size === 0 || file.size > 2 * 1024 * 1024) {
-				console.warn('Signature file ignored (empty or larger than 2 MB)')
+				alert(this.t('souvera_mail', 'Signature file ignored (empty or larger than 2 MB)'))
 				return
 			}
 			const reader = new FileReader()
@@ -438,7 +441,10 @@ export default {
 				this.sigHtml = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
 				this.saveSig()
 			}
-			reader.onerror = () => console.error('Failed to read signature file')
+			reader.onerror = () => {
+				console.error('Failed to read signature file')
+				alert(this.t('souvera_mail', 'Failed to read signature file'))
+			}
 			reader.readAsText(file)
 		},
 	},

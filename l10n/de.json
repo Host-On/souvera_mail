@@ -403,7 +403,10 @@
     "HTML source code": "HTML-Quellcode",
     "Show preview": "Vorschau anzeigen",
     "Import HTML file…": "HTML-Datei importieren…",
-    "HTML source code…": "HTML-Quellcode…"
+    "HTML source code…": "HTML-Quellcode…",
+    "Failed to save signature": "Signatur konnte nicht gespeichert werden",
+    "Failed to read signature file": "Signatur-Datei konnte nicht gelesen werden",
+    "Signature file ignored (empty or larger than 2 MB)": "Signatur-Datei ignoriert (leer oder größer als 2 MB)"
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

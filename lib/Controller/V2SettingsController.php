@@ -6,6 +6,7 @@ namespace OCA\SouveraMail\Controller;
 
 use OCA\SouveraMail\Service\AppPasswordService;
 use OCA\SouveraMail\Service\QuotaService;
+use OCA\SouveraMail\Service\SignatureStoreService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
@@ -23,6 +24,7 @@ class V2SettingsController extends Controller
         private IUserSession $userSession,
         private AppPasswordService $appPasswordService,
         private QuotaService $quotaService,
+        private SignatureStoreService $signatureStore,
         private IConfig $config,
         private LoggerInterface $logger,
     ) {
@@ -114,7 +116,7 @@ class V2SettingsController extends Controller
         $uid = $user->getUID();
 
         return new JSONResponse([
-            'signatureHtml' => $this->getPref($uid, 'pref_signature_html', ''),
+            'signatureHtml' => $this->signatureStore->read($uid),
             'signatureEnabled' => $this->getPref($uid, 'pref_signature_enabled', '0') === '1',
             'replyPosition' => $this->getPref($uid, 'pref_reply_position', 'above'),
             'signaturePosition' => $this->getPref($uid, 'pref_signature_position', 'above'),
@@ -155,7 +157,6 @@ class V2SettingsController extends Controller
         }
 
         $allowed = [
-            'signatureHtml' => 'pref_signature_html',
             'signatureEnabled' => 'pref_signature_enabled',
             'replyPosition' => 'pref_reply_position',
             'signaturePosition' => 'pref_signature_position',
@@ -166,6 +167,20 @@ class V2SettingsController extends Controller
             'autoRefresh' => 'pref_auto_refresh',
             'notificationSound' => 'pref_notification_sound',
         ];
+
+        // The signature HTML is stored as a FILE (64 KB DB limit would
+        // break signatures with embedded base64 images) — see SignatureStoreService.
+        if (\array_key_exists('signatureHtml', $body)) {
+            try {
+                $this->signatureStore->write($uid, (string) $body['signatureHtml']);
+            } catch (\Throwable $e) {
+                $this->logger->error(
+                    'Souvera Mail: signature save failed: ' . $e->getMessage(),
+                    ['app' => 'souvera_mail', 'exception' => $e]
+                );
+                return new JSONResponse(['error' => 'Failed to save signature'], 500);
+            }
+        }
 
         foreach ($allowed as $field => $key) {
             if (\array_key_exists($field, $body)) {

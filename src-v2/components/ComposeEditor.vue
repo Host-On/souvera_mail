@@ -151,10 +151,10 @@ export default {
 	},
 	computed: {
 		composeTitle() {
-			if (this.mode === 'reply') return t('souvera_mail', 'Reply')
-			if (this.mode === 'replyAll') return t('souvera_mail', 'Reply all')
-			if (this.mode === 'forward') return t('souvera_mail', 'Forward')
-			return t('souvera_mail', 'New message')
+			if (this.mode === 'reply') return this.t('souvera_mail', 'Reply')
+			if (this.mode === 'replyAll') return this.t('souvera_mail', 'Reply all')
+			if (this.mode === 'forward') return this.t('souvera_mail', 'Forward')
+			return this.t('souvera_mail', 'New message')
 		},
 		canSend() {
 			return (this.to.length > 0 || this.cc.length > 0 || this.bcc.length > 0) && !this.sending
@@ -408,7 +408,7 @@ export default {
 				this.$emit('sent')
 			} catch (e) {
 				console.error('Send failed', e)
-				alert(e.response?.data?.error || t('souvera_mail', 'Failed to send message'))
+				alert(e.response?.data?.error || this.t('souvera_mail', 'Failed to send message'))
 			} finally {
 				this.sending = false
 			}
@@ -440,12 +440,12 @@ export default {
 		},
 		onClose() {
 			if (this.dirty) {
-				if (!confirm(t('souvera_mail', 'Discard unsaved changes?'))) return
+				if (!confirm(this.t('souvera_mail', 'Discard unsaved changes?'))) return
 			}
 			this.$emit('cancel')
 		},
 		onDiscard() {
-			if (confirm(t('souvera_mail', 'Discard this message?'))) {
+			if (confirm(this.t('souvera_mail', 'Discard this message?'))) {
 				if (this.savedDraftId) {
 					this.discardingDraftId = this.savedDraftId
 					axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId)).catch(() => {})
