@@ -171,12 +171,20 @@ export default {
 		subject() { this.markDirty() },
 		bodyHtml() { if (!this._suppressDirty) this.markDirty() },
 		// originalEmail arrives asynchronously (ComposeView fetches the body
-		// after mount) — prefill the subject as soon as it becomes available.
+		// after mount) — build the reply/forward content and prefill the
+		// subject as soon as it becomes available.
 		originalEmail: {
 			immediate: true,
 			handler() {
-				if (this.subject === '' && (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward') && this.originalEmail) {
-					this.subject = this.prefillSubject()
+				if (this.originalEmail) {
+					if (this.mode === 'reply' || this.mode === 'replyAll') {
+						this.buildReplyContent()
+					} else if (this.mode === 'forward') {
+						this.buildForwardContent()
+					}
+					if (this.subject === '' && (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward')) {
+						this.subject = this.prefillSubject()
+					}
 				}
 			},
 		},
@@ -184,11 +192,7 @@ export default {
 	async mounted() {
 		await this.loadIdentities()
 		await this.loadPreferences()
-		if (this.mode === 'reply' || this.mode === 'replyAll') {
-			this.buildReplyContent()
-		} else if (this.mode === 'forward') {
-			this.buildForwardContent()
-		} else if (this.signatureEnabled && this.signatureHtml) {
+		if (this.mode === 'new' && this.signatureEnabled && this.signatureHtml) {
 			this.insertSignature()
 		}
 	},
@@ -222,13 +226,14 @@ export default {
 			if (!sig) return
 			this.initContent(`<p></p>${sig}`, 'start')
 		},
-		// Replaces the editor content only while it is still untouched,
-		// and suppresses the dirty flag for this programmatic initialisation.
+		// Replaces the editor content only while it is still untouched
+		// (re-checked at execution time), and suppresses the dirty flag for
+		// this programmatic initialisation.
 		initContent(html, cursor) {
-			if (this.bodyHtml !== '') return
 			this._suppressDirty = true
 			this.$nextTick(() => {
 				setTimeout(() => {
+					if (this.bodyHtml !== '') return
 					this.$refs.editor?.setContent(html)
 					if (cursor === 'end') this.$refs.editor?.setCursorAtEnd()
 					else this.$refs.editor?.setCursorAtStart()
@@ -282,7 +287,7 @@ export default {
 			this.forwardAttachments = (email.attachments || []).map(a => ({
 				blobId: a.blobId, name: a.name, type: a.type, size: a.size,
 			}))
-			this.initContent(`${quote}${sig ? `<p></p>${sig}` : ''}`, 'start')
+			this.initContent(`<p></p>${quote}${sig ? `<p></p>${sig}` : ''}`, 'start')
 		},
 		markDirty() {
 			this.dirty = true

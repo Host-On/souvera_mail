@@ -141,6 +141,18 @@ class V2SettingsController extends Controller
         }
         $uid = $user->getUID();
         $body = \json_decode(\file_get_contents('php://input'), true);
+        if (!\is_array($body)) {
+            return new JSONResponse(['error' => 'invalid request body'], 400);
+        }
+
+        // Validate positions BEFORE persisting anything, so an invalid value
+        // can never leave a partially saved preferences state behind.
+        foreach (['replyPosition', 'signaturePosition'] as $positionField) {
+            if (\array_key_exists($positionField, $body)
+                && !\in_array((string) $body[$positionField], ['above', 'below'], true)) {
+                return new JSONResponse(['error' => 'invalid position value'], 400);
+            }
+        }
 
         $allowed = [
             'signatureHtml' => 'pref_signature_html',
@@ -157,10 +169,6 @@ class V2SettingsController extends Controller
 
         foreach ($allowed as $field => $key) {
             if (\array_key_exists($field, $body)) {
-                if (($field === 'replyPosition' || $field === 'signaturePosition')
-                    && !\in_array((string) $body[$field], ['above', 'below'], true)) {
-                    return new JSONResponse(['error' => 'invalid position value'], 400);
-                }
                 $this->setPref($uid, $key, (string) $body[$field]);
             }
         }
