@@ -221,6 +221,12 @@ export default {
 			return this.currentAccountId
 		},
 		async refreshEmails() { this.checkedIds = []; this.offset = 0; clearTimeout(this._searchTimer); await this.loadEmails() },
+		// Notify the navigation sidebar to reload mailbox counts.
+		notifyMailboxChange() {
+			setTimeout(() => {
+				window.dispatchEvent(new CustomEvent('souvera-mail:refresh-mailboxes'))
+			}, 300)
+		},
 		toggleCheck(id) {
 			const idx = this.checkedIds.indexOf(id)
 			if (idx >= 0) this.checkedIds.splice(idx, 1)
@@ -245,6 +251,7 @@ export default {
 			}
 			this.checkedIds = []
 			await this.loadEmails()
+			this.notifyMailboxChange()
 			showSuccess(this.t('souvera_mail', 'Marked as read'))
 		},
 		async bulkMarkUnread() {
@@ -253,6 +260,7 @@ export default {
 			}
 			this.checkedIds = []
 			await this.loadEmails()
+			this.notifyMailboxChange()
 			showSuccess(this.t('souvera_mail', 'Marked as unread'))
 		},
 		async bulkDelete() {
@@ -261,6 +269,7 @@ export default {
 			}
 			this.checkedIds = []
 			await this.loadEmails()
+			this.notifyMailboxChange()
 			showSuccess(this.t('souvera_mail', 'Messages deleted'))
 		},
 		async bulkMoveTo(mailboxId) {
@@ -269,11 +278,13 @@ export default {
 			}
 			this.checkedIds = []
 			await this.loadEmails()
+			this.notifyMailboxChange()
 			showSuccess(this.t('souvera_mail', 'Messages moved'))
 		},
 		async onOpenEmail(email) {
 			this.selectedEmail = email
 			this.emailBodyHtml = ''; this.emailBodyPlain = ''; this.loadingBody = true
+			const wasUnread = !email.isRead
 			try {
 				const body = await fetchEmailBody(email.id, this.currentAccountId)
 				this.emailBodyHtml = body.htmlBody || ''; this.emailBodyPlain = body.plainBody || ''
@@ -283,6 +294,7 @@ export default {
 					const listItem = this.emails.find(e => e.id === email.id)
 					if (listItem) listItem.isRead = true
 				}
+				if (wasUnread) this.notifyMailboxChange()
 			} catch (e) { console.error('Failed to open email', e) } finally { this.loadingBody = false }
 		},
 		onReply() {
@@ -302,10 +314,11 @@ export default {
 			try { await deleteEmailApi(this.selectedEmail.id, this.currentAccountId) } catch (e) { console.error('Failed to delete email', e) }
 			this.selectedEmail = null; this.emailBodyHtml = ''; this.emailBodyPlain = ''
 			await this.refreshEmails()
+			this.notifyMailboxChange()
 		},
 		async onMove(mailboxId) {
 			if (!this.selectedEmail) return
-			try { await moveEmail(this.selectedEmail.id, mailboxId, this.currentAccountId); this.selectedEmail = null; await this.refreshEmails() } catch (e) { console.error('Failed to move email', e) }
+			try { await moveEmail(this.selectedEmail.id, mailboxId, this.currentAccountId); this.selectedEmail = null; await this.refreshEmails(); this.notifyMailboxChange() } catch (e) { console.error('Failed to move email', e) }
 		},
 		async toggleFlag(emailId) {
 			const email = this.emails.find(e => e.id === emailId)
