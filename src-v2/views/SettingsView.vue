@@ -455,13 +455,18 @@ export default {
 .settings-view { padding: 30px 32px; height: 100%; overflow-y: auto; box-sizing: border-box; }
 .settings-view__title { margin: 0 0 24px; font-size: 22px; font-weight: 700; }
 
-.settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px; }
+/* Masonry layout: cards keep their natural content height — the next card
+   flows directly below, no equal-height rows. Column width drives the
+   responsive column count (same effect as auto-fill minmax(380px,1fr)). */
+.settings-grid { columns: 380px; column-gap: 20px; }
 
 .settings-card {
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-large);
 	background: var(--color-main-background);
 	overflow: hidden;
+	break-inside: avoid;
+	margin-bottom: 20px;
 }
 .settings-card__title {
 	display: flex; align-items: center; gap: 8px;
