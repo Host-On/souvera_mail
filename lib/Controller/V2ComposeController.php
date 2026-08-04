@@ -304,17 +304,20 @@ class V2ComposeController extends Controller
             'update' => [$id => $emailObj],
         ]);
 
+        if (isset($result['error'])) {
+            return new JSONResponse(['error' => 'Draft update failed', 'detail' => $result['error']], 500);
+        }
         $updated = $result['data']['updated'][$id] ?? null;
         $notUpdated = $result['data']['notUpdated'][$id] ?? null;
-        if ($updated === null && $notUpdated === null && isset($result['error'])) {
-            return new JSONResponse(['error' => 'Draft update failed'], 500);
-        }
         if ($notUpdated !== null) {
             // Draft vanished (e.g. destroyed elsewhere) — fall back to create.
             $create = $this->jmap->singleCall('Email/set', [
                 'accountId' => $accountId,
                 'create' => ['draft1' => $emailObj],
             ]);
+            if (isset($create['error'])) {
+                return new JSONResponse(['error' => 'Draft recreate failed', 'detail' => $create['error']], 500);
+            }
             $created = $create['data']['created']['draft1'] ?? null;
             return new JSONResponse([
                 'success' => true,
