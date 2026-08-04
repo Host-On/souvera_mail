@@ -175,12 +175,18 @@ class V2ComposeController extends Controller
         $emailResp = null;
         $submissionResp = null;
         foreach ($responses as $resp) {
-            if ($resp['name'] === 'Email/set') $emailResp = $resp;
-            if ($resp['name'] === 'EmailSubmission/set') $submissionResp = $resp;
+            // Keep the FIRST match per method: the envelope produces THREE
+            // responses — the explicit Email/set (created.draft1), the
+            // EmailSubmission/set (created.send1) and an IMPLICIT update-only
+            // Email/set triggered by onSuccessUpdateEmail (no "created").
+            // The implicit one must never shadow the explicit creation.
+            if ($emailResp === null && $resp['name'] === 'Email/set') $emailResp = $resp;
+            if ($submissionResp === null && $resp['name'] === 'EmailSubmission/set') $submissionResp = $resp;
         }
 
         $created = $emailResp['args']['created']['draft1'] ?? null;
         $submitted = $submissionResp['args']['created']['send1'] ?? null;
+        $submitFailed = $submissionResp['args']['notCreated']['send1'] ?? null;
         if ($created === null) {
             $this->logger->warning(
                 'Souvera Mail: Email/set reported no created draft1. '
@@ -190,11 +196,14 @@ class V2ComposeController extends Controller
             );
         }
         if ($created === null && $submitted === null) {
-            return new JSONResponse(['error' => 'Email creation failed', 'detail' => $emailResp['args'] ?? []], 500);
+            return new JSONResponse([
+                'error' => 'Email creation failed',
+                'detail' => $submitFailed !== null ? $submitFailed : ($emailResp['args'] ?? []),
+            ], 500);
         }
         // If the submission succeeded the mail IS sent — report success even
         // when the intermediate draft create did not report a created id
-        // (e.g. Stalwart may treat draft+immediate-submit as a direct send).
+        // (the implicit onSuccessUpdateEmail Email/set response has none).
         return new JSONResponse([
             'success' => true,
             'draftId' => $created['id'] ?? '',
