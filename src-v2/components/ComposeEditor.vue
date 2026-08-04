@@ -192,9 +192,10 @@ export default {
 		this._prefsLoaded = true
 		if (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward') {
 			this.buildReplyOrForward()
-		} else if (this.signatureEnabled && this.signatureHtml) {
-			this.insertSignature()
 		}
+		// Note: the signature is NOT inserted into the editor — Tiptap would
+		// normalise complex HTML (tables, images, layout). It is attached
+		// verbatim (sanitized) in buildPayload at send/draft time instead.
 	},
 	beforeUnmount() { clearTimeout(draftTimer) },
 	methods: {
@@ -221,10 +222,23 @@ export default {
 			if (!this.signatureHtml) return ''
 			return DOMPurify.sanitize(this.signatureHtml, { USE_PROFILES: { html: true } })
 		},
-		insertSignature() {
+		// Appends the (sanitized) signature relative to the quoted block:
+		// 'above' → right before <blockquote>, 'below' → right after it,
+		// no quote (new mail) → at the end. Keeps the raw HTML intact.
+		attachSignature(html) {
+			if (!this.signatureEnabled) return html
 			const sig = this.sanitizedSignature()
-			if (!sig) return
-			this.initContent(`<p></p>${sig}`, 'start')
+			if (!sig || html.includes(sig)) return html
+			const openIdx = html.indexOf('<blockquote')
+			const closeIdx = openIdx !== -1 ? html.indexOf('</blockquote>', openIdx) : -1
+			if (closeIdx !== -1) {
+				if (this.signaturePosition === 'below') {
+					const end = closeIdx + '</blockquote>'.length
+					return html.slice(0, end) + sig + html.slice(end)
+				}
+				return html.slice(0, openIdx) + sig + html.slice(openIdx)
+			}
+			return html + sig
 		},
 		// Replaces the editor content only while it is still untouched
 		// (re-checked at execution time), and suppresses the dirty flag for
@@ -299,24 +313,14 @@ export default {
 			const body = email.htmlBody || email.plainBody || ''
 			const { html } = sanitizeMailHtml(body, { attachments: email.attachments || [], blockRemote: false })
 			const quote = buildReplyQuote(email, html)
-			const sig = this.signatureEnabled ? this.sanitizedSignature() : ''
 			const answer = '<p></p>'
-			// answer area [signature (above)] [quote] [signature (below)] — or,
-			// for replies below the quote: [sig above] [quote] [sig below] answer
-			let parts
+			// The signature is attached at send time (attachSignature), so the
+			// editor only carries the answer paragraph and the quote.
 			if (this.replyPosition === 'below') {
-				parts = []
-				if (sig && this.signaturePosition === 'above') parts.push(sig)
-				parts.push(quote)
-				if (sig && this.signaturePosition === 'below') parts.push(sig)
-				parts.push(answer)
+				this.initContent(`${quote}${answer}`, 'end')
 			} else {
-				parts = [answer]
-				if (sig && this.signaturePosition === 'above') parts.push(sig)
-				parts.push(quote)
-				if (sig && this.signaturePosition === 'below') parts.push(sig)
+				this.initContent(`${answer}${quote}`, 'start')
 			}
-			this.initContent(parts.join(''), this.replyPosition === 'below' ? 'end' : 'start')
 		},
 		buildForwardContent() {
 			const email = this.originalEmail
@@ -324,15 +328,10 @@ export default {
 			const body = email.htmlBody || email.plainBody || ''
 			const { html } = sanitizeMailHtml(body, { attachments: email.attachments || [], blockRemote: false })
 			const quote = buildForwardBody(email, html)
-			const sig = this.signatureEnabled ? this.sanitizedSignature() : ''
 			this.forwardAttachments = (email.attachments || []).map(a => ({
 				blobId: a.blobId, name: a.name, type: a.type, size: a.size,
 			}))
-			const parts = ['<p></p>']
-			if (sig && this.signaturePosition === 'above') parts.push(sig)
-			parts.push(quote)
-			if (sig && this.signaturePosition === 'below') parts.push(sig)
-			this.initContent(parts.join(''), 'start')
+			this.initContent(`<p></p>${quote}`, 'start')
 		},
 		markDirty() {
 			this.dirty = true
@@ -353,14 +352,15 @@ export default {
 			}
 		},
 		buildPayload() {
+			const bodyHtml = this.attachSignature(this.bodyHtml)
 			return {
 				identityId: this.fromIdentityId,
 				to: this.to.map(r => r.email),
 				cc: this.cc.map(r => r.email),
 				bcc: this.bcc.map(r => r.email),
 				subject: this.subject,
-				bodyHtml: this.bodyHtml,
-				bodyPlain: this.bodyHtml.replace(/<[^>]+>/g, ''),
+				bodyHtml,
+				bodyPlain: bodyHtml.replace(/<[^>]+>/g, ''),
 				attachments: this.attachments.map(a => ({
 					name: a.name, type: a.type || 'application/octet-stream',
 					data: a.data || null, blobId: a.blobId || null,

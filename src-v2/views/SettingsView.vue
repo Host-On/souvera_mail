@@ -428,12 +428,17 @@ export default {
 			const file = e.target.files?.[0]
 			e.target.value = ''
 			if (!file) return
+			if (file.size === 0 || file.size > 2 * 1024 * 1024) {
+				console.warn('Signature file ignored (empty or larger than 2 MB)')
+				return
+			}
 			const reader = new FileReader()
 			reader.onload = () => {
 				const raw = String(reader.result || '')
 				this.sigHtml = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
 				this.saveSig()
 			}
+			reader.onerror = () => console.error('Failed to read signature file')
 			reader.readAsText(file)
 		},
 	},
@@ -522,9 +527,6 @@ export default {
 .signature-editor__actions {
 	display: flex; gap: 8px; margin-top: 8px;
 }
-.signature-textarea--source {
-	min-height: 200px; font-family: monospace; font-size: 12px;
-}
 .hidden-file-input { display: none; }
 .signature-textarea {
 	width: 100%; border: 1px solid var(--color-border);
@@ -533,6 +535,11 @@ export default {
 	font: inherit; font-size: 13px; resize: vertical;
 	background: var(--color-main-background); color: var(--color-main-text);
 	box-sizing: border-box;
+}
+/* After .signature-textarea so monospace wins for the source view */
+.signature-textarea--source {
+	min-height: 200px;
+	font-family: monospace; font-size: 12px; font-weight: normal;
 }
 .folder-list { display: flex; flex-direction: column; gap: 4px; }
 .folder-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: var(--border-radius); }
