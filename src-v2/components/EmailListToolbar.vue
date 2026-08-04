@@ -26,22 +26,25 @@
 			</template>
 			<template v-else>
 				<NcTextField class="email-list-toolbar__search"
-					:value="searchQuery"
+					:model-value="searchQuery"
 					:placeholder="t('souvera_mail', 'Search in mailbox…')"
-					@update:modelValue="$emit('update:search', $event)" />
-				<NcActions>
+					:show-trailing-button="searchQuery !== ''"
+					trailing-button-icon="close"
+					:trailing-button-label="t('souvera_mail', 'Clear search')"
+					@update:modelValue="$emit('update:search', $event)"
+					@trailing-button-click="$emit('update:search', '')" />
+				<NcActions class="email-list-toolbar__filter"
+					:menu-name="activeFilterMenuName"
+					:primary="filter !== 'all'"
+					:force-name="true">
 					<template #icon><Filter :size="18" /></template>
-					<NcActionButton :name="t('souvera_mail', 'All')" @click="$emit('update:filter', 'all')">
-						<template #icon><EmailOutline :size="16" /></template>
-					</NcActionButton>
-					<NcActionButton :name="t('souvera_mail', 'Unread')" @click="$emit('update:filter', 'unread')">
-						<template #icon><EmailOpen :size="16" /></template>
-					</NcActionButton>
-					<NcActionButton :name="t('souvera_mail', 'Flagged')" @click="$emit('update:filter', 'flagged')">
-						<template #icon><Star :size="16" /></template>
-					</NcActionButton>
-					<NcActionButton :name="t('souvera_mail', 'With attachments')" @click="$emit('update:filter', 'attachments')">
-						<template #icon><Paperclip :size="16" /></template>
+					<NcActionButton v-for="f in filterOptions" :key="f.value"
+						type="radio"
+						:name="f.label"
+						:model-value="filter"
+						:value="f.value"
+						@click="$emit('update:filter', f.value)">
+						<template #icon><component :is="f.icon" :size="16" /></template>
 					</NcActionButton>
 				</NcActions>
 			</template>
@@ -74,19 +77,35 @@ export default {
 		selectAllState: { type: [Boolean, String], default: false },
 		targetMailboxes: { type: Array, default: () => [] },
 		searchQuery: { type: String, default: '' },
+		filter: { type: String, default: 'all' },
 	},
 	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter'],
+	computed: {
+		activeFilterMenuName() {
+			const active = this.filterOptions.find(f => f.value === this.filter)
+			return this.t('souvera_mail', 'Filter: {name}', { name: active ? active.label : this.t('souvera_mail', 'All') })
+		},
+		filterOptions() {
+			return [
+				{ value: 'all', label: this.t('souvera_mail', 'All'), icon: EmailOutline },
+				{ value: 'unread', label: this.t('souvera_mail', 'Unread'), icon: EmailOpen },
+				{ value: 'flagged', label: this.t('souvera_mail', 'Flagged'), icon: Star },
+				{ value: 'attachments', label: this.t('souvera_mail', 'With attachments'), icon: Paperclip },
+			]
+		},
+	},
 }
 </script>
 
 <style scoped>
 .email-list-toolbar {
 	display: flex; justify-content: space-between; align-items: center;
+	flex-wrap: wrap; row-gap: 4px;
 	padding: 8px 12px;
 	border-bottom: 1px solid var(--color-border);
 	background: var(--color-background-dark);
 }
-.email-list-toolbar__left { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; }
-.email-list-toolbar__search { flex: 1; max-width: 300px; min-width: 120px; margin: 0 8px; }
+.email-list-toolbar__left { display: flex; align-items: center; flex-wrap: wrap; column-gap: 2px; row-gap: 4px; flex: 1; min-width: 0; }
+.email-list-toolbar__search { flex: 1; max-width: 300px; min-width: 100px; margin: 0 8px; }
 .selected-count { font-size: 13px; color: var(--color-primary-element); font-weight: 500; margin: 0 4px; }
 </style>

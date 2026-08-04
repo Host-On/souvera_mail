@@ -13,6 +13,7 @@
 				@move-to="bulkMoveTo"
 				@toggle-select-all="toggleSelectAll"
 				:search-query="searchQuery"
+				:filter="filterType"
 				@update:search="onSearch"
 				@update:filter="onFilter" />
 
@@ -122,7 +123,7 @@ export default {
 		},
 	},
 	watch: {
-		selectedMailbox() { this.checkedIds = []; this.offset = 0; this.selectedEmail = null; this.loadEmails() },
+		selectedMailbox() { clearTimeout(this._searchTimer); this.checkedIds = []; this.offset = 0; this.selectedEmail = null; this.loadEmails() },
 	},
 	async mounted() {
 		if (this.selectedMailbox) await this.loadEmails()
@@ -140,10 +141,13 @@ export default {
 	beforeUnmount() {
 		this._hotkeys?.destroy()
 		this.stopAutoRefresh()
+		clearTimeout(this._searchTimer)
 		if (this._audioCtx) { this._audioCtx.close(); this._audioCtx = null }
 	},
 	methods: {
 		async loadEmails() {
+			const seq = (this._loadSeq || 0) + 1
+			this._loadSeq = seq
 			this.loadingEmails = true
 			let accountId = null
 			let mailboxId = this.selectedMailbox
@@ -152,7 +156,20 @@ export default {
 			}
 			const prevIds = this.emails.map(e => e.id)
 			const prevTotal = this.emailTotal
-			try { const r = await fetchEmails(mailboxId, this.limit, this.offset, accountId, this.searchQuery, this.filterType); this.emails = r.emails; this.emailTotal = r.total } catch (e) { console.error('Failed to load emails', e) } finally { this.loadingEmails = false }
+			try {
+				const r = await fetchEmails(mailboxId, this.limit, this.offset, accountId, this.searchQuery, this.filterType)
+				// Ignore stale responses from earlier search/filter/pagination changes
+				if (seq !== this._loadSeq) return
+				this.emails = r.emails
+				this.emailTotal = r.total
+			} catch (e) {
+				console.error('Failed to load emails', e)
+				return
+			} finally {
+				// Only the current request controls the loading state; stale
+				// requests must never hide the list or keep the skeleton up
+				if (seq === this._loadSeq) this.loadingEmails = false
+			}
 			// Play sound only when there are genuinely new emails (not page/filter changes)
 			if (prevIds.length > 0 && this.emailTotal > prevTotal) {
 				const newIds = this.emails.map(e => e.id).filter(id => !prevIds.includes(id))
@@ -162,17 +179,28 @@ export default {
 		onSearch(q) {
 			this.searchQuery = q
 			this.offset = 0
-			this.loadEmails()
+			// Invalidate in-flight responses immediately and keep the last valid
+			// list visible (no skeleton flicker) until the debounced search runs
+			this._loadSeq = (this._loadSeq || 0) + 1
+			this.loadingEmails = false
+			this.scheduleSearch()
+		},
+		scheduleSearch() {
+			clearTimeout(this._searchTimer)
+			this._searchTimer = setTimeout(() => {
+				this.loadEmails()
+			}, 350)
 		},
 		onFilter(type) {
 			this.filterType = type
 			this.offset = 0
+			clearTimeout(this._searchTimer)
 			this.loadEmails()
 		},
 		getAccountId() {
 			return this.currentAccountId
 		},
-		async refreshEmails() { this.checkedIds = []; this.offset = 0; await this.loadEmails() },
+		async refreshEmails() { this.checkedIds = []; this.offset = 0; clearTimeout(this._searchTimer); await this.loadEmails() },
 		toggleCheck(id) {
 			const idx = this.checkedIds.indexOf(id)
 			if (idx >= 0) this.checkedIds.splice(idx, 1)
@@ -253,8 +281,8 @@ export default {
 			email.isFlagged = newFlag
 			try { await toggleEmailFlag(emailId, newFlag, this.currentAccountId) } catch (e) { console.error('Failed to toggle flag', e); email.isFlagged = !newFlag }
 		},
-		goPrev() { if (this.offset > 0) { this.offset = Math.max(0, this.offset - this.limit); this.loadEmails() } },
-		goNext() { if (this.offset + this.limit < this.emailTotal) { this.offset += this.limit; this.loadEmails() } },
+		goPrev() { if (this.offset > 0) { clearTimeout(this._searchTimer); this.offset = Math.max(0, this.offset - this.limit); this.loadEmails() } },
+		goNext() { if (this.offset + this.limit < this.emailTotal) { clearTimeout(this._searchTimer); this.offset += this.limit; this.loadEmails() } },
 		navigateEmail(dir) {
 			if (!this.selectedEmail || this.emails.length === 0) return
 			const idx = this.emails.findIndex(e => e.id === this.selectedEmail.id)
@@ -267,7 +295,10 @@ export default {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
 				const interval = (data.autoRefresh || 0) * 1000
 				if (interval > 0) {
-					this._autoRefreshTimer = setInterval(() => { this.loadEmails() }, interval)
+					this._autoRefreshTimer = setInterval(() => {
+						clearTimeout(this._searchTimer)
+						this.loadEmails()
+					}, interval)
 				}
 			} catch {}
 		},
