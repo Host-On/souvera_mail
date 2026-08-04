@@ -64,6 +64,7 @@ export default {
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/bimi'), {
 					params: { domain },
+					timeout: 10000,
 				})
 				const logo = data.logoUrl || null
 				cache.set(domain, logo)
