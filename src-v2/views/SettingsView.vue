@@ -21,8 +21,13 @@
 							<span v-else class="settings-muted">{{ t('souvera_mail', 'No quota information available') }}</span>
 						</span>
 					</div>
-					<QuotaDonut v-if="quotaUnlimited || quotaTotal > 0"
-						:size="56" :used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
+					<div v-if="quotaTotal > 0 && !quotaUnlimited" class="quota-bar">
+						<div class="quota-bar__fill" :style="{ width: quotaPercent + '%' }" />
+					</div>
+					<div class="setting-row">
+						<span class="setting-label">{{ t('souvera_mail', 'Version') }}</span>
+						<span class="setting-value">{{ appVersion || t('souvera_mail', 'Loading…') }}</span>
+					</div>
 				</div>
 			</div>
 
@@ -317,6 +322,7 @@ export default {
 		return {
 			accountEmail: '',
 			quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false,
+			appVersion: '',
 			passwords: [], showCreate: false, newName: '',
 			sharedAbove: true,
 			sigHtml: '', sigEnabled: false, showSigSource: false,
@@ -401,6 +407,10 @@ export default {
 			walk(roots, 0)
 			return flat
 		},
+		quotaPercent() {
+			if (this.quotaTotal <= 0) return 0
+			return Math.min(100, Math.round((this.quotaUsed / this.quotaTotal) * 100))
+		},
 	},
 	methods: {
 		async loadAll() {
@@ -412,6 +422,7 @@ export default {
 			try {
 				const r = await API.prefs(); const p = r.data
 				this.accountEmail = (p.account && p.account.email) || ''
+				this.appVersion = (p.account && p.account.version) || ''
 				this.sigHtml = p.signatureHtml || ''
 				this.sigEnabled = p.signatureEnabled || false
 				this.replyPosition = p.replyPosition === 'below' ? 'below' : 'above'
@@ -733,4 +744,6 @@ export default {
 .folder-row--dragging { opacity: 0.4; }
 .folder-row--drag-over { border-color: var(--color-primary-element) !important; background: var(--color-primary-element-light); }
 .create-row__sub { font-size: 12px; color: var(--color-text-maxcontrast); margin: 2px 0; }
+.quota-bar { height: 6px; background: var(--color-border); border-radius: 3px; overflow: hidden; margin: 4px 0 8px; }
+.quota-bar__fill { height: 100%; background: var(--color-primary-element); border-radius: 3px; transition: width 0.4s ease; }
 </style>

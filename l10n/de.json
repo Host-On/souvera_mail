@@ -444,7 +444,8 @@
     "Subfolder": "Unterordner",
     "Subfolder of": "Unterordner von",
     "Folder moved": "Ordner verschoben",
-    "Failed to move folder": "Ordner konnte nicht verschoben werden"
+    "Failed to move folder": "Ordner konnte nicht verschoben werden",
+    "Version": "Version"
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }
