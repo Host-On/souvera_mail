@@ -113,12 +113,20 @@ export default {
 .email-list-toolbar__search { flex: 1; max-width: 300px; min-width: 100px; margin: 0 8px; }
 .selected-count { font-size: 13px; color: var(--color-primary-element); font-weight: 500; margin: 0 4px; }
 
-/* Two-row mode (side-by-side list panel): row 1 = checkbox + search,
-   row 2 = filter (left) + compose button (right). */
-.email-list-toolbar--tworow { flex-wrap: wrap; row-gap: 6px; }
+/* Two-row mode (side-by-side list panel) — EXACTLY two lines:
+   row 1 = checkbox + search, row 2 = filter (left) + compose (right). */
+.email-list-toolbar--tworow { position: relative; flex-wrap: wrap; row-gap: 6px; }
 .email-list-toolbar--tworow .email-list-toolbar__left { flex: 1 1 100%; }
 .email-list-toolbar--tworow .email-list-toolbar__search {
-	flex: 1 1 auto; max-width: none; min-width: 140px;
+	flex: 1 1 auto; max-width: none; min-width: 120px;
 }
-.email-list-toolbar--tworow .email-list-toolbar__compose { margin-left: auto; }
+.email-list-toolbar--tworow .email-list-toolbar__filter {
+	flex-basis: 100%;           /* forces the filter into row 2 */
+	margin-right: 100px;        /* leave room for the compose button */
+}
+.email-list-toolbar--tworow .email-list-toolbar__compose {
+	position: absolute;         /* pinned right in row 2 */
+	right: 12px;
+	bottom: 6px;
+}
 </style>
