@@ -146,9 +146,10 @@ export default {
 	},
 	methods: {
 		async loadEmails() {
-			this.loadingEmails = true
 			const seq = (this._loadSeq || 0) + 1
 			this._loadSeq = seq
+			this._pendingLoads = (this._pendingLoads || 0) + 1
+			this.loadingEmails = true
 			let accountId = null
 			let mailboxId = this.selectedMailbox
 			if (mailboxId && mailboxId.includes('|')) {
@@ -165,7 +166,10 @@ export default {
 			} catch (e) {
 				console.error('Failed to load emails', e)
 				return
-			} finally { if (seq === this._loadSeq) this.loadingEmails = false }
+			} finally {
+				this._pendingLoads--
+				this.loadingEmails = this._pendingLoads > 0
+			}
 			// Play sound only when there are genuinely new emails (not page/filter changes)
 			if (prevIds.length > 0 && this.emailTotal > prevTotal) {
 				const newIds = this.emails.map(e => e.id).filter(id => !prevIds.includes(id))
@@ -175,6 +179,9 @@ export default {
 		onSearch(q) {
 			this.searchQuery = q
 			this.offset = 0
+			// Invalidate in-flight responses immediately so the list never shows
+			// results that don't match the typed search text
+			this._loadSeq = (this._loadSeq || 0) + 1
 			this.scheduleSearch()
 		},
 		scheduleSearch() {
