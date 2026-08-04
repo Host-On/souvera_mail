@@ -77,7 +77,9 @@
         li.setAttribute('role', 'presentation');
 
         const label = data.unlimited
-            ? t('souvera_mail', 'Mail storage: {used} used', { used: data.formatted.used })
+            ? (data.usageKnown === false
+                ? t('souvera_mail', 'Mail storage: unlimited')
+                : t('souvera_mail', 'Mail storage: {used} used', { used: data.formatted.used }))
             : t('souvera_mail', 'Mail storage: {used} / {total}', { used: data.formatted.used, total: data.formatted.total });
 
         li.innerHTML = `

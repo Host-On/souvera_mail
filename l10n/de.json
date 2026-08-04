@@ -314,7 +314,9 @@
     "selected": "ausgewählt",
     "Move to folder": "In Ordner verschieben",
     "Shared folders are mailboxes that other users have granted you access to.": "Geteilte Ordner sind Postfächer, zu denen andere Nutzer Ihnen Zugriff gewährt haben.",
-    "This message has no content or could not be loaded.": "Diese Nachricht hat keinen Inhalt oder konnte nicht geladen werden."
+    "This message has no content or could not be loaded.": "Diese Nachricht hat keinen Inhalt oder konnte nicht geladen werden.",
+    "Mail storage: unlimited": "Postfach-Speicher: unbegrenzt",
+    "Unlimited": "Unbegrenzt"
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }
