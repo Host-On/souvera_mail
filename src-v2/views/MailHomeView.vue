@@ -248,8 +248,17 @@ export default {
 		},
 		selectAll() { this.checkedIds = this.emails.map(e => e.id) },
 		async markAllRead() {
-			this.checkedIds = this.emails.map(e => e.id)
-			await this.bulkMarkRead()
+			try {
+				const mailboxId = this.selectedMailbox.includes('|')
+					? this.selectedMailbox.split('|')[1]
+					: this.selectedMailbox
+				await axios.post(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + mailboxId + '/mark-all-read'))
+				showSuccess(this.t('souvera_mail', 'Marked all as read'))
+				await this.loadEmails()
+			} catch (e) {
+				console.error('Mark all read failed', e)
+				showError(this.t('souvera_mail', 'Failed to mark all as read'))
+			}
 		},
 		async markAllUnread() {
 			this.checkedIds = this.emails.map(e => e.id)

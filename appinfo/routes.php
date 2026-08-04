@@ -326,6 +326,11 @@ return [
             'verb' => 'POST',
         ],
         [
+            'name' => 'v2_mailbox#markAllRead',
+            'url' => '/api/v2/mailboxes/{id}/mark-all-read',
+            'verb' => 'POST',
+        ],
+        [
             'name' => 'v2_mailbox#flagEmail',
             'url' => '/api/v2/emails/{id}/flag',
             'verb' => 'POST',
