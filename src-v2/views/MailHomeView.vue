@@ -420,8 +420,7 @@ export default {
 		},
 		playFileSound(sound) {
 			try {
-				const root = (typeof OC !== 'undefined' && OC.getRootPath ? OC.getRootPath() : '')
-				const url = root + '/apps/souvera_mail/app/smail/v/current/static/sounds/' + sound + '.mp3'
+				const url = generateUrl('/apps/souvera_mail/js/sounds/' + sound + '.mp3')
 				const a = new Audio(url)
 				a.volume = 0.4
 				a.play()
