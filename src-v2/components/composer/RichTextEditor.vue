@@ -46,6 +46,7 @@
 			</NcButton>
 		</div>
 		<editor-content :editor="editor" class="richtext-editor__content" @click="focusEditor" />
+		<slot name="footer" />
 	</div>
 	<div v-else class="richtext-editor__loading">
 		<span class="icon-loading" />
