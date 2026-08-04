@@ -210,6 +210,7 @@
 						<template #icon><Plus :size="20" /></template>
 						{{ t('souvera_mail', 'New folder') }}
 					</NcButton>
+					<p class="settings-muted" style="font-size:12px; margin:4px 0 0">{{ t('souvera_mail', 'Drag folders to rearrange or move them into another folder.') }}</p>
 					<div v-if="showCreateFolder" class="create-row">
 						<NcTextField v-model="newFolderName" :placeholder="t('souvera_mail', 'Folder name')" />
 						<div v-if="newSubfolderParentId" class="create-row__sub">
@@ -219,32 +220,35 @@
 						<NcButton variant="tertiary" @click="showCreateFolder = false; newSubfolderParentId = null">{{ t('souvera_mail', 'Cancel') }}</NcButton>
 					</div>
 					<div v-if="folderTree.length > 0" class="folder-list">
-						<div v-for="f in folderTree" :key="f.id" class="folder-row"
-							:style="{ paddingLeft: (16 + f.depth * 20) + 'px' }"
-							draggable="true"
-							@dragstart="onFolderDragStart($event, f)"
-							@dragover.prevent="onFolderDragOver($event, f)"
-							@dragleave="onFolderDragLeave($event)"
-							@drop="onFolderDrop($event, f)"
-							@dragend="onFolderDragEnd($event)"
-							:class="{ 'folder-row--drag-over': dragOverId === f.id, 'folder-row--dragging': dragId === f.id }">
-							<span class="folder-row__name">{{ f.name }}</span>
-							<div class="folder-row__actions">
-								<NcButton variant="tertiary" size="small"
-									:aria-label="t('souvera_mail', 'Subfolder')"
-									@click="newSubfolderParentId = f.id; newFolderName = ''; showCreateFolder = true">
-									<template #icon><FolderPlus :size="14" /></template>
-								</NcButton>
-								<NcButton variant="tertiary" size="small"
-									:aria-label="t('souvera_mail', 'Rename')" @click="startRenameFolder(f)">
-									<template #icon><Pencil :size="14" /></template>
-								</NcButton>
-								<NcButton variant="tertiary" size="small"
-									:aria-label="t('souvera_mail', 'Delete')" @click="deleteFolder(f.id)">
-									<template #icon><TrashCan :size="14" /></template>
-								</NcButton>
+						<template v-for="f in folderTree" :key="f.id">
+							<div v-if="f._heading" class="folder-heading">{{ f._heading }}</div>
+							<div v-else class="folder-row"
+								:style="{ paddingLeft: (16 + f.depth * 20) + 'px' }"
+								draggable="true"
+								@dragstart="onFolderDragStart($event, f)"
+								@dragover.prevent="onFolderDragOver($event, f)"
+								@dragleave="onFolderDragLeave($event)"
+								@drop="onFolderDrop($event, f)"
+								@dragend="onFolderDragEnd($event)"
+								:class="{ 'folder-row--drag-over': dragOverId === f.id, 'folder-row--dragging': dragId === f.id }">
+								<span class="folder-row__name">{{ f.name }}</span>
+								<div class="folder-row__actions">
+									<NcButton variant="tertiary" size="small"
+										:aria-label="t('souvera_mail', 'Subfolder')"
+										@click="newSubfolderParentId = f.id; newFolderName = ''; showCreateFolder = true">
+										<template #icon><FolderPlus :size="14" /></template>
+									</NcButton>
+									<NcButton variant="tertiary" size="small"
+										:aria-label="t('souvera_mail', 'Rename')" @click="startRenameFolder(f)">
+										<template #icon><Pencil :size="14" /></template>
+									</NcButton>
+									<NcButton variant="tertiary" size="small"
+										:aria-label="t('souvera_mail', 'Delete')" @click="deleteFolder(f.id)">
+										<template #icon><TrashCan :size="14" /></template>
+									</NcButton>
+								</div>
 							</div>
-						</div>
+						</template>
 					</div>
 					<NcEmptyContent v-else-if="loadedFolders" :name="t('souvera_mail', 'No custom folders')" />
 				</div>
@@ -386,12 +390,29 @@ export default {
 		sigPreviewHtml() {
 			return DOMPurify.sanitize(this.sigHtml || '', { USE_PROFILES: { html: true } })
 		},
-		// Flattened tree: roots first, then children nested under parents
+		// Flattened tree: roots first, then children nested under parents.
+		// System folders (inbox, sent, …) are included as anchor nodes so
+		// that any child folder underneath them appears correctly indented.
 		folderTree() {
 			const list = this.userFoldersList
 			if (!list || !list.length) return []
 			const byId = {}
-			for (const f of list) { byId[f.id] = { ...f, children: [] } }
+			for (const f of list) { byId[f.id] = { ...f, children: [], isSystem: false } }
+
+			// Collect parent IDs that are not in the list itself (system folders).
+			const missingParents = new Set()
+			for (const id in byId) {
+				const f = byId[id]
+				if (f.parentId && !byId[f.parentId]) {
+					missingParents.add(f.parentId)
+				}
+			}
+			// Fetch missing parent info from the full mailbox list (App.vue stored
+			// system mailboxes are not in userFoldersList — create stub entries).
+			for (const pid of missingParents) {
+				byId[pid] = { id: pid, name: pid, children: [], isSystem: true, depth: 0 }
+			}
+
 			const roots = []
 			for (const id in byId) {
 				const f = byId[id]
@@ -400,11 +421,23 @@ export default {
 				} else { roots.push(f) }
 			}
 			const flat = []
+			const systemRoots = []; const userRoots = []
+			for (const r of roots) {
+				(r.isSystem ? systemRoots : userRoots).push(r)
+			}
 			function walk(nodes, depth) {
 				nodes.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-				for (const n of nodes) { flat.push({ ...n, depth }); walk(n.children, depth + 1) }
+				for (const n of nodes) {
+					flat.push({ ...n, depth })
+					walk(n.children, depth + 1)
+				}
 			}
-			walk(roots, 0)
+			// Show user roots first, then system-folder subtrees (collapsed by default).
+			walk(userRoots, 0)
+			if (systemRoots.length) {
+				flat.push({ _heading: 'System folders', depth: 0, id: '_system' })
+				walk(systemRoots, 1)
+			}
 			return flat
 		},
 		quotaPercent() {
@@ -744,6 +777,7 @@ export default {
 .folder-row--dragging { opacity: 0.4; }
 .folder-row--drag-over { border-color: var(--color-primary-element) !important; background: var(--color-primary-element-light); }
 .create-row__sub { font-size: 12px; color: var(--color-text-maxcontrast); margin: 2px 0; }
+.folder-heading { font-size: 11px; font-weight: 600; color: var(--color-text-maxcontrast); text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 10px 4px; }
 .quota-bar { height: 6px; background: var(--color-border); border-radius: 3px; overflow: hidden; margin: 4px 0 8px; }
 .quota-bar__fill { height: 100%; background: var(--color-primary-element); border-radius: 3px; transition: width 0.4s ease; }
 </style>

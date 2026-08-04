@@ -445,7 +445,9 @@
     "Subfolder of": "Unterordner von",
     "Folder moved": "Ordner verschoben",
     "Failed to move folder": "Ordner konnte nicht verschoben werden",
-    "Version": "Version"
+    "Version": "Version",
+    "System folders": "System-Ordner",
+    "Drag folders to rearrange or move them into another folder.": "Ordner per Drag & Drop neu anordnen oder in andere Ordner verschieben."
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }
