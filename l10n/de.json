@@ -406,7 +406,26 @@
     "HTML source code…": "HTML-Quellcode…",
     "Failed to save signature": "Signatur konnte nicht gespeichert werden",
     "Failed to read signature file": "Signatur-Datei konnte nicht gelesen werden",
-    "Signature file ignored (empty or larger than 2 MB)": "Signatur-Datei ignoriert (leer oder größer als 2 MB)"
+    "Signature file ignored (empty or larger than 2 MB)": "Signatur-Datei ignoriert (leer oder größer als 2 MB)",
+    "Message sent": "Nachricht gesendet",
+    "Signature saved": "Signatur gespeichert",
+    "App password created": "App-Passwort erstellt",
+    "Failed to create app password": "App-Passwort konnte nicht erstellt werden",
+    "App password removed": "App-Passwort entfernt",
+    "Failed to remove app password": "App-Passwort konnte nicht entfernt werden",
+    "Shared folder position saved": "Position der geteilten Ordner gespeichert",
+    "Failed to save": "Speichern fehlgeschlagen",
+    "Notification sound saved": "Benachrichtigungston gespeichert",
+    "Folder created": "Ordner erstellt",
+    "Failed to create folder": "Ordner konnte nicht erstellt werden",
+    "Folder renamed": "Ordner umbenannt",
+    "Failed to rename folder": "Ordner konnte nicht umbenannt werden",
+    "Folder deleted": "Ordner gelöscht",
+    "Failed to delete folder": "Ordner konnte nicht gelöscht werden",
+    "Marked as read": "Als gelesen markiert",
+    "Marked as unread": "Als ungelesen markiert",
+    "Messages deleted": "Nachrichten gelöscht",
+    "Messages moved": "Nachrichten verschoben"
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

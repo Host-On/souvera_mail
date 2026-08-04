@@ -83,6 +83,7 @@ import EmailDetail from '../components/EmailDetail.vue'
 import { useHotkeys } from '../composables/useHotkeys.js'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
+import { showSuccess } from '@nextcloud/dialogs'
 
 const { fetchEmails, fetchEmailBody, deleteEmailApi, moveEmail, markEmailRead, toggleEmailFlag } = useJmapClient()
 
@@ -216,6 +217,7 @@ export default {
 			}
 			this.checkedIds = []
 			await this.loadEmails()
+			showSuccess(this.t('souvera_mail', 'Marked as read'))
 		},
 		async bulkMarkUnread() {
 			for (const id of this.checkedIds) {
@@ -223,6 +225,7 @@ export default {
 			}
 			this.checkedIds = []
 			await this.loadEmails()
+			showSuccess(this.t('souvera_mail', 'Marked as unread'))
 		},
 		async bulkDelete() {
 			for (const id of this.checkedIds) {
@@ -230,6 +233,7 @@ export default {
 			}
 			this.checkedIds = []
 			await this.loadEmails()
+			showSuccess(this.t('souvera_mail', 'Messages deleted'))
 		},
 		async bulkMoveTo(mailboxId) {
 			for (const id of this.checkedIds) {
@@ -237,6 +241,7 @@ export default {
 			}
 			this.checkedIds = []
 			await this.loadEmails()
+			showSuccess(this.t('souvera_mail', 'Messages moved'))
 		},
 		async onOpenEmail(email) {
 			this.selectedEmail = email

@@ -93,6 +93,7 @@ import AttachmentList from './composer/AttachmentList.vue'
 import CloudFilePicker from './CloudFilePicker.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
+import { showSuccess, showError } from '@nextcloud/dialogs'
 import DOMPurify from 'dompurify'
 import { sanitizeMailHtml } from '../utils/mailSanitizer.js'
 import { buildReplyQuote, buildForwardBody } from '../utils/quoteBuilder.js'
@@ -405,10 +406,11 @@ export default {
 				if (this.savedDraftId) {
 					try { await axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId)) } catch {}
 				}
+				showSuccess(this.t('souvera_mail', 'Message sent'))
 				this.$emit('sent')
 			} catch (e) {
 				console.error('Send failed', e)
-				alert(e.response?.data?.error || this.t('souvera_mail', 'Failed to send message'))
+				showError(e.response?.data?.error || this.t('souvera_mail', 'Failed to send message'))
 			} finally {
 				this.sending = false
 			}
