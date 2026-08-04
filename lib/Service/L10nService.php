@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace OCA\SouveraMail\Service;
 
 use OCP\App\IAppManager;
+use OCP\IConfig;
+use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -20,8 +22,31 @@ class L10nService
 {
     public function __construct(
         private IAppManager $appManager,
+        private IUserSession $userSession,
+        private IConfig $config,
         private LoggerInterface $logger,
     ) {
+    }
+
+    /**
+     * The language for the v2 UI. The user's PERSONAL language setting
+     * (IUser::getLanguage — e.g. "de" for "Deutsch (Persönlich: Du)")
+     * is authoritative. IL10N::getLanguageCode() is NOT used here: the
+     * DI container may have cached an IL10N instance created with a
+     * different language earlier in the request, which would silently
+     * resolve to English despite the user's personal setting.
+     */
+    public function resolveLanguage(): string
+    {
+        $user = $this->userSession->getUser();
+        if ($user !== null) {
+            $lang = \trim((string) $user->getLanguage());
+            if ($lang !== '') {
+                return $lang;
+            }
+        }
+        $default = \trim((string) $this->config->getSystemValueString('default_language', ''));
+        return $default !== '' ? $default : 'en';
     }
 
     /**

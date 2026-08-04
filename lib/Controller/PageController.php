@@ -11,7 +11,6 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IGroupManager;
-use OCP\IL10N;
 use OCP\INavigationManager;
 use OCP\IRequest;
 use OCP\IURLGenerator;
@@ -26,7 +25,6 @@ class PageController extends Controller
         private IGroupManager $groupManager,
         private EngineHelper $engineHelper,
         private IURLGenerator $urlGenerator,
-        private IL10N $l10n,
         private L10nService $l10nService,
         private ?string $userId,
     ) {
@@ -266,12 +264,9 @@ class PageController extends Controller
         // the runtime endpoint /api/v2/l10n when the inline script was not
         // available (e.g. older NC versions without the $cspNonce template
         // variable would silently CSP-block it). See L10nService.
-        try {
-            $lang = $this->l10n->getLanguageCode();
-        } catch (\Throwable) {
-            $lang = 'en';
-        }
-        $translations = $this->l10nService->getCatalog($lang);
+        // The language comes from the user's PERSONAL setting, not the
+        // cached IL10N instance (which may resolve to the instance default).
+        $translations = $this->l10nService->getCatalog($this->l10nService->resolveLanguage());
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
         // The inline <script> in templates/v2.php uses the NC-provided
         // $cspNonce template variable (part of the default CSP header),
