@@ -132,12 +132,15 @@ export default {
 			if (inbox) this.selectedMailbox = inbox.id
 		} catch(e) { console.error(e) }
 		await Promise.all([this.loadQuota(), this.loadShared(), this.loadLayout()])
+		// Refresh mailbox unread counts when emails are read/deleted/moved
+		window.addEventListener('souvera-mail:refresh-mailboxes', this.onRefreshMailboxes)
 		this._hotkeys = useHotkeys({
 			c: () => { this.startCompose() },
 			'G': () => { this.$router.push({ name: 'inbox' }) },
 		})
 	},
 	beforeUnmount() {
+		window.removeEventListener('souvera-mail:refresh-mailboxes', this.onRefreshMailboxes)
 		this._hotkeys?.destroy()
 	},
 	errorCaptured(err, instance, info) {
@@ -145,6 +148,9 @@ export default {
 		return false
 	},
 	methods: {
+		async onRefreshMailboxes() {
+			try { this.mailboxes = await fetchMailboxes() } catch(e) { console.error(e) }
+		},
 		onMailboxSelect(id) { this.selectedMailbox = id; this.showSettings = false; this.$router.push({name:'inbox'}) },
 		startCompose() {
 			// Settings replaces the router-view — hide it so the compose
