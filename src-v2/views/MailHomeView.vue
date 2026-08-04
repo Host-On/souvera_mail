@@ -131,6 +131,7 @@ export default {
 		selectedMailbox() { clearTimeout(this._searchTimer); this.checkedIds = []; this.offset = 0; this.selectedEmail = null; this.loadEmails() },
 	},
 	async mounted() {
+		this._originalTitle = document.title
 		if (this.selectedMailbox) await this.loadEmails()
 		this._hotkeys = useHotkeys({
 			k: () => this.navigateEmail(1),
@@ -144,7 +145,7 @@ export default {
 		this.startAutoRefresh()
 		// AudioContext must be created/resumed during a user gesture;
 		// browsers block sound from timers otherwise.
-		this._onUserGesture = () => this.wakeAudio()
+		this._onUserGesture = () => { this.wakeAudio(); this.requestNotifyPerm() }
 		document.addEventListener('click', this._onUserGesture, { once: true })
 		document.addEventListener('keydown', this._onUserGesture, { once: true })
 	},
@@ -164,6 +165,11 @@ export default {
 				}
 				if (this._audioCtx.state === 'suspended') this._audioCtx.resume()
 			} catch {}
+		},
+		requestNotifyPerm() {
+			if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+				try { Notification.requestPermission() } catch {}
+			}
 		},
 		async loadEmails() {
 			const seq = (this._loadSeq || 0) + 1
@@ -193,8 +199,12 @@ export default {
 			// Play sound only when there are genuinely new emails (not page/filter changes)
 			if (prevIds.length > 0 && this.emailTotal > prevTotal) {
 				const newIds = this.emails.map(e => e.id).filter(id => !prevIds.includes(id))
-				if (newIds.length > 0) this.playNewMailSound()
+				if (newIds.length > 0) {
+					this.playNewMailSound()
+					this.notifyBrowser()
+				}
 			}
+			this.notifyTitle()
 		},
 		onSearch(q) {
 			this.searchQuery = q
@@ -358,11 +368,18 @@ export default {
 		},
 		async playNewMailSound() {
 			try {
-				const sound = this._soundPref || 'none'
+				// Always re-read the preference — the user may have changed
+				// it in Settings without a page reload.
+				let sound = this._soundPref || 'none'
+				try {
+					const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
+					sound = data.notificationSound || 'none'
+					this._soundPref = sound
+				} catch {}
 				if (sound === 'none') return
 				if (!this._audioCtx) { this._audioCtx = new (window.AudioContext || window.webkitAudioContext)() }
 				const ctx = this._audioCtx
-				if (ctx.state === 'suspended') await ctx.resume()
+				if (ctx.state === 'suspended') { try { await ctx.resume() } catch {} }
 				const gain = ctx.createGain()
 				gain.connect(ctx.destination)
 				gain.gain.value = 0.15
@@ -373,8 +390,20 @@ export default {
 					const o1 = ctx.createOscillator(); o1.connect(gain); o1.frequency.value = 660; o1.type = 'triangle'; o1.start(); gain.gain.setTargetAtTime(0, ctx.currentTime + 0.3, 0.05); o1.stop(ctx.currentTime + 0.5)
 				}
 				setTimeout(() => { try { gain.disconnect() } catch {} }, 1000)
-			} catch {
-				// Audio may be blocked until a user gesture — resume was attempted above
+			} catch { /* Audio blocked until user gesture */ }
+		},
+		notifyTitle() {
+			if (!this.emails.length) return
+			const unread = this.emails.filter(e => !e.isRead).length
+			document.title = unread > 0 ? `(${unread}) ${this._originalTitle}` : (this._originalTitle || document.title)
+		},
+		notifyBrowser() {
+			if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+			const unread = this.emails.filter(e => !e.isRead).length
+			if (unread > 0) {
+				try {
+					new Notification('Souvera Mail', { body: `${unread} neue Nachricht${unread !== 1 ? 'en' : ''}`, icon: generateUrl('/apps/souvera_mail/img/app.svg') })
+				} catch {}
 			}
 		},
 	},
