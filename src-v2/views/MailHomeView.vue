@@ -174,12 +174,12 @@ export default {
 		},
 		onSearch(q) {
 			this.searchQuery = q
+			this.offset = 0
 			this.scheduleSearch()
 		},
 		scheduleSearch() {
 			clearTimeout(this._searchTimer)
 			this._searchTimer = setTimeout(() => {
-				this.offset = 0
 				this.loadEmails()
 			}, 350)
 		},
@@ -287,7 +287,10 @@ export default {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
 				const interval = (data.autoRefresh || 0) * 1000
 				if (interval > 0) {
-					this._autoRefreshTimer = setInterval(() => { this.loadEmails() }, interval)
+					this._autoRefreshTimer = setInterval(() => {
+						clearTimeout(this._searchTimer)
+						this.loadEmails()
+					}, interval)
 				}
 			} catch {}
 		},

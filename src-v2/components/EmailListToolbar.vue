@@ -100,11 +100,12 @@ export default {
 <style scoped>
 .email-list-toolbar {
 	display: flex; justify-content: space-between; align-items: center;
+	flex-wrap: wrap; row-gap: 4px;
 	padding: 8px 12px;
 	border-bottom: 1px solid var(--color-border);
 	background: var(--color-background-dark);
 }
-.email-list-toolbar__left { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; }
-.email-list-toolbar__search { flex: 1; max-width: 300px; min-width: 120px; margin: 0 8px; }
+.email-list-toolbar__left { display: flex; align-items: center; flex-wrap: wrap; row-gap: 4px; gap: 2px; flex: 1; min-width: 0; }
+.email-list-toolbar__search { flex: 1; max-width: 300px; min-width: 100px; margin: 0 8px; }
 .selected-count { font-size: 13px; color: var(--color-primary-element); font-weight: 500; margin: 0 4px; }
 </style>
