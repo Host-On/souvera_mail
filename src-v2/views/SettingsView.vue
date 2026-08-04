@@ -450,7 +450,7 @@ export default {
 			try { const r = await API.quota(); this.quotaUsed = r.data.used || 0; this.quotaTotal = r.data.total || 0; this.quotaUnlimited = r.data.unlimited || false } catch {}
 			try { const r = await API.passwords(); this.passwords = r.data.passwords || [] } catch {}
 			try { const r = await API.shared(); this.sharedAbove = r.data.position === 'above' } catch {}
-			try { const r = await axios.get(generateUrl('/apps/souvera_mail/migration/welcome-state')); this.migrationCompleted = r.data?.state?.lastJob?.state === 'completed' } catch {}
+			try { const r = await axios.get(generateUrl('/apps/souvera_mail/migration/welcome-state')); const s = r.data?.state?.lastJob?.state; this.migrationCompleted = ['completed','dismissed','failed','cancelled'].includes(s) } catch {}
 			try { const r = await axios.get(generateUrl('/apps/souvera_mail/api/v2/mailboxes')); this.userFoldersList = (r.data.mailboxes || []).filter(m => !['inbox','sent','drafts','archive','junk','trash'].includes(m.role)) } catch {} finally { this.loadedFolders = true }
 			try {
 				const r = await API.prefs(); const p = r.data
