@@ -466,7 +466,12 @@ class V2ComposeController extends Controller
                 'accountId' => $accountId,
                 'create' => $missing,
             ]);
-            if (!isset($create['error'])) {
+            if (isset($create['error'])) {
+                $this->logger->warning(
+                    'Souvera Mail: failed to create missing standard mailboxes: ' . $create['error'],
+                    ['app' => 'souvera_mail']
+                );
+            } else {
                 foreach ($create['data']['created'] ?? [] as $key => $mb) {
                     $role = \str_starts_with((string) $key, 'mb_') ? \substr((string) $key, 3) : '';
                     if ($role === 'drafts' && $drafts === null) {
@@ -477,6 +482,12 @@ class V2ComposeController extends Controller
                     }
                 }
             }
+        }
+        if ($sent === null) {
+            $this->logger->warning(
+                'Souvera Mail: no Sent mailbox id resolvable for account ' . $accountId . ' — sent copy will be skipped',
+                ['app' => 'souvera_mail']
+            );
         }
         return ['drafts' => $drafts, 'sent' => $sent];
     }
