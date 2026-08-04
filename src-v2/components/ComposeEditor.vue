@@ -122,12 +122,8 @@ export default {
 		const toPrefill = idPrefill.filter(r => { const k = r.email.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true })
 
 		let ccPrefill = []
-		if (this.mode === 'replyAll' && this.originalEmail) {
-			const ownAddr = '' // filled by identities later
-			const toList = this.originalEmail.toList || []
-			const ccList = this.originalEmail.ccList || []
-			ccPrefill = [...toList, ...ccList].filter(r => r.email !== ownAddr && r.email !== (this.originalEmail.fromAddress || ''))
-		}
+		// replyAll recipients are filled from originalEmail in the watcher —
+		// originalEmail is always null at data()-time on the router path.
 
 		return {
 			visible: true,
@@ -136,7 +132,7 @@ export default {
 			to: toPrefill,
 			cc: ccPrefill,
 			bcc: [],
-			showCc: ccPrefill.length > 0,
+			showCc: false,
 			showBcc: false,
 			subject: this.prefillSubject(),
 			bodyHtml: '',
@@ -171,13 +167,17 @@ export default {
 		subject() { this.markDirty() },
 		bodyHtml() { if (!this._suppressDirty) this.markDirty() },
 		// originalEmail arrives asynchronously (ComposeView fetches the body
-		// after mount) — build the reply/forward content and prefill the
-		// subject as soon as it becomes available. The build waits for the
-		// preferences (signature, positions) to be loaded.
+		// after mount) — build the reply/forward content, prefill recipients
+		// and the subject as soon as it becomes available. The build waits
+		// for the preferences (signature, positions) to be loaded.
 		originalEmail: {
 			immediate: true,
 			handler() {
 				if (this.originalEmail) {
+					// Recipients need the own addresses from the identities,
+					// which may arrive after originalEmail.
+					if (this._identitiesLoaded) this.prefillRecipients()
+					else this._pendingRecipients = true
 					if (this._prefsLoaded) this.buildReplyOrForward()
 					if (this.subject === '' && (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward')) {
 						this.subject = this.prefillSubject()
@@ -255,6 +255,28 @@ export default {
 				this.buildReplyContent()
 			}
 		},
+		// Recipients come from the asynchronously loaded originalEmail (the
+		// router path never passes reply data in the query). Own addresses
+		// are excluded from replyAll CC lists.
+		prefillRecipients() {
+			if (!this.originalEmail) return
+			if (this.mode === 'replyAll') {
+				if (this.to.length === 0 && this.originalEmail.fromAddress) {
+					this.to = [{ name: this.originalEmail.fromName || '', email: this.originalEmail.fromAddress }]
+				}
+				if (this.cc.length === 0) {
+					const own = new Set((this.identities || []).map(i => (i.email || '').toLowerCase()))
+					const skip = new Set([this.originalEmail.fromAddress, ...own].map(a => (a || '').toLowerCase()))
+					const toList = this.originalEmail.toList || []
+					const ccList = this.originalEmail.ccList || []
+					this.cc = [...toList, ...ccList].filter(r => r.email && !skip.has(r.email.toLowerCase()))
+					if (this.cc.length > 0) this.showCc = true
+				}
+			} else if (this.mode === 'reply' && this.to.length === 0 && this.originalEmail.fromAddress) {
+				this.to = [{ name: this.originalEmail.fromName || '', email: this.originalEmail.fromAddress }]
+			}
+			// forward deliberately leaves To empty — the user picks new recipients
+		},
 		async loadIdentities() {
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/identities'))
@@ -263,6 +285,12 @@ export default {
 				if (list.length > 0) this.fromIdentityId = list[0].id
 			} catch (e) {
 				console.error('Failed to load identities', e)
+			} finally {
+				this._identitiesLoaded = true
+				if (this._pendingRecipients) {
+					this._pendingRecipients = false
+					this.prefillRecipients()
+				}
 			}
 		},
 		buildReplyContent() {
