@@ -440,7 +440,11 @@
     "Empty trash": "Papierkorb leeren",
     "Empty trash folder permanently? This cannot be undone.": "Papierkorb endgültig leeren? Dies kann nicht rückgängig gemacht werden.",
     "Trash emptied": "Papierkorb geleert",
-    "Failed to empty trash": "Papierkorb konnte nicht geleert werden"
+    "Failed to empty trash": "Papierkorb konnte nicht geleert werden",
+    "Subfolder": "Unterordner",
+    "Subfolder of": "Unterordner von",
+    "Folder moved": "Ordner verschoben",
+    "Failed to move folder": "Ordner konnte nicht verschoben werden"
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }
