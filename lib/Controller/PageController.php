@@ -3,6 +3,7 @@
 namespace OCA\SouveraMail\Controller;
 
 use OCA\SouveraMail\Service\DomainConfigService;
+use OCA\SouveraMail\Service\L10nService;
 use OCA\SouveraMail\Util\EngineHelper;
 use OCA\SouveraMail\ContentSecurityPolicy as LocalCSP;
 use OCP\AppFramework\Controller;
@@ -10,10 +11,10 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IGroupManager;
+use OCP\IL10N;
 use OCP\INavigationManager;
 use OCP\IRequest;
 use OCP\IURLGenerator;
-use Psr\Log\LoggerInterface;
 
 class PageController extends Controller
 {
@@ -25,7 +26,8 @@ class PageController extends Controller
         private IGroupManager $groupManager,
         private EngineHelper $engineHelper,
         private IURLGenerator $urlGenerator,
-        private LoggerInterface $logger,
+        private IL10N $l10n,
+        private L10nService $l10nService,
         private ?string $userId,
     ) {
         parent::__construct($appName, $request);
@@ -260,59 +262,16 @@ class PageController extends Controller
     {
         $this->navigationManager->setActiveEntry('souvera_mail');
         // Translations are injected INLINE into the template with the CSP
-        // nonce. The previous approach (writing js/souvera_mail-l10n-<lang>.js
-        // at runtime) was unreliable: per-request file writes race with
-        // asset caching and HTTP-cached copies kept serving stale/empty
-        // catalogs. Inline + nonce is the canonical Nextcloud pattern for
-        // small JSON payloads and cannot go stale or race.
-        $translations = [];
+        // nonce (fast start) — and the v2 client additionally falls back to
+        // the runtime endpoint /api/v2/l10n when the inline script was not
+        // available (e.g. older NC versions without the $cspNonce template
+        // variable would silently CSP-block it). See L10nService.
         try {
-            $lang = \OC::$server->get(\OCP\IL10N::class)->getLanguageCode();
+            $lang = $this->l10n->getLanguageCode();
         } catch (\Throwable) {
             $lang = 'en';
         }
-        $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath('souvera_mail');
-        if ($appPath !== null) {
-            // Nextcloud ships several German variants as distinct language
-            // codes (e.g. "de" and "de_DE", each with its own l10n/<code>.json).
-            // Try the full locale first, then the short form, then the legacy
-            // bundled catalog, so any NC language setting resolves.
-            $langShort = \substr($lang, 0, 2);
-            foreach ([$lang, $langShort] as $candidate) {
-                if ($candidate === '') continue;
-                $l10nPath = $appPath . '/l10n/' . $candidate . '.json';
-                if (\is_file($l10nPath)) {
-                    $raw = \file_get_contents($l10nPath);
-                    if ($raw !== false) {
-                        $parsed = \json_decode($raw, true);
-                        if (\is_array($parsed) && isset($parsed['translations'])
-                            && \is_array($parsed['translations']) && \count($parsed['translations']) > 0) {
-                            $translations = $parsed['translations'];
-                            break;
-                        }
-                    }
-                }
-            }
-            if ($translations === []) {
-                $legacyPath = $appPath . '/js/l10n-' . $langShort . '.json';
-                if (\is_file($legacyPath)) {
-                    $raw = \file_get_contents($legacyPath);
-                    if ($raw !== false) {
-                        $parsed = \json_decode($raw, true);
-                        if (\is_array($parsed) && isset($parsed['translations'])) {
-                            $translations = $parsed['translations'];
-                        }
-                    }
-                }
-            }
-            if ($translations === [] && $lang !== 'en') {
-                $this->logger->warning(
-                    'Souvera Mail: no translation catalog found for language "' . $lang
-                    . '" (looked in l10n/' . $lang . '.json, l10n/' . $langShort . '.json, js/l10n-' . $langShort . '.json)',
-                    ['app' => 'souvera_mail']
-                );
-            }
-        }
+        $translations = $this->l10nService->getCatalog($lang);
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
         // The inline <script> in templates/v2.php uses the NC-provided
         // $cspNonce template variable (part of the default CSP header),

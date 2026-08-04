@@ -361,6 +361,11 @@ return [
             'verb' => 'POST',
         ],
         [
+            'name' => 'v2_l10n#index',
+            'url' => '/api/v2/l10n',
+            'verb' => 'GET',
+        ],
+        [
             'name' => 'v2_search#search',
             'url' => '/api/v2/search',
             'verb' => 'GET',
