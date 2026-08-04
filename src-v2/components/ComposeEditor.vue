@@ -228,20 +228,23 @@ export default {
 		},
 		// Replaces the editor content only while it is still untouched
 		// (re-checked at execution time), and suppresses the dirty flag for
-		// this programmatic initialisation.
+		// this programmatic initialisation. The flag is only set inside the
+		// timer, so user input before it is never hidden from dirty tracking.
 		initContent(html, cursor) {
-			this._suppressDirty = true
 			this.$nextTick(() => {
 				setTimeout(() => {
-					if (this.bodyHtml !== '') {
-						this._suppressDirty = false
-						return
+					if (this.bodyHtml !== '') return
+					this._suppressDirty = true
+					try {
+						this.$refs.editor?.setContent(html)
+						if (cursor === 'end') this.$refs.editor?.setCursorAtEnd()
+						else this.$refs.editor?.setCursorAtStart()
+						this.$refs.editor?.focus()
+					} finally {
+						// Reset after the pre-flush watcher has run, so the
+						// programmatic body change is not marked dirty.
+						this.$nextTick(() => { this._suppressDirty = false })
 					}
-					this.$refs.editor?.setContent(html)
-					if (cursor === 'end') this.$refs.editor?.setCursorAtEnd()
-					else this.$refs.editor?.setCursorAtStart()
-					this.$refs.editor?.focus()
-					this.$nextTick(() => { this._suppressDirty = false })
 				}, 100)
 			})
 		},
