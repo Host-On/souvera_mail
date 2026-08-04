@@ -434,7 +434,9 @@
     "Mark all as read": "Alle als gelesen markieren",
     "Mark all as unread": "Alle als ungelesen markieren",
     "Import already completed": "Import bereits abgeschlossen",
-    "Preview sound": "Sound anhören"
+    "Preview sound": "Sound anhören",
+    "Fullscreen": "Vollbild",
+    "Exit fullscreen": "Vollbild verlassen"
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

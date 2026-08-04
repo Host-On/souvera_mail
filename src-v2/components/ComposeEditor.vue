@@ -1,8 +1,17 @@
 <template>
-	<NcModal v-model:show="visible" size="large" @close="onClose">
+	<NcModal v-model:show="visible" :size="fullscreen ? '' : 'large'" @close="onClose"
+		:class="{ 'compose-modal--fullscreen': fullscreen }">
 		<div class="compose-layout">
 			<div class="compose-layout__header">
 				<h3>{{ composeTitle }}</h3>
+				<NcButton variant="tertiary" size="small"
+					:aria-label="fullscreen ? t('souvera_mail', 'Exit fullscreen') : t('souvera_mail', 'Fullscreen')"
+					@click="fullscreen = !fullscreen">
+					<template #icon>
+						<ArrowExpand v-if="!fullscreen" :size="18" />
+						<ArrowCollapse v-else :size="18" />
+					</template>
+				</NcButton>
 			</div>
 
 			<div v-if="identities.length > 1" class="compose-field compose-field--from">
@@ -43,13 +52,10 @@
 
 			<div class="compose-field compose-field--body">
 				<RichTextEditor ref="editor" v-model="bodyHtml"
-					:placeholder="t('souvera_mail', 'Write your message…')">
-					<template #footer>
-						<div v-if="showSignaturePreview" class="compose-signature" @click.stop>
-							<div class="compose-signature__content" v-html="signaturePreviewHtml"></div>
-						</div>
-					</template>
-				</RichTextEditor>
+					:placeholder="t('souvera_mail', 'Write your message…')" />
+				<div v-if="showSignaturePreview" class="compose-signature" @click.stop>
+					<div class="compose-signature__content" v-html="signaturePreviewHtml"></div>
+				</div>
 			</div>
 
 			<AttachmentList v-if="attachments.length > 0"
@@ -93,6 +99,8 @@ import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
 import Cloud from 'vue-material-design-icons/Cloud.vue'
 import ChevronDown from 'vue-material-design-icons/ChevronDown.vue'
+import Fullscreen from 'vue-material-design-icons/Fullscreen.vue'
+import FullscreenExit from 'vue-material-design-icons/FullscreenExit.vue'
 import RecipientField from './composer/RecipientField.vue'
 import RichTextEditor from './composer/RichTextEditor.vue'
 import AttachmentList from './composer/AttachmentList.vue'
@@ -108,7 +116,7 @@ let draftTimer = null
 
 export default {
 	name: 'ComposeEditor',
-	components: { NcModal, NcButton, NcTextField, Send, Paperclip, TrashCan, ChevronDown, Cloud, RecipientField, RichTextEditor, AttachmentList, CloudFilePicker },
+	components: { NcModal, NcButton, NcTextField, Send, Paperclip, TrashCan, ChevronDown, Fullscreen, FullscreenExit, Cloud, RecipientField, RichTextEditor, AttachmentList, CloudFilePicker },
 	props: {
 		replyTo: { type: Object, default: null },
 		forwardOf: { type: Object, default: null },
@@ -134,6 +142,7 @@ export default {
 
 		return {
 			visible: true,
+			fullscreen: false,
 			fromIdentityId: null,
 			identities: [],
 			to: toPrefill,
@@ -486,6 +495,7 @@ export default {
 
 .compose-layout__header { padding: 12px 20px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
 .compose-layout__header h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.compose-modal--fullscreen :deep(.modal-container) { max-width: calc(100vw - 32px) !important; max-height: calc(100vh - 32px) !important; width: calc(100vw - 32px) !important; }
 
 .compose-field {
 	padding: 10px 20px;
@@ -629,17 +639,20 @@ export default {
 /* Signature preview below the editor — visible like Thunderbird, but not
    part of the editable document (attached verbatim at send time). */
 .compose-signature {
-	margin-top: 16px;
-	padding: 8px 12px;
+	margin: 0 16px 12px;
+	padding: 6px 12px;
 	border: 1px dashed var(--color-border);
 	border-radius: var(--border-radius);
 	background: var(--color-background-dark);
 	pointer-events: none;
 	user-select: none;
+	flex-shrink: 0;
+	max-height: 100px;
+	overflow-y: auto;
 	overflow-x: hidden;
 }
 .compose-signature__content {
-	margin-top: 2px;
+	margin-top: 0;
 	font-size: 13px;
 	color: var(--color-text-maxcontrast);
 	line-height: 1.5;
