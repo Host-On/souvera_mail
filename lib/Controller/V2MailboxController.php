@@ -338,6 +338,48 @@ class V2MailboxController extends Controller
     }
 
     /**
+     * POST /apps/souvera_mail/api/v2/mailboxes/{id}/empty
+     *
+     * Permanently delete ALL emails in the given mailbox.
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function emptyMailbox(string $id): JSONResponse
+    {
+        $accountId = $this->resolveAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+
+        // Query all email IDs in the mailbox.
+        $query = $this->jmap->singleCall('Email/query', [
+            'accountId' => $accountId,
+            'filter' => ['inMailbox' => $id],
+            'limit' => 500,
+        ]);
+
+        $ids = $query['data']['ids'] ?? [];
+        if ($ids === []) {
+            return new JSONResponse(['success' => true, 'total' => 0]);
+        }
+
+        $result = $this->jmap->singleCall('Email/set', [
+            'accountId' => $accountId,
+            'destroy' => $ids,
+        ]);
+
+        if (isset($result['error'])) {
+            return new JSONResponse($result, 500);
+        }
+
+        return new JSONResponse([
+            'success' => true,
+            'total' => \count($ids),
+            'destroyed' => \count($result['data']['destroyed'] ?? []),
+        ]);
+    }
+
+    /**
      * POST /apps/souvera_mail/api/v2/mailboxes/{id}/mark-all-read
      *
      * Mark ALL unread emails in the given mailbox as read in a single

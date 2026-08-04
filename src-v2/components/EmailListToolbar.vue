@@ -17,6 +17,11 @@
 					<template #icon><EmailOutline :size="16" /></template>
 				</NcActionButton>
 			</NcActions>
+			<NcButton v-if="isTrash && selectedCount === 0" variant="tertiary"
+				@click="$emit('emptyTrash')">
+				<template #icon><TrashCan :size="18" /></template>
+				{{ t('souvera_mail', 'Empty trash') }}
+			</NcButton>
 			<template v-if="selectedCount > 0">
 				<span class="selected-count">{{ selectedCount }} {{ t('souvera_mail', 'selected') }}</span>
 				<NcButton variant="tertiary" @click="$emit('markRead')">
@@ -97,8 +102,9 @@ export default {
 		// twoRow: force a two-line toolbar (checkbox+search / filter+compose)
 		// for narrow side-by-side list panels.
 		twoRow: { type: Boolean, default: false },
+		isTrash: { type: Boolean, default: false },
 	},
-	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter', 'selectAll', 'markAllRead', 'markAllUnread'],
+	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter', 'selectAll', 'markAllRead', 'markAllUnread', 'emptyTrash'],
 	computed: {
 		activeFilterMenuName() {
 			const active = this.filterOptions.find(f => f.value === this.filter)

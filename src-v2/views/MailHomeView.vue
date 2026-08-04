@@ -5,6 +5,7 @@
 				:selected-count="checkedIds.length"
 				:select-all-state="selectAllState"
 				:target-mailboxes="moveMailboxes"
+				:is-trash="isTrashMailbox"
 				@refresh="refreshEmails"
 				@compose="$router.push({name:'compose'})"
 				@mark-read="bulkMarkRead"
@@ -15,6 +16,7 @@
 				@select-all="selectAll"
 				@mark-all-read="markAllRead"
 				@mark-all-unread="markAllUnread"
+				@empty-trash="emptyTrash"
 				:search-query="searchQuery"
 				:filter="filterType"
 				:two-row="!verticalLayout"
@@ -125,6 +127,10 @@ export default {
 		},
 		moveMailboxes() {
 			return this.allMailboxes.filter(m => m.role !== 'trash' && m.role !== 'junk')
+		},
+		isTrashMailbox() {
+			const mb = this.allMailboxes.find(m => m.id === this.selectedMailbox || (m._accountId + '|' + m.id) === this.selectedMailbox)
+			return mb?.role === 'trash'
 		},
 	},
 	watch: {
@@ -263,6 +269,20 @@ export default {
 		async markAllUnread() {
 			this.checkedIds = this.emails.map(e => e.id)
 			await this.bulkMarkUnread()
+		},
+		async emptyTrash() {
+			if (!confirm(this.t('souvera_mail', 'Empty trash folder permanently? This cannot be undone.'))) return
+			try {
+				const mailboxId = this.selectedMailbox.includes('|')
+					? this.selectedMailbox.split('|')[1]
+					: this.selectedMailbox
+				await axios.post(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + mailboxId + '/empty'))
+				showSuccess(this.t('souvera_mail', 'Trash emptied'))
+				await this.loadEmails()
+			} catch (e) {
+				console.error('Empty trash failed', e)
+				showError(this.t('souvera_mail', 'Failed to empty trash'))
+			}
 		},
 		async bulkMarkRead() {
 			for (const id of this.checkedIds) {
