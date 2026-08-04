@@ -161,6 +161,7 @@
 	"QUOTA": {
 		"MAIL_STORAGE": "Mail-Speicher",
 		"USED_LABEL": "{used} verwendet",
+		"UNLIMITED_LABEL": "Unbegrenzt",
 		"UNLIMITED_TITLE": "Kein Speicherlimit konfiguriert",
 		"PERCENT_TITLE": "{p}% belegt",
 		"CLICK_FOR_SETTINGS": "Klicken für Einstellungen",
