@@ -11,10 +11,10 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IGroupManager;
+use OCP\IL10N;
 use OCP\INavigationManager;
 use OCP\IRequest;
 use OCP\IURLGenerator;
-use Psr\Log\LoggerInterface;
 
 class PageController extends Controller
 {
@@ -26,7 +26,7 @@ class PageController extends Controller
         private IGroupManager $groupManager,
         private EngineHelper $engineHelper,
         private IURLGenerator $urlGenerator,
-        private LoggerInterface $logger,
+        private IL10N $l10n,
         private L10nService $l10nService,
         private ?string $userId,
     ) {
@@ -267,7 +267,7 @@ class PageController extends Controller
         // available (e.g. older NC versions without the $cspNonce template
         // variable would silently CSP-block it). See L10nService.
         try {
-            $lang = \OC::$server->get(\OCP\IL10N::class)->getLanguageCode();
+            $lang = $this->l10n->getLanguageCode();
         } catch (\Throwable) {
             $lang = 'en';
         }

@@ -36,7 +36,7 @@ class L10nService
         }
 
         $langShort = \substr($lang, 0, 2);
-        foreach ([\trim($lang), $langShort] as $candidate) {
+        foreach (\array_unique([$lang, $langShort]) as $candidate) {
             if ($candidate === '') continue;
             $catalog = $this->readCatalogFile($appPath . '/l10n/' . $candidate . '.json');
             if ($catalog !== null) {
