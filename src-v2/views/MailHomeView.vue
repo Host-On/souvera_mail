@@ -148,7 +148,6 @@ export default {
 		async loadEmails() {
 			const seq = (this._loadSeq || 0) + 1
 			this._loadSeq = seq
-			this._pendingLoads = (this._pendingLoads || 0) + 1
 			this.loadingEmails = true
 			let accountId = null
 			let mailboxId = this.selectedMailbox
@@ -167,8 +166,9 @@ export default {
 				console.error('Failed to load emails', e)
 				return
 			} finally {
-				this._pendingLoads--
-				this.loadingEmails = this._pendingLoads > 0
+				// Only the current request controls the loading state; stale
+				// requests must never hide the list or keep the skeleton up
+				if (seq === this._loadSeq) this.loadingEmails = false
 			}
 			// Play sound only when there are genuinely new emails (not page/filter changes)
 			if (prevIds.length > 0 && this.emailTotal > prevTotal) {
@@ -179,9 +179,10 @@ export default {
 		onSearch(q) {
 			this.searchQuery = q
 			this.offset = 0
-			// Invalidate in-flight responses immediately so the list never shows
-			// results that don't match the typed search text
+			// Invalidate in-flight responses immediately and keep the last valid
+			// list visible (no skeleton flicker) until the debounced search runs
 			this._loadSeq = (this._loadSeq || 0) + 1
+			this.loadingEmails = false
 			this.scheduleSearch()
 		},
 		scheduleSearch() {
