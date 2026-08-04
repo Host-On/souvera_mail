@@ -538,9 +538,11 @@ export default {
 				} catch (e) { console.error('Sound preview failed', e) }
 			} else {
 				try {
-					const a = new Audio(((typeof OC !== 'undefined' && OC.getRootPath ? OC.getRootPath() : '') + '/apps/souvera_mail/js/sounds/' + sound + '.mp3'))
+					const root = (window.OC && window.OC.getRootPath) ? window.OC.getRootPath() : ''
+					const a = new Audio(root + '/apps/souvera_mail/js/sounds/' + sound + '.mp3')
 					a.volume = 0.4
-					a.play()
+					const playPromise = a.play()
+					if (playPromise) playPromise.catch(() => {})
 				} catch {}
 			}
 		},

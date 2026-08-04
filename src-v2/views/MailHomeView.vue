@@ -420,11 +420,13 @@ export default {
 		},
 		playFileSound(sound) {
 			try {
-				const url = ((typeof OC !== 'undefined' && OC.getRootPath ? OC.getRootPath() : '') + '/apps/souvera_mail/js/sounds/' + sound + '.mp3')
+				const root = (window.OC && window.OC.getRootPath) ? window.OC.getRootPath() : ''
+				const url = root + '/apps/souvera_mail/js/sounds/' + sound + '.mp3'
 				const a = new Audio(url)
 				a.volume = 0.4
-				a.play()
-			} catch {}
+				const playPromise = a.play()
+				if (playPromise) playPromise.catch(() => {})
+			} catch { /* Audio.play() blocked or file not found */ }
 		},
 		playSynthSound(sound) {
 			try {
