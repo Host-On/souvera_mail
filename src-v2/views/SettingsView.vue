@@ -337,11 +337,14 @@ export default {
 			],
 			autoRefreshOption: { value: 60, label: '1m' },
 			soundOptions: [
-				{ value: 'none', label: 'None' },
+				{ value: 'none', label: 'Off' },
 				{ value: 'chime', label: 'Chime' },
 				{ value: 'bell', label: 'Bell' },
+				{ value: 'new-mail', label: 'New mail' },
+				{ value: 'alert', label: 'Alert' },
+				{ value: 'ping', label: 'Ping' },
 			],
-			soundOption: { value: 'none', label: 'None' },
+			soundOption: { value: 'none', label: 'Off' },
 			userFoldersList: [],
 			showCreateFolder: false,
 			newFolderName: '',
@@ -431,19 +434,31 @@ export default {
 		previewSound() {
 			const sound = this.soundOption?.value
 			if (!sound || sound === 'none') return
-			try {
-				const ctx = new (window.AudioContext || window.webkitAudioContext)()
-				const gain = ctx.createGain()
-				gain.connect(ctx.destination)
-				gain.gain.value = 0.15
-				if (sound === 'chime') {
-					const o1 = ctx.createOscillator(); o1.connect(gain); o1.frequency.value = 880; o1.type = 'sine'; o1.start(); o1.stop(ctx.currentTime + 0.15)
-					const o2 = ctx.createOscillator(); o2.connect(gain); o2.frequency.value = 1100; o2.type = 'sine'; o2.start(ctx.currentTime + 0.15); o2.stop(ctx.currentTime + 0.35)
-				} else if (sound === 'bell') {
-					const o1 = ctx.createOscillator(); o1.connect(gain); o1.frequency.value = 660; o1.type = 'triangle'; o1.start(); gain.gain.setTargetAtTime(0, ctx.currentTime + 0.3, 0.05); o1.stop(ctx.currentTime + 0.5)
-				}
-				setTimeout(() => { try { gain.disconnect(); ctx.close() } catch {} }, 1000)
-			} catch (e) { console.error('Sound preview failed', e) }
+			this.playSound(sound)
+		},
+		playSound(sound) {
+			if (sound === 'chime' || sound === 'bell') {
+				try {
+					const ctx = new (window.AudioContext || window.webkitAudioContext)()
+					const gain = ctx.createGain()
+					gain.connect(ctx.destination)
+					gain.gain.value = 0.15
+					if (sound === 'chime') {
+						const o1 = ctx.createOscillator(); o1.connect(gain); o1.frequency.value = 880; o1.type = 'sine'; o1.start(); o1.stop(ctx.currentTime + 0.15)
+						const o2 = ctx.createOscillator(); o2.connect(gain); o2.frequency.value = 1100; o2.type = 'sine'; o2.start(ctx.currentTime + 0.15); o2.stop(ctx.currentTime + 0.35)
+					} else {
+						const o1 = ctx.createOscillator(); o1.connect(gain); o1.frequency.value = 660; o1.type = 'triangle'; o1.start(); gain.gain.setTargetAtTime(0, ctx.currentTime + 0.3, 0.05); o1.stop(ctx.currentTime + 0.5)
+					}
+					setTimeout(() => { try { gain.disconnect(); ctx.close() } catch {} }, 1000)
+				} catch (e) { console.error('Sound preview failed', e) }
+			} else {
+				try {
+					const root = (typeof OC !== 'undefined' && OC.getRootPath ? OC.getRootPath() : '')
+					const a = new Audio(root + '/apps/souvera_mail/app/smail/v/current/static/sounds/' + sound + '.mp3')
+					a.volume = 0.4
+					a.play()
+				} catch {}
+			}
 		},
 		async createFolder() {
 			const name = this.newFolderName.trim()

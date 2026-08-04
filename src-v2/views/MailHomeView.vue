@@ -368,8 +368,6 @@ export default {
 		},
 		async playNewMailSound() {
 			try {
-				// Always re-read the preference — the user may have changed
-				// it in Settings without a page reload.
 				let sound = this._soundPref || 'none'
 				try {
 					const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
@@ -377,9 +375,30 @@ export default {
 					this._soundPref = sound
 				} catch {}
 				if (sound === 'none') return
+				this.playSound(sound)
+			} catch {}
+		},
+		playSound(sound) {
+			if (sound === 'chime' || sound === 'bell') {
+				this.playSynthSound(sound)
+			} else {
+				this.playFileSound(sound)
+			}
+		},
+		playFileSound(sound) {
+			try {
+				const root = (typeof OC !== 'undefined' && OC.getRootPath ? OC.getRootPath() : '')
+				const url = root + '/apps/souvera_mail/app/smail/v/current/static/sounds/' + sound + '.mp3'
+				const a = new Audio(url)
+				a.volume = 0.4
+				a.play()
+			} catch {}
+		},
+		playSynthSound(sound) {
+			try {
 				if (!this._audioCtx) { this._audioCtx = new (window.AudioContext || window.webkitAudioContext)() }
 				const ctx = this._audioCtx
-				if (ctx.state === 'suspended') { try { await ctx.resume() } catch {} }
+				if (ctx.state === 'suspended') { try { ctx.resume() } catch {} }
 				const gain = ctx.createGain()
 				gain.connect(ctx.destination)
 				gain.gain.value = 0.15
@@ -390,7 +409,7 @@ export default {
 					const o1 = ctx.createOscillator(); o1.connect(gain); o1.frequency.value = 660; o1.type = 'triangle'; o1.start(); gain.gain.setTargetAtTime(0, ctx.currentTime + 0.3, 0.05); o1.stop(ctx.currentTime + 0.5)
 				}
 				setTimeout(() => { try { gain.disconnect() } catch {} }, 1000)
-			} catch { /* Audio blocked until user gesture */ }
+			} catch {}
 		},
 		notifyTitle() {
 			if (!this.emails.length) return
