@@ -314,7 +314,14 @@
     "selected": "ausgewählt",
     "Move to folder": "In Ordner verschieben",
     "Shared folders are mailboxes that other users have granted you access to.": "Geteilte Ordner sind Postfächer, zu denen andere Nutzer Ihnen Zugriff gewährt haben.",
-    "This message has no content or could not be loaded.": "Diese Nachricht hat keinen Inhalt oder konnte nicht geladen werden."
+    "This message has no content or could not be loaded.": "Diese Nachricht hat keinen Inhalt oder konnte nicht geladen werden.",
+    "Clear search": "Suche leeren",
+    "Filter messages": "Nachrichten filtern",
+    "Filter: {name}": "Filter: {name}",
+    "Unread": "Ungelesen",
+    "Flagged": "Markiert",
+    "With attachments": "Mit Anhängen",
+    "Search in mailbox…": "In Mailbox suchen…"
   },
   "pluralForm": "nplurals=2; plural=(n != 1);"
 }

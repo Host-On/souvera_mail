@@ -26,7 +26,7 @@
 			</template>
 			<template v-else>
 				<NcTextField class="email-list-toolbar__search"
-					:value="searchQuery"
+					:model-value="searchQuery"
 					:placeholder="t('souvera_mail', 'Search in mailbox…')"
 					:show-trailing-button="searchQuery !== ''"
 					trailing-button-icon="close"
@@ -34,14 +34,15 @@
 					@update:modelValue="$emit('update:search', $event)"
 					@trailing-button-click="$emit('update:search', '')" />
 				<NcActions class="email-list-toolbar__filter"
-					:menu-name="activeFilterLabel"
+					:menu-name="activeFilterMenuName"
 					:primary="filter !== 'all'"
-					:aria-label="t('souvera_mail', 'Filter messages')"
 					:force-name="true">
 					<template #icon><Filter :size="18" /></template>
 					<NcActionButton v-for="f in filterOptions" :key="f.value"
+						type="radio"
 						:name="f.label"
-						:checked="filter === f.value"
+						:model-value="filter"
+						:value="f.value"
 						@click="$emit('update:filter', f.value)">
 						<template #icon><component :is="f.icon" :size="16" /></template>
 					</NcActionButton>
@@ -80,9 +81,9 @@ export default {
 	},
 	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter'],
 	computed: {
-		activeFilterLabel() {
+		activeFilterMenuName() {
 			const active = this.filterOptions.find(f => f.value === this.filter)
-			return active ? active.label : this.t('souvera_mail', 'All')
+			return this.t('souvera_mail', 'Filter: {name}', { name: active ? active.label : this.t('souvera_mail', 'All') })
 		},
 		filterOptions() {
 			return [

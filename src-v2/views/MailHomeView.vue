@@ -147,7 +147,8 @@ export default {
 	methods: {
 		async loadEmails() {
 			this.loadingEmails = true
-			const seq = ++this._loadSeq
+			const seq = (this._loadSeq || 0) + 1
+			this._loadSeq = seq
 			let accountId = null
 			let mailboxId = this.selectedMailbox
 			if (mailboxId && mailboxId.includes('|')) {
@@ -161,7 +162,10 @@ export default {
 				if (seq !== this._loadSeq) return
 				this.emails = r.emails
 				this.emailTotal = r.total
-			} catch (e) { console.error('Failed to load emails', e) } finally { if (seq === this._loadSeq) this.loadingEmails = false }
+			} catch (e) {
+				console.error('Failed to load emails', e)
+				return
+			} finally { if (seq === this._loadSeq) this.loadingEmails = false }
 			// Play sound only when there are genuinely new emails (not page/filter changes)
 			if (prevIds.length > 0 && this.emailTotal > prevTotal) {
 				const newIds = this.emails.map(e => e.id).filter(id => !prevIds.includes(id))
@@ -188,7 +192,7 @@ export default {
 		getAccountId() {
 			return this.currentAccountId
 		},
-		async refreshEmails() { this.checkedIds = []; this.offset = 0; await this.loadEmails() },
+		async refreshEmails() { this.checkedIds = []; this.offset = 0; clearTimeout(this._searchTimer); await this.loadEmails() },
 		toggleCheck(id) {
 			const idx = this.checkedIds.indexOf(id)
 			if (idx >= 0) this.checkedIds.splice(idx, 1)
@@ -269,8 +273,8 @@ export default {
 			email.isFlagged = newFlag
 			try { await toggleEmailFlag(emailId, newFlag, this.currentAccountId) } catch (e) { console.error('Failed to toggle flag', e); email.isFlagged = !newFlag }
 		},
-		goPrev() { if (this.offset > 0) { this.offset = Math.max(0, this.offset - this.limit); this.loadEmails() } },
-		goNext() { if (this.offset + this.limit < this.emailTotal) { this.offset += this.limit; this.loadEmails() } },
+		goPrev() { if (this.offset > 0) { clearTimeout(this._searchTimer); this.offset = Math.max(0, this.offset - this.limit); this.loadEmails() } },
+		goNext() { if (this.offset + this.limit < this.emailTotal) { clearTimeout(this._searchTimer); this.offset += this.limit; this.loadEmails() } },
 		navigateEmail(dir) {
 			if (!this.selectedEmail || this.emails.length === 0) return
 			const idx = this.emails.findIndex(e => e.id === this.selectedEmail.id)
