@@ -12,7 +12,8 @@ function bootstrap() {
 	const mount = document.getElementById('souvera-mail-v2-app')
 	if (!mount) return
 
-	// Translations are injected by addHeader with CSP nonce before the app loads.
+	// Translations are injected inline into the v2 template (templates/v2.php)
+	// as a CSP-nonce script, which always runs before this DOMContentLoaded boot.
 	const translations = window._souvera_mail_translations || {}
 	function appT(app, msg, vars) {
 		let result = translations[msg] || msg
