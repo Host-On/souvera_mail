@@ -14,6 +14,7 @@
 				@toggle-select-all="toggleSelectAll"
 				:search-query="searchQuery"
 				:filter="filterType"
+				:two-row="!verticalLayout"
 				@update:search="onSearch"
 				@update:filter="onFilter" />
 
