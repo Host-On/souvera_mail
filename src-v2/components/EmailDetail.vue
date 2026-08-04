@@ -17,7 +17,7 @@
 				<NcActions :aria-label="t('souvera_mail', 'More actions')">
 					<template #icon><FolderMove :size="20" /></template>
 					<NcActionButton v-for="mb in moveMailboxes" :key="mb.id"
-						:name="mb.name"
+						:name="mailboxDisplayName(mb)"
 						@click="moveTo(mb.id)">
 						<template #icon><Folder :size="20" /></template>
 					</NcActionButton>
@@ -169,6 +169,7 @@ import FolderPlus from 'vue-material-design-icons/FolderPlus.vue'
 import HtmlMailFrame from './HtmlMailFrame.vue'
 import BimiLogo from './BimiLogo.vue'
 import { buildBlobUrl } from '../utils/mailSanitizer.js'
+import { mailboxDisplayName } from '../utils/mailboxNames.js'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 

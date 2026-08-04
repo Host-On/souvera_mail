@@ -1,6 +1,6 @@
 <template>
 	<NcAppNavigationItem
-		:name="mailbox.name"
+		:name="displayName"
 		:active="active"
 		:allow-collapse="children.length > 0"
 		:open="open"
@@ -28,6 +28,7 @@
 
 <script>
 import { NcAppNavigationItem, NcCounterBubble } from '@nextcloud/vue'
+import { mailboxDisplayName } from '../utils/mailboxNames.js'
 import Inbox from 'vue-material-design-icons/Inbox.vue'
 import Send from 'vue-material-design-icons/Send.vue'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
@@ -54,6 +55,7 @@ export default {
 	emits: ['select'],
 	data() { return { open: false } },
 	computed: {
+		displayName() { return mailboxDisplayName(this.mailbox) },
 		active() {
 			if (!this.selected) return false
 			return this.selected === this.mailbox.id

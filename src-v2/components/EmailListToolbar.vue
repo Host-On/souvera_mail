@@ -17,7 +17,7 @@
 					<NcActionButton v-for="mb in targetMailboxes" :key="mb.id"
 						@click="$emit('moveTo', mb.id)">
 						<template #icon><Folder :size="20" /></template>
-						{{ mb.name }}
+						{{ mailboxDisplayName(mb) }}
 					</NcActionButton>
 				</NcActions>
 				<NcButton variant="tertiary" @click="$emit('bulkDelete')">
@@ -68,6 +68,7 @@ import Folder from 'vue-material-design-icons/Folder.vue'
 import Filter from 'vue-material-design-icons/Filter.vue'
 import Star from 'vue-material-design-icons/Star.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
+import { mailboxDisplayName } from '../utils/mailboxNames.js'
 
 export default {
 	name: 'EmailListToolbar',
