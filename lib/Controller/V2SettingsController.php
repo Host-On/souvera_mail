@@ -157,6 +157,10 @@ class V2SettingsController extends Controller
 
         foreach ($allowed as $field => $key) {
             if (\array_key_exists($field, $body)) {
+                if (($field === 'replyPosition' || $field === 'signaturePosition')
+                    && !\in_array((string) $body[$field], ['above', 'below'], true)) {
+                    return new JSONResponse(['error' => 'invalid position value'], 400);
+                }
                 $this->setPref($uid, $key, (string) $body[$field]);
             }
         }

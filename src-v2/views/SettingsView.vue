@@ -107,7 +107,7 @@
 						<div>
 							<span class="setting-label">{{ t('souvera_mail', 'Signature position') }}</span>
 						</div>
-						<NcSelect v-model="signaturePositionOption" :options="signaturePositionOptions"
+						<NcSelect v-model="signaturePositionOption" :options="signaturePositionOptions" :clearable="false"
 							label="label" class="setting-select"
 							@update:modelValue="saveSig" />
 					</div>
@@ -129,7 +129,7 @@
 						<div>
 							<span class="setting-label">{{ t('souvera_mail', 'Write replies') }}</span>
 						</div>
-						<NcSelect v-model="replyPositionOption" :options="replyPositionOptions"
+						<NcSelect v-model="replyPositionOption" :options="replyPositionOptions" :clearable="false"
 							label="label" class="setting-select"
 							@update:modelValue="saveSig" />
 					</div>
@@ -388,14 +388,16 @@ export default {
 		},
 		async saveSig() {
 			try {
+				const replyPosition = this.replyPositionOption?.value === 'below' ? 'below' : 'above'
+				const signaturePosition = this.signaturePositionOption?.value === 'below' ? 'below' : 'above'
 				await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), {
 					signatureHtml: this.sigHtml,
 					signatureEnabled: this.sigEnabled,
-					replyPosition: this.replyPositionOption.value,
-					signaturePosition: this.signaturePositionOption.value,
+					replyPosition,
+					signaturePosition,
 				})
-				this.replyPosition = this.replyPositionOption.value
-				this.signaturePosition = this.signaturePositionOption.value
+				this.replyPosition = replyPosition
+				this.signaturePosition = signaturePosition
 			} catch {}
 		},
 	},

@@ -5,28 +5,29 @@ function escapeHtml(str) {
 	return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function bodyOrDefault(email) {
+function bodyOrDefault(email, sanitizedHtml) {
+	if (sanitizedHtml) return sanitizedHtml
 	if (email.htmlBody) return email.htmlBody
 	if (email.plainBody) return escapeHtml(email.plainBody).replace(/\n/g, '<br>')
 	return ''
 }
 
-export function buildReplyQuote(email) {
+export function buildReplyQuote(email, sanitizedHtml) {
 	const date = email.receivedAt ? new Date(email.receivedAt).toLocaleString() : ''
-	const from = email.fromName ? `${email.fromName} <${email.fromAddress}>` : (email.fromAddress || '')
-	const body = bodyOrDefault(email)
+	const from = escapeHtml(email.fromName ? `${email.fromName} <${email.fromAddress}>` : (email.fromAddress || ''))
+	const body = bodyOrDefault(email, sanitizedHtml)
 
 	return `<p></p><p></p>`
 		+ `<div style="margin-top:12px">${t('souvera_mail', 'On {date}, {from} wrote:', { date, from })}</div>`
 		+ `<blockquote>${body}</blockquote>`
 }
 
-export function buildForwardBody(email) {
+export function buildForwardBody(email, sanitizedHtml) {
 	const date = email.receivedAt ? new Date(email.receivedAt).toLocaleString() : ''
 	const from = email.fromName ? `${email.fromName} <${email.fromAddress}>` : (email.fromAddress || '')
 	const to = email.toAddresses || ''
 	const subject = email.subject || ''
-	const body = bodyOrDefault(email)
+	const body = bodyOrDefault(email, sanitizedHtml)
 
 	return `<div style="margin-bottom:12px">---------- ${t('souvera_mail', 'Forwarded message')} ----------</div>`
 		+ `<table style="font-size:13px;margin-bottom:12px">`

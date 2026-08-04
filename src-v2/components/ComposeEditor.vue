@@ -169,7 +169,7 @@ export default {
 		cc: { deep: true, handler() { this.markDirty() } },
 		bcc: { deep: true, handler() { this.markDirty() } },
 		subject() { this.markDirty() },
-		bodyHtml() { this.markDirty() },
+		bodyHtml() { if (!this._suppressDirty) this.markDirty() },
 		// originalEmail arrives asynchronously (ComposeView fetches the body
 		// after mount) — prefill the subject as soon as it becomes available.
 		originalEmail: {
@@ -195,16 +195,12 @@ export default {
 	beforeUnmount() { clearTimeout(draftTimer) },
 	methods: {
 		prefillSubject() {
-			const replySubject = this.replyTo?.subject || this.originalEmail?.subject
-			if (replySubject) {
-				const s = replySubject
-				return s.match(/^(Re|Fwd):\s*/i) ? s : `Re: ${s}`
+			const s = this.replyTo?.subject || this.originalEmail?.subject || this.forwardOf?.subject || ''
+			if (!s) return ''
+			if (this.mode === 'forward') {
+				return s.match(/^Fwd:\s*/i) ? s : `Fwd: ${s}`
 			}
-			if (this.forwardOf?.subject) {
-				const s = this.forwardOf.subject
-				return s.match(/^(Fwd):\s*/i) ? s : `Fwd: ${s}`
-			}
-			return ''
+			return s.match(/^(Re|Fwd):\s*/i) ? s : `Re: ${s}`
 		},
 		async loadPreferences() {
 			try {
@@ -224,10 +220,20 @@ export default {
 		insertSignature() {
 			const sig = this.sanitizedSignature()
 			if (!sig) return
+			this.initContent(`<p></p>${sig}`, 'start')
+		},
+		// Replaces the editor content only while it is still untouched,
+		// and suppresses the dirty flag for this programmatic initialisation.
+		initContent(html, cursor) {
+			if (this.bodyHtml !== '') return
+			this._suppressDirty = true
 			this.$nextTick(() => {
 				setTimeout(() => {
-					this.$refs.editor?.setContent(sig)
-					this.$refs.editor?.setCursorAtStart()
+					this.$refs.editor?.setContent(html)
+					if (cursor === 'end') this.$refs.editor?.setCursorAtEnd()
+					else this.$refs.editor?.setCursorAtStart()
+					this.$refs.editor?.focus()
+					this.$nextTick(() => { this._suppressDirty = false })
 				}, 100)
 			})
 		},
@@ -247,23 +253,24 @@ export default {
 			const body = email.htmlBody || email.plainBody || ''
 			const { html } = sanitizeMailHtml(body, { attachments: email.attachments || [], blockRemote: false })
 			const quote = buildReplyQuote(email, html)
-			const sig = this.sanitizedSignature()
-			// Order: [answer area] [signature (above)] [quote] [signature (below)]
-			const parts = []
-			if (sig && this.signaturePosition === 'above') parts.push(sig)
-			parts.push(quote)
-			if (sig && this.signaturePosition === 'below') parts.push(sig)
-			this.$nextTick(() => {
-				setTimeout(() => {
-					this.$refs.editor?.setContent(parts.join(''))
-					if (this.replyPosition === 'below') {
-						this.$refs.editor?.setCursorAtEnd()
-					} else {
-						this.$refs.editor?.setCursorAtStart()
-					}
-					this.$refs.editor?.focus()
-				}, 100)
-			})
+			const sig = this.signatureEnabled ? this.sanitizedSignature() : ''
+			const answer = '<p></p>'
+			// answer area [signature (above)] [quote] [signature (below)] — or,
+			// for replies below the quote: [sig above] [quote] [sig below] answer
+			let parts
+			if (this.replyPosition === 'below') {
+				parts = []
+				if (sig && this.signaturePosition === 'above') parts.push(sig)
+				parts.push(quote)
+				if (sig && this.signaturePosition === 'below') parts.push(sig)
+				parts.push(answer)
+			} else {
+				parts = [answer]
+				if (sig && this.signaturePosition === 'above') parts.push(sig)
+				parts.push(quote)
+				if (sig && this.signaturePosition === 'below') parts.push(sig)
+			}
+			this.initContent(parts.join(''), this.replyPosition === 'below' ? 'end' : 'start')
 		},
 		buildForwardContent() {
 			const email = this.originalEmail
@@ -271,14 +278,11 @@ export default {
 			const body = email.htmlBody || email.plainBody || ''
 			const { html } = sanitizeMailHtml(body, { attachments: email.attachments || [], blockRemote: false })
 			const quote = buildForwardBody(email, html)
+			const sig = this.signatureEnabled ? this.sanitizedSignature() : ''
 			this.forwardAttachments = (email.attachments || []).map(a => ({
 				blobId: a.blobId, name: a.name, type: a.type, size: a.size,
 			}))
-			this.$nextTick(() => {
-				setTimeout(() => {
-					this.$refs.editor?.insertHtml(quote)
-				}, 100)
-			})
+			this.initContent(`${quote}${sig ? `<p></p>${sig}` : ''}`, 'start')
 		},
 		markDirty() {
 			this.dirty = true
