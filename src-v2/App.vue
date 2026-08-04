@@ -22,7 +22,7 @@
 				<template v-if="sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
 					<template v-for="group in sharedAccountGroups" :key="group.accountId">
-						<NcAppNavigationCaption :name="group.accountName" />
+						<NcAppNavigationCaption class="shared-group-caption" :name="group.accountName" />
 						<MailboxItem v-for="mp in group.roots" :key="mp.id"
 							:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="sharedSelected(mp)" :depth="0"
 							@select="onSharedSelect(mp._accountId, $event)" />
@@ -39,7 +39,7 @@
 				<template v-if="!sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
 					<template v-for="group in sharedAccountGroups" :key="'low-'+group.accountId">
-						<NcAppNavigationCaption :name="group.accountName" />
+						<NcAppNavigationCaption class="shared-group-caption" :name="group.accountName" />
 						<MailboxItem v-for="mp in group.roots" :key="mp.id"
 							:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="sharedSelected(mp)" :depth="0"
 							@select="onSharedSelect(mp._accountId, $event)" />
@@ -213,20 +213,27 @@ export default {
 .compose-btn { flex: 1; }
 .compose-row :deep(button[aria-label="Contacts"]) { min-width: 44px; padding: 0; }
 
-/* Shared account sub-headers — visually distinct from top-level sections */
-:deep(.app-navigation-caption) + :deep(.app-navigation-caption) {
-	margin-top: 2px;
-	padding-left: 16px;
-	font-size: 13px;
-	opacity: 0.8;
+/* Shared account sub-headers — clearly distinct from the top-level
+   "Mailboxes" / "Shared with me" / "Folders" captions: smaller, lighter,
+   indented, with a bullet. Targets the inner __name element because the
+   caption component sets font-size/font-weight/color there with higher
+   specificity (which is why styling the outer li never showed). */
+:deep(.shared-group-caption) {
+	padding-left: 30px !important;
+	padding-right: var(--app-navigation-padding);
 }
-:deep(.app-navigation-caption) + :deep(.app-navigation-caption)::before {
-	content: '';
+:deep(.shared-group-caption .app-navigation-caption__name) {
+	font-size: 12px !important;
+	font-weight: 400 !important;
+	color: var(--color-text-maxcontrast) !important;
+	line-height: 28px;
+}
+:deep(.shared-group-caption .app-navigation-caption__name)::before {
+	content: '•';
 	display: inline-block;
-	width: 6px; height: 6px;
-	border-radius: 50%;
-	background: var(--color-border);
-	margin-right: 6px;
-	vertical-align: middle;
+	margin-right: 7px;
+	color: var(--color-border-dark);
+	font-size: 10px;
+	vertical-align: 1px;
 }
 </style>
