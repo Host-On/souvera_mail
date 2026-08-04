@@ -64,7 +64,7 @@ trait SelfUpdateTrait
             $branch = trim((string) $config->getAppValue($appId, 'devops.branch', 'main'));
 
             if ($channel === 'dev') {
-                $result = $this->downloadBranch($appId, $appPath, $branch);
+                $result = $this->downloadBranch($appId, $appPath, $branch, $installed);
             } else {
                 $latest = $this->latestReleaseTag();
                 if ($latest === null) {
@@ -116,7 +116,7 @@ trait SelfUpdateTrait
         return ltrim((string) $data['tag_name'], 'v');
     }
 
-    private function downloadBranch(string $appId, string $appPath, string $branch): array
+    private function downloadBranch(string $appId, string $appPath, string $branch, string $installedVersion): array
     {
         $repo = $this->getRepo();
         if ($repo === '') {
@@ -135,8 +135,7 @@ trait SelfUpdateTrait
         }
 
         $url = "https://api.github.com/repos/$repo/zipball/$branch";
-        $installed = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId);
-        $result = $this->downloadAndApply($appId, $appPath, $url, $installed === '0' ? null : $installed);
+        $result = $this->downloadAndApply($appId, $appPath, $url, $installedVersion);
         if (empty($result['error'])) {
             \OCP\Server::get(\OCP\IConfig::class)
                 ->setAppValue($appId, 'devops.last_sha', $latestSha);
@@ -237,17 +236,26 @@ trait SelfUpdateTrait
 
         // Downgrade guard: verify the version of the EXTRACTED code BEFORE
         // touching the installed app. If the archive does not actually
-        // contain a newer version (stale cache, wrong tag, mix-up), abort.
+        // contain a newer version (stale cache, wrong tag, mix-up) — or its
+        // version cannot be verified at all — abort (fail closed).
         $extractedVersion = $this->readAppVersion($sourceDir);
-        if ($installedVersion !== null && $extractedVersion !== null
-            && version_compare($extractedVersion, $installedVersion, '<=')) {
-            $this->rmdirRecursive($extractDir);
-            return [
-                'error' => "Downgrade blocked: extracted app version {$extractedVersion} "
-                    . "is not newer than installed version {$installedVersion}",
-                'extracted_version' => $extractedVersion,
-                'installed_version' => $installedVersion,
-            ];
+        if ($installedVersion !== null) {
+            if ($extractedVersion === null) {
+                $this->rmdirRecursive($extractDir);
+                return [
+                    'error' => 'Cannot verify extracted app version — update aborted',
+                    'installed_version' => $installedVersion,
+                ];
+            }
+            if (version_compare($extractedVersion, $installedVersion, '<=')) {
+                $this->rmdirRecursive($extractDir);
+                return [
+                    'error' => "Downgrade blocked: extracted app version {$extractedVersion} "
+                        . "is not newer than installed version {$installedVersion}",
+                    'extracted_version' => $extractedVersion,
+                    'installed_version' => $installedVersion,
+                ];
+            }
         }
 
         // Atomic swap: backup current → extract new → enable → keep or rollback.
