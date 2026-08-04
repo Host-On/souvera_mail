@@ -46,9 +46,9 @@ class BimiService
         if ($cached !== null) {
             $data = \json_decode($cached, true);
             if (\is_array($data)) {
-                // Sanitize legacy cache entries that may contain http:// URLs
+                // Sanitize legacy cache entries that may contain http:// or malformed URLs
                 $logoUrl = $data['logoUrl'] ?? null;
-                if ($logoUrl !== null && !$this->isAllowedLogoUrl($logoUrl)) {
+                if (!$this->isAllowedLogoUrl($logoUrl)) {
                     $data['logoUrl'] = null;
                     $data['verified'] = false;
                 }
@@ -134,9 +134,11 @@ class BimiService
         return \in_array($host, ['default._bimi', 'bimi.entrust.net', 'bimi.digicert.com'], true);
     }
 
-    private function isAllowedLogoUrl(string $url): bool
+    private function isAllowedLogoUrl($url): bool
     {
-        return \filter_var($url, \FILTER_VALIDATE_URL) !== false
+        return \is_string($url)
+            && $url !== ''
+            && \filter_var($url, \FILTER_VALIDATE_URL) !== false
             && \str_starts_with(\strtolower($url), 'https://');
     }
 

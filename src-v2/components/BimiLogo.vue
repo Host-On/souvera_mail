@@ -8,6 +8,7 @@ import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 
 const cache = new Map()
+const pending = new Map()
 
 export default {
 	name: 'BimiLogo',
@@ -17,7 +18,7 @@ export default {
 	},
 	emits: ['loaded', 'failed'],
 	data() {
-		return { logoUrl: null }
+		return { logoUrl: null, renderedDomain: '' }
 	},
 	computed: {
 		domain() {
@@ -42,19 +43,22 @@ export default {
 				this.$emit('failed')
 				return
 			}
-			if (cache.has(domain)) {
-				const entry = cache.get(domain)
-				if (entry instanceof Promise) {
-					entry.then(() => {
-						if (this.isCurrent(domain)) this.applyLogo(cache.get(domain))
-					})
-					return
-				}
-				if (this.isCurrent(domain)) this.applyLogo(entry)
+			if (pending.has(domain)) {
+				pending.get(domain).then((logo) => {
+					if (this.isCurrent(domain)) this.applyLogo(logo)
+				})
 				return
 			}
-			const pending = this.fetchLogo(domain)
-			cache.set(domain, pending)
+			if (cache.has(domain)) {
+				if (this.isCurrent(domain)) this.applyLogo(cache.get(domain))
+				return
+			}
+			const promise = this.fetchLogo(domain)
+			pending.set(domain, promise)
+			promise.then((logo) => {
+				pending.delete(domain)
+				if (this.isCurrent(domain)) this.applyLogo(logo)
+			})
 		},
 		async fetchLogo(domain) {
 			try {
@@ -63,16 +67,17 @@ export default {
 				})
 				const logo = data.logoUrl || null
 				cache.set(domain, logo)
-				if (this.isCurrent(domain)) this.applyLogo(logo)
+				return logo
 			} catch {
 				cache.set(domain, null)
-				if (this.isCurrent(domain)) this.applyLogo(null)
+				return null
 			}
 		},
 		isCurrent(domain) {
 			return this.domain === domain
 		},
 		applyLogo(url) {
+			this.renderedDomain = this.domain
 			if (url) {
 				this.logoUrl = url
 				this.$emit('loaded', url)
@@ -82,12 +87,10 @@ export default {
 			}
 		},
 		onError() {
-			const domain = this.domain
-			if (this.isCurrent(domain)) {
-				cache.set(domain, null)
-				this.logoUrl = null
-				this.$emit('failed')
-			}
+			if (this.renderedDomain !== this.domain) return
+			cache.set(this.renderedDomain, null)
+			this.logoUrl = null
+			this.$emit('failed')
 		},
 	},
 }
