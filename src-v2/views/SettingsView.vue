@@ -244,6 +244,7 @@
 
 <script>
 import { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent } from '@nextcloud/vue'
+import { showSuccess, showError } from '@nextcloud/dialogs'
 import Plus from 'vue-material-design-icons/Plus.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
 import Account from 'vue-material-design-icons/Account.vue'
@@ -361,14 +362,26 @@ export default {
 		},
 		fmtDate(ts) { return ts ? new Date(ts).toLocaleDateString() : '' },
 		async create() {
-			try { const r = await axios.post(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'), { name: this.newName }); this.passwords.push({ id: r.data.id, description: this.newName, createdAt: new Date().toISOString() }); this.showCreate = false; this.newName = '' } catch {}
+			try {
+				const r = await axios.post(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'), { name: this.newName })
+				this.passwords.push({ id: r.data.id, description: this.newName, createdAt: new Date().toISOString() })
+				this.showCreate = false; this.newName = ''
+				showSuccess(this.t('souvera_mail', 'App password created'))
+			} catch (e) { console.error('App password create failed', e); showError(this.t('souvera_mail', 'Failed to create app password')) }
 		},
 		async remove(id) {
-			try { await axios.delete(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords/' + id)); this.passwords = this.passwords.filter(p => p.id !== id) } catch {}
+			try {
+				await axios.delete(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords/' + id))
+				this.passwords = this.passwords.filter(p => p.id !== id)
+				showSuccess(this.t('souvera_mail', 'App password removed'))
+			} catch (e) { console.error('App password remove failed', e); showError(this.t('souvera_mail', 'Failed to remove app password')) }
 		},
 		async setSharedPosition(above) {
 			this.sharedAbove = above
-			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/shared/position'), { position: above ? 'above' : 'below' }) } catch {}
+			try {
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/shared/position'), { position: above ? 'above' : 'below' })
+				showSuccess(this.t('souvera_mail', 'Shared folder position saved'))
+			} catch (e) { console.error('Shared position save failed', e); showError(this.t('souvera_mail', 'Failed to save')) }
 		},
 		async setVerticalLayout(val) {
 			this.verticalLayout = val
@@ -377,7 +390,10 @@ export default {
 		},
 		async onSoundChange(val) {
 			if (val?.value) {
-				try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { notificationSound: val.value }) } catch {}
+				try {
+					await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { notificationSound: val.value })
+					showSuccess(this.t('souvera_mail', 'Notification sound saved'))
+				} catch (e) { console.error('Sound save failed', e); showError(this.t('souvera_mail', 'Failed to save')) }
 			}
 		},
 		async createFolder() {
@@ -387,7 +403,8 @@ export default {
 				const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/mailboxes'), { name })
 				this.userFoldersList.push({ id: data.id, name })
 				this.showCreateFolder = false; this.newFolderName = ''
-			} catch (e) { console.error('Folder create failed', e) }
+				showSuccess(this.t('souvera_mail', 'Folder created'))
+			} catch (e) { console.error('Folder create failed', e); showError(this.t('souvera_mail', 'Failed to create folder')) }
 		},
 		async startRenameFolder(f) {
 			const name = prompt(this.t('souvera_mail', 'New name'), f.name)
@@ -395,7 +412,8 @@ export default {
 				try {
 					await axios.put(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + f.id), { name: name.trim() })
 					f.name = name.trim()
-				} catch (e) { console.error('Folder rename failed', e) }
+					showSuccess(this.t('souvera_mail', 'Folder renamed'))
+				} catch (e) { console.error('Folder rename failed', e); showError(this.t('souvera_mail', 'Failed to rename folder')) }
 			}
 		},
 		async deleteFolder(id) {
@@ -403,7 +421,8 @@ export default {
 			try {
 				await axios.delete(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + id))
 				this.userFoldersList = this.userFoldersList.filter(f => f.id !== id)
-			} catch (e) { console.error('Folder delete failed', e) }
+				showSuccess(this.t('souvera_mail', 'Folder deleted'))
+			} catch (e) { console.error('Folder delete failed', e); showError(this.t('souvera_mail', 'Failed to delete folder')) }
 		},
 		async saveSig() {
 			try {
@@ -417,9 +436,10 @@ export default {
 				})
 				this.replyPosition = replyPosition
 				this.signaturePosition = signaturePosition
+				showSuccess(this.t('souvera_mail', 'Signature saved'))
 			} catch (e) {
 				console.error('Failed to save signature', e)
-				alert(this.t('souvera_mail', 'Failed to save signature') + ': ' + (e.response?.data?.error || e.message))
+				showError(this.t('souvera_mail', 'Failed to save signature') + ': ' + (e.response?.data?.error || e.message))
 			}
 		},
 		toggleSigSource() {
@@ -432,7 +452,7 @@ export default {
 			e.target.value = ''
 			if (!file) return
 			if (file.size === 0 || file.size > 2 * 1024 * 1024) {
-				alert(this.t('souvera_mail', 'Signature file ignored (empty or larger than 2 MB)'))
+				showError(this.t('souvera_mail', 'Signature file ignored (empty or larger than 2 MB)'))
 				return
 			}
 			const reader = new FileReader()
@@ -443,7 +463,7 @@ export default {
 			}
 			reader.onerror = () => {
 				console.error('Failed to read signature file')
-				alert(this.t('souvera_mail', 'Failed to read signature file'))
+				showError(this.t('souvera_mail', 'Failed to read signature file'))
 			}
 			reader.readAsText(file)
 		},

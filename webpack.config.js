@@ -18,6 +18,11 @@ module.exports = {
 		alias: {
 			vue$: 'vue/dist/vue.runtime.esm-bundler.js',
 		},
+		fallback: {
+			// @nextcloud/files → is-svg → @file-type/xml → sax declares node
+			// 'stream'; it is never used at runtime by the toasts we import.
+			stream: false,
+		},
 	},
 	module: {
 		rules: [
