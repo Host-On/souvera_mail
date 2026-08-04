@@ -124,7 +124,7 @@ class V2SettingsController extends Controller
             'readingPane' => $this->getPref($uid, 'pref_reading_pane', '1') === '1',
             'remoteImages' => $this->getPref($uid, 'pref_remote_images', 'never'),
             'verticalLayout' => $this->getPref($uid, 'pref_vertical_layout', '0') === '1',
-            'autoRefresh' => (int) $this->getPref($uid, 'pref_auto_refresh', '0'),
+            'autoRefresh' => (int) $this->getPref($uid, 'pref_auto_refresh', '60'),
             'notificationSound' => $this->getPref($uid, 'pref_notification_sound', 'none'),
             'account' => [
                 'email' => $user->getSystemEMailAddress() ?? $uid,
