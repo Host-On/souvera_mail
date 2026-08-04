@@ -116,6 +116,8 @@ class V2SettingsController extends Controller
         return new JSONResponse([
             'signatureHtml' => $this->getPref($uid, 'pref_signature_html', ''),
             'signatureEnabled' => $this->getPref($uid, 'pref_signature_enabled', '0') === '1',
+            'replyPosition' => $this->getPref($uid, 'pref_reply_position', 'above'),
+            'signaturePosition' => $this->getPref($uid, 'pref_signature_position', 'above'),
             'messagesPerPage' => (int) $this->getPref($uid, 'pref_messages_per_page', '50'),
             'readingPane' => $this->getPref($uid, 'pref_reading_pane', '1') === '1',
             'remoteImages' => $this->getPref($uid, 'pref_remote_images', 'never'),
@@ -143,6 +145,8 @@ class V2SettingsController extends Controller
         $allowed = [
             'signatureHtml' => 'pref_signature_html',
             'signatureEnabled' => 'pref_signature_enabled',
+            'replyPosition' => 'pref_reply_position',
+            'signaturePosition' => 'pref_signature_position',
             'messagesPerPage' => 'pref_messages_per_page',
             'readingPane' => 'pref_reading_pane',
             'remoteImages' => 'pref_remote_images',

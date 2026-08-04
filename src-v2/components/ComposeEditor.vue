@@ -93,6 +93,7 @@ import AttachmentList from './composer/AttachmentList.vue'
 import CloudFilePicker from './CloudFilePicker.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
+import DOMPurify from 'dompurify'
 import { sanitizeMailHtml } from '../utils/mailSanitizer.js'
 import { buildReplyQuote, buildForwardBody } from '../utils/quoteBuilder.js'
 
@@ -146,6 +147,10 @@ export default {
 			showCloudPicker: false,
 			savedDraftId: null,
 			discardingDraftId: null,
+			signatureHtml: '',
+			signatureEnabled: false,
+			replyPosition: 'above',
+			signaturePosition: 'above',
 		}
 	},
 	computed: {
@@ -165,20 +170,34 @@ export default {
 		bcc: { deep: true, handler() { this.markDirty() } },
 		subject() { this.markDirty() },
 		bodyHtml() { this.markDirty() },
+		// originalEmail arrives asynchronously (ComposeView fetches the body
+		// after mount) — prefill the subject as soon as it becomes available.
+		originalEmail: {
+			immediate: true,
+			handler() {
+				if (this.subject === '' && (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward') && this.originalEmail) {
+					this.subject = this.prefillSubject()
+				}
+			},
+		},
 	},
 	async mounted() {
 		await this.loadIdentities()
+		await this.loadPreferences()
 		if (this.mode === 'reply' || this.mode === 'replyAll') {
 			this.buildReplyContent()
 		} else if (this.mode === 'forward') {
 			this.buildForwardContent()
+		} else if (this.signatureEnabled && this.signatureHtml) {
+			this.insertSignature()
 		}
 	},
 	beforeUnmount() { clearTimeout(draftTimer) },
 	methods: {
 		prefillSubject() {
-			if (this.replyTo?.subject) {
-				const s = this.replyTo.subject
+			const replySubject = this.replyTo?.subject || this.originalEmail?.subject
+			if (replySubject) {
+				const s = replySubject
 				return s.match(/^(Re|Fwd):\s*/i) ? s : `Re: ${s}`
 			}
 			if (this.forwardOf?.subject) {
@@ -186,6 +205,31 @@ export default {
 				return s.match(/^(Fwd):\s*/i) ? s : `Fwd: ${s}`
 			}
 			return ''
+		},
+		async loadPreferences() {
+			try {
+				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
+				this.signatureHtml = data.signatureHtml || ''
+				this.signatureEnabled = !!data.signatureEnabled
+				this.replyPosition = data.replyPosition === 'below' ? 'below' : 'above'
+				this.signaturePosition = data.signaturePosition === 'below' ? 'below' : 'above'
+			} catch (e) {
+				console.error('Failed to load preferences', e)
+			}
+		},
+		sanitizedSignature() {
+			if (!this.signatureHtml) return ''
+			return DOMPurify.sanitize(this.signatureHtml, { USE_PROFILES: { html: true } })
+		},
+		insertSignature() {
+			const sig = this.sanitizedSignature()
+			if (!sig) return
+			this.$nextTick(() => {
+				setTimeout(() => {
+					this.$refs.editor?.setContent(sig)
+					this.$refs.editor?.setCursorAtStart()
+				}, 100)
+			})
 		},
 		async loadIdentities() {
 			try {
@@ -203,9 +247,20 @@ export default {
 			const body = email.htmlBody || email.plainBody || ''
 			const { html } = sanitizeMailHtml(body, { attachments: email.attachments || [], blockRemote: false })
 			const quote = buildReplyQuote(email, html)
+			const sig = this.sanitizedSignature()
+			// Order: [answer area] [signature (above)] [quote] [signature (below)]
+			const parts = []
+			if (sig && this.signaturePosition === 'above') parts.push(sig)
+			parts.push(quote)
+			if (sig && this.signaturePosition === 'below') parts.push(sig)
 			this.$nextTick(() => {
 				setTimeout(() => {
-					this.$refs.editor?.insertHtml(quote)
+					this.$refs.editor?.setContent(parts.join(''))
+					if (this.replyPosition === 'below') {
+						this.$refs.editor?.setCursorAtEnd()
+					} else {
+						this.$refs.editor?.setCursorAtStart()
+					}
 					this.$refs.editor?.focus()
 				}, 100)
 			})
