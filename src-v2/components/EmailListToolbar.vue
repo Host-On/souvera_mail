@@ -28,20 +28,22 @@
 				<NcTextField class="email-list-toolbar__search"
 					:value="searchQuery"
 					:placeholder="t('souvera_mail', 'Search in mailbox…')"
-					@update:modelValue="$emit('update:search', $event)" />
-				<NcActions>
+					:show-trailing-button="searchQuery !== ''"
+					trailing-button-icon="close"
+					:trailing-button-label="t('souvera_mail', 'Clear search')"
+					@update:modelValue="$emit('update:search', $event)"
+					@trailing-button-click="$emit('update:search', '')" />
+				<NcActions class="email-list-toolbar__filter"
+					:menu-name="activeFilterLabel"
+					:primary="filter !== 'all'"
+					:aria-label="t('souvera_mail', 'Filter messages')"
+					:force-name="true">
 					<template #icon><Filter :size="18" /></template>
-					<NcActionButton :name="t('souvera_mail', 'All')" @click="$emit('update:filter', 'all')">
-						<template #icon><EmailOutline :size="16" /></template>
-					</NcActionButton>
-					<NcActionButton :name="t('souvera_mail', 'Unread')" @click="$emit('update:filter', 'unread')">
-						<template #icon><EmailOpen :size="16" /></template>
-					</NcActionButton>
-					<NcActionButton :name="t('souvera_mail', 'Flagged')" @click="$emit('update:filter', 'flagged')">
-						<template #icon><Star :size="16" /></template>
-					</NcActionButton>
-					<NcActionButton :name="t('souvera_mail', 'With attachments')" @click="$emit('update:filter', 'attachments')">
-						<template #icon><Paperclip :size="16" /></template>
+					<NcActionButton v-for="f in filterOptions" :key="f.value"
+						:name="f.label"
+						:checked="filter === f.value"
+						@click="$emit('update:filter', f.value)">
+						<template #icon><component :is="f.icon" :size="16" /></template>
 					</NcActionButton>
 				</NcActions>
 			</template>
@@ -74,8 +76,23 @@ export default {
 		selectAllState: { type: [Boolean, String], default: false },
 		targetMailboxes: { type: Array, default: () => [] },
 		searchQuery: { type: String, default: '' },
+		filter: { type: String, default: 'all' },
 	},
 	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter'],
+	computed: {
+		activeFilterLabel() {
+			const active = this.filterOptions.find(f => f.value === this.filter)
+			return active ? active.label : this.t('souvera_mail', 'All')
+		},
+		filterOptions() {
+			return [
+				{ value: 'all', label: this.t('souvera_mail', 'All'), icon: EmailOutline },
+				{ value: 'unread', label: this.t('souvera_mail', 'Unread'), icon: EmailOpen },
+				{ value: 'flagged', label: this.t('souvera_mail', 'Flagged'), icon: Star },
+				{ value: 'attachments', label: this.t('souvera_mail', 'With attachments'), icon: Paperclip },
+			]
+		},
+	},
 }
 </script>
 

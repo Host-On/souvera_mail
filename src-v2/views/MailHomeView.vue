@@ -13,6 +13,7 @@
 				@move-to="bulkMoveTo"
 				@toggle-select-all="toggleSelectAll"
 				:search-query="searchQuery"
+				:filter="filterType"
 				@update:search="onSearch"
 				@update:filter="onFilter" />
 
@@ -140,11 +141,13 @@ export default {
 	beforeUnmount() {
 		this._hotkeys?.destroy()
 		this.stopAutoRefresh()
+		clearTimeout(this._searchTimer)
 		if (this._audioCtx) { this._audioCtx.close(); this._audioCtx = null }
 	},
 	methods: {
 		async loadEmails() {
 			this.loadingEmails = true
+			const seq = ++this._loadSeq
 			let accountId = null
 			let mailboxId = this.selectedMailbox
 			if (mailboxId && mailboxId.includes('|')) {
@@ -152,7 +155,13 @@ export default {
 			}
 			const prevIds = this.emails.map(e => e.id)
 			const prevTotal = this.emailTotal
-			try { const r = await fetchEmails(mailboxId, this.limit, this.offset, accountId, this.searchQuery, this.filterType); this.emails = r.emails; this.emailTotal = r.total } catch (e) { console.error('Failed to load emails', e) } finally { this.loadingEmails = false }
+			try {
+				const r = await fetchEmails(mailboxId, this.limit, this.offset, accountId, this.searchQuery, this.filterType)
+				// Ignore stale responses from earlier search/filter/pagination changes
+				if (seq !== this._loadSeq) return
+				this.emails = r.emails
+				this.emailTotal = r.total
+			} catch (e) { console.error('Failed to load emails', e) } finally { if (seq === this._loadSeq) this.loadingEmails = false }
 			// Play sound only when there are genuinely new emails (not page/filter changes)
 			if (prevIds.length > 0 && this.emailTotal > prevTotal) {
 				const newIds = this.emails.map(e => e.id).filter(id => !prevIds.includes(id))
@@ -161,12 +170,19 @@ export default {
 		},
 		onSearch(q) {
 			this.searchQuery = q
-			this.offset = 0
-			this.loadEmails()
+			this.scheduleSearch()
+		},
+		scheduleSearch() {
+			clearTimeout(this._searchTimer)
+			this._searchTimer = setTimeout(() => {
+				this.offset = 0
+				this.loadEmails()
+			}, 350)
 		},
 		onFilter(type) {
 			this.filterType = type
 			this.offset = 0
+			clearTimeout(this._searchTimer)
 			this.loadEmails()
 		},
 		getAccountId() {
