@@ -295,30 +295,39 @@ class V2ComposeController extends Controller
         );
         $emailObj['keywords'] = ['$draft' => true];
 
-        // Destroy old draft + create new (atomic replacement).
-        $result = $this->jmap->call([
-            ['Email/set', [
-                'accountId' => $accountId,
-                'destroy' => [$id],
-            ]],
-            ['Email/set', [
-                'accountId' => $accountId,
-                'create' => ['draft1' => $emailObj],
-            ]],
+        // Update the draft IN PLACE (Email/set update). The previous
+        // destroy+create replacement assigned a new id on every autosave —
+        // and the client never picked it up, so every autosave left yet
+        // another draft behind.
+        $result = $this->jmap->singleCall('Email/set', [
+            'accountId' => $accountId,
+            'update' => [$id => $emailObj],
         ]);
 
-        $responses = $result['responses'] ?? [];
-        $created = null;
-        foreach ($responses as $resp) {
-            if ($resp['name'] === 'Email/set') {
-                $created = $resp['args']['created']['draft1'] ?? null;
-                if ($created !== null) break;
+        if (isset($result['error'])) {
+            return new JSONResponse(['error' => 'Draft update failed', 'detail' => $result['error']], 500);
+        }
+        $updated = $result['data']['updated'][$id] ?? null;
+        $notUpdated = $result['data']['notUpdated'][$id] ?? null;
+        if ($notUpdated !== null) {
+            // Draft vanished (e.g. destroyed elsewhere) — fall back to create.
+            $create = $this->jmap->singleCall('Email/set', [
+                'accountId' => $accountId,
+                'create' => ['draft1' => $emailObj],
+            ]);
+            if (isset($create['error'])) {
+                return new JSONResponse(['error' => 'Draft recreate failed', 'detail' => $create['error']], 500);
             }
+            $created = $create['data']['created']['draft1'] ?? null;
+            return new JSONResponse([
+                'success' => true,
+                'draftId' => $created['id'] ?? '',
+            ]);
         }
 
         return new JSONResponse([
             'success' => true,
-            'draftId' => $created['id'] ?? '',
+            'draftId' => $updated['id'] ?? $id,
         ]);
     }
 
