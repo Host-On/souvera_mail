@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace OCA\SouveraMail\Command;
 
+use OCA\SouveraMail\Service\L10nService;
 use OCP\App\IAppManager;
-use OCP\IL10N;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -39,8 +39,8 @@ class L10nCheck extends Command
 {
     public function __construct(
         private IAppManager $appManager,
-        private IL10N $l10n,
         private \OCP\IUserManager $userManager,
+        private L10nService $l10nService,
     ) {
         parent::__construct();
     }
@@ -56,7 +56,8 @@ class L10nCheck extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $uid = (string) ($input->getArgument('uid') ?? '');
-        $lang = $this->l10n->getLanguageCode();
+        // Personal user language is authoritative (L10nService::resolveLanguage).
+        $lang = $this->l10nService->resolveLanguage();
         if ($uid !== '') {
             $user = $this->userManager->get($uid);
             if ($user === null) {

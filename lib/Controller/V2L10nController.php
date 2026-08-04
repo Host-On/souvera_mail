@@ -9,7 +9,6 @@ use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
-use OCP\IL10N;
 use OCP\IRequest;
 
 /**
@@ -27,7 +26,6 @@ class V2L10nController extends Controller
         string $appName,
         IRequest $request,
         private L10nService $l10nService,
-        private IL10N $l10n,
     ) {
         parent::__construct($appName, $request);
     }
@@ -36,11 +34,8 @@ class V2L10nController extends Controller
     #[NoCSRFRequired]
     public function index(): JSONResponse
     {
-        try {
-            $lang = $this->l10n->getLanguageCode();
-        } catch (\Throwable) {
-            $lang = 'en';
-        }
+        // Personal user language is authoritative (see L10nService::resolveLanguage).
+        $lang = $this->l10nService->resolveLanguage();
         $translations = $this->l10nService->getCatalog($lang);
         return new JSONResponse([
             'language' => $lang,
