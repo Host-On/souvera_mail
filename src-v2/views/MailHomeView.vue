@@ -139,14 +139,29 @@ export default {
 			Escape: () => { this.selectedEmail = null; this.checkedIds = [] },
 		})
 		this.startAutoRefresh()
+		// AudioContext must be created/resumed during a user gesture;
+		// browsers block sound from timers otherwise.
+		this._onUserGesture = () => this.wakeAudio()
+		document.addEventListener('click', this._onUserGesture, { once: true })
+		document.addEventListener('keydown', this._onUserGesture, { once: true })
 	},
 	beforeUnmount() {
 		this._hotkeys?.destroy()
 		this.stopAutoRefresh()
 		clearTimeout(this._searchTimer)
+		document.removeEventListener('click', this._onUserGesture)
+		document.removeEventListener('keydown', this._onUserGesture)
 		if (this._audioCtx) { this._audioCtx.close(); this._audioCtx = null }
 	},
 	methods: {
+		wakeAudio() {
+			try {
+				if (!this._audioCtx) {
+					this._audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+				}
+				if (this._audioCtx.state === 'suspended') this._audioCtx.resume()
+			} catch {}
+		},
 		async loadEmails() {
 			const seq = (this._loadSeq || 0) + 1
 			this._loadSeq = seq
@@ -299,26 +314,28 @@ export default {
 			this.stopAutoRefresh()
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
-				const interval = (data.autoRefresh || 0) * 1000
-				if (interval > 0) {
-					this._autoRefreshTimer = setInterval(() => {
-						clearTimeout(this._searchTimer)
-						this.loadEmails()
-					}, interval)
-				}
-			} catch {}
+				const interval = (data.autoRefresh || 60) * 1000
+				this._soundPref = data.notificationSound || 'none'
+				this._autoRefreshTimer = setInterval(() => {
+					clearTimeout(this._searchTimer)
+					this.loadEmails()
+				}, interval)
+			} catch {
+				// Fallback: poll every 60 seconds even if prefs aren't reachable
+				this._autoRefreshTimer = setInterval(() => {
+					clearTimeout(this._searchTimer)
+					this.loadEmails()
+				}, 60000)
+			}
 		},
 		stopAutoRefresh() {
 			if (this._autoRefreshTimer) { clearInterval(this._autoRefreshTimer); this._autoRefreshTimer = null }
 		},
 		async playNewMailSound() {
 			try {
-				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
-				const sound = data.notificationSound || 'none'
+				const sound = this._soundPref || 'none'
 				if (sound === 'none') return
-				if (!this._audioCtx) {
-					this._audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-				}
+				if (!this._audioCtx) { this._audioCtx = new (window.AudioContext || window.webkitAudioContext)() }
 				const ctx = this._audioCtx
 				if (ctx.state === 'suspended') await ctx.resume()
 				const gain = ctx.createGain()
@@ -331,7 +348,9 @@ export default {
 					const o1 = ctx.createOscillator(); o1.connect(gain); o1.frequency.value = 660; o1.type = 'triangle'; o1.start(); gain.gain.setTargetAtTime(0, ctx.currentTime + 0.3, 0.05); o1.stop(ctx.currentTime + 0.5)
 				}
 				setTimeout(() => { try { gain.disconnect() } catch {} }, 1000)
-			} catch {}
+			} catch {
+				// Audio may be blocked until a user gesture — resume was attempted above
+			}
 		},
 	},
 }

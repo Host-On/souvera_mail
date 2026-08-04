@@ -324,7 +324,7 @@ export default {
 				{ value: 120, label: '2m' },
 				{ value: 300, label: '5m' },
 			],
-			autoRefreshOption: { value: 0, label: 'Off' },
+			autoRefreshOption: { value: 60, label: '1m' },
 			soundOptions: [
 				{ value: 'none', label: 'None' },
 				{ value: 'chime', label: 'Chime' },
@@ -366,7 +366,7 @@ export default {
 				if (sp) this.signaturePositionOption = sp
 				if (p.remoteImages === 'always') this.remoteImagesOption = this.remoteImageOptions[1]
 				this.verticalLayout = p.verticalLayout || false
-				const ar = this.autoRefreshOptions.find(o => o.value === (p.autoRefresh || 0))
+				const ar = this.autoRefreshOptions.find(o => o.value === (p.autoRefresh || 60))
 				if (ar) this.autoRefreshOption = ar
 				const so = this.soundOptions.find(o => o.value === (p.notificationSound || 'none'))
 				if (so) this.soundOption = so
