@@ -80,9 +80,16 @@
 						<div>
 							<span class="setting-label">{{ t('souvera_mail', 'Notification sound') }}</span>
 						</div>
-						<NcSelect v-model="soundOption" :options="soundOptions"
-							label="label" class="setting-select"
-							@update:modelValue="onSoundChange" />
+						<div class="setting-row__sound">
+							<NcSelect v-model="soundOption" :options="soundOptions"
+								label="label" class="setting-select"
+								@update:modelValue="onSoundChange" />
+							<NcButton variant="tertiary" size="small"
+								:aria-label="t('souvera_mail', 'Preview sound')"
+								@click="previewSound">
+								<template #icon><Play :size="16" /></template>
+							</NcButton>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -272,6 +279,7 @@ import CodeTags from 'vue-material-design-icons/CodeTags.vue'
 import FileUpload from 'vue-material-design-icons/FileUpload.vue'
 import Download from 'vue-material-design-icons/Download.vue'
 import Import from 'vue-material-design-icons/Import.vue'
+import Play from 'vue-material-design-icons/Play.vue'
 import DOMPurify from 'dompurify'
 import QuotaDonut from '../components/QuotaDonut.vue'
 import axios from '@nextcloud/axios'
@@ -286,7 +294,7 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, QuotaDonut },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Play, QuotaDonut },
 	data() {
 		return {
 			accountEmail: '',
@@ -419,6 +427,23 @@ export default {
 				} catch (e) { console.error('Sound save failed', e); showError(this.t('souvera_mail', 'Failed to save')) }
 			}
 		},
+		previewSound() {
+			const sound = this.soundOption?.value
+			if (!sound || sound === 'none') return
+			try {
+				const ctx = new (window.AudioContext || window.webkitAudioContext)()
+				const gain = ctx.createGain()
+				gain.connect(ctx.destination)
+				gain.gain.value = 0.15
+				if (sound === 'chime') {
+					const o1 = ctx.createOscillator(); o1.connect(gain); o1.frequency.value = 880; o1.type = 'sine'; o1.start(); o1.stop(ctx.currentTime + 0.15)
+					const o2 = ctx.createOscillator(); o2.connect(gain); o2.frequency.value = 1100; o2.type = 'sine'; o2.start(ctx.currentTime + 0.15); o2.stop(ctx.currentTime + 0.35)
+				} else if (sound === 'bell') {
+					const o1 = ctx.createOscillator(); o1.connect(gain); o1.frequency.value = 660; o1.type = 'triangle'; o1.start(); gain.gain.setTargetAtTime(0, ctx.currentTime + 0.3, 0.05); o1.stop(ctx.currentTime + 0.5)
+				}
+				setTimeout(() => { try { gain.disconnect(); ctx.close() } catch {} }, 1000)
+			} catch (e) { console.error('Sound preview failed', e) }
+		},
 		async createFolder() {
 			const name = this.newFolderName.trim()
 			if (!name) return
@@ -533,6 +558,7 @@ export default {
 .setting-label { font-size: 14px; font-weight: 500; }
 .setting-value { font-size: 14px; color: var(--color-text-maxcontrast); }
 .setting-select { min-width: 180px; }
+.setting-row__sound { display: flex; align-items: center; gap: 6px; }
 
 .layout-options { display: flex; gap: 12px; }
 .layout-option {
