@@ -201,19 +201,35 @@
 					{{ t('souvera_mail', 'Folders') }}
 				</h2>
 				<div class="settings-card__body">
-					<NcButton variant="primary" @click="showCreateFolder = true">
+					<NcButton variant="primary" @click="showCreateFolder = true; newSubfolderParentId = null">
 						<template #icon><Plus :size="20" /></template>
 						{{ t('souvera_mail', 'New folder') }}
 					</NcButton>
 					<div v-if="showCreateFolder" class="create-row">
 						<NcTextField v-model="newFolderName" :placeholder="t('souvera_mail', 'Folder name')" />
+						<div v-if="newSubfolderParentId" class="create-row__sub">
+							{{ t('souvera_mail', 'Subfolder of') }} "{{ getFolderName(newSubfolderParentId) }}"
+						</div>
 						<NcButton variant="primary" @click="createFolder" :disabled="newFolderName.trim() === ''">{{ t('souvera_mail', 'Create') }}</NcButton>
-						<NcButton variant="tertiary" @click="showCreateFolder = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+						<NcButton variant="tertiary" @click="showCreateFolder = false; newSubfolderParentId = null">{{ t('souvera_mail', 'Cancel') }}</NcButton>
 					</div>
-					<div v-if="userFoldersList.length > 0" class="folder-list">
-						<div v-for="f in userFoldersList" :key="f.id" class="folder-row">
-							<span>{{ f.name }}</span>
+					<div v-if="folderTree.length > 0" class="folder-list">
+						<div v-for="f in folderTree" :key="f.id" class="folder-row"
+							:style="{ paddingLeft: (16 + f.depth * 20) + 'px' }"
+							draggable="true"
+							@dragstart="onFolderDragStart($event, f)"
+							@dragover.prevent="onFolderDragOver($event, f)"
+							@dragleave="onFolderDragLeave($event)"
+							@drop="onFolderDrop($event, f)"
+							@dragend="onFolderDragEnd($event)"
+							:class="{ 'folder-row--drag-over': dragOverId === f.id, 'folder-row--dragging': dragId === f.id }">
+							<span class="folder-row__name">{{ f.name }}</span>
 							<div class="folder-row__actions">
+								<NcButton variant="tertiary" size="small"
+									:aria-label="t('souvera_mail', 'Subfolder')"
+									@click="newSubfolderParentId = f.id; newFolderName = ''; showCreateFolder = true">
+									<template #icon><FolderPlus :size="14" /></template>
+								</NcButton>
 								<NcButton variant="tertiary" size="small"
 									:aria-label="t('souvera_mail', 'Rename')" @click="startRenameFolder(f)">
 									<template #icon><Pencil :size="14" /></template>
@@ -281,6 +297,7 @@ import FileUpload from 'vue-material-design-icons/FileUpload.vue'
 import Download from 'vue-material-design-icons/Download.vue'
 import Import from 'vue-material-design-icons/Import.vue'
 import Play from 'vue-material-design-icons/Play.vue'
+import FolderPlus from 'vue-material-design-icons/FolderPlus.vue'
 import DOMPurify from 'dompurify'
 import QuotaDonut from '../components/QuotaDonut.vue'
 import axios from '@nextcloud/axios'
@@ -295,7 +312,7 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Play, QuotaDonut },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Play, FolderPlus, QuotaDonut },
 	data() {
 		return {
 			accountEmail: '',
@@ -348,6 +365,9 @@ export default {
 			userFoldersList: [],
 			showCreateFolder: false,
 			newFolderName: '',
+			newSubfolderParentId: null,
+			dragId: null,
+			dragOverId: null,
 			loadedFolders: false,
 		}
 	},
@@ -359,6 +379,27 @@ export default {
 	computed: {
 		sigPreviewHtml() {
 			return DOMPurify.sanitize(this.sigHtml || '', { USE_PROFILES: { html: true } })
+		},
+		// Flattened tree: roots first, then children nested under parents
+		folderTree() {
+			const list = this.userFoldersList
+			if (!list || !list.length) return []
+			const byId = {}
+			for (const f of list) { byId[f.id] = { ...f, children: [] } }
+			const roots = []
+			for (const id in byId) {
+				const f = byId[id]
+				if (f.parentId && byId[f.parentId]) {
+					byId[f.parentId].children.push(f)
+				} else { roots.push(f) }
+			}
+			const flat = []
+			function walk(nodes, depth) {
+				nodes.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+				for (const n of nodes) { flat.push({ ...n, depth }); walk(n.children, depth + 1) }
+			}
+			walk(roots, 0)
+			return flat
 		},
 	},
 	methods: {
@@ -464,9 +505,11 @@ export default {
 			const name = this.newFolderName.trim()
 			if (!name) return
 			try {
-				const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/mailboxes'), { name })
-				this.userFoldersList.push({ id: data.id, name })
-				this.showCreateFolder = false; this.newFolderName = ''
+				const body = { name }
+				if (this.newSubfolderParentId) body.parentId = this.newSubfolderParentId
+				const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/mailboxes'), body)
+				this.userFoldersList.push({ id: data.id, name, parentId: this.newSubfolderParentId || null })
+				this.showCreateFolder = false; this.newFolderName = ''; this.newSubfolderParentId = null
 				showSuccess(this.t('souvera_mail', 'Folder created'))
 			} catch (e) { console.error('Folder create failed', e); showError(this.t('souvera_mail', 'Failed to create folder')) }
 		},
@@ -488,6 +531,33 @@ export default {
 				showSuccess(this.t('souvera_mail', 'Folder deleted'))
 			} catch (e) { console.error('Folder delete failed', e); showError(this.t('souvera_mail', 'Failed to delete folder')) }
 		},
+		getFolderName(id) {
+			const f = this.userFoldersList.find(x => x.id === id)
+			return f ? f.name : ''
+		},
+		// ---- drag & drop to move folders ----
+		onFolderDragStart(e, folder) {
+			this.dragId = folder.id
+			e.dataTransfer.effectAllowed = 'move'
+			e.dataTransfer.setData('text/plain', folder.id)
+		},
+		onFolderDragOver(e, target) {
+			if (this.dragId && this.dragId !== target.id) { this.dragOverId = target.id }
+		},
+		onFolderDragLeave() { this.dragOverId = null },
+		async onFolderDrop(e, target) {
+			e.preventDefault(); this.dragOverId = null
+			const id = this.dragId; this.dragId = null
+			if (!id || id === target.id) return
+			const moved = this.userFoldersList.find(f => f.id === id)
+			if (!moved) return
+			try {
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + id), { parentId: target.id })
+				moved.parentId = target.id
+				showSuccess(this.t('souvera_mail', 'Folder moved'))
+			} catch (e) { console.error('Folder move failed', e); showError(this.t('souvera_mail', 'Failed to move folder')) }
+		},
+		onFolderDragEnd() { this.dragId = null; this.dragOverId = null },
 		async saveSig() {
 			try {
 				const replyPosition = this.replyPositionOption?.value === 'below' ? 'below' : 'above'
@@ -660,4 +730,8 @@ export default {
 .folder-list { display: flex; flex-direction: column; gap: 4px; }
 .folder-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: var(--border-radius); }
 .folder-row__actions { display: flex; gap: 2px; }
+.folder-row__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; margin-right: 8px; }
+.folder-row--dragging { opacity: 0.4; }
+.folder-row--drag-over { border-color: var(--color-primary-element) !important; background: var(--color-primary-element-light); }
+.create-row__sub { font-size: 12px; color: var(--color-text-maxcontrast); margin: 2px 0; }
 </style>
