@@ -129,6 +129,22 @@ class MigrationService
     }
 
     /**
+     * Reset the welcome state and cancel any active migration for the
+     * given user — allows re-running the wizard after a completed run.
+     */
+    public function resetForUser(string $userId): void
+    {
+        $this->config->deleteUserValue($userId, 'souvera_mail', self::USERCONFIG_WELCOME_DISMISSED);
+        try {
+            $active = $this->jobs->findActiveForUser($userId);
+            $active->setStatus(MigrationJob::STATUS_CANCELLED);
+            $this->jobs->update($active);
+        } catch (DoesNotExistException) {
+            // No active job — nothing to cancel.
+        }
+    }
+
+    /**
      * Pre-flight IMAP source credential check. Returns provider.tools'
      * raw success/message so the UI can display a green ✓ or red ✗.
      *
