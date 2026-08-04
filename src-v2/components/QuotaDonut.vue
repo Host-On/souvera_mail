@@ -4,7 +4,7 @@
 		<svg viewBox="0 0 36 36" class="quota-donut__svg"
 			:style="{ width: size + 'px', height: size + 'px' }">
 			<circle cx="18" cy="18" r="15.5" fill="none"
-				stroke="var(--color-border)" stroke-width="4" />
+				:stroke="trackColor" stroke-width="4" />
 			<circle cx="18" cy="18" r="15.5" fill="none"
 				:stroke="donutColor"
 				stroke-width="4"
@@ -29,8 +29,14 @@ export default {
 		// inline: donut acts as the icon of a nav-style row — icon left,
 		// label right, left-aligned, single-line height (nav footer use).
 		inline: { type: Boolean, default: false },
+		// lightTrack: white track circle for dark/grey backgrounds
+		// (nav footer); default uses the theme border colour (settings).
+		lightTrack: { type: Boolean, default: false },
 	},
 	computed: {
+		trackColor() {
+			return this.lightTrack ? '#ffffff' : 'var(--color-border)'
+		},
 		label() {
 			if (this.unlimited) return this.inline ? (this.t ? this.t('souvera_mail', 'Unlimited') : 'Unlimited') : '∞'
 			return this.percent + '%'
@@ -60,7 +66,7 @@ export default {
 
 .quota-donut--inline {
 	display: flex; align-items: center; gap: 10px;
-	padding: 6px 12px; text-align: left;
+	padding: 6px 12px 6px 8px; text-align: left;
 }
 .quota-donut--inline .quota-donut__svg { margin: 0; flex-shrink: 0; }
 .quota-donut--inline .quota-donut__label {
