@@ -46,6 +46,12 @@ class BimiService
         if ($cached !== null) {
             $data = \json_decode($cached, true);
             if (\is_array($data)) {
+                // Sanitize legacy cache entries that may contain http:// URLs
+                $logoUrl = $data['logoUrl'] ?? null;
+                if ($logoUrl !== null && !$this->isAllowedLogoUrl($logoUrl)) {
+                    $data['logoUrl'] = null;
+                    $data['verified'] = false;
+                }
                 return $data + ['domain' => $domain];
             }
         }
@@ -110,10 +116,7 @@ class BimiService
                 }
             }
 
-            if (isset($data['l'])
-                && \filter_var($data['l'], \FILTER_VALIDATE_URL)
-                && \str_starts_with(\strtolower($data['l']), 'https://')
-            ) {
+            if (isset($data['l']) && $this->isAllowedLogoUrl($data['l'])) {
                 $tags = isset($data['a']) ? \explode(',', $data['a']) : [];
                 return [
                     'logo' => $data['l'],
@@ -129,6 +132,12 @@ class BimiService
     {
         $host = \parse_url($url, \PHP_URL_HOST) ?? '';
         return \in_array($host, ['default._bimi', 'bimi.entrust.net', 'bimi.digicert.com'], true);
+    }
+
+    private function isAllowedLogoUrl(string $url): bool
+    {
+        return \filter_var($url, \FILTER_VALIDATE_URL) !== false
+            && \str_starts_with(\strtolower($url), 'https://');
     }
 
     private function convertSvgToPng(string $url): string

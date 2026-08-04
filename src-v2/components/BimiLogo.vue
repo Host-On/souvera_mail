@@ -35,7 +35,7 @@ export default {
 		},
 	},
 	methods: {
-		async resolve() {
+		resolve() {
 			const domain = this.domain
 			this.logoUrl = null
 			if (!domain) {
@@ -43,16 +43,29 @@ export default {
 				return
 			}
 			if (cache.has(domain)) {
-				if (this.isCurrent(domain)) this.applyLogo(cache.get(domain))
+				const entry = cache.get(domain)
+				if (entry instanceof Promise) {
+					entry.then(() => {
+						if (this.isCurrent(domain)) this.applyLogo(cache.get(domain))
+					})
+					return
+				}
+				if (this.isCurrent(domain)) this.applyLogo(entry)
 				return
 			}
+			const pending = this.fetchLogo(domain)
+			cache.set(domain, pending)
+		},
+		async fetchLogo(domain) {
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/bimi'), {
 					params: { domain },
 				})
-				cache.set(domain, data.logoUrl || null)
-				if (this.isCurrent(domain)) this.applyLogo(data.logoUrl || null)
+				const logo = data.logoUrl || null
+				cache.set(domain, logo)
+				if (this.isCurrent(domain)) this.applyLogo(logo)
 			} catch {
+				cache.set(domain, null)
 				if (this.isCurrent(domain)) this.applyLogo(null)
 			}
 		},
@@ -69,9 +82,12 @@ export default {
 			}
 		},
 		onError() {
-			cache.set(this.domain, null)
-			this.logoUrl = null
-			this.$emit('failed')
+			const domain = this.domain
+			if (this.isCurrent(domain)) {
+				cache.set(domain, null)
+				this.logoUrl = null
+				this.$emit('failed')
+			}
 		},
 	},
 }
