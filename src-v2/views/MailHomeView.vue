@@ -123,7 +123,7 @@ export default {
 		},
 	},
 	watch: {
-		selectedMailbox() { this.checkedIds = []; this.offset = 0; this.selectedEmail = null; this.loadEmails() },
+		selectedMailbox() { clearTimeout(this._searchTimer); this.checkedIds = []; this.offset = 0; this.selectedEmail = null; this.loadEmails() },
 	},
 	async mounted() {
 		if (this.selectedMailbox) await this.loadEmails()
