@@ -6,7 +6,7 @@
 				:select-all-state="selectAllState"
 				:target-mailboxes="moveMailboxes"
 				:is-trash="isTrashMailbox"
-				@refresh="refreshEmails"
+				@refresh="onRefresh"
 				@compose="$router.push({name:'compose'})"
 				@mark-read="bulkMarkRead"
 				@mark-unread="bulkMarkUnread"
@@ -21,10 +21,9 @@
 				:filter="filterType"
 				:two-row="!verticalLayout"
 				:refresh-countdown="refreshCountdown"
+				:refresh-total="_refreshInterval"
 				@update:search="onSearch"
-				@update:filter="onFilter"
-				@refresh="onRefresh" />
-
+				@update:filter="onFilter" />
 			<EmailListSkeleton v-if="loadingEmails" />
 			<template v-else-if="emails.length > 0">
 				<div class="email-items">
@@ -126,6 +125,8 @@ export default {
 			searchQuery: '',
 			filterType: 'all',
 			refreshCountdown: 60,
+			_refreshInterval: 60,
+			_soundPref: 'none',
 		}
 	},
 	computed: {
