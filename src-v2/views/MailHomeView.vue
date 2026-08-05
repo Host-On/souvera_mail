@@ -378,14 +378,27 @@ export default {
 		},
 		async deleteEmail() {
 			if (!this.selectedEmail) return
+			const idx = this.emails.findIndex(e => e.id === this.selectedEmail.id)
 			try { await deleteEmailApi(this.selectedEmail.id, this.currentAccountId) } catch (e) { console.error('Failed to delete email', e) }
-			this.selectedEmail = null; this.emailBodyHtml = ''; this.emailBodyPlain = ''
 			await this.refreshEmails()
 			this.notifyMailboxChange()
+			if (this.emails.length > 0) {
+				const next = this.emails[Math.min(idx, this.emails.length - 1)]
+				if (next) this.onOpenEmail(next)
+			} else {
+				this.selectedEmail = null; this.emailBodyHtml = ''; this.emailBodyPlain = ''
+			}
 		},
 		async onMove(mailboxId) {
 			if (!this.selectedEmail) return
-			try { await moveEmail(this.selectedEmail.id, mailboxId, this.currentAccountId); this.selectedEmail = null; await this.refreshEmails(); this.notifyMailboxChange() } catch (e) { console.error('Failed to move email', e) }
+			const idx = this.emails.findIndex(e => e.id === this.selectedEmail.id)
+			try { await moveEmail(this.selectedEmail.id, mailboxId, this.currentAccountId); await this.refreshEmails(); this.notifyMailboxChange() } catch (e) { console.error('Failed to move email', e) }
+			if (this.emails.length > 0) {
+				const next = this.emails[Math.min(idx, this.emails.length - 1)]
+				if (next) this.onOpenEmail(next)
+			} else {
+				this.selectedEmail = null; this.emailBodyHtml = ''; this.emailBodyPlain = ''
+			}
 		},
 		async toggleFlag(emailId) {
 			const email = this.emails.find(e => e.id === emailId)
