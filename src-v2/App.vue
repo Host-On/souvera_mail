@@ -54,9 +54,9 @@
 						@click="openArchive">
 						<template #icon><Archive :size="20" /></template>
 					</NcAppNavigationItem>
-					<NcAppNavigationItem :name="t('souvera_mail', 'Settings')"
-						:active="showSettings"
-						@click="showSettings = true; $router.push({name:'inbox'})">
+				<NcAppNavigationItem :name="t('souvera_mail', 'Settings')"
+					:active="$route.name === 'settings'"
+					@click="$router.push({name:'settings'})">
 						<template #icon><Cog :size="20" /></template>
 					</NcAppNavigationItem>
 				</div>
@@ -64,8 +64,7 @@
 		</NcAppNavigation>
 
 	<NcAppContent>
-		<SettingsView v-if="showSettings" />
-		<router-view v-else v-slot="{ Component }">
+		<router-view v-slot="{ Component }">
 			<component :is="Component" :key="$route.fullPath" v-bind="routeProps" />
 		</router-view>
 	</NcAppContent>
@@ -82,7 +81,6 @@ import Archive from 'vue-material-design-icons/Archive.vue'
 import Contacts from 'vue-material-design-icons/Contacts.vue'
 import MailboxItem from './components/MailboxItem.vue'
 import QuotaDonut from './components/QuotaDonut.vue'
-import SettingsView from './views/SettingsView.vue'
 import ContactPicker from './components/ContactPicker.vue'
 import { useJmapClient } from './composables/useJmapClient.js'
 import { useHotkeys } from './composables/useHotkeys.js'
@@ -93,9 +91,9 @@ const ROLE_ORDER = { inbox:0, drafts:1, sent:2, archive:3, junk:4, trash:5 }
 
 export default {
 	name: 'MailV2App',
-	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, Contacts, MailboxItem, QuotaDonut, SettingsView, ContactPicker },
+	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, Contacts, MailboxItem, QuotaDonut, ContactPicker },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, showSettings: false, isVertical: false, showContactPicker: false }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },
@@ -151,18 +149,14 @@ export default {
 		async onRefreshMailboxes() {
 			try { this.mailboxes = await fetchMailboxes() } catch(e) { console.error(e) }
 		},
-		onMailboxSelect(id) { this.selectedMailbox = id; this.showSettings = false; this.$router.push({name:'inbox'}) },
+		onMailboxSelect(id) { this.selectedMailbox = id; this.$router.push({name:'inbox'}) },
 		startCompose() {
-			// Settings replaces the router-view — hide it so the compose
-			// route actually renders.
-			this.showSettings = false
 			if (this.$route.name !== 'compose') {
 				this.$router.push({ name: 'compose' })
 			}
 		},
 		onSharedSelect(accountId, mailboxId) {
 			this.selectedMailbox = accountId + '|' + mailboxId
-			this.showSettings = false
 			if (this.$route.name === 'inbox') {
 				this.$router.replace({ name: 'inbox', query: { t: String(Date.now()) } })
 			} else {
