@@ -65,7 +65,9 @@
 
 	<NcAppContent>
 		<router-view v-slot="{ Component }">
-			<component :is="Component" :key="$route.fullPath" v-bind="routeProps" />
+			<keep-alive>
+				<component :is="Component" v-if="$route.matched.length" v-bind="routeProps" />
+			</keep-alive>
 		</router-view>
 	</NcAppContent>
 	</NcContent>
