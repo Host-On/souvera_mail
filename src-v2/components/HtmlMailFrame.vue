@@ -29,9 +29,10 @@ export default {
 	emits: ['mailto', 'blocked'],
 	data() {
 		return {
-			remoteAllowed: this.defaultAllowRemote,
-			displayHtml: '',
-			blockedCount: 0,
+			// Do NOT shadow the remoteAllowed prop — the parent controls it
+			// and the watcher (below) fires when the parent toggles it.
+			_displayHtml: '',
+			_blockedCount: 0,
 			frameHeight: 0,
 			frameKey: 0,
 			resizeObserver: null,
@@ -40,11 +41,7 @@ export default {
 	watch: {
 		html: { immediate: true, handler: 'rebuildContent' },
 		attachments: { handler: 'rebuildContent' },
-		remoteAllowed: {
-			handler: function(val) {
-				if (val) this.loadRemoteImages()
-			},
-		},
+		remoteAllowed: { immediate: true, handler: 'loadRemoteImages' },
 	},
 	methods: {
 		rebuildContent() {
@@ -52,39 +49,16 @@ export default {
 				attachments: this.attachments,
 				blockRemote: !this.remoteAllowed,
 			})
-			this.blockedCount = blockedCount
-			this.displayHtml = html
+			this._blockedCount = blockedCount
+			this._displayHtml = html
 			this.frameKey++
 			if (blockedCount > 0 && !this.remoteAllowed) {
 				this.$emit('blocked', blockedCount)
 			}
 		},
 		loadRemoteImages() {
-			this.remoteAllowed = true
-			this.blockedCount = 0
-			const doc = this.$refs.frame?.contentDocument
-			if (!doc) { this.frameKey++; return }
-			const imgs = doc.querySelectorAll('[data-blocked-src]')
-			imgs.forEach(img => {
-				const src = img.getAttribute('data-blocked-src')
-				if (src) {
-					img.setAttribute('src', src)
-					img.removeAttribute('data-blocked-src')
-					img.removeAttribute('width')
-					img.removeAttribute('height')
-					if (img.hasAttribute('style')) {
-						img.setAttribute('style', img.getAttribute('style').replace(/(width|height)\s*:\s*[^;]+;?/gi, ''))
-					}
-				}
-			})
-			const bgs = doc.querySelectorAll('[data-blocked-bg]')
-			bgs.forEach(el => {
-				const bg = el.getAttribute('data-blocked-bg')
-				if (bg) {
-					el.setAttribute('background', bg)
-					el.removeAttribute('data-blocked-bg')
-				}
-			})
+			if (!this.remoteAllowed) return
+			this.rebuildContent()
 		},
 		onFrameLoad() {
 			const doc = this.$refs.frame?.contentDocument
@@ -122,7 +96,7 @@ export default {
 	},
 	computed: {
 		srcdoc() {
-			return `<!doctype html><head><meta charset="utf-8"><base target="_blank"><style>${BASE_CSS}</style></head><body>${this.displayHtml}</body>`
+			return `<!doctype html><head><meta charset="utf-8"><base target="_blank"><style>${BASE_CSS}</style></head><body>${this._displayHtml}</body>`
 		},
 	},
 	beforeUnmount() {

@@ -134,19 +134,16 @@
 		</NcDialog>
 
 		<div class="email-detail__body">
-			<HtmlMailFrame v-if="htmlBody"
-				:html="htmlBody"
+			<HtmlMailFrame v-if="displayHtml"
+				:html="displayHtml"
 				:attachments="email.attachments || []"
 				:remote-allowed="remoteAllowed"
 				@mailto="$emit('mailto', $event)"
 				@blocked="onBlocked" />
-			<div v-else-if="plainBody" class="email-body-text">{{ plainBody }}</div>
-			<div v-else-if="loading" class="email-detail__loading">
-				<span class="icon-loading" />
-			</div>
-			<p v-else class="email-detail__empty">
+			<pre v-else-if="displayPlain" class="email-detail__plaintext">{{ displayPlain }}</pre>
+			<NcNoteCard v-else type="warning" class="email-detail__blocked">
 				{{ t('souvera_mail', 'This message has no content or could not be loaded.') }}
-			</p>
+			</NcNoteCard>
 		</div>
 	</div>
 </template>
@@ -186,6 +183,17 @@ export default {
 	emits: ['close', 'reply', 'replyAll', 'forward', 'delete', 'move', 'mailto'],
 	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: false } },
 	computed: {
+		// Convert plain text to displayable HTML (newlines → <br>, safe)
+		displayHtml() {
+			if (this.htmlBody) return this.htmlBody
+			if (this.plainBody) {
+				return this.plainBody
+					.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+					.replace(/\n/g, '<br>')
+			}
+			return ''
+		},
+		displayPlain() { return !this.htmlBody ? this.plainBody : '' },
 		filePath() {
 			const p = this.folderPath.replace(/^\//, '')
 			return p
@@ -336,6 +344,7 @@ export default {
 .email-detail__loading { display: flex; justify-content: center; padding: 48px; }
 .email-detail__empty { color: var(--color-text-maxcontrast); text-align: center; padding: 48px; }
 .email-detail__blocked { margin-top: 10px; }
+.email-detail__plaintext { white-space: pre-wrap; font-family: monospace; font-size: 13px; line-height: 1.5; padding: 16px; }
 .folder-picker { display: flex; flex-direction: column; min-height: 300px; max-height: 55vh; }
 .folder-picker__breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-bottom: 8px; }
 .folder-picker__sep { color: var(--color-text-maxcontrast); padding: 0 2px; }
