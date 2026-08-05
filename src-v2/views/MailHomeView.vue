@@ -421,7 +421,7 @@ export default {
 		playFileSound(sound) {
 			try {
 				const root = (window.OC && window.OC.getRootPath) ? window.OC.getRootPath() : ''
-				const url = root + '/apps/souvera_mail/js/sounds/' + sound + '.mp3'
+				const url = root + '/apps/souvera_mail/img/sounds/' + sound + '.mp3'
 				const a = new Audio(url)
 				a.volume = 0.4
 				const playPromise = a.play()
