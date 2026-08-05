@@ -67,11 +67,21 @@
 				</NcActions>
 			</template>
 		</div>
-		<NcButton variant="tertiary" class="email-list-toolbar__refresh" @click="$emit('refresh')"
-			:title="t('souvera_mail', 'Refresh') + ' (' + refreshCountdown + 's)'">
-			<template #icon><Refresh :size="20" /></template>
-			{{ refreshCountdown }}s
-		</NcButton>
+		<div class="toolbar__refresh-donut"
+			@click="$emit('refresh')"
+			:title="t('souvera_mail', 'Refresh ({n}s)', { n: refreshCountdown })">
+			<svg viewBox="0 0 36 36" class="donut-svg">
+				<circle cx="18" cy="18" r="15" fill="none"
+					stroke="var(--color-border)" stroke-width="3" />
+				<circle cx="18" cy="18" r="15" fill="none"
+					stroke="var(--color-primary)" stroke-width="3"
+					:stroke-dasharray="circumference"
+					:stroke-dashoffset="donutOffset"
+					stroke-linecap="round"
+					class="donut-fill" />
+			</svg>
+			<Refresh :size="14" class="donut-icon" />
+		</div>
 		<NcButton variant="primary" class="email-list-toolbar__compose" @click="$emit('compose')">
 			<template #icon><Pencil :size="20" /></template>
 			{{ t('souvera_mail', 'New') }}
@@ -109,9 +119,15 @@ export default {
 		twoRow: { type: Boolean, default: false },
 		isTrash: { type: Boolean, default: false },
 		refreshCountdown: { type: Number, default: 0 },
+		refreshTotal: { type: Number, default: 60 },
 	},
 	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter', 'selectAll', 'markAllRead', 'markAllUnread', 'emptyTrash'],
 	computed: {
+		circumference() { return 2 * Math.PI * 15 },
+		donutOffset() {
+			const fraction = this.refreshTotal > 0 ? this.refreshCountdown / this.refreshTotal : 0
+			return this.circumference * (1 - fraction)
+		},
 		activeFilterMenuName() {
 			const active = this.filterOptions.find(f => f.value === this.filter)
 			return this.t('souvera_mail', 'Filter: {name}', { name: active ? active.label : this.t('souvera_mail', 'All') })
@@ -169,4 +185,19 @@ export default {
 	right: 12px;
 	bottom: 6px;
 }
+
+.toolbar__refresh-donut {
+	position: relative;
+	width: 32px; height: 32px;
+	display: flex; align-items: center; justify-content: center;
+	cursor: pointer; flex-shrink: 0;
+	border-radius: 50%;
+}
+.toolbar__refresh-donut:hover { background: var(--color-background-hover); }
+.donut-svg { position: absolute; width: 28px; height: 28px; top: 2px; left: 2px; }
+.donut-fill {
+	transform: rotate(-90deg); transform-origin: 50% 50%;
+	transition: stroke-dashoffset 0.3s linear;
+}
+.donut-icon { position: relative; z-index: 1; opacity: 0.7; }
 </style>
