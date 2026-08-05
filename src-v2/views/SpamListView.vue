@@ -24,7 +24,7 @@
 				class="spam-item"
 				:class="{ 'spam-item--active': selectedItem && selectedItem.id === item.id && selectedItem._source === item._source }"
 				@click="openItem(item)">
-				<NcCheckboxRadioSwitch :checked.sync="item._checked" @click.stop @update:checked="toggleCheck(item)" />
+				<NcCheckboxRadioSwitch :model-value="item._checked" @click.stop @update:model-value="item._checked = $event" />
 				<div class="spam-item__content">
 					<div class="spam-item__top">
 						<span class="spam-item__from">{{ item.fromName || item.fromAddress || '&nbsp;' }}</span>
@@ -133,9 +133,6 @@ export default {
 			this.showDetail = false
 			this.selectedItem = null
 			this.detailBody = null
-		},
-		toggleCheck(item) {
-			item._checked = !item._checked
 		},
 		async releaseSelected() {
 			const checked = this.checkedIds
