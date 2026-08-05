@@ -34,6 +34,11 @@ return [
             'verb' => 'POST'
         ],
         [
+            'name' => 'page#sound',
+            'url' => '/sound/{name}',
+            'verb' => 'GET'
+        ],
+        [
             'name' => 'page#appGet',
             'url' => '/app/',
             'verb' => 'GET'

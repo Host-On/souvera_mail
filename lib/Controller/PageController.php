@@ -62,6 +62,36 @@ class PageController extends Controller
     }
 
     /**
+     * GET /apps/souvera_mail/sound/{name}
+     *
+     * Serves notification sound files (new-mail.mp3, alert.mp3,
+     * ping.mp3) stored in img/sounds/. Neither js/ nor img/ are
+     * guaranteed to be served by every webserver config — a PHP
+     * endpoint is the only path that works everywhere.
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function sound(string $name): \OCP\AppFramework\Http\Response
+    {
+        $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath('souvera_mail');
+        if ($appPath === null) {
+            return new \OCP\AppFramework\Http\DataResponse(['error' => 'Not found'], 404);
+        }
+        $safeName = \basename($name);
+        $filePath = $appPath . '/img/sounds/' . $safeName;
+        if (!\is_file($filePath)) {
+            return new \OCP\AppFramework\Http\DataResponse(['error' => 'Not found'], 404);
+        }
+        $ext = \strtolower(\pathinfo($filePath, \PATHINFO_EXTENSION));
+        $mime = $ext === 'ogg' ? 'audio/ogg' : 'audio/mpeg';
+        return new \OCP\AppFramework\Http\DataDownloadResponse(
+            (string) \file_get_contents($filePath),
+            $safeName,
+            $mime
+        );
+    }
+
+    /**
      * Shared implementation for `index()` (with `?embedded=1`
      * detection) and `embed()` (always standalone).
      *

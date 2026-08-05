@@ -55,9 +55,9 @@
 		</div>
 
 		<div v-if="selectedEmail && !verticalLayout" class="mail-resize-handle mail-resize-handle--h"
-			@mousedown="onResizeStart($event, 'horizontal')" />
+			@mousedown.prevent="onResizeStart($event, 'horizontal')" />
 		<div v-if="selectedEmail && verticalLayout" class="mail-resize-handle mail-resize-handle--v"
-			@mousedown="onResizeStart($event, 'vertical')" />
+			@mousedown.prevent="onResizeStart($event, 'vertical')" />
 
 		<div v-if="selectedEmail" class="mail-detail-panel">
 			<EmailDetail
@@ -432,7 +432,7 @@ export default {
 		playFileSound(sound) {
 			try {
 				const root = (window.OC && window.OC.getRootPath) ? window.OC.getRootPath() : ''
-				const url = root + '/apps/souvera_mail/img/sounds/' + sound + '.mp3'
+				const url = root + '/apps/souvera_mail/sound/' + sound + '.mp3'
 				const a = new Audio(url)
 				a.volume = 0.4
 				const playPromise = a.play()
@@ -509,8 +509,8 @@ export default {
 .email-items { flex: 1; overflow-y: auto; }
 .mail-resize-handle { flex-shrink: 0; background: transparent; transition: background 0.15s; z-index: 5; }
 .mail-resize-handle:hover { background: var(--color-primary-element); opacity: 0.5; }
-.mail-resize-handle--h { width: 4px; cursor: col-resize; }
-.mail-resize-handle--v { height: 4px; cursor: row-resize; }
+.mail-resize-handle--h { width: 6px; cursor: col-resize; background: var(--color-background-dark); border-left: 1px solid var(--color-border); border-right: 1px solid var(--color-border); }
+.mail-resize-handle--v { height: 6px; cursor: row-resize; background: var(--color-background-dark); border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
 .mail-resize-handle--v:hover { opacity: 0.5; }
 body.resize-active { user-select: none; cursor: col-resize; }
 </style>
