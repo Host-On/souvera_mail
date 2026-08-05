@@ -55,8 +55,8 @@
 						<template #icon><Archive :size="20" /></template>
 					</NcAppNavigationItem>
 				<NcAppNavigationItem :name="t('souvera_mail', 'Settings')"
-					:active="$route.name === 'settings'"
-					@click="$router.push({name:'settings'})">
+					:to="{ name: 'settings' }"
+					:active="$route.name === 'settings'">
 						<template #icon><Cog :size="20" /></template>
 					</NcAppNavigationItem>
 				</div>

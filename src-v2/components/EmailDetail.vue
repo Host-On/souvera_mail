@@ -179,9 +179,10 @@ export default {
 		plainBody: { type: String, default: '' },
 		loading: { type: Boolean, default: false },
 		mailboxes: { type: Array, default: () => [] },
+		remoteAlways: { type: Boolean, default: false },
 	},
 	emits: ['close', 'reply', 'replyAll', 'forward', 'delete', 'move', 'mailto'],
-	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: false } },
+	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: this.remoteAlways } },
 	computed: {
 		// Convert plain text to displayable HTML (newlines → <br>, safe)
 		displayHtml() {

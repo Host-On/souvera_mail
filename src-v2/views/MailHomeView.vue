@@ -70,6 +70,7 @@
 				:plain-body="emailBodyPlain"
 				:loading="loadingBody"
 				:mailboxes="allMailboxes"
+				:remote-always="_remoteAlways"
 				@close="selectedEmail = null"
 				@reply="onReply"
 				@reply-all="onReplyAll"
@@ -398,6 +399,7 @@ export default {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
 				const interval = (data.autoRefresh || 60) * 1000
 				this._soundPref = data.notificationSound || 'none'
+				this._remoteAlways = data.remoteImages === 'always'
 				this._autoRefreshTimer = setInterval(() => {
 					clearTimeout(this._searchTimer)
 					this._isAutoRefresh = true
