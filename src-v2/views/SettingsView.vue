@@ -539,7 +539,7 @@ export default {
 			} else {
 				try {
 					const root = (window.OC && window.OC.getRootPath) ? window.OC.getRootPath() : ''
-					const a = new Audio(root + '/apps/souvera_mail/img/sounds/' + sound + '.mp3')
+					const a = new Audio(root + '/apps/souvera_mail/sound/' + sound + '.mp3')
 					a.volume = 0.4
 					const playPromise = a.play()
 					if (playPromise) playPromise.catch(() => {})
