@@ -20,8 +20,10 @@
 				:search-query="searchQuery"
 				:filter="filterType"
 				:two-row="!verticalLayout"
+				:refresh-countdown="refreshCountdown"
 				@update:search="onSearch"
-				@update:filter="onFilter" />
+				@update:filter="onFilter"
+				@refresh="onRefresh" />
 
 			<EmailListSkeleton v-if="loadingEmails" />
 			<template v-else-if="emails.length > 0">
@@ -123,6 +125,7 @@ export default {
 			checkedIds: [],
 			searchQuery: '',
 			filterType: 'all',
+			refreshCountdown: 60,
 		}
 	},
 	computed: {
@@ -193,10 +196,10 @@ export default {
 				try { Notification.requestPermission() } catch {}
 			}
 		},
-		async loadEmails() {
+		async loadEmails(showSkeleton = true) {
+			if (showSkeleton) this.loadingEmails = true
 			const seq = (this._loadSeq || 0) + 1
 			this._loadSeq = seq
-			this.loadingEmails = true
 			let accountId = null
 			let mailboxId = this.selectedMailbox
 			if (mailboxId && mailboxId.includes('|')) {
@@ -231,6 +234,10 @@ export default {
 				}
 			}
 			this.notifyTitle()
+		},
+		async onRefresh() {
+			this.refreshCountdown = this._refreshInterval || 60
+			await this.refreshEmails()
 		},
 		onSearch(q) {
 			this.searchQuery = q
@@ -398,24 +405,34 @@ export default {
 			this.stopAutoRefresh()
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
-				const interval = (data.autoRefresh || 60) * 1000
+				const interval = (data.autoRefresh || 60)
+				this._refreshInterval = interval
 				this._soundPref = data.notificationSound || 'none'
 				this._remoteAlways = data.remoteImages === 'always'
-				this._autoRefreshTimer = setInterval(() => {
-					clearTimeout(this._searchTimer)
-					this._isAutoRefresh = true
-					this.loadEmails()
-				}, interval)
+				this.refreshCountdown = interval
+				this._countdownTimer = setInterval(() => {
+					this.refreshCountdown = Math.max(0, this.refreshCountdown - 1)
+					if (this.refreshCountdown <= 0) {
+						this.refreshCountdown = interval
+						this._isAutoRefresh = true
+						this.loadEmails(false) // background reload, no skeleton
+					}
+				}, 1000)
 			} catch {
-				this._autoRefreshTimer = setInterval(() => {
-					clearTimeout(this._searchTimer)
-					this._isAutoRefresh = true
-					this.loadEmails()
-				}, 60000)
+				this._refreshInterval = 60
+				this.refreshCountdown = 60
+				this._countdownTimer = setInterval(() => {
+					this.refreshCountdown = Math.max(0, this.refreshCountdown - 1)
+					if (this.refreshCountdown <= 0) {
+						this.refreshCountdown = 60
+						this._isAutoRefresh = true
+						this.loadEmails(false)
+					}
+				}, 1000)
 			}
 		},
 		stopAutoRefresh() {
-			if (this._autoRefreshTimer) { clearInterval(this._autoRefreshTimer); this._autoRefreshTimer = null }
+			if (this._countdownTimer) { clearInterval(this._countdownTimer); this._countdownTimer = null }
 		},
 		async playNewMailSound() {
 			try {
