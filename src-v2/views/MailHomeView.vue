@@ -1,6 +1,6 @@
 <template>
 	<div class="mail-home" :class="{ 'mail-home--vertical': verticalLayout }">
-		<div class="mail-list-panel" :style="{ width: listWidth }">
+		<div class="mail-list-panel" :style="panelStyle">
 			<EmailListToolbar
 				:selected-count="checkedIds.length"
 				:select-all-state="selectAllState"
@@ -53,6 +53,11 @@
 				</template>
 			</NcEmptyContent>
 		</div>
+
+		<div v-if="selectedEmail && !verticalLayout" class="mail-resize-handle mail-resize-handle--h"
+			@mousedown="onResizeStart($event, 'horizontal')" />
+		<div v-if="selectedEmail && verticalLayout" class="mail-resize-handle mail-resize-handle--v"
+			@mousedown="onResizeStart($event, 'vertical')" />
 
 		<div v-if="selectedEmail" class="mail-detail-panel">
 			<EmailDetail
@@ -108,6 +113,8 @@ export default {
 			selectedEmail: null,
 			emailBodyHtml: '', emailBodyPlain: '',
 			listWidth: 'clamp(320px, 33%, 460px)',
+			listHeight: '45%',
+			resizing: false,
 			checkedIds: [],
 			searchQuery: '',
 			filterType: 'all',
@@ -127,6 +134,10 @@ export default {
 		},
 		moveMailboxes() {
 			return this.allMailboxes.filter(m => m.role !== 'trash' && m.role !== 'junk')
+		},
+		panelStyle() {
+			if (this.verticalLayout) return { maxHeight: this.listHeight }
+			return { width: this.listWidth }
 		},
 		isTrashMailbox() {
 			const mb = this.allMailboxes.find(m => m.id === this.selectedMailbox || (m._accountId + '|' + m.id) === this.selectedMailbox)
@@ -450,6 +461,28 @@ export default {
 			const unread = this.emails.filter(e => !e.isRead).length
 			document.title = unread > 0 ? `(${unread}) ${this._originalTitle}` : (this._originalTitle || document.title)
 		},
+		// ---- resize handle for the list / detail panels ----
+		onResizeStart(e, direction) {
+			this.resizing = true
+			const startX = e.clientX
+			const startY = e.clientY
+			const startW = this.$el.querySelector('.mail-list-panel')?.offsetWidth || 320
+			const startH = this.$el.querySelector('.mail-list-panel')?.offsetHeight || 200
+			const containerW = this.$el.offsetWidth
+			const containerH = this.$el.offsetHeight
+			const onMove = (ev) => {
+				if (direction === 'horizontal') {
+					const w = Math.max(260, Math.min(containerW - 200, startW + (ev.clientX - startX)))
+					this.listWidth = w + 'px'
+				} else {
+					const h = Math.max(150, Math.min(containerH - 150, startH + (ev.clientY - startY)))
+					this.listHeight = (h / containerH * 100).toFixed(0) + '%'
+				}
+			}
+			const onUp = () => { this.resizing = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+			window.addEventListener('mousemove', onMove)
+			window.addEventListener('mouseup', onUp)
+		},
 		notifyBrowser() {
 			if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
 			const unread = this.emails.filter(e => !e.isRead).length
@@ -474,4 +507,10 @@ export default {
 .mail-detail-empty { flex: 1; }
 .mail-loading { display: flex; justify-content: center; padding: 48px; }
 .email-items { flex: 1; overflow-y: auto; }
+.mail-resize-handle { flex-shrink: 0; background: transparent; transition: background 0.15s; z-index: 5; }
+.mail-resize-handle:hover { background: var(--color-primary-element); opacity: 0.5; }
+.mail-resize-handle--h { width: 4px; cursor: col-resize; }
+.mail-resize-handle--v { height: 4px; cursor: row-resize; }
+.mail-resize-handle--v:hover { opacity: 0.5; }
+body.resize-active { user-select: none; cursor: col-resize; }
 </style>
