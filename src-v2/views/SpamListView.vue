@@ -14,7 +14,23 @@
 			</div>
 		</div>
 
-		<NcEmptyContent v-if="!loading && items.length === 0"
+		<div v-if="loading && items.length === 0" class="spam-view__loading">
+			<div class="spam-view__skeleton" v-for="n in 6" :key="n">
+				<div class="skeleton-line skeleton-line--wide" />
+				<div class="skeleton-line" />
+			</div>
+		</div>
+
+		<div v-else-if="error" class="spam-view__error">
+			<NcEmptyContent :name="t('souvera_mail', 'Failed to load spam')">
+				<template #icon><AlertCircle :size="48" /></template>
+				<template #action>
+					<NcButton variant="primary" @click="loadItems">{{ t('souvera_mail', 'Retry') }}</NcButton>
+				</template>
+			</NcEmptyContent>
+		</div>
+
+		<NcEmptyContent v-else-if="!loading && items.length === 0"
 			:name="t('souvera_mail', 'No spam')">
 			<template #icon><CheckAll :size="48" /></template>
 		</NcEmptyContent>
@@ -53,7 +69,6 @@
 			</NcButton>
 		</div>
 
-		<!-- Detail panel -->
 		<SpamDetail v-if="selectedItem && showDetail"
 			:item="selectedItem"
 			:body="detailBody"
@@ -70,6 +85,7 @@ import { showSuccess, showError } from '@nextcloud/dialogs'
 import EmailOutline from 'vue-material-design-icons/EmailOutline.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
 import CheckAll from 'vue-material-design-icons/CheckAll.vue'
+import AlertCircle from 'vue-material-design-icons/AlertCircle.vue'
 import { useSpamClient } from '../composables/useSpamClient.js'
 import SpamDetail from '../components/SpamDetail.vue'
 
@@ -77,12 +93,13 @@ const { fetchSpamItems, viewSpamItem, releaseSpamItems, deleteSpamItems } = useS
 
 export default {
 	name: 'SpamListView',
-	components: { NcButton, NcEmptyContent, NcCheckboxRadioSwitch, EmailOutline, TrashCan, CheckAll, SpamDetail },
+	components: { NcButton, NcEmptyContent, NcCheckboxRadioSwitch, EmailOutline, TrashCan, CheckAll, AlertCircle, SpamDetail },
 	data() {
 		return {
 			items: [],
 			total: 0,
 			loading: false,
+			error: false,
 			offset: 0,
 			pageSize: 50,
 			selectedItem: null,
@@ -102,13 +119,14 @@ export default {
 	methods: {
 		async loadItems() {
 			this.loading = true
+			this.error = false
 			try {
 				const res = await fetchSpamItems(this.pageSize, this.offset)
 				this.items = (res.items || []).map(item => ({ ...item, _checked: false }))
 				this.total = res.total || 0
 			} catch (e) {
 				console.error('Failed to load spam items', e)
-				showError(this.t('souvera_mail', 'Failed to load spam'))
+				this.error = true
 			} finally {
 				this.loading = false
 			}
@@ -252,4 +270,10 @@ export default {
 	padding: 8px; border-top: 1px solid var(--color-border);
 }
 .spam-view__pagination-info { font-size: 12px; color: var(--color-text-maxcontrast); }
+.spam-view__loading { padding: 12px; }
+.spam-view__skeleton { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.skeleton-line { height: 12px; background: var(--color-background-dark); border-radius: 4px; animation: pulse 1.5s ease-in-out infinite; width: 60%; }
+.skeleton-line--wide { width: 90%; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.spam-view__error { padding: 24px; }
 </style>

@@ -45,16 +45,13 @@ class V2SpamController extends Controller
     #[NoCSRFRequired]
     public function list(): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
-        if ($accountId === null) {
-            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
-        }
+        $accountId = $this->getAccountIdSafe();
 
         $limit = \min(100, \max(1, (int) ($this->request->getParam('limit') ?? 50)));
         $offset = \max(0, (int) ($this->request->getParam('offset') ?? 0));
 
-        // 1. Fetch JMAP junk emails
-        $junkEmails = $this->fetchJunkEmails($accountId);
+        // 1. Fetch JMAP junk emails (skip if no account)
+        $junkEmails = $accountId !== null ? $this->fetchJunkEmails($accountId) : [];
 
         // 2. Fetch Shield/PMG quarantine items
         $shieldItems = $this->fetchShieldSpam();
@@ -66,7 +63,11 @@ class V2SpamController extends Controller
         // 4. Apply pagination
         $page = \array_slice($merged, $offset, $limit);
 
-        return new JSONResponse(['items' => $page, 'total' => $total]);
+        return new JSONResponse([
+            'items' => $page,
+            'total' => $total,
+            'jmapAvailable' => $accountId !== null,
+        ]);
     }
 
     /**
@@ -155,6 +156,20 @@ class V2SpamController extends Controller
     // -------------------------------------------------------------------
     // Fetch helpers
     // -------------------------------------------------------------------
+
+    // -------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------
+
+    private function getAccountIdSafe(): ?string
+    {
+        try {
+            return $this->jmap->getCurrentAccountId();
+        } catch (\Throwable $e) {
+            $this->logger->warning('SpamController: JMAP account resolution failed', ['exception' => $e]);
+            return null;
+        }
+    }
 
     /**
      * @return array<int,array<string,mixed>>
