@@ -513,13 +513,13 @@ export default {
 .email-items { flex: 1; overflow-y: auto; }
 .mail-resize-handle { flex-shrink: 0; background: var(--color-background-dark); transition: background 0.15s; z-index: 5; display: flex; align-items: center; justify-content: center; }
 .mail-resize-handle:hover { background: var(--color-primary-element-light); }
-.mail-resize-handle--h { width: 6px; cursor: col-resize; border-left: 1px solid var(--color-border); border-right: 1px solid var(--color-border); }
+.mail-resize-handle--h { width: 8px; cursor: col-resize; border-left: 1px solid var(--color-border); border-right: 1px solid var(--color-border); }
 .mail-resize-handle--v { height: 6px; cursor: row-resize; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
 .mail-resize-handle__grip {
-	width: 3px; height: 32px; border-radius: 2px;
+	width: 4px; height: 36px; border-radius: 2px;
 	background: var(--color-border-dark);
 }
-.mail-resize-handle--v .mail-resize-handle__grip { width: 32px; height: 3px; }
+.mail-resize-handle--v .mail-resize-handle__grip { width: 36px; height: 4px; }
 .mail-resize-handle--v:hover { opacity: 0.5; }
 body.resize-active { user-select: none; cursor: col-resize; }
 </style>
