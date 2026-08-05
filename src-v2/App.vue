@@ -86,8 +86,8 @@ import { useJmapClient } from './composables/useJmapClient.js'
 import { useHotkeys } from './composables/useHotkeys.js'
 
 const { fetchMailboxes } = useJmapClient()
-const SYSTEM_ROLES = ['inbox', 'sent', 'drafts', 'archive', 'junk', 'trash']
-const ROLE_ORDER = { inbox:0, drafts:1, sent:2, archive:3, junk:4, trash:5 }
+const SYSTEM_ROLES = ['inbox', 'drafts', 'sent', 'junk', 'trash']
+const ROLE_ORDER = { inbox:0, drafts:1, sent:2, junk:3, trash:4 }
 
 export default {
 	name: 'MailV2App',
@@ -106,7 +106,7 @@ export default {
 		},
 		userFolders() { return this.mailboxes.filter(m => !SYSTEM_ROLES.includes(m.role)) },
 		userFolderRoots() { return this.userFolders.filter(m => !m.parentId || !this.userFolders.find(p => p.id === m.parentId)) },
-		sharedMailboxRoots() { return this.sharedMailboxes.filter(m => !m.parentId || !this.sharedMailboxes.find(p => p.id === m.parentId)) },
+		sharedMailboxRoots() { return this.sharedMailboxes.filter(m => (!m.parentId || !this.sharedMailboxes.find(p => p.id === m.parentId)) && m.role !== 'archive') },
 		sharedAccountGroups() {
 			const map = new Map()
 			for (const m of this.sharedMailboxes) {
@@ -119,6 +119,10 @@ export default {
 			for (const m of this.sharedMailboxRoots) {
 				const aid = m._accountId || ''
 				if (map.has(aid)) map.get(aid).roots.push(m)
+			}
+			// Sort system folders within each group by role order
+			for (const [, g] of map) {
+				g.roots.sort((a, b) => (ROLE_ORDER[a.role] ?? 99) - (ROLE_ORDER[b.role] ?? 99))
 			}
 			return [...map.values()]
 		},
