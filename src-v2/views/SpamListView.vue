@@ -161,6 +161,7 @@ export default {
 				if (jmapIds.length > 0) await releaseSpamItems(jmapIds, 'jmap')
 				if (shieldIds.length > 0) await releaseSpamItems(shieldIds, 'shield')
 				showSuccess(this.t('souvera_mail', 'Released {n} items', { n: checked.length }))
+				this.offset = 0
 				await this.loadItems()
 			} catch (e) {
 				console.error('Release failed', e)
@@ -187,6 +188,7 @@ export default {
 				if (shieldIds.length > 0) await deleteSpamItems(shieldIds, 'shield')
 				if (jmapIds.length > 0) await deleteSpamItems(jmapIds, 'jmap')
 				showSuccess(this.t('souvera_mail', 'Deleted {n} items', { n: checked.length }))
+				this.offset = 0
 				await this.loadItems()
 			} catch (e) {
 				console.error('Delete failed', e)

@@ -78,11 +78,6 @@ class V2SpamController extends Controller
     #[NoCSRFRequired]
     public function view(): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
-        if ($accountId === null) {
-            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
-        }
-
         $id = \trim((string) ($this->request->getParam('id') ?? ''));
         $source = \trim((string) ($this->request->getParam('source') ?? 'jmap'));
 
@@ -94,6 +89,11 @@ class V2SpamController extends Controller
             return $this->viewShieldItem($id);
         }
 
+        // JMAP path requires account
+        $accountId = $this->getAccountIdSafe();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
+        }
         return $this->viewJmapEmail($accountId, $id);
     }
 
@@ -104,11 +104,6 @@ class V2SpamController extends Controller
     #[NoAdminRequired]
     public function release(): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
-        if ($accountId === null) {
-            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
-        }
-
         $body = \json_decode(\file_get_contents('php://input'), true) ?? [];
         $ids = (array) ($body['ids'] ?? []);
         $source = \trim((string) ($body['source'] ?? ''));
@@ -122,6 +117,10 @@ class V2SpamController extends Controller
         }
 
         // JMAP release: move from junk → inbox
+        $accountId = $this->getAccountIdSafe();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
+        }
         return $this->releaseJmap($accountId, $ids);
     }
 
@@ -132,11 +131,6 @@ class V2SpamController extends Controller
     #[NoAdminRequired]
     public function delete(): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
-        if ($accountId === null) {
-            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
-        }
-
         $body = \json_decode(\file_get_contents('php://input'), true) ?? [];
         $ids = (array) ($body['ids'] ?? []);
         $source = \trim((string) ($body['source'] ?? 'jmap'));
@@ -150,6 +144,10 @@ class V2SpamController extends Controller
         }
 
         // JMAP delete: move to trash
+        $accountId = $this->getAccountIdSafe();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
+        }
         return $this->deleteJmap($accountId, $ids);
     }
 
