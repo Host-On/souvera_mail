@@ -151,7 +151,16 @@ export default {
 	},
 	methods: {
 		async onRefreshMailboxes() {
-			try { this.mailboxes = await fetchMailboxes() } catch(e) { console.error(e) }
+			try {
+				this.mailboxes = await fetchMailboxes()
+				if (this.sharedFolders.length > 0) {
+					const allShared = []
+					for (const sh of this.sharedFolders) {
+						try { allShared.push(...(await fetchMailboxes(sh.id))) } catch {}
+					}
+					this.sharedMailboxes = allShared
+				}
+			} catch(e) { console.error(e) }
 		},
 		onMailboxSelect(id) { this.selectedMailbox = id; this.$router.push({name:'inbox'}) },
 		startCompose() {
