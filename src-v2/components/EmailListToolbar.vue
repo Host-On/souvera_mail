@@ -67,6 +67,11 @@
 				</NcActions>
 			</template>
 		</div>
+		<NcButton variant="tertiary" class="email-list-toolbar__refresh" @click="$emit('refresh')"
+			:title="t('souvera_mail', 'Refresh') + ' (' + refreshCountdown + 's)'">
+			<template #icon><Refresh :size="20" /></template>
+			{{ refreshCountdown }}s
+		</NcButton>
 		<NcButton variant="primary" class="email-list-toolbar__compose" @click="$emit('compose')">
 			<template #icon><Pencil :size="20" /></template>
 			{{ t('souvera_mail', 'New') }}
@@ -103,6 +108,7 @@ export default {
 		// for narrow side-by-side list panels.
 		twoRow: { type: Boolean, default: false },
 		isTrash: { type: Boolean, default: false },
+		refreshCountdown: { type: Number, default: 0 },
 	},
 	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter', 'selectAll', 'markAllRead', 'markAllUnread', 'emptyTrash'],
 	computed: {
