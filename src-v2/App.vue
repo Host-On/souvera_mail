@@ -19,13 +19,6 @@
 					:mailbox="mb" :all-mailboxes="mailboxes" :selected="selectedMailbox" :depth="0"
 					@select="onMailboxSelect" />
 
-				<NcAppNavigationItem
-					:name="t('souvera_mail', 'Spam')"
-					:to="{ name: 'spam' }"
-					:active="$route.name === 'spam'">
-					<template #icon><AlertCircle :size="20" /></template>
-				</NcAppNavigationItem>
-
 				<template v-if="sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
 					<template v-for="group in sharedAccountGroups" :key="group.accountId">
@@ -88,7 +81,6 @@ import Cog from 'vue-material-design-icons/Cog.vue'
 import Share from 'vue-material-design-icons/Share.vue'
 import Archive from 'vue-material-design-icons/Archive.vue'
 import Contacts from 'vue-material-design-icons/Contacts.vue'
-import AlertCircle from 'vue-material-design-icons/AlertCircle.vue'
 import MailboxItem from './components/MailboxItem.vue'
 import QuotaDonut from './components/QuotaDonut.vue'
 import ContactPicker from './components/ContactPicker.vue'
@@ -96,12 +88,12 @@ import { useJmapClient } from './composables/useJmapClient.js'
 import { useHotkeys } from './composables/useHotkeys.js'
 
 const { fetchMailboxes } = useJmapClient()
-const SYSTEM_ROLES = ['inbox', 'drafts', 'sent', 'trash']
-const ROLE_ORDER = { inbox:0, drafts:1, sent:2, junk:3, trash:3 }
+const SYSTEM_ROLES = ['inbox', 'drafts', 'sent', 'junk', 'trash']
+const ROLE_ORDER = { inbox:0, drafts:1, sent:2, junk:3, trash:4 }
 
 export default {
 	name: 'MailV2App',
-	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, Contacts, AlertCircle, MailboxItem, QuotaDonut, ContactPicker },
+	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, Contacts, MailboxItem, QuotaDonut, ContactPicker },
 	data() {
 		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false }
 	},
@@ -172,7 +164,15 @@ export default {
 				}
 			} catch(e) { console.error(e) }
 		},
-		onMailboxSelect(id) { this.selectedMailbox = id; this.$router.push({name:'inbox'}) },
+		onMailboxSelect(id) {
+			this.selectedMailbox = id
+			const mb = this.mailboxes.find(m => m.id === id)
+			if (mb && mb.role === 'junk') {
+				this.$router.push({ name: 'spam' })
+			} else {
+				this.$router.push({ name: 'inbox' })
+			}
+		},
 		startCompose() {
 			if (this.$route.name !== 'compose') {
 				this.$router.push({ name: 'compose' })

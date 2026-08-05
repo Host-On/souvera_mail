@@ -45,16 +45,13 @@ class V2SpamController extends Controller
     #[NoCSRFRequired]
     public function list(): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
-        if ($accountId === null) {
-            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
-        }
+        $accountId = $this->getAccountIdSafe();
 
         $limit = \min(100, \max(1, (int) ($this->request->getParam('limit') ?? 50)));
         $offset = \max(0, (int) ($this->request->getParam('offset') ?? 0));
 
-        // 1. Fetch JMAP junk emails
-        $junkEmails = $this->fetchJunkEmails($accountId);
+        // 1. Fetch JMAP junk emails (skip if no account)
+        $junkEmails = $accountId !== null ? $this->fetchJunkEmails($accountId) : [];
 
         // 2. Fetch Shield/PMG quarantine items
         $shieldItems = $this->fetchShieldSpam();
@@ -66,7 +63,11 @@ class V2SpamController extends Controller
         // 4. Apply pagination
         $page = \array_slice($merged, $offset, $limit);
 
-        return new JSONResponse(['items' => $page, 'total' => $total]);
+        return new JSONResponse([
+            'items' => $page,
+            'total' => $total,
+            'jmapAvailable' => $accountId !== null,
+        ]);
     }
 
     /**
@@ -77,11 +78,6 @@ class V2SpamController extends Controller
     #[NoCSRFRequired]
     public function view(): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
-        if ($accountId === null) {
-            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
-        }
-
         $id = \trim((string) ($this->request->getParam('id') ?? ''));
         $source = \trim((string) ($this->request->getParam('source') ?? 'jmap'));
 
@@ -93,6 +89,11 @@ class V2SpamController extends Controller
             return $this->viewShieldItem($id);
         }
 
+        // JMAP path requires account
+        $accountId = $this->getAccountIdSafe();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
+        }
         return $this->viewJmapEmail($accountId, $id);
     }
 
@@ -103,11 +104,6 @@ class V2SpamController extends Controller
     #[NoAdminRequired]
     public function release(): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
-        if ($accountId === null) {
-            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
-        }
-
         $body = \json_decode(\file_get_contents('php://input'), true) ?? [];
         $ids = (array) ($body['ids'] ?? []);
         $source = \trim((string) ($body['source'] ?? ''));
@@ -121,6 +117,10 @@ class V2SpamController extends Controller
         }
 
         // JMAP release: move from junk → inbox
+        $accountId = $this->getAccountIdSafe();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
+        }
         return $this->releaseJmap($accountId, $ids);
     }
 
@@ -131,11 +131,6 @@ class V2SpamController extends Controller
     #[NoAdminRequired]
     public function delete(): JSONResponse
     {
-        $accountId = $this->jmap->getCurrentAccountId();
-        if ($accountId === null) {
-            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
-        }
-
         $body = \json_decode(\file_get_contents('php://input'), true) ?? [];
         $ids = (array) ($body['ids'] ?? []);
         $source = \trim((string) ($body['source'] ?? 'jmap'));
@@ -149,12 +144,30 @@ class V2SpamController extends Controller
         }
 
         // JMAP delete: move to trash
+        $accountId = $this->getAccountIdSafe();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
+        }
         return $this->deleteJmap($accountId, $ids);
     }
 
     // -------------------------------------------------------------------
     // Fetch helpers
     // -------------------------------------------------------------------
+
+    // -------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------
+
+    private function getAccountIdSafe(): ?string
+    {
+        try {
+            return $this->jmap->getCurrentAccountId();
+        } catch (\Throwable $e) {
+            $this->logger->warning('SpamController: JMAP account resolution failed', ['exception' => $e]);
+            return null;
+        }
+    }
 
     /**
      * @return array<int,array<string,mixed>>
