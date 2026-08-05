@@ -386,6 +386,26 @@ return [
             'verb' => 'GET',
         ],
         [
+            'name' => 'v2_spam#list',
+            'url' => '/api/v2/spam/list',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'v2_spam#view',
+            'url' => '/api/v2/spam/view',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'v2_spam#release',
+            'url' => '/api/v2/spam/release',
+            'verb' => 'POST',
+        ],
+        [
+            'name' => 'v2_spam#delete',
+            'url' => '/api/v2/spam/delete',
+            'verb' => 'POST',
+        ],
+        [
             'name' => 'v2_shield#quarantine',
             'url' => '/api/v2/shield/quarantine',
             'verb' => 'GET',

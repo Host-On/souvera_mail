@@ -4,11 +4,13 @@ import ComposeView from './views/ComposeView.vue'
 import SearchView from './views/SearchView.vue'
 import ShieldView from './views/ShieldView.vue'
 import SettingsView from './views/SettingsView.vue'
+import SpamListView from './views/SpamListView.vue'
 
 const routes = [
 	{ path: '/', name: 'inbox', component: MailHomeView },
 	{ path: '/compose', name: 'compose', component: ComposeView },
 	{ path: '/search', name: 'search', component: SearchView },
+	{ path: '/spam', name: 'spam', component: SpamListView },
 	{ path: '/shield', name: 'shield', component: ShieldView },
 	{ path: '/settings', name: 'settings', component: SettingsView },
 ]
