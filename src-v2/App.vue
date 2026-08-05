@@ -223,7 +223,7 @@ export default {
 </script>
 
 <style scoped>
-.compose-row { display: flex; gap: 4px; margin: 8px; position: sticky; top: 0; background: var(--color-main-background); z-index: 2; flex-shrink: 0; min-height: 44px; align-items: center; overflow: hidden; }
+.compose-row { display: flex; gap: 4px; margin: 4px 8px; position: sticky; top: 0; background: var(--color-main-background); z-index: 2; flex-shrink: 0; min-height: 48px; align-items: center; overflow: hidden; }
 /* Prevent the compose row from shrinking (scrollable nav must not eat it) */
 :deep(.app-navigation) > :first-child { flex-shrink: 0; }
 .compose-btn { flex: 1; }

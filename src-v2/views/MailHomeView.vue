@@ -224,7 +224,8 @@ export default {
 			this._isAutoRefresh = false
 			if (wasAutoRefresh && prevIds.length > 0 && this.emailTotal > prevTotal) {
 				const newIds = this.emails.map(e => e.id).filter(id => !prevIds.includes(id))
-				if (newIds.length > 0) {
+				const newUnread = this.emails.filter(e => newIds.includes(e.id) && !e.isRead)
+				if (newUnread.length > 0) {
 					this.playNewMailSound()
 					this.notifyBrowser()
 				}
