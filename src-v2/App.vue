@@ -96,8 +96,8 @@ import { useJmapClient } from './composables/useJmapClient.js'
 import { useHotkeys } from './composables/useHotkeys.js'
 
 const { fetchMailboxes } = useJmapClient()
-const SYSTEM_ROLES = ['inbox', 'drafts', 'sent', 'junk', 'trash']
-const ROLE_ORDER = { inbox:0, drafts:1, sent:2, junk:3, trash:4 }
+const SYSTEM_ROLES = ['inbox', 'drafts', 'sent', 'trash']
+const ROLE_ORDER = { inbox:0, drafts:1, sent:2, junk:3, trash:3 }
 
 export default {
 	name: 'MailV2App',

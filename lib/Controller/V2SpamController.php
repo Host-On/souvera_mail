@@ -226,7 +226,10 @@ class V2SpamController extends Controller
             $url = $this->urlGenerator->getAbsoluteURL('/apps/souvera_shield/api/internal/spam/list');
             $response = $client->get($url, [
                 'timeout' => 15,
-                'headers' => ['Accept' => 'application/json'],
+                'headers' => \array_merge(
+                    ['Accept' => 'application/json'],
+                    $this->forwardSessionCookies(),
+                ),
             ]);
             $data = \json_decode($response->getBody(), true) ?? [];
             $items = $data['data'] ?? [];
@@ -246,6 +249,7 @@ class V2SpamController extends Controller
                     'isFlagged' => false,
                     'hasAttachment' => false,
                     '_source' => 'shield',
+                    '_pmail' => $item['_pmail'] ?? '',
                 ];
             }, $items);
         } catch (\Throwable $e) {
@@ -272,6 +276,21 @@ class V2SpamController extends Controller
             return \strcmp($tb, $ta); // descending
         });
         return $merged;
+    }
+
+    private function forwardSessionCookies(): array
+    {
+        $headers = [];
+        // Forward NC session cookie so Shield can resolve the user
+        if (isset($_SERVER['HTTP_COOKIE'])) {
+            $headers['Cookie'] = $_SERVER['HTTP_COOKIE'];
+        }
+        // Also forward the request token for CSRF-protected POST endpoints
+        $reqToken = \OCP\Util::getRequestToken();
+        if ($reqToken !== null && $reqToken !== '') {
+            $headers['requesttoken'] = $reqToken;
+        }
+        return $headers;
     }
 
     // -------------------------------------------------------------------
@@ -316,7 +335,10 @@ class V2SpamController extends Controller
             $url = $this->urlGenerator->getAbsoluteURL('/apps/souvera_shield/api/internal/spam/view?id=' . \urlencode($id));
             $response = $client->get($url, [
                 'timeout' => 15,
-                'headers' => ['Accept' => 'application/json'],
+                'headers' => \array_merge(
+                    ['Accept' => 'application/json'],
+                    $this->forwardSessionCookies(),
+                ),
             ]);
             $data = \json_decode($response->getBody(), true) ?? [];
             return new JSONResponse($data);
@@ -337,7 +359,10 @@ class V2SpamController extends Controller
             $url = $this->urlGenerator->getAbsoluteURL('/apps/souvera_shield/api/internal/spam/release');
             $response = $client->post($url, [
                 'timeout' => 30,
-                'headers' => ['Content-Type' => 'application/json', 'Accept' => 'application/json'],
+                'headers' => \array_merge(
+                    ['Content-Type' => 'application/json', 'Accept' => 'application/json'],
+                    $this->forwardSessionCookies(),
+                ),
                 'body' => \json_encode(['ids' => $ids]),
             ]);
             $result = \json_decode($response->getBody(), true) ?? [];
@@ -391,7 +416,10 @@ class V2SpamController extends Controller
             $url = $this->urlGenerator->getAbsoluteURL('/apps/souvera_shield/api/internal/spam/delete');
             $response = $client->post($url, [
                 'timeout' => 30,
-                'headers' => ['Content-Type' => 'application/json', 'Accept' => 'application/json'],
+                'headers' => \array_merge(
+                    ['Content-Type' => 'application/json', 'Accept' => 'application/json'],
+                    $this->forwardSessionCookies(),
+                ),
                 'body' => \json_encode(['ids' => $ids]),
             ]);
             $result = \json_decode($response->getBody(), true) ?? [];
