@@ -24,7 +24,16 @@
 					</label>
 				</div>
 
-				<div v-for="(c, i) in conditions" :key="i" class="sf-condition">
+				<div v-for="(c, i) in conditions" :key="i" class="sf-condition"
+					draggable="true"
+					@dragstart="dragStart($event, i, 'condition')"
+					@dragover.prevent="dragOver($event, i, 'condition')"
+					@dragenter.prevent
+					@drop.prevent="drop($event, i, 'condition')"
+					@dragend="dragEnd">
+					<span class="sf-grip" title="Ziehen zum Umsortieren">
+						<DragHorizontal :size="16" />
+					</span>
 					<select v-model="c.field" class="sf-select">
 						<option v-for="o in fieldOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
 					</select>
@@ -48,7 +57,16 @@
 			<div class="sf-section">
 				<label class="sf-section__title">{{ t('souvera_mail', 'Actions') }}</label>
 
-				<div v-for="(a, i) in actions" :key="i" class="sf-action">
+				<div v-for="(a, i) in actions" :key="i" class="sf-action"
+					draggable="true"
+					@dragstart="dragStart($event, i, 'action')"
+					@dragover.prevent="dragOver($event, i, 'action')"
+					@dragenter.prevent
+					@drop.prevent="drop($event, i, 'action')"
+					@dragend="dragEnd">
+					<span class="sf-grip" title="Ziehen zum Umsortieren">
+						<DragHorizontal :size="16" />
+					</span>
 					<select v-model="a.type" class="sf-select" @change="a.value = ''">
 						<option v-for="o in actionTypes" :key="o.value" :value="o.value">{{ o.label }}</option>
 					</select>
@@ -94,6 +112,7 @@ import { NcDialog, NcButton, NcTextField } from '@nextcloud/vue'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 import Plus from 'vue-material-design-icons/Plus.vue'
 import Minus from 'vue-material-design-icons/Minus.vue'
+import DragHorizontal from 'vue-material-design-icons/DragHorizontal.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { useSieveClient } from '../composables/useSieveClient.js'
@@ -102,7 +121,7 @@ const { saveScript, validateScript } = useSieveClient()
 
 export default {
 	name: 'SieveFilterEditor',
-	components: { NcDialog, NcButton, NcTextField, Plus, Minus },
+	components: { NcDialog, NcButton, NcTextField, Plus, Minus, DragHorizontal },
 	props: {
 		editId: { type: String, default: '' },
 		editName: { type: String, default: '' },
@@ -118,6 +137,8 @@ export default {
 			actions: [],
 			mailboxes: [],
 			saving: false,
+			dragIndex: -1,
+			dragType: '',
 			fieldOptions: [
 				{ value: 'subject', label: this.t('souvera_mail', 'Subject') },
 				{ value: 'from',    label: this.t('souvera_mail', 'From') },
@@ -161,6 +182,34 @@ export default {
 	methods: {
 		addCondition() { this.conditions.push({ field: 'subject', operator: 'contains', value: '' }) },
 		addAction() { this.actions.push({ type: 'markread', value: '' }) },
+		dragStart(e, index, type) {
+			this.dragIndex = index
+			this.dragType = type
+			e.dataTransfer.effectAllowed = 'move'
+			e.dataTransfer.setData('text/plain', String(index))
+		},
+		dragOver(e, index, type) {
+			if (type !== this.dragType) return
+			const el = e.currentTarget
+			const rect = el.getBoundingClientRect()
+			const mid = (rect.top + rect.bottom) / 2
+			el.classList.remove('sf-drag--over', 'sf-drag--before')
+			el.classList.add(e.clientY < mid ? 'sf-drag--before' : 'sf-drag--over')
+		},
+		drop(e, index, type) {
+			const list = type === 'condition' ? this.conditions : this.actions
+			const from = this.dragIndex
+			if (from === index) return
+			const item = list.splice(from, 1)[0]
+			list.splice(from < index ? index - 1 : index, 0, item)
+		},
+		dragEnd(e) {
+			this.dragIndex = -1
+			this.dragType = ''
+			for (const el of e.currentTarget?.parentElement?.querySelectorAll('.sf-drag--over,.sf-drag--before') || []) {
+				el.classList.remove('sf-drag--over', 'sf-drag--before')
+			}
+		},
 		buildSieve() {
 			const lines = []
 			const needed = new Set()
@@ -257,7 +306,13 @@ export default {
 .sf-radio:hover .sf-radio__label { background: var(--color-background-hover); }
 .sf-radio--active .sf-radio__label { background: var(--color-primary-element); color: #fff; font-weight: 600; }
 .sf-condition { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.sf-condition[draggable="true"] { cursor: grab; }
 .sf-action { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.sf-action[draggable="true"] { cursor: grab; }
+.sf-grip { display: flex; align-items: center; padding: 2px; border-radius: 4px; border: 1px dashed var(--color-border); cursor: grab; flex-shrink: 0; opacity: 0.5; transition: opacity 0.15s; }
+.sf-grip:hover { opacity: 1; background: var(--color-background-hover); }
+.sf-drag--over { border-top: 2px solid var(--color-primary-element) !important; }
+.sf-drag--before { border-bottom: 2px solid var(--color-primary-element) !important; }
 .sf-select {
 	padding: 6px 8px; border: 1px solid var(--color-border); border-radius: 6px;
 	background: var(--color-main-background); color: var(--color-main-text); font-size: 13px;
