@@ -200,7 +200,55 @@
 				</div>
 			</div>
 
-		<div class="settings-card">
+			<div class="settings-card">
+				<h2 class="settings-card__title">
+					<Filter :size="20" />
+					{{ t('souvera_mail', 'Filters') }}
+				</h2>
+				<div class="settings-card__body">
+					<p class="settings-muted">{{ t('souvera_mail', 'Mail filters (Sieve) — sort incoming mail automatically into folders, flag, forward or discard.') }}</p>
+
+					<div v-if="loadingSieve" class="settings-muted">{{ t('souvera_mail', 'Loading…') }}</div>
+
+					<NcEmptyContent v-else-if="sieveScripts.length === 0"
+						:name="t('souvera_mail', 'No filters yet')">
+						<template #icon><Filter :size="36" /></template>
+					</NcEmptyContent>
+
+					<div v-else class="sieve-list">
+						<div v-for="s in sieveScripts" :key="s.id" class="sieve-list__item">
+							<span class="sieve-list__name">{{ s.name }}</span>
+							<span class="sieve-list__active" v-if="s.isActive">{{ t('souvera_mail', 'active') }}</span>
+							<div class="sieve-list__actions">
+								<NcButton variant="tertiary" :title="t('souvera_mail', 'Edit')" @click="editSieve(s)">
+									<template #icon><Pencil :size="16" /></template>
+								</NcButton>
+								<NcButton variant="tertiary" :title="s.isActive ? t('souvera_mail', 'Deactivate') : t('souvera_mail', 'Activate')" @click="toggleSieve(s)">
+									<template #icon><component :is="s.isActive ? 'Check' : 'Play' " :size="16" /></template>
+								</NcButton>
+								<NcButton variant="tertiary" :title="t('souvera_mail', 'Delete')" @click="deleteSieve(s)">
+									<template #icon><TrashCan :size="16" /></template>
+								</NcButton>
+							</div>
+						</div>
+					</div>
+
+					<NcButton variant="primary" class="sieve-list__add" @click="showSieveEditor = true">
+						<template #icon><Plus :size="20" /></template>
+						{{ t('souvera_mail', 'New filter') }}
+					</NcButton>
+				</div>
+			</div>
+
+			<SieveFilterEditor v-if="showSieveEditor"
+				:open="showSieveEditor"
+				:edit-id="editingSieve?.id || ''"
+				:edit-name="editingSieve?.name || ''"
+				:edit-body="editingSieve?.body || ''"
+				@close="closeSieveEditor"
+				@saved="refreshSieve" />
+
+			<div class="settings-card">
 				<h2 class="settings-card__title">
 					<Folder :size="20" />
 					{{ t('souvera_mail', 'Folders') }}
@@ -307,8 +355,11 @@ import Download from 'vue-material-design-icons/Download.vue'
 import Import from 'vue-material-design-icons/Import.vue'
 import Play from 'vue-material-design-icons/Play.vue'
 import FolderPlus from 'vue-material-design-icons/FolderPlus.vue'
+import Filter from 'vue-material-design-icons/Filter.vue'
+import Check from 'vue-material-design-icons/Check.vue'
 import DOMPurify from 'dompurify'
 import QuotaDonut from '../components/QuotaDonut.vue'
+import SieveFilterEditor from '../components/SieveFilterEditor.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 
@@ -321,7 +372,7 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Play, FolderPlus, QuotaDonut },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Play, FolderPlus, Filter, Check, QuotaDonut, SieveFilterEditor },
 	data() {
 		return {
 			accountEmail: '',
@@ -379,6 +430,11 @@ export default {
 			dragId: null,
 			dragOverId: null,
 			loadedFolders: false,
+
+			sieveScripts: [],
+			loadingSieve: false,
+			showSieveEditor: false,
+			editingSieve: null,
 		}
 	},
 	mounted() {
@@ -452,6 +508,7 @@ export default {
 			try { const r = await API.shared(); this.sharedAbove = r.data.position === 'above' } catch {}
 			try { const r = await axios.get(generateUrl('/apps/souvera_mail/migration/welcome-state')); const s = r.data?.state?.lastJob?.state; this.migrationCompleted = ['completed','dismissed','failed','cancelled'].includes(s) } catch {}
 			try { const r = await axios.get(generateUrl('/apps/souvera_mail/api/v2/mailboxes')); this.userFoldersList = (r.data.mailboxes || []).filter(m => !['inbox','sent','drafts','junk','trash'].includes(m.role)) } catch {} finally { this.loadedFolders = true }
+			this.loadSieve()
 			try {
 				const r = await API.prefs(); const p = r.data
 				this.accountEmail = (p.account && p.account.email) || ''
@@ -474,6 +531,45 @@ export default {
 				if (pp) this.messagesPerPageOption = pp
 			} catch {}
 			this.loaded = true
+		},
+		async loadSieve() {
+			this.loadingSieve = true
+			try {
+				const { useSieveClient } = await import('../composables/useSieveClient.js')
+				const { fetchScripts } = useSieveClient()
+				this.sieveScripts = await fetchScripts()
+			} catch {}
+			this.loadingSieve = false
+		},
+		async refreshSieve() { await this.loadSieve() },
+		editSieve(filter) {
+			this.editingSieve = filter
+			this.showSieveEditor = true
+		},
+		closeSieveEditor() {
+			this.showSieveEditor = false
+			this.editingSieve = null
+		},
+		async toggleSieve(filter) {
+			try {
+				const { useSieveClient } = await import('../composables/useSieveClient.js')
+				const { activateScript } = useSieveClient()
+				await activateScript(filter.name, !filter.isActive)
+				filter.isActive = !filter.isActive
+			} catch (e) {
+				showError(this.t('souvera_mail', 'Failed to update filter'))
+			}
+		},
+		async deleteSieve(filter) {
+			try {
+				const { useSieveClient } = await import('../composables/useSieveClient.js')
+				const { deleteScript } = useSieveClient()
+				await deleteScript(filter.name)
+				this.sieveScripts = this.sieveScripts.filter(s => s.id !== filter.id)
+				showSuccess(this.t('souvera_mail', 'Filter deleted'))
+			} catch (e) {
+				showError(this.t('souvera_mail', 'Failed to delete filter'))
+			}
 		},
 		formatSize(bytes) {
 			if (!bytes) return '0 B'; const u = ['B','KB','MB','GB']; let i = 0, s = bytes
@@ -782,4 +878,12 @@ export default {
 .folder-heading { font-size: 11px; font-weight: 600; color: var(--color-text-maxcontrast); text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 10px 4px; }
 .quota-bar { height: 6px; background: var(--color-border); border-radius: 3px; overflow: hidden; margin: 4px 0 8px; }
 .quota-bar__fill { height: 100%; background: var(--color-primary-element); border-radius: 3px; transition: width 0.4s ease; }
+
+.sieve-list { display: flex; flex-direction: column; gap: 2px; }
+.sieve-list__item { display: flex; align-items: center; padding: 6px 8px; border-radius: 6px; gap: 8px; }
+.sieve-list__item:hover { background: var(--color-background-hover); }
+.sieve-list__name { font-size: 13px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sieve-list__active { font-size: 11px; padding: 0 6px; border-radius: 3px; background: #e8f5e9; color: #2e7d32; flex-shrink: 0; }
+.sieve-list__actions { display: flex; gap: 2px; flex-shrink: 0; }
+.sieve-list__add { margin-top: 8px; }
 </style>
