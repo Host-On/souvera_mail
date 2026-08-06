@@ -9,7 +9,7 @@ module.exports = {
 	output: {
 		path: path.resolve(__dirname, 'js'),
 		filename: 'souvera_mail-[name].js',
-		chunkFilename: 'souvera_mail-[name]-[contenthash].js',
+		chunkFilename: 'souvera_mail-[name]-[fullhash].js',
 		publicPath: '/apps/souvera_mail/js/',
 		clean: false,
 	},
