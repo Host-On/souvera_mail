@@ -7,24 +7,21 @@
 			<!-- Filter name -->
 			<div class="sf-field">
 				<label>{{ t('souvera_mail', 'Filter name') }}</label>
-				<NcTextField :value="filterName" :placeholder="t('souvera_mail', 'My filter')"
-					@update:value="filterName = $event" />
+				<NcTextField v-model="filterName" :placeholder="t('souvera_mail', 'My filter')" />
 			</div>
 
 			<!-- Conditions -->
 			<div class="sf-section">
 				<label class="sf-section__title">{{ t('souvera_mail', 'Conditions') }}</label>
 				<div class="sf-match-type">
-					<NcButton variant="tertiary"
-						:class="{ 'sf-match-type--active': matchType === 'any' }"
-						@click="matchType = 'any'">
-						{{ t('souvera_mail', 'Match if ANY condition is met') }}
-					</NcButton>
-					<NcButton variant="tertiary"
-						:class="{ 'sf-match-type--active': matchType === 'all' }"
-						@click="matchType = 'all'">
-						{{ t('souvera_mail', 'Match if ALL conditions are met') }}
-					</NcButton>
+					<label class="sf-radio" :class="{ 'sf-radio--active': matchType === 'any' }">
+						<input type="radio" v-model="matchType" value="any" class="sf-radio__input" />
+						<span class="sf-radio__label">{{ t('souvera_mail', 'One condition is enough (OR)') }}</span>
+					</label>
+					<label class="sf-radio" :class="{ 'sf-radio--active': matchType === 'all' }">
+						<input type="radio" v-model="matchType" value="all" class="sf-radio__input" />
+						<span class="sf-radio__label">{{ t('souvera_mail', 'All conditions must match (AND)') }}</span>
+					</label>
 				</div>
 
 				<div v-for="(c, i) in conditions" :key="i" class="sf-condition">
@@ -34,8 +31,7 @@
 					<select v-model="c.operator" class="sf-select sf-select--op">
 						<option v-for="o in operatorOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
 					</select>
-					<NcTextField :value="c.value" :placeholder="t('souvera_mail', 'Value')"
-						@update:value="c.value = $event" />
+					<NcTextField v-model="c.value" :placeholder="t('souvera_mail', 'Value')" />
 					<NcButton variant="tertiary" @click="conditions.splice(i, 1)" v-if="conditions.length > 1"
 						:title="t('souvera_mail', 'Remove condition')">
 						<template #icon><Minus :size="16" /></template>
@@ -61,9 +57,8 @@
 						<option v-for="o in mailboxOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
 					</select>
 
-					<NcTextField v-if="a.type === 'redirect'" :value="a.value"
-						:placeholder="'user@domain.de'"
-						@update:value="a.value = $event" />
+					<NcTextField v-if="a.type === 'redirect'" v-model="a.value"
+						:placeholder="'user@domain.de'" />
 
 					<NcButton variant="tertiary" @click="actions.splice(i, 1)" v-if="actions.length > 1"
 						:title="t('souvera_mail', 'Remove action')">
@@ -247,8 +242,15 @@ export default {
 .sf-field { display: flex; flex-direction: column; gap: 4px; }
 .sf-field label, .sf-section__title { font-size: 13px; font-weight: 600; color: var(--color-text-maxcontrast); }
 .sf-section { display: flex; flex-direction: column; gap: 6px; }
-.sf-match-type { display: flex; gap: 4px; margin-bottom: 4px; }
-.sf-match-type--active { background: var(--color-primary-element-light) !important; color: var(--color-primary-element-text) !important; }
+.sf-match-type { display: flex; gap: 0; margin-bottom: 4px; border-radius: 8px; overflow: hidden; border: 2px solid var(--color-border); }
+.sf-radio { flex: 1; cursor: pointer; }
+.sf-radio__input { position: absolute; opacity: 0; width: 0; height: 0; }
+.sf-radio__label { display: block; padding: 8px 12px; text-align: center; font-size: 13px; font-weight: 500;
+	background: var(--color-main-background); color: var(--color-text-maxcontrast);
+	border-right: 1px solid var(--color-border); transition: all 0.15s; }
+.sf-radio:last-child .sf-radio__label { border-right: none; }
+.sf-radio:hover .sf-radio__label { background: var(--color-background-hover); }
+.sf-radio--active .sf-radio__label { background: var(--color-primary-element); color: #fff; font-weight: 600; }
 .sf-condition { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .sf-action { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .sf-select {
