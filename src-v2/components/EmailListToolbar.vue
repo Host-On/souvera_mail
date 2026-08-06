@@ -1,5 +1,6 @@
 <template>
-	<div class="email-list-toolbar" :class="{ 'email-list-toolbar--tworow': twoRow }">
+	<div class="email-list-toolbar" :class="{ 'email-list-toolbar--tworow': twoRow, 'email-list-toolbar--search-open': showSearch }">
+		<div class="email-list-toolbar__row">
 		<div class="email-list-toolbar__left">
 			<NcCheckboxRadioSwitch class="email-list-toolbar__check" :model-value="selectAllState"
 				:indeterminate="selectAllState === 'indeterminate'"
@@ -55,17 +56,6 @@
 					<template #icon><Magnify :size="18" /></template>
 				</NcButton>
 
-				<NcTextField v-show="showSearch"
-					ref="searchField"
-					class="email-list-toolbar__search"
-					:model-value="searchQuery"
-					:placeholder="t('souvera_mail', 'Search in mailbox…')"
-					:show-trailing-button="searchQuery !== ''"
-					trailing-button-icon="close"
-					:trailing-button-label="t('souvera_mail', 'Clear search')"
-					@update:modelValue="$emit('update:search', $event)"
-					@trailing-button-click="$emit('update:search', '')" />
-
 				<NcActions class="email-list-toolbar__filter"
 					:menu-name="activeFilterMenuName"
 					:primary="filter !== 'all'"
@@ -105,6 +95,20 @@
 				<template #icon><Pencil :size="20" /></template>
 				{{ t('souvera_mail', 'New') }}
 			</NcButton>
+		</div> <!-- end __right -->
+		</div> <!-- end __row -->
+
+		<div v-show="showSearch" class="email-list-toolbar__search-row">
+			<NcTextField
+				ref="searchField"
+				class="email-list-toolbar__search-full"
+				:model-value="searchQuery"
+				:placeholder="t('souvera_mail', 'Search in mailbox…')"
+				:show-trailing-button="searchQuery !== ''"
+				trailing-button-icon="close"
+				:trailing-button-label="t('souvera_mail', 'Clear search')"
+				@update:modelValue="$emit('update:search', $event)"
+				@trailing-button-click="$emit('update:search', '')" />
 		</div>
 	</div>
 </template>
@@ -166,21 +170,10 @@ export default {
 	watch: {
 		searchQuery: {
 			immediate: true,
-			handler(n) {
-				this.localSearch = n
-				if (n) this.showSearch = true
-			},
-		},
-		twoRow: {
-			immediate: true,
-			handler(n) {
-				// Auto-expand search on wide screens, collapse on narrow
-				if (!n && this.twoRow !== undefined) this.showSearch = true
-			},
+			handler(n) { if (n) this.showSearch = true },
 		},
 	},
 	async mounted() {
-		// On wide (non-two-row) screens, search is always visible
 		if (!this.twoRow) this.showSearch = true
 	},
 }
@@ -188,15 +181,16 @@ export default {
 
 <style scoped>
 .email-list-toolbar {
-	display: flex; justify-content: space-between; align-items: center;
+	display: flex; flex-direction: column;
 	padding: 6px 10px;
 	border-bottom: 1px solid var(--color-border);
 	background: var(--color-background-dark);
 }
+.email-list-toolbar__row { display: flex; justify-content: space-between; align-items: center; }
 .email-list-toolbar__left { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; }
 .email-list-toolbar__right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.email-list-toolbar__bulk-spinner { flex-shrink: 0; }
-.email-list-toolbar__search { flex: 1; max-width: 300px; min-width: 100px; }
+.email-list-toolbar__search-row { padding-top: 6px; }
+.email-list-toolbar__search-full { width: 100%; }
 .email-list-toolbar__search-toggle { flex-shrink: 0; }
 .selected-count { font-size: 13px; color: var(--color-primary-element); font-weight: 500; margin: 0 4px; }
 
@@ -204,9 +198,6 @@ export default {
 .email-list-toolbar--tworow { padding: 9px 8px; }
 .email-list-toolbar--tworow .email-list-toolbar__left {
 	display: flex; align-items: center; gap: 3px; flex: 1; min-width: 0;
-}
-.email-list-toolbar--tworow .email-list-toolbar__search {
-	max-width: 180px; min-width: 80px; margin: 0;
 }
 
 /* Refresh donut */
