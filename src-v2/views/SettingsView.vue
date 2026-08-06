@@ -87,14 +87,14 @@
 							<span class="setting-label">{{ t('souvera_mail', 'Notification sound') }}</span>
 						</div>
 						<div class="setting-row__sound">
-							<NcSelect v-model="soundOption" :options="soundOptions"
-								label="label" class="setting-select" :clearable="false"
-								@update:modelValue="onSoundChange" />
 							<NcButton variant="tertiary" size="small"
 								:aria-label="t('souvera_mail', 'Preview sound')"
 								@click="previewSound">
 								<template #icon><Play :size="16" /></template>
 							</NcButton>
+							<NcSelect v-model="soundOption" :options="soundOptions"
+								label="label" class="setting-select" :clearable="false"
+								@update:modelValue="onSoundChange" />
 						</div>
 					</div>
 				</div>
@@ -272,8 +272,8 @@
 							<div v-if="f._heading" class="folder-heading">{{ f._heading }}</div>
 							<div v-else class="folder-row"
 								:style="{ paddingLeft: (16 + f.depth * 20) + 'px' }"
-								draggable="true"
-								@dragstart="onFolderDragStart($event, f)"
+								:draggable="!f.isSystem"
+								@dragstart="!f.isSystem && onFolderDragStart($event, f)"
 								@dragover.prevent="onFolderDragOver($event, f)"
 								@dragleave="onFolderDragLeave($event)"
 								@drop="onFolderDrop($event, f)"
@@ -286,11 +286,11 @@
 										@click="newSubfolderParentId = f.id; newFolderName = ''; showCreateFolder = true">
 										<template #icon><FolderPlus :size="14" /></template>
 									</NcButton>
-									<NcButton variant="tertiary" size="small"
+									<NcButton v-if="!f.isSystem" variant="tertiary" size="small"
 										:aria-label="t('souvera_mail', 'Rename')" @click="startRenameFolder(f)">
 										<template #icon><Pencil :size="14" /></template>
 									</NcButton>
-									<NcButton variant="tertiary" size="small"
+									<NcButton v-if="!f.isSystem" variant="tertiary" size="small"
 										:aria-label="t('souvera_mail', 'Delete')" @click="deleteFolder(f.id)">
 										<template #icon><TrashCan :size="14" /></template>
 									</NcButton>
@@ -433,6 +433,7 @@ export default {
 			dragId: null,
 			dragOverId: null,
 			loadedFolders: false,
+			allMailboxesList: [],
 
 			sieveScripts: [],
 			loadingSieve: false,
@@ -454,7 +455,6 @@ export default {
 		// that any child folder underneath them appears correctly indented.
 		folderTree() {
 			const list = this.userFoldersList
-			if (!list || !list.length) return []
 			const byId = {}
 			for (const f of list) { byId[f.id] = { ...f, children: [], isSystem: false } }
 
@@ -466,10 +466,18 @@ export default {
 					missingParents.add(f.parentId)
 				}
 			}
-			// Fetch missing parent info from the full mailbox list (App.vue stored
-			// system mailboxes are not in userFoldersList — create stub entries).
+			// Fetch missing parent info from the full mailbox list
 			for (const pid of missingParents) {
-				byId[pid] = { id: pid, name: pid, children: [], isSystem: true, depth: 0 }
+				const mb = this.allMailboxesList?.find(m => m.id === pid)
+				const name = mb ? (mb.name || pid) : pid
+				byId[pid] = { id: pid, name, children: [], isSystem: true, depth: 0, role: mb?.role }
+			}
+			// Also add system mailboxes that can have subfolders (Inbox, Drafts, Sent)
+			const wantedRoles = ['inbox', 'drafts', 'sent']
+			for (const mb of (this.allMailboxesList || [])) {
+				if (!wantedRoles.includes(mb.role)) continue
+				if (byId[mb.id]) continue
+				byId[mb.id] = { id: mb.id, name: mb.name || mb.id, children: [], isSystem: true, depth: 0, role: mb.role }
 			}
 
 			const roots = []
@@ -510,7 +518,7 @@ export default {
 			try { const r = await API.passwords(); this.passwords = r.data.passwords || [] } catch {}
 			try { const r = await API.shared(); this.sharedAbove = r.data.position === 'above' } catch {}
 			try { const r = await axios.get(generateUrl('/apps/souvera_mail/migration/welcome-state')); const s = r.data?.state?.lastJob?.state; this.migrationCompleted = ['completed','dismissed','failed','cancelled'].includes(s) } catch {}
-			try { const r = await axios.get(generateUrl('/apps/souvera_mail/api/v2/mailboxes')); this.userFoldersList = (r.data.mailboxes || []).filter(m => !['inbox','sent','drafts','junk','trash'].includes(m.role)) } catch {} finally { this.loadedFolders = true }
+			try { const r = await axios.get(generateUrl('/apps/souvera_mail/api/v2/mailboxes')); this.allMailboxesList = r.data.mailboxes || []; this.userFoldersList = this.allMailboxesList.filter(m => !['inbox','sent','drafts','junk','trash'].includes(m.role)) } catch {} finally { this.loadedFolders = true }
 			this.loadSieve()
 			try {
 				const r = await API.prefs(); const p = r.data

@@ -22,6 +22,7 @@
 				:two-row="!verticalLayout"
 				:refresh-countdown="refreshCountdown"
 				:refresh-total="_refreshInterval"
+				:loading-bulk="bulkProcessing"
 				@update:search="onSearch"
 				@update:filter="onFilter" />
 			<EmailListSkeleton v-if="loadingEmails" />
@@ -116,6 +117,7 @@ export default {
 		return {
 			emails: [], emailTotal: 0, offset: 0, limit: 50,
 			loadingEmails: false, loadingBody: false,
+			bulkProcessing: false,
 			selectedEmail: null,
 			emailBodyHtml: '', emailBodyPlain: '',
 			listWidth: 'clamp(320px, 33%, 460px)',
@@ -282,6 +284,7 @@ export default {
 		},
 		selectAll() { this.checkedIds = this.emails.map(e => e.id) },
 		async markAllRead() {
+			this.bulkProcessing = true
 			try {
 				const mailboxId = this.selectedMailbox.includes('|')
 					? this.selectedMailbox.split('|')[1]
@@ -292,7 +295,7 @@ export default {
 			} catch (e) {
 				console.error('Mark all read failed', e)
 				showError(this.t('souvera_mail', 'Failed to mark all as read'))
-			}
+			} finally { this.bulkProcessing = false }
 		},
 		async markAllUnread() {
 			this.checkedIds = this.emails.map(e => e.id)
@@ -300,6 +303,7 @@ export default {
 		},
 		async emptyTrash() {
 			if (!confirm(this.t('souvera_mail', 'Empty trash folder permanently? This cannot be undone.'))) return
+			this.bulkProcessing = true
 			try {
 				const mailboxId = this.selectedMailbox.includes('|')
 					? this.selectedMailbox.split('|')[1]
@@ -310,9 +314,10 @@ export default {
 			} catch (e) {
 				console.error('Empty trash failed', e)
 				showError(this.t('souvera_mail', 'Failed to empty trash'))
-			}
+			} finally { this.bulkProcessing = false }
 		},
 		async bulkMarkRead() {
+			this.bulkProcessing = true
 			for (const id of this.checkedIds) {
 				try { await markEmailRead(id, true, this.currentAccountId) } catch (e) { console.error('Failed to mark read', e) }
 			}
@@ -320,8 +325,10 @@ export default {
 			await this.loadEmails()
 			this.notifyMailboxChange()
 			showSuccess(this.t('souvera_mail', 'Marked as read'))
+			this.bulkProcessing = false
 		},
 		async bulkMarkUnread() {
+			this.bulkProcessing = true
 			for (const id of this.checkedIds) {
 				try { await markEmailRead(id, false, this.currentAccountId) } catch (e) { console.error('Failed to mark unread', e) }
 			}
@@ -329,8 +336,10 @@ export default {
 			await this.loadEmails()
 			this.notifyMailboxChange()
 			showSuccess(this.t('souvera_mail', 'Marked as unread'))
+			this.bulkProcessing = false
 		},
 		async bulkDelete() {
+			this.bulkProcessing = true
 			for (const id of this.checkedIds) {
 				try { await deleteEmailApi(id, this.currentAccountId) } catch (e) { console.error('Failed to delete', e) }
 			}
@@ -338,8 +347,10 @@ export default {
 			await this.loadEmails()
 			this.notifyMailboxChange()
 			showSuccess(this.t('souvera_mail', 'Messages deleted'))
+			this.bulkProcessing = false
 		},
 		async bulkMoveTo(mailboxId) {
+			this.bulkProcessing = true
 			for (const id of this.checkedIds) {
 				try { await moveEmail(id, mailboxId, this.currentAccountId) } catch (e) { console.error('Failed to move', e) }
 			}
@@ -347,6 +358,7 @@ export default {
 			await this.loadEmails()
 			this.notifyMailboxChange()
 			showSuccess(this.t('souvera_mail', 'Messages moved'))
+			this.bulkProcessing = false
 		},
 		async onOpenEmail(email) {
 			this.selectedEmail = email
