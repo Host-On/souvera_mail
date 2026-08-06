@@ -320,8 +320,19 @@
 					</div>
 					<div v-if="passwords.length > 0" class="password-list">
 						<div v-for="pw in passwords" :key="pw.id" class="password-row">
-							<div>
+							<div class="password-info">
 								<div class="password-name">{{ pw.description || pw.name }}</div>
+								<div class="password-secret" v-if="pw.secret">
+									<code :class="{ 'password-secret--hidden': !pw._showSecret }"
+										@click="pw._showSecret = !pw._showSecret">
+										{{ pw._showSecret ? pw.secret : '••••••••••••••••' }}
+									</code>
+									<NcButton variant="tertiary" size="small"
+										:title="t('souvera_mail', 'Copy')"
+										@click="copySecret(pw.secret)">
+										<template #icon><ContentCopy :size="12" /></template>
+									</NcButton>
+								</div>
 								<div class="settings-muted">{{ pw.createdAt ? fmtDate(pw.createdAt) : '' }}</div>
 							</div>
 							<NcButton variant="tertiary" size="small"
@@ -357,6 +368,7 @@ import Play from 'vue-material-design-icons/Play.vue'
 import FolderPlus from 'vue-material-design-icons/FolderPlus.vue'
 import Filter from 'vue-material-design-icons/Filter.vue'
 import Check from 'vue-material-design-icons/Check.vue'
+import ContentCopy from 'vue-material-design-icons/ContentCopy.vue'
 import DOMPurify from 'dompurify'
 import QuotaDonut from '../components/QuotaDonut.vue'
 import SieveFilterEditor from '../components/SieveFilterEditor.vue'
@@ -375,7 +387,7 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Play, FolderPlus, Filter, Check, QuotaDonut, SieveFilterEditor },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Play, FolderPlus, Filter, Check, ContentCopy, QuotaDonut, SieveFilterEditor },
 	data() {
 		return {
 			accountEmail: '',
@@ -585,10 +597,14 @@ export default {
 		async create() {
 			try {
 				const r = await axios.post(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'), { name: this.newName })
-				this.passwords.push({ id: r.data.id, description: this.newName, createdAt: new Date().toISOString() })
+				const pw = { id: r.data.id, description: this.newName, secret: r.data.secret, createdAt: new Date().toISOString(), _showSecret: true }
+				this.passwords.push(pw)
 				this.showCreate = false; this.newName = ''
 				showSuccess(this.t('souvera_mail', 'App password created'))
 			} catch (e) { console.error('App password create failed', e); showError(this.t('souvera_mail', 'Failed to create app password')) }
+		},
+		async copySecret(secret) {
+			try { await navigator.clipboard.writeText(secret); showSuccess(this.t('souvera_mail', 'Copied')) } catch {}
 		},
 		async remove(id) {
 			try {
@@ -834,6 +850,9 @@ export default {
 	background: var(--color-background-dark);
 }
 .password-name { font-weight: 500; font-size: 13px; }
+.password-secret { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+.password-secret code { font-family: monospace; font-size: 12px; padding: 1px 6px; background: var(--color-background-dark); border-radius: 3px; cursor: pointer; user-select: all; }
+.password-secret--hidden { letter-spacing: 2px; }
 .password-value { font-size: 12px; font-family: monospace; word-break: break-all; }
 .setting-row--column { flex-direction: column; align-items: stretch; }
 .signature-editor {
