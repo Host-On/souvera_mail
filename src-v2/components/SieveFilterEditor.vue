@@ -96,6 +96,9 @@ import Plus from 'vue-material-design-icons/Plus.vue'
 import Minus from 'vue-material-design-icons/Minus.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
+import { useSieveClient } from '../composables/useSieveClient.js'
+
+const { saveScript, validateScript } = useSieveClient()
 
 export default {
 	name: 'SieveFilterEditor',
@@ -226,8 +229,6 @@ export default {
 			if (!body) { showError(this.t('souvera_mail', 'No conditions defined')); return }
 			this.saving = true
 			try {
-				const { useSieveClient } = await import('../composables/useSieveClient.js')
-				const { saveScript } = useSieveClient()
 				await saveScript(this.filterName.trim(), body)
 				showSuccess(this.t('souvera_mail', 'Filter saved'))
 				this.$emit('saved'); this.$emit('close')

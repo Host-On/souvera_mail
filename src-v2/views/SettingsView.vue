@@ -360,6 +360,9 @@ import Check from 'vue-material-design-icons/Check.vue'
 import DOMPurify from 'dompurify'
 import QuotaDonut from '../components/QuotaDonut.vue'
 import SieveFilterEditor from '../components/SieveFilterEditor.vue'
+import { useSieveClient } from '../composables/useSieveClient.js'
+
+const { fetchScripts, activateScript, deleteScript } = useSieveClient()
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 
@@ -535,8 +538,6 @@ export default {
 		async loadSieve() {
 			this.loadingSieve = true
 			try {
-				const { useSieveClient } = await import('../composables/useSieveClient.js')
-				const { fetchScripts } = useSieveClient()
 				this.sieveScripts = await fetchScripts()
 			} catch {}
 			this.loadingSieve = false
@@ -552,8 +553,6 @@ export default {
 		},
 		async toggleSieve(filter) {
 			try {
-				const { useSieveClient } = await import('../composables/useSieveClient.js')
-				const { activateScript } = useSieveClient()
 				await activateScript(filter.name, !filter.isActive)
 				filter.isActive = !filter.isActive
 			} catch (e) {
@@ -562,8 +561,6 @@ export default {
 		},
 		async deleteSieve(filter) {
 			try {
-				const { useSieveClient } = await import('../composables/useSieveClient.js')
-				const { deleteScript } = useSieveClient()
 				await deleteScript(filter.name)
 				this.sieveScripts = this.sieveScripts.filter(s => s.id !== filter.id)
 				showSuccess(this.t('souvera_mail', 'Filter deleted'))

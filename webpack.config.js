@@ -12,6 +12,7 @@ module.exports = {
 		chunkFilename: 'souvera_mail-[name]-[fullhash].js',
 		publicPath: '/apps/souvera_mail/js/',
 		clean: false,
+		chunkLoadingGlobal: 'souveraMailChunks',
 	},
 	resolve: {
 		extensions: ['.js', '.mjs', '.vue'],
@@ -61,6 +62,8 @@ module.exports = {
 	// Vue must NOT be externalised — it is bundled per app.
 	optimization: {
 		splitChunks: false,
+		// Disable dynamic-import chunk creation — bundle everything into main
+		// entry point. Chunks that fail to deploy (404) break the entire app.
 	},
 	performance: {
 		hints: false,
