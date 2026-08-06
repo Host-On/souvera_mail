@@ -67,17 +67,18 @@
 					@trailing-button-click="$emit('update:search', '')" />
 
 				<NcActions class="email-list-toolbar__filter"
-					:value="filter"
 					:menu-name="activeFilterMenuName"
 					:primary="filter !== 'all'"
-					:force-name="true"
-					@update:value="$emit('update:filter', $event)">
+					:force-name="true">
 					<template #icon><Filter :size="18" /></template>
 					<NcActionButton v-for="f in filterOptions" :key="f.value"
-						type="radio"
-						:name="f.label"
-						:value="f.value">
-						<template #icon><component :is="f.icon" :size="16" /></template>
+						:aria-label="f.label"
+						@click="$emit('update:filter', f.value)">
+						<template #icon>
+							<Check v-if="filter === f.value" :size="16" />
+							<component :is="f.icon" v-else :size="16" />
+						</template>
+						{{ f.label }}
 					</NcActionButton>
 				</NcActions>
 			</template>
@@ -122,12 +123,13 @@ import Star from 'vue-material-design-icons/Star.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import DotsHorizontal from 'vue-material-design-icons/DotsHorizontal.vue'
 import CheckAll from 'vue-material-design-icons/CheckAll.vue'
+import Check from 'vue-material-design-icons/Check.vue'
 import Magnify from 'vue-material-design-icons/Magnify.vue'
 import { mailboxDisplayName } from '../utils/mailboxNames.js'
 
 export default {
 	name: 'EmailListToolbar',
-	components: { NcButton, NcActions, NcActionButton, NcCheckboxRadioSwitch, NcTextField, NcLoadingIcon, Refresh, Pencil, EmailOpen, EmailOutline, TrashCan, FolderMove, Folder, Filter, Star, Paperclip, DotsHorizontal, CheckAll, Magnify },
+	components: { NcButton, NcActions, NcActionButton, NcCheckboxRadioSwitch, NcTextField, NcLoadingIcon, Refresh, Pencil, EmailOpen, EmailOutline, TrashCan, FolderMove, Folder, Filter, Star, Paperclip, DotsHorizontal, CheckAll, Check, Magnify },
 	props: {
 		selectedCount: { type: Number, default: 0 },
 		selectAllState: { type: [Boolean, String], default: false },
@@ -199,7 +201,7 @@ export default {
 .selected-count { font-size: 13px; color: var(--color-primary-element); font-weight: 500; margin: 0 4px; }
 
 /* Two-row mode — everything in one compact row */
-.email-list-toolbar--tworow { padding: 4px 8px; }
+.email-list-toolbar--tworow { padding: 9px 8px; }
 .email-list-toolbar--tworow .email-list-toolbar__left {
 	display: flex; align-items: center; gap: 3px; flex: 1; min-width: 0;
 }
