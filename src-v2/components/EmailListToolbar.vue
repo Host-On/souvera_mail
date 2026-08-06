@@ -6,7 +6,8 @@
 				@update:modelValue="$emit('toggleSelectAll')" />
 
 			<NcActions v-if="selectedCount === 0" class="email-list-toolbar__quick-actions"
-				:aria-label="t('souvera_mail', 'More actions')">
+				:aria-label="t('souvera_mail', 'More actions')"
+				:disabled="loadingBulk">
 				<template #icon><DotsHorizontal :size="18" /></template>
 				<NcActionButton :name="t('souvera_mail', 'Select all')" @click="$emit('selectAll')">
 					<template #icon><CheckAll :size="16" /></template>
@@ -83,6 +84,7 @@
 		</div>
 
 		<div class="email-list-toolbar__right">
+			<NcLoadingIcon v-if="loadingBulk" :size="18" class="email-list-toolbar__bulk-spinner" />
 			<div class="toolbar__refresh-donut"
 				@click="$emit('refresh')"
 				:title="t('souvera_mail', 'Refresh ({n}s)', { n: refreshCountdown })">
@@ -107,7 +109,7 @@
 </template>
 
 <script>
-import { NcButton, NcActions, NcActionButton, NcCheckboxRadioSwitch, NcTextField } from '@nextcloud/vue'
+import { NcButton, NcActions, NcActionButton, NcCheckboxRadioSwitch, NcTextField, NcLoadingIcon } from '@nextcloud/vue'
 import Refresh from 'vue-material-design-icons/Refresh.vue'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
 import EmailOpen from 'vue-material-design-icons/EmailOpen.vue'
@@ -125,7 +127,7 @@ import { mailboxDisplayName } from '../utils/mailboxNames.js'
 
 export default {
 	name: 'EmailListToolbar',
-	components: { NcButton, NcActions, NcActionButton, NcCheckboxRadioSwitch, NcTextField, Refresh, Pencil, EmailOpen, EmailOutline, TrashCan, FolderMove, Folder, Filter, Star, Paperclip, DotsHorizontal, CheckAll, Magnify },
+	components: { NcButton, NcActions, NcActionButton, NcCheckboxRadioSwitch, NcTextField, NcLoadingIcon, Refresh, Pencil, EmailOpen, EmailOutline, TrashCan, FolderMove, Folder, Filter, Star, Paperclip, DotsHorizontal, CheckAll, Magnify },
 	props: {
 		selectedCount: { type: Number, default: 0 },
 		selectAllState: { type: [Boolean, String], default: false },
@@ -136,6 +138,7 @@ export default {
 		isTrash: { type: Boolean, default: false },
 		refreshCountdown: { type: Number, default: 0 },
 		refreshTotal: { type: Number, default: 60 },
+		loadingBulk: { type: Boolean, default: false },
 	},
 	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter', 'selectAll', 'markAllRead', 'markAllUnread', 'emptyTrash'],
 	data() {
@@ -190,6 +193,7 @@ export default {
 }
 .email-list-toolbar__left { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; }
 .email-list-toolbar__right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.email-list-toolbar__bulk-spinner { flex-shrink: 0; }
 .email-list-toolbar__search { flex: 1; max-width: 300px; min-width: 100px; }
 .email-list-toolbar__search-toggle { flex-shrink: 0; }
 .selected-count { font-size: 13px; color: var(--color-primary-element); font-weight: 500; margin: 0 4px; }
