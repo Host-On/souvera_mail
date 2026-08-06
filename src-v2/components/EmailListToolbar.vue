@@ -67,16 +67,16 @@
 					@trailing-button-click="$emit('update:search', '')" />
 
 				<NcActions class="email-list-toolbar__filter"
+					:value="filter"
 					:menu-name="activeFilterMenuName"
 					:primary="filter !== 'all'"
-					:force-name="true">
+					:force-name="true"
+					@update:value="$emit('update:filter', $event)">
 					<template #icon><Filter :size="18" /></template>
 					<NcActionButton v-for="f in filterOptions" :key="f.value"
 						type="radio"
 						:name="f.label"
-						:model-value="filter"
-						:value="f.value"
-						@click="$emit('update:filter', f.value)">
+						:value="f.value">
 						<template #icon><component :is="f.icon" :size="16" /></template>
 					</NcActionButton>
 				</NcActions>
