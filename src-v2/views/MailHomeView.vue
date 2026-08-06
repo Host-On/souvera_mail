@@ -284,12 +284,26 @@ export default {
 		},
 		selectAll() { this.checkedIds = this.emails.map(e => e.id) },
 		async markAllRead() {
-			this.checkedIds = this.emails.map(e => e.id)
-			await this.bulkMarkRead()
+			this.bulkProcessing = true
+			try {
+				let accountId = null; let mailboxId = this.selectedMailbox
+				if (mailboxId && mailboxId.includes('|')) { [accountId, mailboxId] = mailboxId.split('|') }
+				const r = await fetchEmails(mailboxId, 500, 0, accountId, '', 'unread')
+				if (r.emails.length === 0) { this.bulkProcessing = false; return }
+				this.checkedIds = r.emails.map(e => e.id)
+				await this.bulkMarkRead()
+			} catch (e) { console.error(e); this.bulkProcessing = false }
 		},
 		async markAllUnread() {
-			this.checkedIds = this.emails.map(e => e.id)
-			await this.bulkMarkUnread()
+			this.bulkProcessing = true
+			try {
+				let accountId = null; let mailboxId = this.selectedMailbox
+				if (mailboxId && mailboxId.includes('|')) { [accountId, mailboxId] = mailboxId.split('|') }
+				const r = await fetchEmails(mailboxId, 500, 0, accountId)
+				if (r.emails.length === 0) { this.bulkProcessing = false; return }
+				this.checkedIds = r.emails.map(e => e.id)
+				await this.bulkMarkUnread()
+			} catch (e) { console.error(e); this.bulkProcessing = false }
 		},
 		async emptyTrash() {
 			if (!confirm(this.t('souvera_mail', 'Empty trash folder permanently? This cannot be undone.'))) return
