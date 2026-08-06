@@ -15,22 +15,29 @@
 			<div class="sf-section">
 				<label class="sf-section__title">{{ t('souvera_mail', 'Conditions') }}</label>
 				<div class="sf-match-type">
-					<NcButton variant="tertiary" :type="matchType === 'any' ? 'primary' : 'tertiary'" @click="matchType = 'any'">
-						{{ t('souvera_mail', 'Match ANY') }}
+					<NcButton variant="tertiary"
+						:class="{ 'sf-match-type--active': matchType === 'any' }"
+						@click="matchType = 'any'">
+						{{ t('souvera_mail', 'Match if ANY condition is met') }}
 					</NcButton>
-					<NcButton variant="tertiary" :type="matchType === 'all' ? 'primary' : 'tertiary'" @click="matchType = 'all'">
-						{{ t('souvera_mail', 'Match ALL') }}
+					<NcButton variant="tertiary"
+						:class="{ 'sf-match-type--active': matchType === 'all' }"
+						@click="matchType = 'all'">
+						{{ t('souvera_mail', 'Match if ALL conditions are met') }}
 					</NcButton>
 				</div>
 
 				<div v-for="(c, i) in conditions" :key="i" class="sf-condition">
-					<NcSelect :value="c.field" :options="fieldOptions" :label="t('souvera_mail', 'Field')"
-						@update:value="c.field = $event" />
-					<NcSelect :value="c.operator" :options="operatorOptions" style="max-width:120px"
-						@update:value="c.operator = $event" />
+					<select v-model="c.field" class="sf-select">
+						<option v-for="o in fieldOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+					</select>
+					<select v-model="c.operator" class="sf-select sf-select--op">
+						<option v-for="o in operatorOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+					</select>
 					<NcTextField :value="c.value" :placeholder="t('souvera_mail', 'Value')"
 						@update:value="c.value = $event" />
-					<NcButton variant="tertiary" @click="conditions.splice(i, 1)" v-if="conditions.length > 1">
+					<NcButton variant="tertiary" @click="conditions.splice(i, 1)" v-if="conditions.length > 1"
+						:title="t('souvera_mail', 'Remove condition')">
 						<template #icon><Minus :size="16" /></template>
 					</NcButton>
 				</div>
@@ -46,20 +53,20 @@
 				<label class="sf-section__title">{{ t('souvera_mail', 'Actions') }}</label>
 
 				<div v-for="(a, i) in actions" :key="i" class="sf-action">
-					<NcSelect :value="a.type" :options="actionOptions" :label="t('souvera_mail', 'Action')"
-						@update:value="onActionChange(a, $event)" />
+					<select v-model="a.type" class="sf-select" @change="a.value = ''">
+						<option v-for="o in actionTypes" :key="o.value" :value="o.value">{{ o.label }}</option>
+					</select>
 
-					<!-- Move to folder: show folder picker -->
-					<NcSelect v-if="a.type === 'move'" :value="a.value" :options="mailboxOptions"
-						:placeholder="t('souvera_mail', 'Folder')" style="max-width:200px"
-						@update:value="a.value = $event" />
+					<select v-if="a.type === 'move'" v-model="a.value" class="sf-select sf-select--folder">
+						<option v-for="o in mailboxOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
+					</select>
 
-					<!-- Redirect: show email input -->
 					<NcTextField v-if="a.type === 'redirect'" :value="a.value"
 						:placeholder="'user@domain.de'"
 						@update:value="a.value = $event" />
 
-					<NcButton variant="tertiary" @click="actions.splice(i, 1)" v-if="actions.length > 1">
+					<NcButton variant="tertiary" @click="actions.splice(i, 1)" v-if="actions.length > 1"
+						:title="t('souvera_mail', 'Remove action')">
 						<template #icon><Minus :size="16" /></template>
 					</NcButton>
 				</div>
@@ -70,7 +77,7 @@
 				</NcButton>
 			</div>
 
-			<!-- Generated Sieve preview (collapsed) -->
+			<!-- Generated Sieve preview -->
 			<details class="sf-preview" v-if="generatedSieve">
 				<summary>{{ t('souvera_mail', 'Show source') }}</summary>
 				<pre class="sf-preview__code">{{ generatedSieve }}</pre>
@@ -88,7 +95,7 @@
 </template>
 
 <script>
-import { NcDialog, NcButton, NcTextField, NcSelect } from '@nextcloud/vue'
+import { NcDialog, NcButton, NcTextField } from '@nextcloud/vue'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 import Plus from 'vue-material-design-icons/Plus.vue'
 import Minus from 'vue-material-design-icons/Minus.vue'
@@ -97,7 +104,7 @@ import { generateUrl } from '@nextcloud/router'
 
 export default {
 	name: 'SieveFilterEditor',
-	components: { NcDialog, NcButton, NcTextField, NcSelect, Plus, Minus },
+	components: { NcDialog, NcButton, NcTextField, Plus, Minus },
 	props: {
 		editId: { type: String, default: '' },
 		editName: { type: String, default: '' },
@@ -120,11 +127,11 @@ export default {
 				{ value: 'body',    label: this.t('souvera_mail', 'Body') },
 			],
 			operatorOptions: [
-				{ value: 'contains',  label: this.t('souvera_mail', 'contains') },
-				{ value: 'equals',    label: this.t('souvera_mail', 'equals') },
-				{ value: 'starts',    label: this.t('souvera_mail', 'starts with') },
-				{ value: 'ends',      label: this.t('souvera_mail', 'ends with') },
-				{ value: 'regex',     label: this.t('souvera_mail', 'matches regex') },
+				{ value: 'contains', label: this.t('souvera_mail', 'contains') },
+				{ value: 'equals',   label: this.t('souvera_mail', 'equals') },
+				{ value: 'starts',   label: this.t('souvera_mail', 'starts with') },
+				{ value: 'ends',     label: this.t('souvera_mail', 'ends with') },
+				{ value: 'regex',    label: this.t('souvera_mail', 'matches regex') },
 			],
 			actionTypes: [
 				{ value: 'move',     label: this.t('souvera_mail', 'Move to folder') },
@@ -137,15 +144,12 @@ export default {
 		}
 	},
 	computed: {
-		actionOptions() { return this.actionTypes },
 		mailboxOptions() {
 			return this.mailboxes
 				.filter(m => m.role !== 'trash' && m.role !== 'junk')
 				.map(m => ({ value: m.name, label: m.name }))
 		},
-		generatedSieve() {
-			return this.buildSieve()
-		},
+		generatedSieve() { return this.buildSieve() },
 	},
 	async mounted() {
 		if (this.editName) this.filterName = this.editName
@@ -159,18 +163,11 @@ export default {
 	methods: {
 		addCondition() { this.conditions.push({ field: 'subject', operator: 'contains', value: '' }) },
 		addAction() { this.actions.push({ type: 'markread', value: '' }) },
-		onActionChange(action, newType) {
-			action.type = newType
-			action.value = ''
-		},
 		buildSieve() {
 			const lines = []
 			const needed = new Set()
-			const hasMove = this.actions.some(a => a.type === 'move')
-			const hasFlag = this.actions.some(a => a.type === 'markread' || a.type === 'markflag')
-			if (hasMove) needed.add('"fileinto"')
-			if (hasFlag) needed.add('"imap4flags"')
-
+			if (this.actions.some(a => a.type === 'move')) needed.add('"fileinto"')
+			if (this.actions.some(a => a.type === 'markread' || a.type === 'markflag')) needed.add('"imap4flags"')
 			if (needed.size > 0) lines.push(`require [${[...needed].join(', ')}];`)
 			lines.push('')
 
@@ -179,33 +176,17 @@ export default {
 
 			const op = this.matchType === 'all' ? 'allof' : 'anyof'
 			const tests = conds.map(c => {
-				let op = ':contains'
-				let val = c.value
-				if (c.operator === 'equals') {
-					op = ':is'
-					val = `"${val}"`
-				} else if (c.operator === 'starts') {
-					op = ':matches'
-					val = `"${this.escapeRegex(val)}*"`
-				} else if (c.operator === 'ends') {
-					op = ':matches'
-					val = `"*${this.escapeRegex(val)}"`
-				} else if (c.operator === 'regex') {
-					op = ':regex'
-					val = `"${val}"`
-				} else {
-					val = `"${val}"`
-				}
+				let op = ':contains'; let val = c.value
+				if (c.operator === 'equals') { op = ':is'; val = `"${val}"` }
+				else if (c.operator === 'starts') { op = ':matches'; val = `"${this.escapeRegex(val)}*"` }
+				else if (c.operator === 'ends') { op = ':matches'; val = `"*${this.escapeRegex(val)}"` }
+				else if (c.operator === 'regex') { op = ':regex'; val = `"${val}"` }
+				else { val = `"${val}"` }
 				return `header ${op} "${c.field}" ${val}`
 			})
 
-			if (tests.length === 1) {
-				lines.push(`if ${tests[0]} {`)
-			} else {
-				lines.push(`if ${op} (`)
-				lines.push('    ' + tests.join(',\n    '))
-				lines.push(`) {`)
-			}
+			if (tests.length === 1) lines.push(`if ${tests[0]} {`)
+			else { lines.push(`if ${op} (`); lines.push('    ' + tests.join(',\n    ')); lines.push(`) {`) }
 
 			for (const a of this.actions) {
 				if (a.type === 'move' && a.value) lines.push(`    fileinto "${a.value}";`)
@@ -216,53 +197,33 @@ export default {
 				if (a.type === 'stop') lines.push('    stop;')
 			}
 			lines.push('}')
-
 			return lines.join('\n')
 		},
-		escapeRegex(str) {
-			return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-		},
+		escapeRegex(str) { return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') },
 		parseFromSieve(body) {
-			// Best-effort parse: extract conditions and actions from existing Sieve
-			this.conditions = []
-			this.actions = []
+			this.conditions = []; this.actions = []
 			try {
-				const match = body.match(/if ((?:allof|anyof)\s*\(([^)]+)\)|header\s+\S+\s+"([^"]+)"\s+"([^"]+)"\s*)/s)
-				if (match) {
-					const inner = match[2] || match[0]
-					if (inner.includes('anyof')) this.matchType = 'any'
-					else if (inner.includes('allof')) this.matchType = 'all'
-
-					const headerRe = /header\s+(:contains|:is|:matches|:regex)\s+"([^"]+)"\s+"([^"]+)"/g
-					let h
-					while ((h = headerRe.exec(body)) !== null) {
-						let op = 'contains'
-						if (h[1] === ':is') op = 'equals'
-						else if (h[1] === ':regex') op = 'regex'
-						else if (h[1] === ':matches') {
-							const v = h[3]
-							if (v.startsWith('"*') && v.endsWith('*"')) op = 'contains'
-							else if (v.endsWith('*"')) op = 'starts'
-							else if (v.startsWith('"*')) op = 'ends'
-						}
-						this.conditions.push({ field: h[2], operator: op, value: h[3] })
+				const m = body.match(/if ((?:allof|anyof)\s*\(|header\s+\S+\s+"([^"]+)"\s+"([^"]*)"\s*)/s)
+				if (m) { this.matchType = (m[0] && m[0].includes('allof')) ? 'all' : 'any' }
+				const re = /header\s+(:contains|:is|:matches|:regex)\s+"([^"]+)"\s+"([^"]+)"/g
+				let h; while ((h = re.exec(body)) !== null) {
+					let op = 'contains'
+					if (h[1] === ':is') op = 'equals'
+					else if (h[1] === ':regex') op = 'regex'
+					else if (h[1] === ':matches') {
+						const v = h[3]; if (v.endsWith('*"') && !v.startsWith('"*')) op = 'starts'; else if (v.startsWith('"*') && !v.endsWith('*"')) op = 'ends'
 					}
+					this.conditions.push({ field: h[2], operator: op, value: h[3].replace(/^"|"$/g, '').replace(/^\*|\*$/g, '') })
 				}
-				if (this.conditions.length === 0) {
-					this.conditions = [{ field: 'subject', operator: 'contains', value: '' }]
-				}
-
+				if (this.conditions.length === 0) this.conditions = [{ field: 'subject', operator: 'contains', value: '' }]
 				if (body.includes('fileinto')) this.actions.push({ type: 'move', value: (body.match(/fileinto\s+"([^"]+)"/) || [])[1] || '' })
 				if (body.includes('addflag "\\\\Seen"') || body.includes('addflag "\\Seen"')) this.actions.push({ type: 'markread', value: '' })
-				if (body.includes('addflag "\\\\Flagged"') || body.includes('addflag "\\Flagged"')) this.actions.push({ type: 'markflag', value: '' })
+				if (body.includes('addflag "\\\\Flagged"')) this.actions.push({ type: 'markflag', value: '' })
 				if (body.includes('redirect')) this.actions.push({ type: 'redirect', value: (body.match(/redirect\s+"([^"]+)"/) || [])[1] || '' })
 				if (body.includes('discard')) this.actions.push({ type: 'discard', value: '' })
 				if (body.includes('stop')) this.actions.push({ type: 'stop', value: '' })
 				if (this.actions.length === 0) this.actions = [{ type: 'move', value: 'Junk' }]
-			} catch {
-				this.conditions = [{ field: 'subject', operator: 'contains', value: '' }]
-				this.actions = [{ type: 'move', value: 'Junk' }]
-			}
+			} catch { this.conditions = [{ field: 'subject', operator: 'contains', value: '' }]; this.actions = [{ type: 'move', value: 'Junk' }] }
 		},
 		async save() {
 			if (!this.filterName.trim()) { showError(this.t('souvera_mail', 'Name is required')); return }
@@ -274,11 +235,8 @@ export default {
 				const { saveScript } = useSieveClient()
 				await saveScript(this.filterName.trim(), body)
 				showSuccess(this.t('souvera_mail', 'Filter saved'))
-				this.$emit('saved')
-				this.$emit('close')
-			} catch (e) {
-				showError(e?.response?.data?.error || this.t('souvera_mail', 'Failed to save filter'))
-			} finally { this.saving = false }
+				this.$emit('saved'); this.$emit('close')
+			} catch (e) { showError(e?.response?.data?.error || this.t('souvera_mail', 'Failed to save filter')) } finally { this.saving = false }
 		},
 	},
 }
@@ -290,8 +248,17 @@ export default {
 .sf-field label, .sf-section__title { font-size: 13px; font-weight: 600; color: var(--color-text-maxcontrast); }
 .sf-section { display: flex; flex-direction: column; gap: 6px; }
 .sf-match-type { display: flex; gap: 4px; margin-bottom: 4px; }
+.sf-match-type--active { background: var(--color-primary-element-light) !important; color: var(--color-primary-element-text) !important; }
 .sf-condition { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .sf-action { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.sf-select {
+	padding: 6px 8px; border: 1px solid var(--color-border); border-radius: 6px;
+	background: var(--color-main-background); color: var(--color-main-text); font-size: 13px;
+	height: 34px; min-width: 100px; outline: none;
+}
+.sf-select:focus { border-color: var(--color-primary-element); }
+.sf-select--op { max-width: 130px; }
+.sf-select--folder { max-width: 180px; }
 .sf-preview { margin-top: 8px; }
 .sf-preview summary { font-size: 12px; color: var(--color-text-maxcontrast); cursor: pointer; }
 .sf-preview__code { margin-top: 4px; padding: 8px; background: var(--color-background-dark); border-radius: 6px; font-size: 12px; font-family: monospace; white-space: pre-wrap; max-height: 200px; overflow: auto; }
