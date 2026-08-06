@@ -231,7 +231,11 @@ export default {
 				await saveScript(this.filterName.trim(), body)
 				showSuccess(this.t('souvera_mail', 'Filter saved'))
 				this.$emit('saved'); this.$emit('close')
-			} catch (e) { showError(e?.response?.data?.error || this.t('souvera_mail', 'Failed to save filter')) } finally { this.saving = false }
+			} catch (e) {
+				const msg = e?.response?.data?.error || e?.response?.data?.message || e?.message || this.t('souvera_mail', 'Failed to save filter')
+				console.error('Sieve save error', e)
+				showError(msg)
+			} finally { this.saving = false }
 		},
 	},
 }
