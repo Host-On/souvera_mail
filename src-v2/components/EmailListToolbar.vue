@@ -67,25 +67,27 @@
 				</NcActions>
 			</template>
 		</div>
-		<div class="toolbar__refresh-donut"
-			@click="$emit('refresh')"
-			:title="t('souvera_mail', 'Refresh ({n}s)', { n: refreshCountdown })">
-			<svg viewBox="0 0 36 36" class="donut-svg">
-				<circle cx="18" cy="18" r="15" fill="none"
-					stroke="var(--color-border)" stroke-width="3" />
-				<circle cx="18" cy="18" r="15" fill="none"
-					stroke="var(--color-primary)" stroke-width="3"
-					:stroke-dasharray="circumference"
-					:stroke-dashoffset="donutOffset"
-					stroke-linecap="round"
-					class="donut-fill" />
-			</svg>
-			<Refresh :size="14" class="donut-icon" />
+		<div class="email-list-toolbar__right">
+			<div class="toolbar__refresh-donut"
+				@click="$emit('refresh')"
+				:title="t('souvera_mail', 'Refresh ({n}s)', { n: refreshCountdown })">
+				<svg viewBox="0 0 36 36" class="donut-svg">
+					<circle cx="18" cy="18" r="15" fill="none"
+						stroke="var(--color-border)" stroke-width="3" />
+					<circle cx="18" cy="18" r="15" fill="none"
+						stroke="var(--color-primary)" stroke-width="3"
+						:stroke-dasharray="circumference"
+						:stroke-dashoffset="donutOffset"
+						stroke-linecap="round"
+						class="donut-fill" />
+				</svg>
+				<Refresh :size="14" class="donut-icon" />
+			</div>
+			<NcButton variant="primary" class="email-list-toolbar__compose" @click="$emit('compose')">
+				<template #icon><Pencil :size="20" /></template>
+				{{ t('souvera_mail', 'New') }}
+			</NcButton>
 		</div>
-		<NcButton variant="primary" class="email-list-toolbar__compose" @click="$emit('compose')">
-			<template #icon><Pencil :size="20" /></template>
-			{{ t('souvera_mail', 'New') }}
-		</NcButton>
 	</div>
 </template>
 
@@ -153,14 +155,21 @@ export default {
 	background: var(--color-background-dark);
 }
 .email-list-toolbar__left { display: flex; align-items: center; flex-wrap: wrap; column-gap: 2px; row-gap: 4px; flex: 1; min-width: 0; }
+.email-list-toolbar__right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .email-list-toolbar__search { flex: 1; max-width: 300px; min-width: 100px; margin: 0 8px; }
 .selected-count { font-size: 13px; color: var(--color-primary-element); font-weight: 500; margin: 0 4px; }
 
 /* Two-row mode (side-by-side list panel) — EXACTLY two lines with
    CSS grid, no flex-wrap guesswork. */
-.email-list-toolbar--tworow { position: relative; }
+.email-list-toolbar--tworow {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	grid-template-rows: auto auto;
+	align-items: center;
+	column-gap: 8px; row-gap: 6px;
+}
 .email-list-toolbar--tworow .email-list-toolbar__left {
-	flex: 1 1 100%;
+	flex: 1 1 auto;
 	display: grid;
 	grid-template-columns: auto auto 1fr;
 	grid-template-rows: auto auto;
@@ -175,15 +184,18 @@ export default {
 	max-width: none; min-width: 0;
 	margin: 0;
 }
-/* Row 2: filter (spans all three columns) */
+/* Row 2: filter (spans all columns), right buttons next to it */
 .email-list-toolbar--tworow .email-list-toolbar__filter {
 	grid-column: 1 / 4; grid-row: 2;
-	margin-right: 100px;  /* room for the absolutely-placed compose button */
+}
+/* Right side: refresh + compose — grid row 2, sits next to left content */
+.email-list-toolbar--tworow .email-list-toolbar__right {
+	grid-column: 2; grid-row: 2;
+	display: flex; gap: 6px; align-items: center;
 }
 .email-list-toolbar--tworow .email-list-toolbar__compose {
-	position: absolute;
-	right: 12px;
-	bottom: 6px;
+	/* remove absolute positioning */
+	position: static;
 }
 
 .toolbar__refresh-donut {
