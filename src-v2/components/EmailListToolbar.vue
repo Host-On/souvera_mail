@@ -4,6 +4,7 @@
 			<NcCheckboxRadioSwitch class="email-list-toolbar__check" :model-value="selectAllState"
 				:indeterminate="selectAllState === 'indeterminate'"
 				@update:modelValue="$emit('toggleSelectAll')" />
+
 			<NcActions v-if="selectedCount === 0" class="email-list-toolbar__quick-actions"
 				:aria-label="t('souvera_mail', 'More actions')">
 				<template #icon><DotsHorizontal :size="18" /></template>
@@ -17,11 +18,13 @@
 					<template #icon><EmailOutline :size="16" /></template>
 				</NcActionButton>
 			</NcActions>
+
 			<NcButton v-if="isTrash && selectedCount === 0" variant="tertiary"
 				@click="$emit('emptyTrash')">
 				<template #icon><TrashCan :size="18" /></template>
 				{{ t('souvera_mail', 'Empty trash') }}
 			</NcButton>
+
 			<template v-if="selectedCount > 0">
 				<span class="selected-count">{{ selectedCount }} {{ t('souvera_mail', 'selected') }}</span>
 				<NcButton variant="tertiary" @click="$emit('markRead')">
@@ -42,8 +45,18 @@
 					<template #icon><TrashCan :size="20" /></template>
 				</NcButton>
 			</template>
+
 			<template v-else>
-				<NcTextField class="email-list-toolbar__search"
+				<NcButton variant="tertiary" class="email-list-toolbar__search-toggle"
+					:aria-label="t('souvera_mail', 'Search')"
+					:title="t('souvera_mail', 'Search')"
+					@click="showSearch = !showSearch">
+					<template #icon><Magnify :size="18" /></template>
+				</NcButton>
+
+				<NcTextField v-show="showSearch"
+					ref="searchField"
+					class="email-list-toolbar__search"
 					:model-value="searchQuery"
 					:placeholder="t('souvera_mail', 'Search in mailbox…')"
 					:show-trailing-button="searchQuery !== ''"
@@ -51,6 +64,7 @@
 					:trailing-button-label="t('souvera_mail', 'Clear search')"
 					@update:modelValue="$emit('update:search', $event)"
 					@trailing-button-click="$emit('update:search', '')" />
+
 				<NcActions class="email-list-toolbar__filter"
 					:menu-name="activeFilterMenuName"
 					:primary="filter !== 'all'"
@@ -67,6 +81,7 @@
 				</NcActions>
 			</template>
 		</div>
+
 		<div class="email-list-toolbar__right">
 			<div class="toolbar__refresh-donut"
 				@click="$emit('refresh')"
@@ -105,25 +120,27 @@ import Star from 'vue-material-design-icons/Star.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import DotsHorizontal from 'vue-material-design-icons/DotsHorizontal.vue'
 import CheckAll from 'vue-material-design-icons/CheckAll.vue'
+import Magnify from 'vue-material-design-icons/Magnify.vue'
 import { mailboxDisplayName } from '../utils/mailboxNames.js'
 
 export default {
 	name: 'EmailListToolbar',
-	components: { NcButton, NcActions, NcActionButton, NcCheckboxRadioSwitch, NcTextField, Refresh, Pencil, EmailOpen, EmailOutline, TrashCan, FolderMove, Folder, Filter, Star, Paperclip, DotsHorizontal, CheckAll },
+	components: { NcButton, NcActions, NcActionButton, NcCheckboxRadioSwitch, NcTextField, Refresh, Pencil, EmailOpen, EmailOutline, TrashCan, FolderMove, Folder, Filter, Star, Paperclip, DotsHorizontal, CheckAll, Magnify },
 	props: {
 		selectedCount: { type: Number, default: 0 },
 		selectAllState: { type: [Boolean, String], default: false },
 		targetMailboxes: { type: Array, default: () => [] },
 		searchQuery: { type: String, default: '' },
 		filter: { type: String, default: 'all' },
-		// twoRow: force a two-line toolbar (checkbox+search / filter+compose)
-		// for narrow side-by-side list panels.
 		twoRow: { type: Boolean, default: false },
 		isTrash: { type: Boolean, default: false },
 		refreshCountdown: { type: Number, default: 0 },
 		refreshTotal: { type: Number, default: 60 },
 	},
 	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter', 'selectAll', 'markAllRead', 'markAllUnread', 'emptyTrash'],
+	data() {
+		return { showSearch: false, localSearch: '' }
+	},
 	computed: {
 		circumference() { return 2 * Math.PI * 15 },
 		donutOffset() {
@@ -134,14 +151,32 @@ export default {
 			const active = this.filterOptions.find(f => f.value === this.filter)
 			return this.t('souvera_mail', 'Filter: {name}', { name: active ? active.label : this.t('souvera_mail', 'All') })
 		},
-		filterOptions() {
-			return [
-				{ value: 'all', label: this.t('souvera_mail', 'All'), icon: EmailOutline },
-				{ value: 'unread', label: this.t('souvera_mail', 'Unread'), icon: EmailOpen },
-				{ value: 'flagged', label: this.t('souvera_mail', 'Flagged'), icon: Star },
-				{ value: 'attachments', label: this.t('souvera_mail', 'With attachments'), icon: Paperclip },
-			]
+		filterOptions() { return [
+			{ value: 'all', label: this.t('souvera_mail', 'All'), icon: EmailOutline },
+			{ value: 'unread', label: this.t('souvera_mail', 'Unread'), icon: EmailOpen },
+			{ value: 'flagged', label: this.t('souvera_mail', 'Flagged'), icon: Star },
+			{ value: 'attachments', label: this.t('souvera_mail', 'With attachments'), icon: Paperclip },
+		]},
+	},
+	watch: {
+		searchQuery: {
+			immediate: true,
+			handler(n) {
+				this.localSearch = n
+				if (n) this.showSearch = true
+			},
 		},
+		twoRow: {
+			immediate: true,
+			handler(n) {
+				// Auto-expand search on wide screens, collapse on narrow
+				if (!n && this.twoRow !== undefined) this.showSearch = true
+			},
+		},
+	},
+	async mounted() {
+		// On wide (non-two-row) screens, search is always visible
+		if (!this.twoRow) this.showSearch = true
 	},
 }
 </script>
@@ -149,67 +184,33 @@ export default {
 <style scoped>
 .email-list-toolbar {
 	display: flex; justify-content: space-between; align-items: center;
-	flex-wrap: wrap; row-gap: 4px;
-	padding: 8px 12px;
+	padding: 6px 10px;
 	border-bottom: 1px solid var(--color-border);
 	background: var(--color-background-dark);
 }
-.email-list-toolbar__left { display: flex; align-items: center; flex-wrap: wrap; column-gap: 2px; row-gap: 4px; flex: 1; min-width: 0; }
+.email-list-toolbar__left { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; }
 .email-list-toolbar__right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.email-list-toolbar__search { flex: 1; max-width: 300px; min-width: 100px; margin: 0 8px; }
+.email-list-toolbar__search { flex: 1; max-width: 300px; min-width: 100px; }
+.email-list-toolbar__search-toggle { flex-shrink: 0; }
 .selected-count { font-size: 13px; color: var(--color-primary-element); font-weight: 500; margin: 0 4px; }
 
-/* Two-row mode (side-by-side list panel) — EXACTLY two lines with
-   CSS grid, no flex-wrap guesswork. */
-.email-list-toolbar--tworow {
-	display: grid;
-	grid-template-columns: 1fr auto;
-	grid-template-rows: auto auto;
-	align-items: center;
-	column-gap: 8px; row-gap: 6px;
-}
+/* Two-row mode — everything in one compact row */
+.email-list-toolbar--tworow { padding: 4px 8px; }
 .email-list-toolbar--tworow .email-list-toolbar__left {
-	flex: 1 1 auto;
-	display: grid;
-	grid-template-columns: auto auto 1fr;
-	grid-template-rows: auto auto;
-	align-items: center;
-	column-gap: 4px; row-gap: 6px;
+	display: flex; align-items: center; gap: 3px; flex: 1; min-width: 0;
 }
-/* Row 1: checkbox, quick-actions, search */
-.email-list-toolbar--tworow .email-list-toolbar__check { grid-column: 1; grid-row: 1; }
-.email-list-toolbar--tworow .email-list-toolbar__quick-actions { grid-column: 2; grid-row: 1; }
 .email-list-toolbar--tworow .email-list-toolbar__search {
-	grid-column: 3; grid-row: 1;
-	max-width: none; min-width: 0;
-	margin: 0;
-}
-/* Row 2: filter (spans all columns), right buttons next to it */
-.email-list-toolbar--tworow .email-list-toolbar__filter {
-	grid-column: 1 / 4; grid-row: 2;
-}
-/* Right side: refresh + compose — grid row 2, sits next to left content */
-.email-list-toolbar--tworow .email-list-toolbar__right {
-	grid-column: 2; grid-row: 2;
-	display: flex; gap: 6px; align-items: center;
-}
-.email-list-toolbar--tworow .email-list-toolbar__compose {
-	/* remove absolute positioning */
-	position: static;
+	max-width: 180px; min-width: 80px; margin: 0;
 }
 
+/* Refresh donut */
 .toolbar__refresh-donut {
-	position: relative;
-	width: 32px; height: 32px;
+	position: relative; width: 28px; height: 28px;
 	display: flex; align-items: center; justify-content: center;
-	cursor: pointer; flex-shrink: 0;
-	border-radius: 50%;
+	cursor: pointer; flex-shrink: 0; border-radius: 50%;
 }
 .toolbar__refresh-donut:hover { background: var(--color-background-hover); }
-.donut-svg { position: absolute; width: 28px; height: 28px; top: 2px; left: 2px; }
-.donut-fill {
-	transform: rotate(-90deg); transform-origin: 50% 50%;
-	transition: stroke-dashoffset 0.3s linear;
-}
+.donut-svg { position: absolute; width: 26px; height: 26px; top: 1px; left: 1px; }
+.donut-fill { transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.3s linear; }
 .donut-icon { position: relative; z-index: 1; opacity: 0.7; }
 </style>
