@@ -97,6 +97,14 @@
 								@update:modelValue="onSoundChange" />
 						</div>
 					</div>
+					<div class="setting-row">
+						<div>
+							<span class="setting-label">{{ t('souvera_mail', 'Default sender') }}</span>
+						</div>
+						<NcSelect v-model="defaultIdentityOption" :options="identityOptions"
+							label="label" class="setting-select" :clearable="false"
+							@update:modelValue="onDefaultIdentityChange" />
+					</div>
 				</div>
 			</div>
 
@@ -456,6 +464,9 @@ export default {
 			loadingSieve: false,
 			showSieveEditor: false,
 			editingSieve: null,
+
+			identityOptions: [],
+			defaultIdentityOption: null,
 		}
 	},
 	mounted() {
@@ -557,8 +568,10 @@ export default {
 				if (so) this.soundOption = so
 				const pp = this.pageSizeOptions.find(o => o.value === p.messagesPerPage)
 				if (pp) this.messagesPerPageOption = pp
+				this._prefsDefaultIdentityId = p.defaultIdentityId || ''
 			} catch {}
 			this.loaded = true
+			this.loadIdentityOptions()
 		},
 		async loadSieve() {
 			this.loadingSieve = true
@@ -568,6 +581,23 @@ export default {
 			this.loadingSieve = false
 		},
 		async refreshSieve() { await this.loadSieve() },
+		async loadIdentityOptions() {
+			try {
+				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/identities'))
+				const list = (data.identities || []).map(i => ({ id: i.id, label: `${i.email}`, value: i.id, name: i.name, email: i.email }))
+				this.identityOptions = list
+				const prefId = this._prefsDefaultIdentityId
+				const found = prefId ? list.find(i => i.id === prefId) : null
+				this.defaultIdentityOption = found || list[0] || null
+			} catch {}
+		},
+		async onDefaultIdentityChange(opt) {
+			if (!opt) return
+			try {
+				await API.savePrefs({ defaultIdentityId: opt.value || opt.id })
+				showSuccess(this.t('souvera_mail', 'Default sender saved'))
+			} catch { showError(this.t('souvera_mail', 'Failed to save')) }
+		},
 		editSieve(filter) {
 			this.editingSieve = filter
 			this.showSieveEditor = true

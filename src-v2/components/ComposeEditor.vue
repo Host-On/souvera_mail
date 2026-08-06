@@ -144,6 +144,7 @@ export default {
 			visible: true,
 			fullscreen: false,
 			fromIdentityId: null,
+			defaultIdentityId: '',
 			identities: [],
 			to: toPrefill,
 			cc: ccPrefill,
@@ -236,6 +237,7 @@ export default {
 				this.signatureEnabled = !!data.signatureEnabled
 				this.replyPosition = data.replyPosition === 'below' ? 'below' : 'above'
 				this.signaturePosition = data.signaturePosition === 'below' ? 'below' : 'above'
+				this.defaultIdentityId = data.defaultIdentityId || ''
 			} catch (e) {
 				console.error('Failed to load preferences', e)
 			}
@@ -349,7 +351,10 @@ export default {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/identities'))
 				const list = (data.identities || []).map(i => ({ id: i.id, label: `${i.name || ''} <${i.email}>`, name: i.name, email: i.email }))
 				this.identities = list
-				if (list.length > 0) this.fromIdentityId = list[0].id
+				if (list.length > 0) {
+					const pref = this.defaultIdentityId ? list.find(i => i.id === this.defaultIdentityId) : null
+					this.fromIdentityId = pref ? pref.id : list[0].id
+				}
 			} catch (e) {
 				console.error('Failed to load identities', e)
 			} finally {

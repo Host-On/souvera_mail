@@ -29,7 +29,6 @@ class V2MailboxController extends Controller
         'inbox' => 'Inbox',
         'drafts' => 'Drafts',
         'sent' => 'Sent',
-        'archive' => 'Archive',
         'junk' => 'Junk',
         'trash' => 'Trash',
     ];

@@ -126,6 +126,7 @@ class V2SettingsController extends Controller
             'verticalLayout' => $this->getPref($uid, 'pref_vertical_layout', '0') === '1',
             'autoRefresh' => (int) $this->getPref($uid, 'pref_auto_refresh', '60'),
             'notificationSound' => $this->getPref($uid, 'pref_notification_sound', 'none'),
+            'defaultIdentityId' => $this->getPref($uid, 'pref_default_identity', ''),
             'account' => [
                 'email' => $user->getSystemEMailAddress() ?? $uid,
                 'server' => '',
@@ -167,6 +168,7 @@ class V2SettingsController extends Controller
             'verticalLayout' => 'pref_vertical_layout',
             'autoRefresh' => 'pref_auto_refresh',
             'notificationSound' => 'pref_notification_sound',
+            'defaultIdentityId' => 'pref_default_identity',
         ];
 
         // The signature HTML is stored as a FILE (64 KB DB limit would
