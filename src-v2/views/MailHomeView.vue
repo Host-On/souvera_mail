@@ -309,10 +309,11 @@ export default {
 			if (!confirm(this.t('souvera_mail', 'Empty trash folder permanently? This cannot be undone.'))) return
 			this.bulkProcessing = true
 			try {
-				const mailboxId = this.selectedMailbox.includes('|')
-					? this.selectedMailbox.split('|')[1]
-					: this.selectedMailbox
-				await axios.post(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + mailboxId + '/empty'))
+				let accountId = null; let mailboxId = this.selectedMailbox
+				if (mailboxId && mailboxId.includes('|')) { [accountId, mailboxId] = mailboxId.split('|') }
+				await axios.post(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + mailboxId + '/empty'), {}, {
+					params: accountId ? { accountId } : {},
+				})
 				showSuccess(this.t('souvera_mail', 'Trash emptied'))
 				await this.loadEmails()
 			} catch (e) {

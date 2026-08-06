@@ -345,7 +345,10 @@ class V2MailboxController extends Controller
     #[NoCSRFRequired]
     public function emptyMailbox(string $id): JSONResponse
     {
-        $accountId = $this->resolveAccountId();
+        $accountId = $this->request->getParam('accountId');
+        if (empty($accountId)) {
+            $accountId = $this->resolveAccountId();
+        }
         if ($accountId === null) {
             return new JSONResponse(['error' => 'Not authenticated'], 401);
         }
@@ -388,7 +391,10 @@ class V2MailboxController extends Controller
     #[NoCSRFRequired]
     public function markAllRead(string $id): JSONResponse
     {
-        $accountId = $this->resolveAccountId();
+        $accountId = $this->request->getParam('accountId');
+        if (empty($accountId)) {
+            $accountId = $this->resolveAccountId();
+        }
         if ($accountId === null) {
             return new JSONResponse(['error' => 'Not authenticated'], 401);
         }
