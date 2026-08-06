@@ -195,7 +195,7 @@ export default {
 .selected-count { font-size: 13px; color: var(--color-primary-element); font-weight: 500; margin: 0 4px; }
 
 /* Two-row mode — everything in one compact row */
-.email-list-toolbar--tworow { padding: 9px 8px; }
+.email-list-toolbar--tworow { padding: 8px 8px; }
 .email-list-toolbar--tworow .email-list-toolbar__left {
 	display: flex; align-items: center; gap: 3px; flex: 1; min-width: 0;
 }
