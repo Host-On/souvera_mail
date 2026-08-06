@@ -27,6 +27,7 @@ class V2JmapProxy
         'urn:ietf:params:jmap:mail',
         'urn:ietf:params:jmap:submission',
         'urn:ietf:params:jmap:blob',
+        'urn:ietf:params:jmap:sieve',
     ];
 
     private int $callCounter = 0;

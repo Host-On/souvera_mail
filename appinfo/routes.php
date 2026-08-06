@@ -410,13 +410,41 @@ return [
             'url' => '/api/v2/shield/quarantine',
             'verb' => 'GET',
         ],
-        [
-            'name' => 'v2_shield#report',
-            'url' => '/api/v2/shield/report',
-            'verb' => 'POST',
-        ],
-        [
-            'name' => 'v2_settings#quota',
+		[
+			'name' => 'v2_spam#delete',
+			'url' => '/api/v2/spam/delete',
+			'verb' => 'POST',
+		],
+
+		// Sieve filter management
+		[
+			'name' => 'v2_sieve#list',
+			'url' => '/api/v2/sieve',
+			'verb' => 'GET',
+		],
+		[
+			'name' => 'v2_sieve#save',
+			'url' => '/api/v2/sieve',
+			'verb' => 'POST',
+		],
+		[
+			'name' => 'v2_sieve#activate',
+			'url' => '/api/v2/sieve/{name}/activate',
+			'verb' => 'PUT',
+		],
+		[
+			'name' => 'v2_sieve#delete',
+			'url' => '/api/v2/sieve/{name}',
+			'verb' => 'DELETE',
+		],
+		[
+			'name' => 'v2_sieve#validate',
+			'url' => '/api/v2/sieve/validate',
+			'verb' => 'POST',
+		],
+
+		[
+			'name' => 'v2_settings#quota',
             'url' => '/api/v2/settings/quota',
             'verb' => 'GET',
         ],
