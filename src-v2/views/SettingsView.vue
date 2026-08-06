@@ -240,6 +240,22 @@
 				</div>
 			</div>
 
+			<NcDialog v-if="newSecret"
+				:name="t('souvera_mail', 'App password created')"
+				:open.sync="true"
+				size="normal"
+				@update:open="newSecret = null">
+				<p class="settings-muted">{{ t('souvera_mail', 'This password is only shown once. Save it now.') }}</p>
+				<div class="password-reveal">
+					<code>{{ newSecret }}</code>
+					<NcButton variant="tertiary" size="small"
+						:title="t('souvera_mail', 'Copy')"
+						@click="copySecret(newSecret)">
+						<template #icon><ContentCopy :size="16" /></template>
+					</NcButton>
+				</div>
+			</NcDialog>
+
 			<SieveFilterEditor v-if="showSieveEditor"
 				:open="showSieveEditor"
 				:edit-id="editingSieve?.id || ''"
@@ -322,17 +338,6 @@
 						<div v-for="pw in passwords" :key="pw.id" class="password-row">
 							<div class="password-info">
 								<div class="password-name">{{ pw.description || pw.name }}</div>
-								<div class="password-secret" v-if="pw.secret">
-									<code :class="{ 'password-secret--hidden': !pw._showSecret }"
-										@click="pw._showSecret = !pw._showSecret">
-										{{ pw._showSecret ? pw.secret : '••••••••••••••••' }}
-									</code>
-									<NcButton variant="tertiary" size="small"
-										:title="t('souvera_mail', 'Copy')"
-										@click="copySecret(pw.secret)">
-										<template #icon><ContentCopy :size="12" /></template>
-									</NcButton>
-								</div>
 								<div class="settings-muted">{{ pw.createdAt ? fmtDate(pw.createdAt) : '' }}</div>
 							</div>
 							<NcButton variant="tertiary" size="small"
@@ -350,7 +355,7 @@
 </template>
 
 <script>
-import { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent } from '@nextcloud/vue'
+import { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog } from '@nextcloud/vue'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 import Plus from 'vue-material-design-icons/Plus.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
@@ -387,13 +392,13 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Play, FolderPlus, Filter, Check, ContentCopy, QuotaDonut, SieveFilterEditor },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Play, FolderPlus, Filter, Check, ContentCopy, QuotaDonut, SieveFilterEditor },
 	data() {
 		return {
 			accountEmail: '',
 			quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false,
 			appVersion: '',
-			passwords: [], showCreate: false, newName: '',
+			passwords: [], showCreate: false, newName: '', newSecret: null,
 			sharedAbove: true,
 			sigHtml: '', sigEnabled: false, showSigSource: false,
 			replyPosition: 'above', signaturePosition: 'above',
@@ -597,10 +602,9 @@ export default {
 		async create() {
 			try {
 				const r = await axios.post(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'), { name: this.newName })
-				const pw = { id: r.data.id, description: this.newName, secret: r.data.secret, createdAt: new Date().toISOString(), _showSecret: true }
-				this.passwords.push(pw)
+				this.passwords.push({ id: r.data.id, description: this.newName, createdAt: new Date().toISOString() })
+				this.newSecret = r.data.secret
 				this.showCreate = false; this.newName = ''
-				showSuccess(this.t('souvera_mail', 'App password created'))
 			} catch (e) { console.error('App password create failed', e); showError(this.t('souvera_mail', 'Failed to create app password')) }
 		},
 		async copySecret(secret) {
@@ -910,4 +914,7 @@ export default {
 .sieve-list__active { font-size: 11px; padding: 0 6px; border-radius: 3px; background: #e8f5e9; color: #2e7d32; flex-shrink: 0; }
 .sieve-list__actions { display: flex; gap: 2px; flex-shrink: 0; }
 .sieve-list__add { margin-top: 8px; }
+
+.password-reveal { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
+.password-reveal code { font-family: monospace; font-size: 14px; padding: 6px 12px; background: var(--color-background-dark); border-radius: 6px; flex: 1; word-break: break-all; }
 </style>
