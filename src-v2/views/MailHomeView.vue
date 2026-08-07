@@ -288,22 +288,43 @@ export default {
 			try {
 				let accountId = null; let mailboxId = this.selectedMailbox
 				if (mailboxId && mailboxId.includes('|')) { [accountId, mailboxId] = mailboxId.split('|') }
-				const r = await fetchEmails(mailboxId, 500, 0, accountId, '', 'unread')
-				if (r.emails.length === 0) { this.bulkProcessing = false; return }
-				this.checkedIds = r.emails.map(e => e.id)
-				await this.bulkMarkRead()
-			} catch (e) { console.error(e); this.bulkProcessing = false }
+				// Paginate through ALL unread emails
+				let offset = 0; const batchSize = 500
+				while (true) {
+					const r = await fetchEmails(mailboxId, batchSize, offset, accountId, '', 'unread')
+					if (r.emails.length === 0) break
+					this.checkedIds = r.emails.map(e => e.id)
+					await this.bulkMarkReadSilent()
+					offset += batchSize
+					if (r.emails.length < batchSize) break
+				}
+				this.checkedIds = []
+				await this.loadEmails(false)
+				this.notifyMailboxChange()
+				showSuccess(this.t('souvera_mail', 'All marked as read'))
+			} catch (e) { console.error(e); showError(this.t('souvera_mail', 'Failed to mark all as read')) }
+			finally { this.bulkProcessing = false }
 		},
 		async markAllUnread() {
 			this.bulkProcessing = true
 			try {
 				let accountId = null; let mailboxId = this.selectedMailbox
 				if (mailboxId && mailboxId.includes('|')) { [accountId, mailboxId] = mailboxId.split('|') }
-				const r = await fetchEmails(mailboxId, 500, 0, accountId)
-				if (r.emails.length === 0) { this.bulkProcessing = false; return }
-				this.checkedIds = r.emails.map(e => e.id)
-				await this.bulkMarkUnread()
-			} catch (e) { console.error(e); this.bulkProcessing = false }
+				let offset = 0; const batchSize = 500
+				while (true) {
+					const r = await fetchEmails(mailboxId, batchSize, offset, accountId)
+					if (r.emails.length === 0) break
+					this.checkedIds = r.emails.map(e => e.id)
+					await this.bulkMarkUnreadSilent()
+					offset += batchSize
+					if (r.emails.length < batchSize) break
+				}
+				this.checkedIds = []
+				await this.loadEmails(false)
+				this.notifyMailboxChange()
+				showSuccess(this.t('souvera_mail', 'All marked as unread'))
+			} catch (e) { console.error(e); showError(this.t('souvera_mail', 'Failed to mark all as unread')) }
+			finally { this.bulkProcessing = false }
 		},
 		async emptyTrash() {
 			if (!confirm(this.t('souvera_mail', 'Empty trash folder permanently? This cannot be undone.'))) return
@@ -342,6 +363,18 @@ export default {
 			this.notifyMailboxChange()
 			showSuccess(this.t('souvera_mail', 'Marked as unread'))
 			this.bulkProcessing = false
+		},
+		// Silent variants — used by the pagination loop; the caller
+		// handles loadEmails() and notifications once at the end.
+		async bulkMarkReadSilent() {
+			for (const id of this.checkedIds) {
+				try { await markEmailRead(id, true, this.currentAccountId) } catch (e) { console.error('Failed to mark read', e) }
+			}
+		},
+		async bulkMarkUnreadSilent() {
+			for (const id of this.checkedIds) {
+				try { await markEmailRead(id, false, this.currentAccountId) } catch (e) { console.error('Failed to mark unread', e) }
+			}
 		},
 		async bulkDelete() {
 			this.bulkProcessing = true
