@@ -1,5 +1,7 @@
 <template>
 	<div class="email-list-item"
+		draggable="true"
+		@dragstart="onDragStart($event)"
 		:class="{
 			'email-list-item--unread': !email.isRead,
 			'email-list-item--active': active,
@@ -52,6 +54,14 @@ export default {
 		checked: { type: Boolean, default: false },
 	},
 	emits: ['click', 'check', 'flag'],
+	methods: {
+		onDragStart(e) {
+			e.dataTransfer.effectAllowed = 'move'
+			e.dataTransfer.setData('text/plain', this.email.id)
+			// Store in window for cross-component drag (list → sidebar)
+			window.__souveraDragEmail = this.email.id
+		},
+	},
 }
 </script>
 

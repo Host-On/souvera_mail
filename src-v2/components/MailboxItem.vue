@@ -5,7 +5,10 @@
 		:allow-collapse="children.length > 0"
 		:open="open"
 		@click="$emit('select', mailbox.id)"
-		@update:open="open = $event">
+		@update:open="open = $event"
+		@dragover.prevent="onDragOver"
+		@dragleave="onDragLeave"
+		@drop.prevent="onDrop">
 		<template #icon>
 			<component :is="icon" :size="20" />
 		</template>
@@ -21,7 +24,8 @@
 				:all-mailboxes="allMailboxes"
 				:selected="selected"
 				:depth="depth + 1"
-				@select="$emit('select', $event)" />
+				@select="$emit('select', $event)"
+				@drop-email="$emit('dropEmail', $event)" />
 		</template>
 	</NcAppNavigationItem>
 </template>
@@ -52,8 +56,8 @@ export default {
 		selected: { type: String, default: '' },
 		depth: { type: Number, default: 0 },
 	},
-	emits: ['select'],
-	data() { return { open: false } },
+	emits: ['select', 'dropEmail'],
+	data() { return { open: false, dragOver: false } },
 	computed: {
 		displayName() { return mailboxDisplayName(this.mailbox) },
 		active() {
@@ -64,6 +68,18 @@ export default {
 		icon() { return ROLE_ICONS[this.mailbox.role] || Folder },
 		children() {
 			return this.allMailboxes.filter(m => m.parentId === this.mailbox.id)
+		},
+	},
+	methods: {
+		onDragOver() { this.dragOver = true },
+		onDragLeave() { this.dragOver = false },
+		onDrop(e) {
+			this.dragOver = false
+			const emailId = window.__souveraDragEmail
+			if (emailId) {
+				window.__souveraDragEmail = null
+				this.$emit('dropEmail', { emailId, mailboxId: this.mailbox.id, mailbox: this.mailbox })
+			}
 		},
 	},
 }

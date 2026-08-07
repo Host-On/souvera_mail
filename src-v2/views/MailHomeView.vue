@@ -176,6 +176,11 @@ export default {
 		this._onUserGesture = () => { this.wakeAudio(); this.requestNotifyPerm() }
 		document.addEventListener('click', this._onUserGesture, { once: true })
 		document.addEventListener('keydown', this._onUserGesture, { once: true })
+		this._onMoveEmail = (ev) => {
+			const { emailId, mailboxId, accountId } = ev.detail || {}
+			if (emailId && mailboxId) this.onMove(mailboxId)
+		}
+		window.addEventListener('souvera-mail:move-email', this._onMoveEmail)
 	},
 	beforeUnmount() {
 		this._hotkeys?.destroy()
@@ -183,6 +188,7 @@ export default {
 		clearTimeout(this._searchTimer)
 		document.removeEventListener('click', this._onUserGesture)
 		document.removeEventListener('keydown', this._onUserGesture)
+		window.removeEventListener('souvera-mail:move-email', this._onMoveEmail)
 		if (this._audioCtx) { this._audioCtx.close(); this._audioCtx = null }
 	},
 	methods: {

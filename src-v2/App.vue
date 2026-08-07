@@ -17,7 +17,8 @@
 
 				<MailboxItem v-for="mb in systemFolders" :key="'s-'+mb.id"
 					:mailbox="mb" :all-mailboxes="mailboxes" :selected="selectedMailbox" :depth="0"
-					@select="onMailboxSelect" />
+					@select="onMailboxSelect"
+					@drop-email="onDropEmail" />
 
 				<template v-if="sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
@@ -25,7 +26,8 @@
 						<NcAppNavigationCaption class="shared-group-caption" :name="group.accountName" />
 						<MailboxItem v-for="mp in group.roots" :key="mp.id"
 							:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="sharedSelected(mp)" :depth="0"
-							@select="onSharedSelect(mp._accountId, $event)" />
+							@select="onSharedSelect(mp._accountId, $event)"
+							@drop-email="onDropEmail" />
 					</template>
 				</template>
 
@@ -33,7 +35,8 @@
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Folders')" />
 					<MailboxItem v-for="mb in userFolderRoots" :key="'u-'+mb.id"
 						:mailbox="mb" :all-mailboxes="mailboxes" :selected="selectedMailbox" :depth="0"
-						@select="onMailboxSelect" />
+						@select="onMailboxSelect"
+						@drop-email="onDropEmail" />
 				</template>
 
 				<template v-if="!sharedAbove && sharedFolders.length > 0">
@@ -42,7 +45,8 @@
 						<NcAppNavigationCaption class="shared-group-caption" :name="group.accountName" />
 						<MailboxItem v-for="mp in group.roots" :key="mp.id"
 							:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="sharedSelected(mp)" :depth="0"
-							@select="onSharedSelect(mp._accountId, $event)" />
+							@select="onSharedSelect(mp._accountId, $event)"
+							@drop-email="onDropEmail" />
 					</template>
 				</template>
 			</template>
@@ -170,6 +174,11 @@ export default {
 			} else {
 				this.$router.push({ name: 'inbox' })
 			}
+		},
+		onDropEmail({ emailId, mailboxId, mailbox }) {
+			window.dispatchEvent(new CustomEvent('souvera-mail:move-email', {
+				detail: { emailId, mailboxId, accountId: mailbox._accountId || null }
+			}))
 		},
 		startCompose() {
 			if (this.$route.name !== 'compose') {
