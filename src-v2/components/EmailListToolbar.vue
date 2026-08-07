@@ -38,8 +38,7 @@
 				<NcActions :aria-label="t('souvera_mail', 'Move to folder')">
 					<template #icon><FolderMove :size="20" /></template>
 					<NcActionButton v-for="mb in targetMailboxes" :key="mb.id"
-						:aria-label="mailboxDisplayName(mb)"
-						@click="$emit('moveTo', mb.id)">
+						@mousedown.stop="$emit('moveTo', mb.id)">
 						<template #icon><Folder :size="20" /></template>
 						{{ mailboxDisplayName(mb) }}
 					</NcActionButton>
