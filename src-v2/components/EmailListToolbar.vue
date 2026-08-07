@@ -37,10 +37,9 @@
 				</NcButton>
 				<NcActions :aria-label="t('souvera_mail', 'Move to folder')">
 					<template #icon><FolderMove :size="20" /></template>
-					<NcActionButton v-for="mb in targetMailboxes" :key="mb.id"
-						@mousedown.stop="$emit('moveTo', mb.id)">
+					<NcActionButton v-for="mb in targetMailboxes" :key="mb.id">
 						<template #icon><Folder :size="20" /></template>
-						{{ mailboxDisplayName(mb) }}
+						<span @click.stop="$emit('moveTo', mb.id)">{{ mailboxDisplayName(mb) }}</span>
 					</NcActionButton>
 				</NcActions>
 				<NcButton variant="tertiary" @click="$emit('bulkDelete')">
