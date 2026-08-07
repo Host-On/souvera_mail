@@ -1,14 +1,15 @@
 <template>
+	<div
+		@dragover.prevent="onDragOver"
+		@dragleave="onDragLeave"
+		@drop.prevent="onDrop">
 	<NcAppNavigationItem
 		:name="displayName"
 		:active="active"
 		:allow-collapse="children.length > 0"
 		:open="open"
 		@click="$emit('select', mailbox.id)"
-		@update:open="open = $event"
-		@dragover.prevent="onDragOver"
-		@dragleave="onDragLeave"
-		@drop.prevent="onDrop">
+		@update:open="open = $event">
 		<template #icon>
 			<component :is="icon" :size="20" />
 		</template>
@@ -28,6 +29,7 @@
 				@drop-email="$emit('dropEmail', $event)" />
 		</template>
 	</NcAppNavigationItem>
+	</div>
 </template>
 
 <script>
