@@ -17,9 +17,10 @@
 				<NcActions :aria-label="t('souvera_mail', 'More actions')">
 					<template #icon><FolderMove :size="20" /></template>
 					<NcActionButton v-for="mb in moveMailboxes" :key="mb.id"
-						:name="mailboxDisplayName(mb)"
+						:aria-label="mailboxDisplayName(mb)"
 						@click="moveTo(mb.id)">
 						<template #icon><Folder :size="20" /></template>
+						{{ mailboxDisplayName(mb) }}
 					</NcActionButton>
 				</NcActions>
 				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Delete')" @click="$emit('delete')">
