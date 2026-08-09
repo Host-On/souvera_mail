@@ -157,9 +157,10 @@ export default {
 	},
 	watch: {
 		selectedMailbox() { clearTimeout(this._searchTimer); this.checkedIds = []; this.offset = 0; this.selectedEmail = null; this.loadEmails() },
+		allMailboxes: { handler() { this.notifyTitle() }, deep: true },
 	},
 	async mounted() {
-		this._originalTitle = document.title
+		this._originalTitle = document.title.replace(/^\(\d+\)\s*/, '')
 		if (this.selectedMailbox) await this.loadEmails()
 		this._hotkeys = useHotkeys({
 			k: () => this.navigateEmail(1),
@@ -203,6 +204,8 @@ export default {
 		document.removeEventListener('keydown', this._onUserGesture)
 		window.removeEventListener('souvera-mail:move-email', this._onMoveEmail)
 		if (this._audioCtx) { this._audioCtx.close(); this._audioCtx = null }
+		if (this._originalTitle) document.title = this._originalTitle
+		if (this._mailboxChangeTimer) clearTimeout(this._mailboxChangeTimer)
 	},
 	methods: {
 		wakeAudio() {
@@ -251,6 +254,7 @@ export default {
 				const newIds = this.emails.map(e => e.id).filter(id => !prevIds.includes(id))
 				const newUnread = this.emails.filter(e => newIds.includes(e.id) && !e.isRead)
 				if (newUnread.length > 0) {
+					this.notifyMailboxChange()
 					this.playNewMailSound()
 					this.notifyBrowser()
 				}
@@ -288,7 +292,8 @@ export default {
 		async refreshEmails() { this.checkedIds = []; this.offset = 0; clearTimeout(this._searchTimer); await this.loadEmails() },
 		// Notify the navigation sidebar to reload mailbox counts.
 		notifyMailboxChange() {
-			setTimeout(() => {
+			clearTimeout(this._mailboxChangeTimer)
+			this._mailboxChangeTimer = setTimeout(() => {
 				window.dispatchEvent(new CustomEvent('souvera-mail:refresh-mailboxes'))
 			}, 300)
 		},
@@ -427,7 +432,7 @@ export default {
 					const listItem = this.emails.find(e => e.id === email.id)
 					if (listItem) listItem.isRead = true
 				}
-				if (wasUnread) { this.notifyMailboxChange(); this.notifyTitle() }
+				if (wasUnread) this.notifyMailboxChange()
 			} catch (e) { console.error('Failed to open email', e) } finally { this.loadingBody = false }
 		},
 		onReply() {
