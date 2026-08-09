@@ -312,13 +312,15 @@ export default {
 			try {
 				let accountId = null; let mailboxId = this.selectedMailbox
 				if (mailboxId && mailboxId.includes('|')) { [accountId, mailboxId] = mailboxId.split('|') }
-				let offset = 0; const batchSize = 500
+				const batchSize = 500
 				while (true) {
-					const r = await fetchEmails(mailboxId, batchSize, offset, accountId, '', 'unread')
+					// Always query from position 0 — after each batch the marked
+					// emails drop out of the unread set, so the next batch is
+					// fetched from the top again.
+					const r = await fetchEmails(mailboxId, batchSize, 0, accountId, '', 'unread')
 					if (r.emails.length === 0) break
 					this.checkedIds = r.emails.map(e => e.id)
 					await this.bulkMarkReadSilent()
-					offset += r.emails.length
 				}
 				this.checkedIds = []
 				await this.loadEmails(false)
