@@ -181,23 +181,33 @@ export default {
 			if (this._movingEmail) return
 			const { emailId, mailboxId, accountId: targetAccountId } = ev.detail || {}
 			if (!emailId || !mailboxId) return
-			const sourceId = this.currentAccountId || null
-			const targetId = targetAccountId || null
-			if (sourceId !== targetId) {
-				showError(this.t('souvera_mail', 'Cannot move messages between accounts'))
-				return
-			}
 			this._movingEmail = true
+			// Try source account first; Stalwart auto-rejects if the mailbox
+			// does not exist in that account. Falls through to target account
+			// for cross-account moves (own ↔ shared).
+			const sourceId = this.currentAccountId || undefined
+			const targetId = targetAccountId || undefined
+			const accountsToTry = []
+			if (sourceId) accountsToTry.push(sourceId)
+			if (targetId && targetId !== sourceId) accountsToTry.push(targetId)
+			if (!sourceId && !targetId) accountsToTry.push(undefined)
 			;(async () => {
-				try {
-					await moveEmail(emailId, mailboxId, sourceId)
+				let moved = false
+				for (const acct of accountsToTry) {
+					try {
+						await moveEmail(emailId, mailboxId, acct)
+						moved = true
+						break
+					} catch (e) { /* try next account */ }
+				}
+				if (moved) {
 					await this.loadEmails(false)
 					this.notifyMailboxChange()
 					showSuccess(this.t('souvera_mail', 'Message moved'))
-				} catch (e) {
-					console.error('Drag-drop move failed', e)
+				} else {
 					showError(this.t('souvera_mail', 'Failed to move message'))
-				} finally { this._movingEmail = false }
+				}
+				this._movingEmail = false
 			})()
 		}
 		window.addEventListener('souvera-mail:move-email', this._onMoveEmail)
