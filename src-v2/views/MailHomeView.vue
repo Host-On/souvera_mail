@@ -176,18 +176,22 @@ export default {
 		this._onUserGesture = () => { this.wakeAudio(); this.requestNotifyPerm() }
 		document.addEventListener('click', this._onUserGesture, { once: true })
 		document.addEventListener('keydown', this._onUserGesture, { once: true })
-		this._onMoveEmail = async (ev) => {
-			const { emailId, mailboxId, accountId } = ev.detail || {}
+		this._onMoveEmail = (ev) => {
+			if (this._movingEmail) return
+			const { emailId, mailboxId } = ev.detail || {}
 			if (!emailId || !mailboxId) return
-			try {
-				await moveEmail(emailId, mailboxId, accountId || this.currentAccountId)
-				await this.loadEmails(false)
-				this.notifyMailboxChange()
-				showSuccess(this.t('souvera_mail', 'Message moved'))
-			} catch (e) {
-				console.error('Drag-drop move failed', e)
-				showError(this.t('souvera_mail', 'Failed to move message'))
-			}
+			this._movingEmail = true
+			;(async () => {
+				try {
+					await moveEmail(emailId, mailboxId, this.currentAccountId)
+					await this.loadEmails(false)
+					this.notifyMailboxChange()
+					showSuccess(this.t('souvera_mail', 'Message moved'))
+				} catch (e) {
+					console.error('Drag-drop move failed', e)
+					showError(this.t('souvera_mail', 'Failed to move message'))
+				} finally { this._movingEmail = false }
+			})()
 		}
 		window.addEventListener('souvera-mail:move-email', this._onMoveEmail)
 	},

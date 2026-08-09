@@ -76,6 +76,7 @@ export default {
 		onDragOver() { this.dragOver = true },
 		onDragLeave() { this.dragOver = false },
 		onDrop(e) {
+			e.stopPropagation()
 			this.dragOver = false
 			const emailId = window.__souveraDragEmail
 			if (emailId) {

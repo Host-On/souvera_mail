@@ -58,9 +58,9 @@ export default {
 		onDragStart(e) {
 			e.dataTransfer.effectAllowed = 'move'
 			e.dataTransfer.setData('text/plain', this.email.id)
-			// Store in window for cross-component drag (list → sidebar)
 			window.__souveraDragEmail = this.email.id
 		},
+	},
 	},
 }
 </script>
