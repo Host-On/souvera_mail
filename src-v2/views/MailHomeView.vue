@@ -402,6 +402,7 @@ export default {
 		async bulkDelete() {
 			this.bulkProcessing = true
 			for (const id of this.checkedIds) {
+				try { await markEmailRead(id, true, this.currentAccountId) } catch {}
 				try { await deleteEmailApi(id, this.currentAccountId) } catch (e) { console.error('Failed to delete', e) }
 			}
 			this.checkedIds = []
@@ -452,6 +453,7 @@ export default {
 		async deleteEmail() {
 			if (!this.selectedEmail) return
 			const idx = this.emails.findIndex(e => e.id === this.selectedEmail.id)
+			try { await markEmailRead(this.selectedEmail.id, true, this.currentAccountId); this.selectedEmail.isRead = true } catch {}
 			try { await deleteEmailApi(this.selectedEmail.id, this.currentAccountId) } catch (e) { console.error('Failed to delete email', e) }
 			await this.refreshEmails()
 			this.notifyMailboxChange()
