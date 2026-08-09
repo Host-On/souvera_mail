@@ -427,7 +427,7 @@ export default {
 					const listItem = this.emails.find(e => e.id === email.id)
 					if (listItem) listItem.isRead = true
 				}
-				if (wasUnread) this.notifyMailboxChange()
+				if (wasUnread) { this.notifyMailboxChange(); this.notifyTitle() }
 			} catch (e) { console.error('Failed to open email', e) } finally { this.loadingBody = false }
 		},
 		onReply() {
@@ -561,9 +561,15 @@ export default {
 			} catch {}
 		},
 		notifyTitle() {
-			if (!this.emails.length) return
-			const unread = this.emails.filter(e => !e.isRead).length
-			document.title = unread > 0 ? `(${unread}) ${this._originalTitle}` : (this._originalTitle || document.title)
+			// Count unread across ALL inboxes (own + shared) from sidebar data
+			let total = 0
+			if (this.allMailboxes) {
+				for (const mb of this.allMailboxes) {
+					if (mb.role === 'inbox') total += (mb.unread || 0)
+				}
+			}
+			const prefix = total > 0 ? `(${total}) ` : ''
+			document.title = prefix + (this._originalTitle || 'Souvera Mail')
 		},
 		// ---- resize handle for the list / detail panels ----
 		onResizeStart(e, direction) {
@@ -589,7 +595,12 @@ export default {
 		},
 		notifyBrowser() {
 			if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-			const unread = this.emails.filter(e => !e.isRead).length
+			let unread = 0
+			if (this.allMailboxes) {
+				for (const mb of this.allMailboxes) {
+					if (mb.role === 'inbox') unread += (mb.unread || 0)
+				}
+			}
 			if (unread > 0) {
 				try {
 					new Notification('Souvera Mail', { body: `${unread} neue Nachricht${unread !== 1 ? 'en' : ''}`, icon: generateUrl('/apps/souvera_mail/img/app.svg') })
