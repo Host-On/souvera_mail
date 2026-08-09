@@ -61,7 +61,6 @@ export default {
 			window.__souveraDragEmail = this.email.id
 		},
 	},
-	},
 }
 </script>
 
