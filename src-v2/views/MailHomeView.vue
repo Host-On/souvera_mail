@@ -307,15 +307,13 @@ export default {
 			try {
 				let accountId = null; let mailboxId = this.selectedMailbox
 				if (mailboxId && mailboxId.includes('|')) { [accountId, mailboxId] = mailboxId.split('|') }
-				// Paginate through ALL unread emails
 				let offset = 0; const batchSize = 500
 				while (true) {
 					const r = await fetchEmails(mailboxId, batchSize, offset, accountId, '', 'unread')
 					if (r.emails.length === 0) break
 					this.checkedIds = r.emails.map(e => e.id)
 					await this.bulkMarkReadSilent()
-					offset += batchSize
-					if (r.emails.length < batchSize) break
+					offset += r.emails.length
 				}
 				this.checkedIds = []
 				await this.loadEmails(false)
@@ -335,8 +333,7 @@ export default {
 					if (r.emails.length === 0) break
 					this.checkedIds = r.emails.map(e => e.id)
 					await this.bulkMarkUnreadSilent()
-					offset += batchSize
-					if (r.emails.length < batchSize) break
+					offset += r.emails.length
 				}
 				this.checkedIds = []
 				await this.loadEmails(false)

@@ -131,7 +131,7 @@ class V2MailboxController extends Controller
         }
 
         $mailboxId = \trim((string) ($this->request->getParam('mailbox') ?? ''));
-        $limit = \min(100, \max(1, (int) ($this->request->getParam('limit') ?? 50)));
+        $limit = \min(500, \max(1, (int) ($this->request->getParam('limit') ?? 50)));
         $offset = \max(0, (int) ($this->request->getParam('offset') ?? 0));
         $searchQuery = \trim((string) ($this->request->getParam('q') ?? ''));
         $filterType = \trim((string) ($this->request->getParam('filter') ?? 'all'));
