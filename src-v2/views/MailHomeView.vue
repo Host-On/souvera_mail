@@ -101,7 +101,7 @@ import EmailDetail from '../components/EmailDetail.vue'
 import { useHotkeys } from '../composables/useHotkeys.js'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
-import { showSuccess } from '@nextcloud/dialogs'
+import { showSuccess, showError } from '@nextcloud/dialogs'
 
 const { fetchEmails, fetchEmailBody, deleteEmailApi, moveEmail, markEmailRead, toggleEmailFlag } = useJmapClient()
 
@@ -179,12 +179,18 @@ export default {
 		document.addEventListener('keydown', this._onUserGesture, { once: true })
 		this._onMoveEmail = (ev) => {
 			if (this._movingEmail) return
-			const { emailId, mailboxId } = ev.detail || {}
+			const { emailId, mailboxId, accountId: targetAccountId } = ev.detail || {}
 			if (!emailId || !mailboxId) return
+			const sourceId = this.currentAccountId || null
+			const targetId = targetAccountId || null
+			if (sourceId !== targetId) {
+				showError(this.t('souvera_mail', 'Cannot move messages between accounts'))
+				return
+			}
 			this._movingEmail = true
 			;(async () => {
 				try {
-					await moveEmail(emailId, mailboxId, this.currentAccountId)
+					await moveEmail(emailId, mailboxId, sourceId)
 					await this.loadEmails(false)
 					this.notifyMailboxChange()
 					showSuccess(this.t('souvera_mail', 'Message moved'))

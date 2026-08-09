@@ -557,12 +557,24 @@ class V2MailboxController extends Controller
         if ($targetId === '') {
             return new JSONResponse(['error' => 'mailboxId required'], 400);
         }
-        $result = $this->jmap->call([
-            ['Email/set', ['accountId' => $accountId, 'update' => [$id => ['mailboxIds' => [$targetId => true]]]]],
+        $result = $this->jmap->singleCall('Email/set', [
+            'accountId' => $accountId,
+            'update' => [$id => ['mailboxIds' => [$targetId => true]]],
         ]);
-        return isset($result['error'])
-            ? new JSONResponse($result, 500)
-             : new JSONResponse(['success' => true]);
+        if (isset($result['error'])) {
+            return new JSONResponse($result, 500);
+        }
+        $data = $result['data'] ?? [];
+        if (isset($data['notUpdated'][$id])) {
+            $r = $data['notUpdated'][$id];
+            return new JSONResponse([
+                'error' => 'Move rejected: ' . ($r['description'] ?? $r['type'] ?? 'notUpdated'),
+            ], 422);
+        }
+        if (!\array_key_exists($id, $data['updated'] ?? [])) {
+            return new JSONResponse(['error' => 'Move not applied'], 500);
+        }
+        return new JSONResponse(['success' => true]);
     }
 
     private function resolveAccountId(): ?string
