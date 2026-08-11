@@ -443,6 +443,28 @@ return [
 			'verb' => 'POST',
 		],
 
+		// External accounts
+		[
+			'name' => 'v2_external_accounts#list',
+			'url' => '/api/v2/external/accounts',
+			'verb' => 'GET',
+		],
+		[
+			'name' => 'v2_external_accounts#create',
+			'url' => '/api/v2/external/accounts',
+			'verb' => 'POST',
+		],
+		[
+			'name' => 'v2_external_accounts#delete',
+			'url' => '/api/v2/external/accounts/{id}',
+			'verb' => 'DELETE',
+		],
+		[
+			'name' => 'v2_external_accounts#test',
+			'url' => '/api/v2/external/accounts/{id}/test',
+			'verb' => 'POST',
+		],
+
 		[
 			'name' => 'v2_settings#quota',
             'url' => '/api/v2/settings/quota',

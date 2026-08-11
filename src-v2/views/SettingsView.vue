@@ -328,6 +328,70 @@
 
 			<div class="settings-card">
 				<h2 class="settings-card__title">
+					<Email :size="20" />
+					{{ t('souvera_mail', 'External accounts') }}
+				</h2>
+				<div class="settings-card__body">
+					<p class="settings-muted">{{ t('souvera_mail', 'Add external IMAP/SMTP accounts (e.g. GMX, Web.de, Gmail). Mails are automatically synced into your mailbox.') }}</p>
+
+					<div v-if="extAccounts.length > 0" class="password-list">
+						<div v-for="a in extAccounts" :key="a.id" class="password-row">
+							<div class="password-info">
+								<div class="password-name">{{ a.email }}</div>
+								<div class="settings-muted">{{ a.provider || a.imap_host }}</div>
+							</div>
+							<NcButton variant="tertiary" size="small" :title="t('souvera_mail', 'Test connection')" @click="testExtAccount(a)">
+								<template #icon><Check :size="16" /></template>
+							</NcButton>
+							<NcButton variant="tertiary" size="small"
+								:aria-label="t('souvera_mail', 'Delete')" @click="removeExtAccount(a.id)">
+								<template #icon><TrashCan :size="16" /></template>
+							</NcButton>
+						</div>
+					</div>
+
+					<NcButton variant="primary" @click="showExtAccountForm = true">
+						<template #icon><Plus :size="20" /></template>
+						{{ t('souvera_mail', 'Add external account') }}
+					</NcButton>
+				</div>
+			</div>
+
+			<NcDialog v-if="showExtAccountForm"
+				:name="t('souvera_mail', 'Add external account')"
+				:open.sync="true"
+				size="large"
+				@update:open="showExtAccountForm = false">
+				<div class="ext-account-form">
+					<div class="ext-account-form__field">
+						<label>{{ t('souvera_mail', 'Email address') }}</label>
+						<NcTextField v-model="extForm.email" placeholder="user@web.de" @update:value="onExtEmailChange" />
+					</div>
+					<template v-if="extForm.imap_host">
+						<div class="ext-account-form__field">
+							<label>{{ t('souvera_mail', 'Password') }}</label>
+							<NcTextField v-model="extForm.password" type="password" />
+						</div>
+						<div class="ext-account-form__row">
+							<div class="ext-account-form__field">
+								<label>IMAP</label>
+								<NcTextField :value="extForm.imap_host + ':' + extForm.imap_port + ' (' + extForm.imap_ssl + ')'" disabled />
+							</div>
+							<div class="ext-account-form__field">
+								<label>SMTP</label>
+								<NcTextField :value="extForm.smtp_host + ':' + extForm.smtp_port + ' (' + extForm.smtp_ssl + ')'" disabled />
+							</div>
+						</div>
+					</template>
+					<div class="ext-account-form__actions">
+						<NcButton variant="secondary" @click="showExtAccountForm = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+						<NcButton variant="primary" @click="addExtAccount" :disabled="!extForm.email || !extForm.imap_host || !extForm.password">{{ t('souvera_mail', 'Add account') }}</NcButton>
+					</div>
+				</div>
+			</NcDialog>
+
+			<div class="settings-card">
+				<h2 class="settings-card__title">
 					<Key :size="20" />
 					{{ t('souvera_mail', 'App passwords') }}
 				</h2>
@@ -382,6 +446,7 @@ import FolderPlus from 'vue-material-design-icons/FolderPlus.vue'
 import Filter from 'vue-material-design-icons/Filter.vue'
 import Check from 'vue-material-design-icons/Check.vue'
 import ContentCopy from 'vue-material-design-icons/ContentCopy.vue'
+import Email from 'vue-material-design-icons/Email.vue'
 import DOMPurify from 'dompurify'
 import QuotaDonut from '../components/QuotaDonut.vue'
 import SieveFilterEditor from '../components/SieveFilterEditor.vue'
@@ -400,7 +465,7 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Play, FolderPlus, Filter, Check, ContentCopy, QuotaDonut, SieveFilterEditor },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Play, FolderPlus, Filter, Check, ContentCopy, Email, QuotaDonut, SieveFilterEditor },
 	data() {
 		return {
 			accountEmail: '',
@@ -464,6 +529,10 @@ export default {
 			loadingSieve: false,
 			showSieveEditor: false,
 			editingSieve: null,
+
+			extAccounts: [],
+			showExtAccountForm: false,
+			extForm: { email: '', imap_host: '', imap_port: 993, imap_ssl: 'ssl', smtp_host: '', smtp_port: 465, smtp_ssl: 'ssl', username: '', password: '', provider: '' },
 
 			identityOptions: [],
 			defaultIdentityOption: null,
@@ -572,6 +641,7 @@ export default {
 			} catch {}
 			this.loaded = true
 			this.loadIdentityOptions()
+			this.loadExternalAccounts()
 		},
 		async loadSieve() {
 			this.loadingSieve = true
@@ -597,6 +667,61 @@ export default {
 				await API.savePrefs({ defaultIdentityId: opt.value || opt.id })
 				showSuccess(this.t('souvera_mail', 'Default sender saved'))
 			} catch { showError(this.t('souvera_mail', 'Failed to save')) }
+		},
+		// External accounts
+		async loadExternalAccounts() {
+			try {
+				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
+				const { list } = useExternalAccounts()
+				this.extAccounts = await list()
+			} catch {}
+		},
+		async onExtEmailChange(email) {
+			if (!email || !email.includes('@')) return
+			try {
+				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
+				const { preset } = useExternalAccounts()
+				const p = await preset(email)
+				if (p) {
+					this.extForm.imap_host = p.imap_host || ''
+					this.extForm.imap_port = p.imap_port || 993
+					this.extForm.imap_ssl = p.imap_ssl || 'ssl'
+					this.extForm.smtp_host = p.smtp_host || ''
+					this.extForm.smtp_port = p.smtp_port || 465
+					this.extForm.smtp_ssl = p.smtp_ssl || 'ssl'
+					this.extForm.username = p.username || email
+					this.extForm.provider = p.provider || ''
+				}
+			} catch {}
+		},
+		async addExtAccount() {
+			try {
+				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
+				const { create } = useExternalAccounts()
+				await create({ ...this.extForm })
+				this.showExtAccountForm = false
+				this.extForm = { email: '', imap_host: '', imap_port: 993, imap_ssl: 'ssl', smtp_host: '', smtp_port: 465, smtp_ssl: 'ssl', username: '', password: '', provider: '' }
+				await this.loadExternalAccounts()
+				showSuccess(this.t('souvera_mail', 'External account added'))
+			} catch (e) { showError(e?.response?.data?.error || this.t('souvera_mail', 'Failed to add account')) }
+		},
+		async removeExtAccount(id) {
+			try {
+				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
+				const { remove } = useExternalAccounts()
+				await remove(id)
+				this.extAccounts = this.extAccounts.filter(a => a.id !== id)
+				showSuccess(this.t('souvera_mail', 'Account removed'))
+			} catch (e) { showError(this.t('souvera_mail', 'Failed to remove account')) }
+		},
+		async testExtAccount(acct) {
+			try {
+				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
+				const { test } = useExternalAccounts()
+				const r = await test(acct.id)
+				if (r.ok) showSuccess(this.t('souvera_mail', 'Connection successful'))
+				else showError(r.error || this.t('souvera_mail', 'Connection failed'))
+			} catch { showError(this.t('souvera_mail', 'Test failed')) }
 		},
 		editSieve(filter) {
 			this.editingSieve = filter
@@ -947,4 +1072,11 @@ export default {
 
 .password-reveal { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
 .password-reveal code { font-family: monospace; font-size: 14px; padding: 6px 12px; background: var(--color-background-dark); border-radius: 6px; flex: 1; word-break: break-all; }
+
+.ext-account-form { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
+.ext-account-form__field { display: flex; flex-direction: column; gap: 4px; }
+.ext-account-form__field label { font-size: 13px; font-weight: 600; color: var(--color-text-maxcontrast); }
+.ext-account-form__row { display: flex; gap: 12px; }
+.ext-account-form__row .ext-account-form__field { flex: 1; }
+.ext-account-form__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 </style>
