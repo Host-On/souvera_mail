@@ -32,4 +32,15 @@
 	#souvera-mail-v2-app .app-navigation {
 		background-color: var(--color-main-background) !important;
 	}
+	/* Detail toolbar: wrap actions so they don't overflow */
+	.email-detail__toolbar {
+		flex-wrap: wrap; gap: 4px;
+	}
+	.email-detail__actions {
+		flex-wrap: wrap;
+	}
+	/* Reduce header title size */
+	.email-detail__header h2 {
+		font-size: 17px;
+	}
 }
