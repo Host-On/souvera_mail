@@ -28,4 +28,8 @@
 	.compose-overlay {
 		z-index: 2000;
 	}
+	/* Force solid background on sidebar when it overlays content */
+	#souvera-mail-v2-app .app-navigation {
+		background-color: var(--color-main-background) !important;
+	}
 }
