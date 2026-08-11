@@ -291,6 +291,17 @@ class AppPasswordService
 
         // ── Phase 3: persist the mapping so revoke can find both sides.
         try {
+            // Guard: clean up stale mapping rows that outlived their Stalwart password.
+            try {
+                $existing = $this->mappingMapper->findByStalwartId($userId, $stalwartId);
+                $this->mappingMapper->delete($existing);
+                $this->logger->warning(
+                    'Souvera Mail: cleaned up stale mapping row for stalwart_app_id ' . $stalwartId,
+                    ['app' => 'souvera_mail', 'user' => $userId]
+                );
+            } catch (\OCP\AppFramework\Db\DoesNotExistException) {
+                // Expected — no collision.
+            }
             $mapping = new AppPasswordMapping();
             $mapping->setUserId($userId);
             $mapping->setNcTokenId((int) $ncToken->getId());
@@ -462,14 +473,20 @@ class AppPasswordService
             try {
                 $this->mappingMapper->delete($mapping);
             } catch (\Throwable $e) {
-                // Log but do not throw — the credential itself is dead
-                // on both sides. A stale mapping row is a housekeeping
-                // problem, not a security one.
-                $this->logger->warning(
-                    'Souvera Mail: Mapping row delete failed after successful revoke: '
-                    . $e->getMessage(),
-                    ['app' => 'souvera_mail']
-                );
+                // Retry once after short delay
+                \usleep(500000);
+                try {
+                    $this->mappingMapper->delete($mapping);
+                } catch (\Throwable $e2) {
+                    $this->logger->warning(
+                        'Souvera Mail: Mapping row delete failed after retry — '
+                        . 'row id=' . ($mapping->getId() ?? '?')
+                        . ' user=' . $userId
+                        . ' stalwart=' . $appPasswordId
+                        . ': ' . $e2->getMessage(),
+                        ['app' => 'souvera_mail']
+                    );
+                }
             }
         }
     }
