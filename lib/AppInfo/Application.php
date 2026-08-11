@@ -215,14 +215,6 @@ if (!\class_exists(Application::class, false)) {class Application extends App im
         // dropdown (SystemDropDown.html). That entry is now injected by
         // the Snappymail plugin's `js/dropdown-menu.js`, so the NC-menu
         // entry has been removed here to avoid the double-entry.
-
-        // External IMAP fetch job: pulls mail from external accounts into
-        // Stalwart every 5 minutes.
-        $context->injectFn(function (\OCP\BackgroundJob\IJobList $jobList): void {
-            if (!$jobList->has(\OCA\SouveraMail\BackgroundJob\ExternalImapFetchJob::class, null)) {
-                $jobList->add(\OCA\SouveraMail\BackgroundJob\ExternalImapFetchJob::class);
-            }
-        });
     }
 }
 
