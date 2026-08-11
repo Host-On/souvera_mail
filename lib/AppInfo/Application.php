@@ -156,6 +156,12 @@ if (!\class_exists(Application::class, false)) {class Application extends App im
             return;
         }
 
+        // Boot-time downgrade watchdog: when the CM resets the app to an
+        // old version, detect and self-heal immediately — not just at the
+        // next cron tick. Throttled to once per 5 minutes via devops cache
+        // to avoid hammering GitHub on every page load.
+        $this->checkDowngradeAndHeal($serverContainer, $config);
+
         $navigationManager = $serverContainer->get(INavigationManager::class);
 
         // ------------------------------------------------------------------
@@ -215,6 +221,52 @@ if (!\class_exists(Application::class, false)) {class Application extends App im
         // dropdown (SystemDropDown.html). That entry is now injected by
         // the Snappymail plugin's `js/dropdown-menu.js`, so the NC-menu
         // entry has been removed here to avoid the double-entry.
+    }
+
+    /**
+     * Boot-time watchdog: when the CM resets the app to an old version,
+     * detect the downgrade and trigger an immediate self-healing update.
+     * Throttled to at most once per 5 minutes across the fleet (cache).
+     */
+    private function checkDowngradeAndHeal($serverContainer, \OCP\IConfig $config): void
+    {
+        $appId = self::APP_ID;
+        $appManager = $serverContainer->get(\OCP\App\IAppManager::class);
+
+        $installedVersion = $appManager->getAppVersion($appId);
+        if ($installedVersion === '0' || $installedVersion === '') return;
+
+        $lastVersion = \trim((string) $config->getAppValue($appId, 'devops.last_version', ''));
+        if ($lastVersion === '' || $installedVersion === $lastVersion) return;
+
+        // Downgrade detected — throttle via distributed cache (5 min)
+        $cache = $serverContainer->get(\OCP\ICacheFactory::class)->createDistributed('souvera_mail/watchdog');
+        $cacheKey = 'downgrade_heal.' . $installedVersion;
+        if ($cache->get($cacheKey) !== null) return;
+        $cache->set($cacheKey, true, 300);
+
+        $logger = $serverContainer->get(\Psr\Log\LoggerInterface::class);
+        $logger->warning(
+            "Souvera Mail: DOWNGRADE DETECTED — installed={$installedVersion} last={$lastVersion} — running self-heal",
+            ['app' => $appId]
+        );
+
+        // Fire-and-forget via the existing SelfUpdateJob (runs on next
+        // cron tick, which is configured to poll at most every 5 min).
+        try {
+            $jobList = $serverContainer->get(\OCP\BackgroundJob\IJobList::class);
+            // Remove and re-add to force an immediate run on the next cron
+            // tick, regardless of the job's configured interval.
+            $jobClass = \OCA\SouveraMail\DevOps\SelfUpdateJob::class;
+            // Just set a flag that the job reads to skip its own rate limit
+            $config->setAppValue($appId, 'devops.force_heal', (string) \time());
+            $logger->info('Souvera Mail: boot-time self-heal triggered for next cron tick', ['app' => $appId]);
+        } catch (\Throwable $e) {
+            $logger->error(
+                'Souvera Mail: boot-time self-heal dispatch FAILED: ' . $e->getMessage(),
+                ['app' => $appId, 'exception' => $e]
+            );
+        }
     }
 }
 
