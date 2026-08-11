@@ -13,7 +13,7 @@
 }
 
 /* TODO D.5: ersetzen durch clamp-Layout + matchMedia */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
 	.mail-list-panel {
 		width: 100% !important;
 		border-right: none !important;

@@ -1,5 +1,6 @@
 <template>
 	<NcContent app-name="souvera_mail">
+		<NcAppNavigationToggle :open="navOpen" @update:open="navOpen = $event" />
 		<NcAppNavigation>
 			<div class="compose-row">
 				<NcButton variant="primary" class="compose-btn" @click="startCompose">
@@ -77,7 +78,7 @@
 </template>
 
 <script>
-import { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton } from '@nextcloud/vue'
+import { NcContent, NcAppNavigation, NcAppNavigationToggle, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton } from '@nextcloud/vue'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
 import Cog from 'vue-material-design-icons/Cog.vue'
 import Share from 'vue-material-design-icons/Share.vue'
@@ -95,16 +96,16 @@ const ROLE_ORDER = { inbox:0, drafts:1, sent:2, junk:3, trash:4 }
 
 export default {
 	name: 'MailV2App',
-	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, Contacts, MailboxItem, QuotaDonut, ContactPicker },
+	components: { NcContent, NcAppNavigation, NcAppNavigationToggle, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, Contacts, MailboxItem, QuotaDonut, ContactPicker },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false, navOpen: true }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },
 		systemFolders() { return this.mailboxes.filter(m => SYSTEM_ROLES.includes(m.role)).sort((a,b) => (ROLE_ORDER[a.role]??99) - (ROLE_ORDER[b.role]??99)) },
 		routeProps() {
 			if (this.$route.name === 'inbox') {
-				return { selectedMailbox: this.selectedMailbox, allMailboxes: [...this.mailboxes, ...this.sharedMailboxes], verticalLayout: this.isVertical }
+				return { selectedMailbox: this.selectedMailbox, allMailboxes: [...this.mailboxes, ...this.sharedMailboxes], verticalLayout: this._responsiveVertical || this.isVertical }
 			}
 			return {}
 		},
@@ -140,6 +141,16 @@ export default {
 		await Promise.all([this.loadQuota(), this.loadShared(), this.loadLayout()])
 		// Refresh mailbox unread counts when emails are read/deleted/moved
 		window.addEventListener('souvera-mail:refresh-mailboxes', this.onRefreshMailboxes)
+		this._onResize = () => {
+			const wasAuto = this._responsiveVertical
+			this._responsiveVertical = window.innerWidth < 1024
+			if (wasAuto !== this._responsiveVertical) {
+				// force re-render of route view with new layout
+				this.$forceUpdate()
+			}
+		}
+		window.addEventListener('resize', this._onResize)
+		this._onResize()
 		this._hotkeys = useHotkeys({
 			c: () => { this.startCompose() },
 			'G': () => { this.$router.push({ name: 'inbox' }) },
@@ -147,6 +158,7 @@ export default {
 	},
 	beforeUnmount() {
 		window.removeEventListener('souvera-mail:refresh-mailboxes', this.onRefreshMailboxes)
+		window.removeEventListener('resize', this._onResize)
 		this._hotkeys?.destroy()
 	},
 	errorCaptured(err, instance, info) {

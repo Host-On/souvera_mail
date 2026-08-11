@@ -120,7 +120,7 @@ export default {
 			bulkProcessing: false,
 			selectedEmail: null,
 			emailBodyHtml: '', emailBodyPlain: '',
-			listWidth: 'clamp(320px, 33%, 460px)',
+			listWidth: 'clamp(280px, 33%, 460px)',
 			listHeight: '45%',
 			resizing: false,
 			checkedIds: [],
