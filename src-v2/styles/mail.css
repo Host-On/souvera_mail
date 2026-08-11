@@ -22,25 +22,38 @@
 		position: fixed;
 		top: 0; left: 0; right: 0; bottom: 0;
 		background: var(--color-main-background);
-		z-index: 10;
+		z-index: 3000;
 		overflow-y: auto;
+		padding-top: 50px; /* NC header height */
 	}
 	.compose-overlay {
-		z-index: 2000;
+		z-index: 4000;
 	}
 	/* Force solid background on sidebar when it overlays content */
 	#souvera-mail-v2-app .app-navigation {
 		background-color: var(--color-main-background) !important;
 	}
-	/* Detail toolbar: wrap actions so they don't overflow */
+	/* Detail toolbar: no negative margins, wrap actions */
+	.email-detail {
+		padding: 0 12px 0 12px !important;
+	}
 	.email-detail__toolbar {
 		flex-wrap: wrap; gap: 4px;
+		margin: 0 !important;
+		padding: 8px 0;
+		border-radius: 0;
+	}
+	.email-detail__header {
+		margin: 0 0 12px 0 !important;
+		padding: 12px 0;
 	}
 	.email-detail__actions {
 		flex-wrap: wrap;
 	}
-	/* Reduce header title size */
 	.email-detail__header h2 {
 		font-size: 17px;
+	}
+	.email-detail__body {
+		margin: 0 !important;
 	}
 }
