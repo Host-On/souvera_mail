@@ -52,6 +52,16 @@
 						@drop-email="onDropEmail" />
 				</template>
 
+				<template v-if="externalAccounts.length > 0">
+					<NcAppNavigationCaption :name="t('souvera_mail', 'External accounts')" />
+					<NcAppNavigationItem v-for="acc in externalAccounts" :key="'ext-'+acc.id"
+						:name="acc.email"
+						:to="{ name: 'external', params: { id: acc.id } }"
+						:active="$route.name === 'external' && String($route.params.id) === String(acc.id)">
+						<template #icon><LanConnect :size="18" /></template>
+					</NcAppNavigationItem>
+				</template>
+
 				<template v-if="!sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
 					<template v-for="group in sharedAccountGroups" :key="'low-'+group.accountId">
@@ -110,6 +120,7 @@ import Archive from 'vue-material-design-icons/Archive.vue'
 import Contacts from 'vue-material-design-icons/Contacts.vue'
 import ChevronDown from 'vue-material-design-icons/ChevronDown.vue'
 import ChevronRight from 'vue-material-design-icons/ChevronRight.vue'
+import LanConnect from 'vue-material-design-icons/LanConnect.vue'
 import MailboxItem from './components/MailboxItem.vue'
 import QuotaDonut from './components/QuotaDonut.vue'
 import ContactPicker from './components/ContactPicker.vue'
@@ -124,9 +135,9 @@ const ROLE_ORDER = { inbox:0, drafts:1, sent:2, junk:3, trash:4 }
 
 export default {
 	name: 'MailV2App',
-	components: { NcContent, NcAppNavigation, NcAppNavigationToggle, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, MailboxItem, QuotaDonut, ContactPicker },
+	components: { NcContent, NcAppNavigation, NcAppNavigationToggle, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, LanConnect, MailboxItem, QuotaDonut, ContactPicker },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false, navOpen: true, navCollapsedGroups: [] }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false, navOpen: true, navCollapsedGroups: [] }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },
@@ -166,9 +177,11 @@ export default {
 			const inbox = this.mailboxes.find(m => m.role === 'inbox') || this.mailboxes[0]
 			if (inbox) this.selectedMailbox = inbox.id
 		} catch(e) { console.error(e) }
-		await Promise.all([this.loadQuota(), this.loadShared(), this.loadLayout()])
+		await Promise.all([this.loadQuota(), this.loadShared(), this.loadLayout(), this.loadExternalAccounts()])
 		// Refresh mailbox unread counts when emails are read/deleted/moved
 		window.addEventListener('souvera-mail:refresh-mailboxes', this.onRefreshMailboxes)
+		// External accounts changed in Settings — refresh the sidebar list.
+		window.addEventListener('souvera-mail:refresh-external', this.loadExternalAccounts)
 		this._onResize = () => {
 			const wasAuto = this._responsiveVertical
 			this._responsiveVertical = window.innerWidth < 1024
@@ -186,6 +199,7 @@ export default {
 	},
 	beforeUnmount() {
 		window.removeEventListener('souvera-mail:refresh-mailboxes', this.onRefreshMailboxes)
+		window.removeEventListener('souvera-mail:refresh-external', this.loadExternalAccounts)
 		window.removeEventListener('resize', this._onResize)
 		this._hotkeys?.destroy()
 	},
@@ -282,7 +296,6 @@ export default {
 		},
 		async loadShared() {
 			try {
-				
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/shared'))
 				this.sharedFolders = data.shared || []
 				this.sharedAbove = data.position === 'above'
@@ -306,6 +319,12 @@ export default {
 				this.isVertical = data.verticalLayout || false
 				this.navCollapsedGroups = data.navCollapsedGroups || []
 			} catch (e) { console.error('Failed to load layout pref', e) }
+		},
+		async loadExternalAccounts() {
+			try {
+				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/external/accounts'))
+				this.externalAccounts = data.accounts || []
+			} catch (e) { console.error('Failed to load external accounts', e) }
 		},
 	},
 }

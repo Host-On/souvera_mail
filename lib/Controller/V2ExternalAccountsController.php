@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace OCA\SouveraMail\Controller;
 
 use OCA\SouveraMail\Service\ExternalAccountService;
+use OCA\SouveraMail\Service\ExternalImapService;
+use OCA\SouveraMail\Service\ExternalSmtpService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -26,6 +28,8 @@ class V2ExternalAccountsController extends Controller
         string $appName,
         IRequest $request,
         private ExternalAccountService $accountService,
+        private ExternalImapService $imapService,
+        private ExternalSmtpService $smtpService,
         private IUserSession $userSession,
         private LoggerInterface $logger,
     ) {
@@ -160,6 +164,119 @@ class V2ExternalAccountsController extends Controller
 
         $result = $this->accountService->testImap($entry);
         return new JSONResponse($result);
+    }
+
+    /**
+     * GET /apps/souvera_mail/api/v2/external/accounts/{id}/folders
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function folders(string $id): JSONResponse
+    {
+        $uid = $this->getUserId();
+        if ($uid === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
+        }
+        $account = $this->accountService->getWithPassword($uid, $id);
+        if ($account === null) {
+            return new JSONResponse(['error' => 'Account not found'], Http::STATUS_NOT_FOUND);
+        }
+        $result = $this->imapService->folders($account);
+        if (!$result['ok']) {
+            $this->logger->warning('ExternalImapService folders failed: ' . ($result['error'] ?? ''), ['app' => 'souvera_mail']);
+        }
+        return new JSONResponse($result);
+    }
+
+    /**
+     * GET /apps/souvera_mail/api/v2/external/accounts/{id}/messages
+     * Query: folder, offset, limit
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function messages(string $id, string $folder = 'INBOX', int $offset = 0, int $limit = 50): JSONResponse
+    {
+        $uid = $this->getUserId();
+        if ($uid === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
+        }
+        $account = $this->accountService->getWithPassword($uid, $id);
+        if ($account === null) {
+            return new JSONResponse(['error' => 'Account not found'], Http::STATUS_NOT_FOUND);
+        }
+        $folder = \trim($folder) === '' ? 'INBOX' : \trim($folder);
+        $limit = \max(1, \min(200, $limit));
+        return new JSONResponse($this->imapService->messages($account, $folder, $offset, $limit));
+    }
+
+    /**
+     * GET /apps/souvera_mail/api/v2/external/accounts/{id}/message/{messageUid}
+     * Query: folder
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function message(string $id, int $messageUid, string $folder = 'INBOX'): JSONResponse
+    {
+        $uid = $this->getUserId();
+        if ($uid === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
+        }
+        $account = $this->accountService->getWithPassword($uid, $id);
+        if ($account === null) {
+            return new JSONResponse(['error' => 'Account not found'], Http::STATUS_NOT_FOUND);
+        }
+        $folder = \trim($folder) === '' ? 'INBOX' : \trim($folder);
+        return new JSONResponse($this->imapService->message($account, $folder, $messageUid));
+    }
+
+    /**
+     * POST /apps/souvera_mail/api/v2/external/accounts/{id}/send
+     * Body: {fromName, to:[], cc:[], bcc:[], subject, bodyHtml, bodyPlain}
+     *
+     * Sends through the account's SMTP server. Recipients are passed
+     * verbatim (no alias checks apply — the account itself is the sender).
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function send(string $id): JSONResponse
+    {
+        $uid = $this->getUserId();
+        if ($uid === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
+        }
+        $account = $this->accountService->getWithPassword($uid, $id);
+        if ($account === null) {
+            return new JSONResponse(['error' => 'Account not found'], Http::STATUS_NOT_FOUND);
+        }
+
+        $body = \json_decode(\file_get_contents('php://input'), true) ?? [];
+        $to = \is_array($body['to'] ?? null) ? $body['to'] : [];
+        $cc = \is_array($body['cc'] ?? null) ? $body['cc'] : [];
+        $bcc = \is_array($body['bcc'] ?? null) ? $body['bcc'] : [];
+        $subject = \trim((string) ($body['subject'] ?? ''));
+        $bodyHtml = \trim((string) ($body['bodyHtml'] ?? ''));
+        $bodyPlain = \trim((string) ($body['bodyPlain'] ?? ''));
+        $fromName = \trim((string) ($body['fromName'] ?? ''));
+
+        if ($to === [] && $cc === [] && $bcc === []) {
+            return new JSONResponse(['error' => 'No recipients'], 400);
+        }
+
+        try {
+            $this->smtpService->send(
+                $account,
+                (string) ($account['email'] ?? ''),
+                $fromName,
+                $to, $cc, $bcc,
+                $subject, $bodyHtml, $bodyPlain,
+            );
+            return new JSONResponse(['success' => true]);
+        } catch (\Throwable $e) {
+            $this->logger->warning('ExternalSmtpService send failed: ' . $e->getMessage(), [
+                'app' => 'souvera_mail', 'exception' => $e,
+            ]);
+            return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_BAD_GATEWAY);
+        }
     }
 
     private function getUserId(): ?string

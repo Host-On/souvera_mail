@@ -469,6 +469,26 @@ return [
 			'url' => '/api/v2/external/accounts/{id}/test',
 			'verb' => 'POST',
 		],
+		[
+			'name' => 'v2_external_accounts#folders',
+			'url' => '/api/v2/external/accounts/{id}/folders',
+			'verb' => 'GET',
+		],
+		[
+			'name' => 'v2_external_accounts#messages',
+			'url' => '/api/v2/external/accounts/{id}/messages',
+			'verb' => 'GET',
+		],
+		[
+			'name' => 'v2_external_accounts#message',
+			'url' => '/api/v2/external/accounts/{id}/message/{messageUid}',
+			'verb' => 'GET',
+		],
+		[
+			'name' => 'v2_external_accounts#send',
+			'url' => '/api/v2/external/accounts/{id}/send',
+			'verb' => 'POST',
+		],
 
 		[
 			'name' => 'v2_settings#quota',

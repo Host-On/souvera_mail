@@ -4,6 +4,7 @@
 			:reply-to="replyEmail"
 			:forward-of="forwardEmail"
 			:mode="composeMode"
+			:initial-ext-identity="initialExtIdentity"
 			:original-email="originalEmail"
 			@cancel="goBack"
 			@sent="onSent" />
@@ -33,6 +34,7 @@ export default {
 			forwardEmail: forward,
 			composeMode: q.mode || (reply ? 'reply' : (forward ? 'forward' : 'new')),
 			originalEmail: null,
+			initialExtIdentity: q.ext ? 'ext:' + q.ext : null,
 		}
 	},
 	async mounted() {

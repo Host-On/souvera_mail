@@ -120,7 +120,7 @@
 										</template>
 										<template v-else>
 											{{ i.name || t('souvera_mail', '(no display name)') }}
-											<NcButton variant="tertiary" size="small"
+											<NcButton v-if="!i.isExternal" variant="tertiary" size="small"
 												:title="t('souvera_mail', 'Edit name')"
 												@click="startEditIdentity(i)">
 												<template #icon><Pencil :size="12" /></template>
@@ -133,6 +133,7 @@
 												</template>
 											</NcButton>
 											<span v-if="i.isAlias" class="identity-row__alias-tag">{{ t('souvera_mail', 'Alias') }}</span>
+											<span v-if="i.isExternal" class="identity-row__alias-tag identity-row__ext-tag">{{ t('souvera_mail', 'External') }}</span>
 										</template>
 									</div>
 								</div>
@@ -389,7 +390,7 @@
 					{{ t('souvera_mail', 'External accounts') }}
 				</h2>
 				<div class="settings-card__body">
-					<p class="settings-muted">{{ t('souvera_mail', 'Add external IMAP/SMTP accounts (e.g. GMX, Web.de, Gmail). Mails are automatically synced into your mailbox.') }}</p>
+					<p class="settings-muted">{{ t('souvera_mail', 'Add external IMAP/SMTP accounts (e.g. GMX, Web.de, Gmail). They appear in the navigation under "External accounts" and can be used as senders.') }}</p>
 
 					<div v-if="extAccounts.length > 0" class="password-list">
 						<div v-for="a in extAccounts" :key="a.id" class="password-row">
@@ -819,7 +820,7 @@ export default {
 				const list = (data.identities || []).map(i => {
 					const isAlias = !!i.isAlias
 					const name = (i.name || '').trim() || (isAlias ? (this.aliasDisplayNames[(i.email || '').toLowerCase()] || '') : '')
-					return { id: i.id, label: name ? `${name} <${i.email}>` : i.email, value: i.id, name, email: i.email, isAlias }
+					return { id: i.id, label: name ? `${name} <${i.email}>` : i.email, value: i.id, name, email: i.email, isAlias, isExternal: !!i.isExternal }
 				})
 				this.identityOptions = list
 			} catch {}
@@ -958,6 +959,7 @@ export default {
 				this.extTestError = ''
 				this.extForm = { email: '', imap_host: '', imap_port: 993, imap_ssl: 'ssl', smtp_host: '', smtp_port: 465, smtp_ssl: 'ssl', username: '', password: '', provider: '' }
 				await this.loadExternalAccounts()
+				window.dispatchEvent(new CustomEvent('souvera-mail:refresh-external'))
 				showSuccess(this.t('souvera_mail', 'External account added'))
 			} catch (e) {
 				console.error('External account add failed', e)
@@ -970,6 +972,7 @@ export default {
 				const { remove } = extAccountsApi
 				await remove(id)
 				this.extAccounts = this.extAccounts.filter(a => a.id !== id)
+				window.dispatchEvent(new CustomEvent('souvera-mail:refresh-external'))
 				showSuccess(this.t('souvera_mail', 'Account removed'))
 			} catch (e) { showError(this.t('souvera_mail', 'Failed to remove account')) }
 		},
@@ -1295,6 +1298,7 @@ export default {
 .identity-row__email { font-weight: 600; font-size: 13px; }
 .identity-row__name { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-maxcontrast); margin-top: 2px; }
 .identity-row__alias-tag { font-size: 10px; padding: 0 6px; border-radius: 3px; background: var(--color-primary-element); color: #fff; }
+.identity-row__ext-tag { background: var(--color-background-darker); color: var(--color-text-maxcontrast); }
 .identity-sig-dialog { display: flex; flex-direction: column; gap: 12px; min-width: 420px; max-width: 90vw; }
 .identity-sig-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .signature-editor {

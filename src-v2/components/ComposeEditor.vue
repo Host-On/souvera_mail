@@ -132,6 +132,7 @@ export default {
 		forwardOf: { type: Object, default: null },
 		mode: { type: String, default: 'new' },
 		originalEmail: { type: Object, default: null },
+		initialExtIdentity: { type: String, default: null },
 	},
 	emits: ['cancel', 'sent'],
 	data() {
@@ -387,8 +388,9 @@ export default {
 				const list = (data.identities || []).map(i => ({ id: i.id, label: i.name ? `${i.name} <${i.email}>` : i.email, name: i.name, email: i.email }))
 				this.identities = list
 				if (list.length > 0) {
-					const pref = this.defaultIdentityId ? list.find(i => i.id === this.defaultIdentityId) : null
-					this.fromIdentityId = pref ? pref.id : list[0].id
+					const forced = this.initialExtIdentity ? list.find(i => i.id === this.initialExtIdentity) : null
+					const pref = !forced && this.defaultIdentityId ? list.find(i => i.id === this.defaultIdentityId) : null
+					this.fromIdentityId = forced ? forced.id : (pref ? pref.id : list[0].id)
 				}
 			} catch (e) {
 				console.error('Failed to load identities', e)

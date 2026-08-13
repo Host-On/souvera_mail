@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace OCA\SouveraMail\Controller;
 
+use OCA\SouveraMail\Service\ExternalAccountService;
+use OCA\SouveraMail\Service\ExternalSmtpService;
 use OCA\SouveraMail\Service\SignatureStoreService;
 use OCA\SouveraMail\Service\StalwartUserContext;
 use OCA\SouveraMail\Service\V2JmapProxy;
@@ -25,6 +27,8 @@ class V2ComposeController extends Controller
         private StalwartUserContext $userContext,
         private IUserSession $userSession,
         private SignatureStoreService $signatureStore,
+        private ExternalAccountService $externalAccounts,
+        private ExternalSmtpService $externalSmtp,
         private IConfig $config,
         private LoggerInterface $logger,
     ) {
@@ -70,6 +74,20 @@ class V2ComposeController extends Controller
                 'email' => $alias,
                 'isAlias' => true,
             ];
+        }
+
+        // Add external IMAP/SMTP accounts as sendable identities (id
+        // "ext:<accountId>") — their messages are sent through the
+        // external SMTP server, see send().
+        if ($uid !== '') {
+            foreach ($this->externalAccounts->listForUser($uid) as $ext) {
+                $identities[] = [
+                    'id' => 'ext:' . $ext['id'],
+                    'name' => '',
+                    'email' => (string) ($ext['email'] ?? ''),
+                    'isExternal' => true,
+                ];
+            }
         }
 
         return new JSONResponse(['identities' => $identities]);
@@ -131,8 +149,8 @@ class V2ComposeController extends Controller
         }
         $uid = $user->getUID();
 
-        // The id must be a REAL identity of this user (JMAP identity or
-        // alias) — never trust the client-provided id verbatim.
+        // The id must be a REAL identity of this user (JMAP identity,
+        // alias or external account) — never trust the client-provided id.
         if (\str_starts_with((string) $id, 'alias:')) {
             $alias = \strtolower(\trim(\substr((string) $id, 6)));
             $allowedAliases = \array_map('strtolower', $this->resolveAliases());
@@ -141,6 +159,12 @@ class V2ComposeController extends Controller
             }
             // Canonical form — same key as used by identities() and send().
             $id = 'alias:' . $alias;
+        } elseif (\str_starts_with((string) $id, 'ext:')) {
+            $extId = \trim(\substr((string) $id, 4));
+            if ($extId === '' || $this->externalAccounts->getWithPassword($uid, $extId) === null) {
+                return new JSONResponse(['error' => 'Unknown external account'], 400);
+            }
+            $id = 'ext:' . $extId;
         } else {
             $result = $this->jmap->singleCall('Identity/get', ['accountId' => $accountId]);
             $list = $result['data']['list'] ?? [];
@@ -260,6 +284,51 @@ class V2ComposeController extends Controller
 
         $user = $this->userSession->getUser();
         $userEmail = $this->userContext->resolveEmail($user->getUID());
+
+        // External accounts (id "ext:<accountId>") send through the
+        // external SMTP server — never through Stalwart/JMAP.
+        if ($identityId !== null && \str_starts_with((string) $identityId, 'ext:')) {
+            $extId = \trim(\substr((string) $identityId, 4));
+            $extAccount = $extId !== '' ? $this->externalAccounts->getWithPassword($user->getUID(), $extId) : null;
+            if ($extAccount === null) {
+                return new JSONResponse(['error' => 'Unknown external account'], 400);
+            }
+            // Only fresh uploads (base64 data) can be attached to an
+            // external send — blobIds reference the Stalwart store and
+            // are not readable for the external path.
+            $extAttachments = [];
+            foreach ($attachments as $att) {
+                if (!\is_array($att)) continue;
+                $data = (string) ($att['data'] ?? '');
+                if ($data === '') {
+                    if (!empty($att['blobId'])) {
+                        return new JSONResponse(['error' => 'Forwarded attachments are not available for external sending'], 400);
+                    }
+                    continue;
+                }
+                $extAttachments[] = [
+                    'name' => \trim((string) ($att['name'] ?? 'attachment')),
+                    'type' => \trim((string) ($att['type'] ?? 'application/octet-stream')),
+                    'data' => $data,
+                ];
+            }
+            try {
+                $this->externalSmtp->send(
+                    $extAccount,
+                    (string) ($extAccount['email'] ?? $userEmail),
+                    '',
+                    $toAddr, $ccAddr, $bccAddr,
+                    $subject, $bodyHtml, $bodyPlain,
+                    $extAttachments,
+                );
+                return new JSONResponse(['success' => true, 'submitted' => true]);
+            } catch (\Throwable $e) {
+                $this->logger->warning('External send failed: ' . $e->getMessage(), [
+                    'app' => 'souvera_mail', 'exception' => $e,
+                ]);
+                return new JSONResponse(['error' => $e->getMessage()], 502);
+            }
+        }
 
         // Alias identities (id "alias:foo@bar.com") are not JMAP identities —
         // the FROM header gets the alias address while the submission uses
