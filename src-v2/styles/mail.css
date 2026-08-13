@@ -18,14 +18,7 @@
 		width: 100% !important;
 		border-right: none !important;
 	}
-	.mail-detail-panel {
-		position: fixed;
-		top: 0; left: 0; right: 0; bottom: 0;
-		background: var(--color-main-background);
-		z-index: 3000;
-		overflow-y: auto;
-		padding-top: 50px; /* NC header height */
-	}
+	/* Detail overlay is handled by MailHomeView (.mail-home--mobile .mail-home--detail-open) */
 	.compose-overlay {
 		z-index: 4000;
 	}

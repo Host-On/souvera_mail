@@ -1,5 +1,10 @@
 <template>
-	<div class="mail-home" :class="{ 'mail-home--vertical': verticalLayout }">
+	<div class="mail-home"
+		:class="{
+			'mail-home--vertical': verticalLayout,
+			'mail-home--mobile': isMobile,
+			'mail-home--detail-open': isMobile && selectedEmail,
+		}">
 		<div class="mail-list-panel" :style="panelStyle">
 			<EmailListToolbar
 				:selected-count="checkedIds.length"
@@ -82,7 +87,7 @@
 				@mailto="onMailto" />
 		</div>
 
-		<NcEmptyContent v-else :name="t('souvera_mail', 'Select a message')"
+		<NcEmptyContent v-else-if="!isMobile" :name="t('souvera_mail', 'Select a message')"
 			class="mail-detail-empty">
 			<template #icon><EmailOutline :size="64" /></template>
 		</NcEmptyContent>
@@ -115,6 +120,7 @@ export default {
 	},
 	data() {
 		return {
+			isMobile: window.innerWidth < 1024,
 			emails: [], emailTotal: 0, offset: 0, limit: 50,
 			loadingEmails: false, loadingBody: false,
 			bulkProcessing: false,
@@ -147,7 +153,12 @@ export default {
 			return this.allMailboxes.filter(m => m.role !== 'trash' && m.role !== 'junk')
 		},
 		panelStyle() {
-			if (this.verticalLayout) return { maxHeight: this.listHeight }
+			if (this.verticalLayout) {
+				// Mobile: list takes full height (detail is a full-screen
+				// overlay when an email is open).
+				if (this.isMobile) return {}
+				return { maxHeight: this.listHeight }
+			}
 			return { width: this.listWidth }
 		},
 		isTrashMailbox() {
@@ -211,6 +222,8 @@ export default {
 			})()
 		}
 		window.addEventListener('souvera-mail:move-email', this._onMoveEmail)
+		this._onResize = () => { this.isMobile = window.innerWidth < 1024 }
+		window.addEventListener('resize', this._onResize)
 	},
 	beforeUnmount() {
 		this._hotkeys?.destroy()
@@ -219,6 +232,7 @@ export default {
 		document.removeEventListener('click', this._onUserGesture)
 		document.removeEventListener('keydown', this._onUserGesture)
 		window.removeEventListener('souvera-mail:move-email', this._onMoveEmail)
+		window.removeEventListener('resize', this._onResize)
 		if (this._audioCtx) { this._audioCtx.close(); this._audioCtx = null }
 		if (this._originalTitle) document.title = this._originalTitle
 		if (this._mailboxChangeTimer) clearTimeout(this._mailboxChangeTimer)
@@ -658,4 +672,22 @@ export default {
 .mail-resize-handle--v .mail-resize-handle__grip { width: 36px; height: 4px; }
 .mail-resize-handle--v:hover { opacity: 0.5; }
 body.resize-active { user-select: none; cursor: col-resize; }
+
+/* ── Mobile (<1024px): full-screen detail overlay, SnappyMail-style ── */
+.mail-home--mobile .mail-resize-handle { display: none; }
+.mail-home--mobile.mail-home--vertical .mail-list-panel { max-height: 100%; }
+.mail-home--mobile.mail-home--detail-open .mail-list-panel { max-height: 100%; }
+.mail-home--mobile.mail-home--detail-open .mail-detail-panel {
+	position: fixed;
+	inset: 0;
+	z-index: 3000;
+	background: var(--color-main-background);
+	overflow-y: auto;
+	animation: mail-detail-slide-in 0.18s ease-out;
+}
+.mail-home--mobile.mail-home--detail-open .mail-resize-handle { display: none; }
+@keyframes mail-detail-slide-in {
+	from { transform: translateX(100%); }
+	to { transform: translateX(0); }
+}
 </style>

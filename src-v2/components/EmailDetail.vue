@@ -1,8 +1,9 @@
 <template>
 	<div class="email-detail" v-if="email">
 		<div class="email-detail__toolbar">
-			<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Back')" @click="$emit('close')">
-				<template #icon><ArrowLeft :size="20" /></template>
+			<NcButton variant="tertiary" class="email-detail__close"
+				:aria-label="t('souvera_mail', 'Back')" @click="$emit('close')">
+				<template #icon><ArrowLeft :size="22" /></template>
 			</NcButton>
 			<div class="email-detail__actions">
 				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Reply')" @click="$emit('reply')">
@@ -300,6 +301,18 @@ export default {
 	padding: 8px 12px; margin: -20px -20px 0 -20px;
 	background: var(--color-background-dark);
 	border-bottom: 1px solid var(--color-border);
+}
+.email-detail__close {
+	flex-shrink: 0;
+	width: 40px; height: 40px;
+	border-radius: 50%;
+}
+@media (max-width: 1024px) {
+	.email-detail__close {
+		width: 44px; height: 44px;
+		background: var(--color-background-hover);
+		border: 1px solid var(--color-border);
+	}
 }
 .email-detail__actions { display: flex; gap: 4px; }
 .email-detail__header {
