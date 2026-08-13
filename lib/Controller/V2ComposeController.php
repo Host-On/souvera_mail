@@ -52,7 +52,80 @@ class V2ComposeController extends Controller
             'email' => $i['email'] ?? '',
         ], $list);
 
+        // Add aliases from souvera_central (email addresses that deliver
+        // to this mailbox but are NOT JMAP identities).
+        $aliases = $this->resolveAliases();
+        $knownEmails = \array_map(fn($i) => \strtolower((string) $i['email']), $identities);
+        foreach ($aliases as $alias) {
+            if (\in_array(\strtolower($alias), $knownEmails, true)) continue;
+            $identities[] = [
+                'id' => 'alias:' . $alias,
+                'name' => '',
+                'email' => $alias,
+                'isAlias' => true,
+            ];
+        }
+
         return new JSONResponse(['identities' => $identities]);
+    }
+
+    /**
+     * PUT /apps/souvera_mail/api/v2/identities/{id}
+     * Body: {name: "..."}
+     */
+    #[NoAdminRequired]
+    public function updateIdentity(string $id): JSONResponse
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+
+        $body = \json_decode(\file_get_contents('php://input'), true) ?? [];
+        $name = \trim((string) ($body['name'] ?? ''));
+
+        $result = $this->jmap->singleCall('Identity/set', [
+            'accountId' => $accountId,
+            'update' => [$id => ['name' => $name]],
+        ]);
+
+        if (isset($result['error'])) {
+            return new JSONResponse($result, 500);
+        }
+        $data = $result['data'] ?? [];
+        if (isset($data['notUpdated'][$id])) {
+            $r = $data['notUpdated'][$id];
+            return new JSONResponse([
+                'error' => 'Update rejected: ' . ($r['description'] ?? $r['type'] ?? 'notUpdated'),
+            ], 422);
+        }
+        if (!\array_key_exists($id, $data['updated'] ?? [])) {
+            return new JSONResponse(['error' => 'Update not applied'], 500);
+        }
+        return new JSONResponse(['success' => true, 'name' => $name]);
+    }
+
+    /**
+     * Resolve the user's email aliases via souvera_central.
+     *
+     * @return string[]
+     */
+    private function resolveAliases(): array
+    {
+        try {
+            $user = \OCP\Server::get(\OCP\IUserSession::class)->getUser();
+            if ($user === null) return [];
+            $email = $user->getEMailAddress();
+            if ($email === null || $email === '') return [];
+            if (!\class_exists('OCA\\SouveraCentral\\Service\\StalwartService')) return [];
+            $stalwart = \OCP\Server::get('OCA\\SouveraCentral\\Service\\StalwartService');
+            $emails = $stalwart->getEmails($email);
+            // getEmails returns primary + aliases — remove the primary.
+            $primary = \strtolower($email);
+            return \array_values(\array_filter($emails, fn($e) => \strtolower((string) $e) !== $primary));
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     /**
@@ -90,7 +163,17 @@ class V2ComposeController extends Controller
         $user = $this->userSession->getUser();
         $userEmail = $this->userContext->resolveEmail($user->getUID());
 
-        if ($identityId === null || $identityId === '') {
+        // Alias identities (id "alias:foo@bar.com") are not JMAP identities —
+        // the FROM header gets the alias address while the submission uses
+        // the primary JMAP identity.
+        $fromEmail = $userEmail;
+        if ($identityId !== null && \str_starts_with((string) $identityId, 'alias:')) {
+            $fromEmail = \substr((string) $identityId, 6);
+            $identityId = $this->resolveIdentityId($accountId);
+            if ($identityId === null) {
+                return new JSONResponse(['error' => 'No JMAP identity found'], 500);
+            }
+        } elseif ($identityId === null || $identityId === '') {
             $identityId = $this->resolveIdentityId($accountId);
             if ($identityId === null) {
                 return new JSONResponse(['error' => 'No JMAP identity found'], 500);
@@ -136,7 +219,7 @@ class V2ComposeController extends Controller
 
         // Build Email/create object — saved in Drafts with draft+seen keywords.
         $emailObj = $this->buildEmailObject(
-            $userEmail, $toAddr, $ccAddr, $bccAddr,
+            $fromEmail, $toAddr, $ccAddr, $bccAddr,
             $subject, $bodyHtml, $bodyPlain,
             \array_merge($blobIds, $fwdBlobIds),
             $inReplyTo, $references, $draftsId

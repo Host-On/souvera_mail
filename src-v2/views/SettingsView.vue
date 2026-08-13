@@ -105,6 +105,32 @@
 							label="label" class="setting-select" :clearable="false"
 							@update:modelValue="onDefaultIdentityChange" />
 					</div>
+					<div class="setting-row setting-row--column" v-if="identityOptions.length > 0">
+						<span class="setting-label">{{ t('souvera_mail', 'Identities') }}</span>
+						<div class="identity-list">
+							<div v-for="i in identityOptions" :key="i.id" class="identity-row">
+								<div class="identity-row__info">
+									<div class="identity-row__email">{{ i.email }}</div>
+									<div class="identity-row__name">
+										<template v-if="editingIdentityId === i.id">
+											<NcTextField v-model="editingIdentityName" size="small" />
+											<NcButton variant="primary" size="small" @click="saveIdentityName(i)">{{ t('souvera_mail', 'Save') }}</NcButton>
+											<NcButton variant="tertiary" size="small" @click="editingIdentityId = null">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+										</template>
+										<template v-else>
+											{{ i.name || t('souvera_mail', '(no display name)') }}
+											<NcButton v-if="!i.isAlias" variant="tertiary" size="small"
+												:title="t('souvera_mail', 'Edit name')"
+												@click="startEditIdentity(i)">
+												<template #icon><Pencil :size="12" /></template>
+											</NcButton>
+											<span v-else class="identity-row__alias-tag">{{ t('souvera_mail', 'Alias') }}</span>
+										</template>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
 				</div>
 			</div>
 
@@ -461,6 +487,7 @@ const API = {
 	passwords: () => axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords')),
 	shared: () => axios.get(generateUrl('/apps/souvera_mail/api/v2/shared')),
 	prefs: () => axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences')),
+	savePrefs: (data) => axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), data),
 }
 
 export default {
@@ -536,6 +563,8 @@ export default {
 
 			identityOptions: [],
 			defaultIdentityOption: null,
+			editingIdentityId: null,
+			editingIdentityName: '',
 		}
 	},
 	mounted() {
@@ -654,7 +683,7 @@ export default {
 		async loadIdentityOptions() {
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/identities'))
-				const list = (data.identities || []).map(i => ({ id: i.id, label: `${i.email}`, value: i.id, name: i.name, email: i.email }))
+				const list = (data.identities || []).map(i => ({ id: i.id, label: `${i.name ? i.name + ' <' + i.email + '>' : i.email}`, value: i.id, name: i.name, email: i.email, isAlias: !!i.isAlias }))
 				this.identityOptions = list
 				const prefId = this._prefsDefaultIdentityId
 				const found = prefId ? list.find(i => i.id === prefId) : null
@@ -667,6 +696,20 @@ export default {
 				await API.savePrefs({ defaultIdentityId: opt.value || opt.id })
 				showSuccess(this.t('souvera_mail', 'Default sender saved'))
 			} catch { showError(this.t('souvera_mail', 'Failed to save')) }
+		},
+		startEditIdentity(identity) {
+			this.editingIdentityId = identity.id
+			this.editingIdentityName = identity.name || ''
+		},
+		async saveIdentityName(identity) {
+			try {
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/identities/' + identity.id), { name: this.editingIdentityName })
+				identity.name = this.editingIdentityName
+				this.editingIdentityId = null
+				showSuccess(this.t('souvera_mail', 'Identity saved'))
+			} catch (e) {
+				showError(e?.response?.data?.error || this.t('souvera_mail', 'Failed to save identity'))
+			}
 		},
 		// External accounts
 		async loadExternalAccounts() {
@@ -1014,6 +1057,13 @@ export default {
 .password-secret--hidden { letter-spacing: 2px; }
 .password-value { font-size: 12px; font-family: monospace; word-break: break-all; }
 .setting-row--column { flex-direction: column; align-items: stretch; }
+
+.identity-list { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.identity-row { display: flex; align-items: center; padding: 6px 8px; border-radius: 6px; background: var(--color-background-dark); }
+.identity-row__info { flex: 1; min-width: 0; }
+.identity-row__email { font-weight: 600; font-size: 13px; }
+.identity-row__name { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-maxcontrast); margin-top: 2px; }
+.identity-row__alias-tag { font-size: 10px; padding: 0 6px; border-radius: 3px; background: var(--color-primary-element); color: #fff; }
 .signature-editor {
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius);

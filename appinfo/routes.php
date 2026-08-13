@@ -526,6 +526,11 @@ return [
             'verb' => 'GET',
         ],
         [
+            'name' => 'v2_compose#updateIdentity',
+            'url' => '/api/v2/identities/{id}',
+            'verb' => 'PUT',
+        ],
+        [
             'name' => 'v2_compose#createDraft',
             'url' => '/api/v2/drafts',
             'verb' => 'POST',
