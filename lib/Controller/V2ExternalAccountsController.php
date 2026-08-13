@@ -61,6 +61,7 @@ class V2ExternalAccountsController extends Controller
      *        smtp_ssl, username, password, provider}
      */
     #[NoAdminRequired]
+    #[NoCSRFRequired]
     public function create(): JSONResponse
     {
         $uid = $this->getUserId();
@@ -80,6 +81,7 @@ class V2ExternalAccountsController extends Controller
      * DELETE /apps/souvera_mail/api/v2/external/accounts/{id}
      */
     #[NoAdminRequired]
+    #[NoCSRFRequired]
     public function delete(string $id): JSONResponse
     {
         $uid = $this->getUserId();
@@ -100,6 +102,7 @@ class V2ExternalAccountsController extends Controller
      * Test IMAP connection for an account.
      */
     #[NoAdminRequired]
+    #[NoCSRFRequired]
     public function test(string $id): JSONResponse
     {
         $uid = $this->getUserId();

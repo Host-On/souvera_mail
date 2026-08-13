@@ -24,7 +24,7 @@
 				<template v-if="sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
 					<template v-for="group in sharedAccountGroups" :key="group.accountId">
-						<NcAppNavigationItem :name="group.accountName" @click="toggleGroup(group.accountId)">
+						<NcAppNavigationItem class="nav-group-toggle" :name="group.accountName" @click="toggleGroup(group.accountId)">
 							<template #icon>
 								<ChevronDown v-if="!isGroupCollapsed(group.accountId)" :size="16" />
 								<ChevronRight v-else :size="16" />
@@ -50,7 +50,7 @@
 				<template v-if="!sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
 					<template v-for="group in sharedAccountGroups" :key="'low-'+group.accountId">
-						<NcAppNavigationItem :name="group.accountName" @click="toggleGroup(group.accountId)">
+						<NcAppNavigationItem class="nav-group-toggle" :name="group.accountName" @click="toggleGroup(group.accountId)">
 							<template #icon>
 								<ChevronDown v-if="!isGroupCollapsed(group.accountId)" :size="16" />
 								<ChevronRight v-else :size="16" />
@@ -321,6 +321,25 @@ export default {
 	color: var(--color-border-dark);
 	font-size: 10px;
 	vertical-align: 1px;
+}
+
+/* Collapsible account group headers — visually distinct from mailbox
+   entries: bold name, subtle background, slight indentation. */
+:deep(.nav-group-toggle) {
+	padding-left: 18px !important;
+}
+:deep(.nav-group-toggle .app-navigation-entry__title) {
+	font-weight: 700 !important;
+	font-size: 13px !important;
+	letter-spacing: 0.3px;
+}
+:deep(.nav-group-toggle .app-navigation-entry) {
+	background: var(--color-background-hover) !important;
+	border-radius: var(--border-radius);
+	margin: 2px 6px;
+}
+:deep(.nav-group-toggle .app-navigation-entry__icon-wrapper) {
+	opacity: 0.8;
 }
 
 /* Nav footer — slightly distinct background, matching the mail detail

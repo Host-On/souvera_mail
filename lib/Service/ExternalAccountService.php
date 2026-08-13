@@ -105,6 +105,9 @@ class ExternalAccountService
         if ($entry['imap_host'] === '') {
             throw new \RuntimeException('IMAP host is required');
         }
+        if ($entry['smtp_host'] === '') {
+            throw new \RuntimeException('SMTP host is required');
+        }
         if ($entry['password'] === '') {
             throw new \RuntimeException('Password is required');
         }

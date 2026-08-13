@@ -206,17 +206,17 @@
 				</h2>
 				<div class="settings-card__body">
 					<p class="settings-muted">{{ t('souvera_mail', 'Import your old emails from another provider.') }}</p>
-					<div class="migration-actions">
-						<NcButton variant="primary" @click="openMigration"
-							:disabled="migrationCompleted">
-							<template #icon><Import :size="20" /></template>
-							{{ migrationCompleted ? t('souvera_mail', 'Import already completed') : t('souvera_mail', 'Start migration assistant') }}
-						</NcButton>
-						<NcButton v-if="migrationCompleted" variant="tertiary" @click="resetMigration">
+					<div v-if="migrationCompleted" class="migration-completed">
+						<span class="migration-completed__badge">✓ {{ t('souvera_mail', 'Import successful') }}</span>
+						<NcButton variant="primary" @click="resetMigration">
 							<template #icon><Refresh :size="20" /></template>
 							{{ t('souvera_mail', 'Start another migration') }}
 						</NcButton>
 					</div>
+					<NcButton v-else variant="primary" @click="openMigration">
+						<template #icon><Import :size="20" /></template>
+						{{ t('souvera_mail', 'Start migration assistant') }}
+					</NcButton>
 				</div>
 			</div>
 
@@ -827,7 +827,11 @@ export default {
 				this.extForm = { email: '', imap_host: '', imap_port: 993, imap_ssl: 'ssl', smtp_host: '', smtp_port: 465, smtp_ssl: 'ssl', username: '', password: '', provider: '' }
 				await this.loadExternalAccounts()
 				showSuccess(this.t('souvera_mail', 'External account added'))
-			} catch (e) { showError(e?.response?.data?.error || this.t('souvera_mail', 'Failed to add account')) }
+			} catch (e) {
+				console.error('External account add failed', e)
+				const msg = e?.response?.data?.error || e?.response?.data?.message || e?.message || this.t('souvera_mail', 'Failed to add account')
+				showError(msg)
+			}
 		},
 		async removeExtAccount(id) {
 			try {
@@ -1137,7 +1141,8 @@ export default {
 .create-row { display: flex; align-items: center; gap: 8px; }
 .create-row :deep(input) { min-width: 200px; }
 .password-list { display: flex; flex-direction: column; gap: 6px; }
-.migration-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.migration-completed { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.migration-completed__badge { color: #2e7d32; font-weight: 600; font-size: 13px; }
 .password-row {
 	display: flex; justify-content: space-between; align-items: center; gap: 8px;
 	padding: 10px 14px; border: 1px solid var(--color-border);
