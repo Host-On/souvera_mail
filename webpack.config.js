@@ -1,4 +1,5 @@
 const path = require('path')
+const webpack = require('webpack')
 const { VueLoaderPlugin } = require('vue-loader')
 
 module.exports = {
@@ -57,6 +58,11 @@ module.exports = {
 	},
 	plugins: [
 		new VueLoaderPlugin(),
+		// Merge ALL async chunks into the entry bundles — the deployment
+		// (self-update zipball) has repeatedly failed to deliver chunk
+		// files (404 → "Loading chunk N failed"), breaking the app.
+		// One chunk per entry (migration-wizard + v2) = zero chunk files.
+		new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 2 }),
 	],
 	// Nextcloud globals (t, n, OC, OCP, OCA) are provided by the host page.
 	// Vue must NOT be externalised — it is bundled per app.

@@ -114,6 +114,8 @@ import MailboxItem from './components/MailboxItem.vue'
 import QuotaDonut from './components/QuotaDonut.vue'
 import ContactPicker from './components/ContactPicker.vue'
 import { useJmapClient } from './composables/useJmapClient.js'
+import axios from '@nextcloud/axios'
+import { generateUrl } from '@nextcloud/router'
 import { useHotkeys } from './composables/useHotkeys.js'
 
 const { fetchMailboxes } = useJmapClient()
@@ -213,8 +215,7 @@ export default {
 			}
 			// Persist per user — fire and forget.
 			try {
-				const { default: axios } = await import('@nextcloud/axios')
-				const { generateUrl } = await import('@nextcloud/router')
+				
 				await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { navCollapsedGroups: this.navCollapsedGroups })
 			} catch {}
 		},
@@ -274,16 +275,14 @@ export default {
 		},
 		async loadQuota() {
 			try {
-				const { default: axios } = await import('@nextcloud/axios')
-				const { generateUrl } = await import('@nextcloud/router')
+				
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/quota'))
 				this.quotaUsed = data.used ?? 0; this.quotaTotal = data.total ?? 0; this.quotaUnlimited = data.unlimited ?? false
 			} catch (e) { console.error('Failed to load quota', e) }
 		},
 		async loadShared() {
 			try {
-				const { default: axios } = await import('@nextcloud/axios')
-				const { generateUrl } = await import('@nextcloud/router')
+				
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/shared'))
 				this.sharedFolders = data.shared || []
 				this.sharedAbove = data.position === 'above'
@@ -302,8 +301,7 @@ export default {
 		},
 		async loadLayout() {
 			try {
-				const { default: axios } = await import('@nextcloud/axios')
-				const { generateUrl } = await import('@nextcloud/router')
+				
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
 				this.isVertical = data.verticalLayout || false
 				this.navCollapsedGroups = data.navCollapsedGroups || []

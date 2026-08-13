@@ -1,1 +1,0 @@
-"use strict";(globalThis.souveraMailChunks||=[]).push([[427],{427(s,a,u){u.r(a),u.d(a,{default:()=>l.N});var l=u(7256)}}]);

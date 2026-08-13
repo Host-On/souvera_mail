@@ -557,8 +557,10 @@ import DOMPurify from 'dompurify'
 import QuotaDonut from '../components/QuotaDonut.vue'
 import SieveFilterEditor from '../components/SieveFilterEditor.vue'
 import { useSieveClient } from '../composables/useSieveClient.js'
+import { useExternalAccounts } from '../composables/useExternalAccounts.js'
 
 const { fetchScripts, activateScript, deleteScript } = useSieveClient()
+const extAccountsApi = useExternalAccounts()
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 
@@ -811,8 +813,7 @@ export default {
 		// External accounts
 		async loadExternalAccounts() {
 			try {
-				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
-				const { list } = useExternalAccounts()
+				const { list } = extAccountsApi
 				this.extAccounts = await list()
 			} catch {}
 		},
@@ -832,8 +833,7 @@ export default {
 			if (!email || !email.includes('@')) return
 			if (this.extManualMode) return
 			try {
-				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
-				const { preset } = useExternalAccounts()
+				const { preset } = extAccountsApi
 				const p = await preset(email)
 				if (p) {
 					this.extForm.imap_host = p.imap_host || ''
@@ -852,8 +852,7 @@ export default {
 			this.extTestOk = false
 			this.extTestError = ''
 			try {
-				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
-				const { testConnection } = useExternalAccounts()
+				const { testConnection } = extAccountsApi
 				const r = await testConnection({ ...this.extForm })
 				if (r.ok) {
 					this.extTestOk = true
@@ -869,8 +868,7 @@ export default {
 		},
 		async addExtAccount() {
 			try {
-				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
-				const { create } = useExternalAccounts()
+				const { create } = extAccountsApi
 				// Username defaults to the email address when empty
 				if (!this.extForm.username) this.extForm.username = this.extForm.email
 				await create({ ...this.extForm })
@@ -889,8 +887,7 @@ export default {
 		},
 		async removeExtAccount(id) {
 			try {
-				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
-				const { remove } = useExternalAccounts()
+				const { remove } = extAccountsApi
 				await remove(id)
 				this.extAccounts = this.extAccounts.filter(a => a.id !== id)
 				showSuccess(this.t('souvera_mail', 'Account removed'))
@@ -898,8 +895,7 @@ export default {
 		},
 		async testExtAccount(acct) {
 			try {
-				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
-				const { test } = useExternalAccounts()
+				const { test } = extAccountsApi
 				const r = await test(acct.id)
 				if (r.ok) showSuccess(this.t('souvera_mail', 'Connection successful'))
 				else showError(r.error || this.t('souvera_mail', 'Connection failed'))
