@@ -25,7 +25,6 @@
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
 					<template v-for="group in sharedAccountGroups" :key="group.accountId">
 						<NcAppNavigationItem class="nav-group-toggle" :name="group.accountName"
-							:active="groupActive(group.accountId)"
 							@click="toggleGroup(group.accountId)">
 							<template #icon>
 								<ChevronDown v-if="!isGroupCollapsed(group.accountId)" :size="16" />
@@ -38,6 +37,7 @@
 						<template v-if="!isGroupCollapsed(group.accountId)">
 							<MailboxItem v-for="mp in group.roots" :key="mp.id"
 								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
+								account-scoped
 								@select="onSharedSelect(mp._accountId, $event)"
 								@drop-email="onDropEmail" />
 						</template>
@@ -61,7 +61,6 @@
 					</li>
 					<template v-for="acc in externalAccounts" :key="'ext-'+acc.id">
 						<NcAppNavigationItem class="nav-group-toggle" :name="acc.email"
-							:active="$route.name === 'external' && String($route.params.id) === String(acc.id)"
 							@click.prevent="toggleExtAccount(acc)">
 							<template #icon>
 								<ChevronDown v-if="extExpanded[acc.id]" :size="16" />
@@ -92,7 +91,6 @@
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
 					<template v-for="group in sharedAccountGroups" :key="'low-'+group.accountId">
 						<NcAppNavigationItem class="nav-group-toggle" :name="group.accountName"
-							:active="groupActive(group.accountId)"
 							@click="toggleGroup(group.accountId)">
 							<template #icon>
 								<ChevronDown v-if="!isGroupCollapsed(group.accountId)" :size="16" />
@@ -105,6 +103,7 @@
 						<template v-if="!isGroupCollapsed(group.accountId)">
 							<MailboxItem v-for="mp in group.roots" :key="mp.id"
 								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
+								account-scoped
 								@select="onSharedSelect(mp._accountId, $event)"
 								@drop-email="onDropEmail" />
 						</template>
@@ -245,10 +244,6 @@ export default {
 				.filter(m => m._accountId === accountId)
 				.reduce((sum, m) => sum + (m.unread || 0), 0)
 		},
-		// True when the currently selected mailbox belongs to this account.
-		groupActive(accountId) {
-			return this.selectedMailbox?.startsWith(accountId + '|') || false
-		},
 		async toggleGroup(accountId) {
 			if (this.isGroupCollapsed(accountId)) {
 				this.navCollapsedGroups = this.navCollapsedGroups.filter(id => id !== accountId)
@@ -375,6 +370,9 @@ export default {
 			return (this.extFolders[id] || []).reduce((sum, f) => sum + (f.unread || 0), 0)
 		},
 		openExtFolder(acc, f) {
+			// Drop any JMAP mailbox selection — external folders live on a
+			// different route and must not keep the old mailbox lit.
+			this.selectedMailbox = ''
 			this.$router.push({ name: 'external', params: { id: acc.id }, query: { folder: f.path } })
 		},
 	},

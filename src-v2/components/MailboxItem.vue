@@ -25,6 +25,7 @@
 				:all-mailboxes="allMailboxes"
 				:selected="selected"
 				:depth="depth + 1"
+				:account-scoped="accountScoped"
 				@select="$emit('select', $event)"
 				@drop-email="$emit('dropEmail', $event)" />
 		</template>
@@ -57,6 +58,10 @@ export default {
 		allMailboxes: { type: Array, default: () => [] },
 		selected: { type: String, default: '' },
 		depth: { type: Number, default: 0 },
+		// Shared-account mailboxes: the selection id is account-scoped
+		// ('accountId|mailboxId') and must ONLY match that form. Prevents
+		// bare-id collisions across accounts lighting up wrong folders.
+		accountScoped: { type: Boolean, default: false },
 	},
 	emits: ['select', 'dropEmail'],
 	data() { return { open: false, dragOver: false } },
@@ -64,8 +69,10 @@ export default {
 		displayName() { return mailboxDisplayName(this.mailbox) },
 		active() {
 			if (!this.selected) return false
+			if (this.accountScoped) {
+				return this.selected === (this.mailbox._accountId + '|' + this.mailbox.id)
+			}
 			return this.selected === this.mailbox.id
-				|| this.selected === (this.mailbox._accountId + '|' + this.mailbox.id)
 		},
 		icon() { return ROLE_ICONS[this.mailbox.role] || Folder },
 		children() {
