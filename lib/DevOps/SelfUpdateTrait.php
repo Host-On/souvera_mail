@@ -272,18 +272,28 @@ trait SelfUpdateTrait
                     'installed_version' => $installedVersion,
                 ];
             }
+            $needsReapply = false;
             if ($extractedVersion === $installedVersion) {
-                // Identical content — treat as up to date. The caller
-                // refreshes devops.last_sha/last_version, which also breaks
-                // the first-run loop for pre-baseline installations.
-                $this->rmdirRecursive($extractDir);
-                return [
-                    'up_to_date' => true,
-                    'extracted_version' => $extractedVersion,
-                    'installed_version' => $installedVersion,
-                ];
+                // Identical version — normally up to date. BUT: a previous
+                // update may have left the installed app in a broken,
+                // half-copied state (missing files) with the same version
+                // number. Heal it instead of reporting up_to_date forever.
+                if ($this->appHasCoreFiles($appPath)) {
+                    $this->rmdirRecursive($extractDir);
+                    return [
+                        'up_to_date' => true,
+                        'extracted_version' => $extractedVersion,
+                        'installed_version' => $installedVersion,
+                    ];
+                }
+                \OCP\Server::get(\Psr\Log\LoggerInterface::class)->warning(
+                    'SelfUpdate: installed app ' . $appId . ' reports version '
+                    . $installedVersion . ' but core files are missing — re-applying.',
+                    ['app' => $appId]
+                );
+                $needsReapply = true;
             }
-            if (version_compare($extractedVersion, $installedVersion, '<=')) {
+            if (!$needsReapply && version_compare($extractedVersion, $installedVersion, '<=')) {
                 $this->rmdirRecursive($extractDir);
                 return [
                     'error' => "Downgrade blocked: extracted app version {$extractedVersion} "
@@ -294,25 +304,48 @@ trait SelfUpdateTrait
             }
         }
 
-        // Atomic swap: backup current → extract new → enable → keep or rollback.
+        // Atomic swap: stage the new tree NEXT TO the live app first (the
+        // slow file-by-file copy then never affects running requests),
+        // then swap two sibling renames on the same filesystem.
         $backupDir = $appPath . '.bak';
         if (is_dir($backupDir)) {
             $this->rmdirRecursive($backupDir);
         }
+        $stagingDir = $appPath . '.new';
+        if (is_dir($stagingDir)) {
+            $this->rmdirRecursive($stagingDir);
+        }
+        // EXDEV-safe: the extract dir lives on the local filesystem
+        // (/tmp), the app dir possibly on NFS — rename() across mounts
+        // fails with "Invalid cross-device link". Copy file-by-file into
+        // the staging dir (same filesystem as the final app dir).
+        try {
+            $this->copyRecursive($sourceDir, $stagingDir);
+        } catch (\Throwable $e) {
+            $this->rmdirRecursive($stagingDir);
+            $this->rmdirRecursive($extractDir);
+            return ['error' => 'Cannot copy extracted app into staging: ' . $e->getMessage()];
+        }
+        if (!$this->appHasCoreFiles($stagingDir)) {
+            $this->rmdirRecursive($stagingDir);
+            $this->rmdirRecursive($extractDir);
+            return ['error' => 'Staged app is incomplete — update aborted'];
+        }
         if (!rename($appPath, $backupDir)) {
+            $this->rmdirRecursive($stagingDir);
             $this->rmdirRecursive($extractDir);
             return ['error' => 'Cannot move current app to backup'];
         }
-        // EXDEV-safe install: the extract dir lives on the local filesystem
-        // (/tmp), the app dir on NFS — rename() across mounts fails with
-        // "Invalid cross-device link". Copy file-by-file instead.
-        try {
-            $this->copyRecursive($sourceDir, $appPath);
-        } catch (\Throwable $e) {
-            // Restore backup.
-            rename($backupDir, $appPath);
+        if (!rename($stagingDir, $appPath)) {
+            // Restore backup, clean up staging.
+            if (!rename($backupDir, $appPath)) {
+                $this->rmdirRecursive($stagingDir);
+                $this->rmdirRecursive($extractDir);
+                return ['error' => 'FATAL: cannot move app to backup AND cannot restore it — app dir missing'];
+            }
+            $this->rmdirRecursive($stagingDir);
             $this->rmdirRecursive($extractDir);
-            return ['error' => 'Cannot copy extracted app into place: ' . $e->getMessage()];
+            return ['error' => 'Cannot move staged app into place'];
         }
         $this->rmdirRecursive($sourceDir);
 
@@ -320,7 +353,10 @@ trait SelfUpdateTrait
         if (!empty($enableResult['error'])) {
             // Rollback: restore backup, remove broken new version.
             $this->rmdirRecursive($appPath);
-            rename($backupDir, $appPath);
+            if (!rename($backupDir, $appPath)) {
+                $this->rmdirRecursive($extractDir);
+                return ['error' => 'FATAL: enable failed AND backup restore failed — app dir missing'];
+            }
             $this->rmdirRecursive($extractDir);
             return $enableResult;
         }
@@ -329,6 +365,28 @@ trait SelfUpdateTrait
         $this->rmdirRecursive($backupDir);
         $this->rmdirRecursive($extractDir);
         return $enableResult;
+    }
+
+    /**
+     * Sanity check that an app directory contains the files the app needs
+     * to boot (autoload bootstrap + main entry points). Used to detect a
+     * half-copied install and to validate the staging directory before
+     * the atomic swap.
+     */
+    private function appHasCoreFiles(string $appDir): bool
+    {
+        $required = [
+            'appinfo/info.xml',
+            'composer/autoload.php',
+            'lib/Controller/PageController.php',
+            'lib/Service/L10nService.php',
+        ];
+        foreach ($required as $rel) {
+            if (!\is_file($appDir . '/' . $rel)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private function readAppVersion(string $appDir): ?string
