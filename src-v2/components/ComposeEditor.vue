@@ -239,12 +239,28 @@ export default {
 			return DOMPurify.sanitize(this.signatureHtml, { USE_PROFILES: { html: true } })
 		},
 		// Thunderbird-style signature block: RFC 3676 separator "--" line
-		// followed by the sanitized signature HTML. Inserted directly into
-		// the editor on init (new/reply/forward).
+		// followed by the signature. The signature HTML is wrapped in a
+		// <div data-signature> so the editor renders it RAW (tables, images,
+		// inline styles) via the custom SignatureNode without normalising it.
 		signatureBlock() {
 			const sig = this.sanitizedSignature()
 			if (!sig) return ''
-			return `<p>--</p>${sig}`
+			return `<p>--</p><div data-signature="">${sig}</div>`
+		},
+		// Serialize the editor body for sending: getHTML emits an empty
+		// <div data-signature=""></div> marker for each signature node —
+		// replace it with the sanitized raw HTML (or strip when disabled).
+		serializeBody() {
+			const raw = this.signatureEnabled ? this.sanitizedSignature() : ''
+			let html = this.bodyHtml
+			if (raw) {
+				html = html.replace(/<div data-signature=""><\/div>/, `<div data-signature="">${raw}</div>`)
+			} else {
+				html = html.replace(/<div data-signature=""><\/div>/, '')
+				// Also drop a leftover standalone "--" separator line
+				html = html.replace(/<p>\s*--\s*<\/p>/, '')
+			}
+			return html
 		},
 		// Replaces the editor content only while it is still untouched
 		// (re-checked at execution time), and suppresses the dirty flag for
@@ -367,9 +383,9 @@ export default {
 			}
 		},
 		buildPayload() {
-			// The signature is already part of this.bodyHtml (inserted into
-			// the editor on init) — no second attachment here.
-			const bodyHtml = this.bodyHtml
+			// The signature lives in the editor as a marker node — serialize
+			// it back to raw HTML before sending/drafting.
+			const bodyHtml = this.serializeBody()
 			return {
 				identityId: this.fromIdentityId,
 				to: this.to.map(r => r.email),

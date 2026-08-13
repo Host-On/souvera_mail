@@ -131,6 +131,7 @@ import StarterKit from '@tiptap/starter-kit'
 import LinkExtension from '@tiptap/extension-link'
 import Underline from '@tiptap/extension-underline'
 import Placeholder from '@tiptap/extension-placeholder'
+import { Signature } from './SignatureNode.js'
 
 export default {
 	name: 'RichTextEditor',
@@ -166,6 +167,7 @@ export default {
 				Placeholder.configure({
 					placeholder: this.placeholder,
 				}),
+				Signature,
 			],
 			onUpdate: () => {
 				this.$emit('update:modelValue', this.editor.getHTML())
@@ -357,4 +359,23 @@ export default {
 .richtext-editor__content :deep(em) { font-style: italic; }
 
 .richtext-editor__loading { display: flex; justify-content: center; padding: 48px; }
+
+/* ── Signature node (raw HTML, non-editable) ───────────────────────── */
+.richtext-editor__content :deep(.signature-node) {
+	margin-top: 14px;
+	padding-top: 8px;
+	border-top: 1px dashed var(--color-border);
+	cursor: default;
+}
+.richtext-editor__content :deep(.signature-node *) {
+	max-width: 100%;
+}
+.richtext-editor__content :deep(.signature-node table) {
+	border-collapse: collapse;
+	max-width: 100%;
+}
+.richtext-editor__content :deep(.signature-node img) {
+	max-width: 100%;
+	height: auto;
+}
 </style>
