@@ -376,7 +376,7 @@
 						</div>
 					</div>
 
-					<NcButton variant="primary" @click="showExtAccountForm = true">
+					<NcButton variant="primary" @click="openExtAccountForm">
 						<template #icon><Plus :size="20" /></template>
 						{{ t('souvera_mail', 'Add external account') }}
 					</NcButton>
@@ -393,25 +393,84 @@
 						<label>{{ t('souvera_mail', 'Email address') }}</label>
 						<NcTextField v-model="extForm.email" placeholder="user@web.de" @update:value="onExtEmailChange" />
 					</div>
-					<template v-if="extForm.imap_host">
-						<div class="ext-account-form__field">
-							<label>{{ t('souvera_mail', 'Password') }}</label>
-							<NcTextField v-model="extForm.password" type="password" />
+					<div class="ext-account-form__field">
+						<label>{{ t('souvera_mail', 'Password') }}</label>
+						<NcTextField v-model="extForm.password" type="password" />
+					</div>
+
+					<!-- Auto-config summary (preset found, manual collapsed) -->
+					<div v-if="extForm.imap_host && !extManualMode" class="ext-account-form__preset-summary">
+						<div class="ext-account-form__preset-row">
+							<span class="ext-account-form__preset-label">IMAP</span>
+							<code>{{ extForm.imap_host }}:{{ extForm.imap_port }} ({{ sslLabel(extForm.imap_ssl) }})</code>
 						</div>
-						<div class="ext-account-form__row">
-							<div class="ext-account-form__field">
-								<label>IMAP</label>
-								<NcTextField :value="extForm.imap_host + ':' + extForm.imap_port + ' (' + extForm.imap_ssl + ')'" disabled />
+						<div class="ext-account-form__preset-row">
+							<span class="ext-account-form__preset-label">SMTP</span>
+							<code>{{ extForm.smtp_host }}:{{ extForm.smtp_port }} ({{ sslLabel(extForm.smtp_ssl) }})</code>
+						</div>
+						<NcButton variant="tertiary" size="small" @click="extManualMode = true">
+							{{ t('souvera_mail', 'Manual configuration') }}
+						</NcButton>
+					</div>
+
+					<!-- Manual configuration -->
+					<template v-if="extManualMode">
+						<div class="ext-account-form__section">
+							<label class="ext-account-form__section-title">{{ t('souvera_mail', 'Incoming server (IMAP)') }}</label>
+							<div class="ext-account-form__row">
+								<div class="ext-account-form__field" style="flex:2">
+									<label>{{ t('souvera_mail', 'Host') }}</label>
+									<NcTextField v-model="extForm.imap_host" placeholder="imap.example.com" />
+								</div>
+								<div class="ext-account-form__field" style="flex:1">
+									<label>{{ t('souvera_mail', 'Port') }}</label>
+									<NcTextField v-model="extForm.imap_port" type="number" />
+								</div>
+								<div class="ext-account-form__field" style="flex:1">
+									<label>{{ t('souvera_mail', 'Security') }}</label>
+									<select v-model="extForm.imap_ssl" class="native-select">
+										<option value="ssl">SSL/TLS</option>
+										<option value="starttls">STARTTLS</option>
+										<option value="none">{{ t('souvera_mail', 'None') }}</option>
+									</select>
+								</div>
 							</div>
-							<div class="ext-account-form__field">
-								<label>SMTP</label>
-								<NcTextField :value="extForm.smtp_host + ':' + extForm.smtp_port + ' (' + extForm.smtp_ssl + ')'" disabled />
+						</div>
+						<div class="ext-account-form__section">
+							<label class="ext-account-form__section-title">{{ t('souvera_mail', 'Outgoing server (SMTP)') }}</label>
+							<div class="ext-account-form__row">
+								<div class="ext-account-form__field" style="flex:2">
+									<label>{{ t('souvera_mail', 'Host') }}</label>
+									<NcTextField v-model="extForm.smtp_host" placeholder="smtp.example.com" />
+								</div>
+								<div class="ext-account-form__field" style="flex:1">
+									<label>{{ t('souvera_mail', 'Port') }}</label>
+									<NcTextField v-model="extForm.smtp_port" type="number" />
+								</div>
+								<div class="ext-account-form__field" style="flex:1">
+									<label>{{ t('souvera_mail', 'Security') }}</label>
+									<select v-model="extForm.smtp_ssl" class="native-select">
+										<option value="ssl">SSL/TLS</option>
+										<option value="starttls">STARTTLS</option>
+										<option value="none">{{ t('souvera_mail', 'None') }}</option>
+									</select>
+								</div>
 							</div>
+						</div>
+						<div class="ext-account-form__field">
+							<label>{{ t('souvera_mail', 'Username') }}</label>
+							<NcTextField v-model="extForm.username" :placeholder="extForm.email || 'user@example.com'" />
 						</div>
 					</template>
+
+					<!-- If no preset was found and manual not open, offer manual -->
+					<NcButton v-if="!extForm.imap_host && !extManualMode" variant="tertiary" @click="extManualMode = true">
+						{{ t('souvera_mail', 'Manual configuration') }}
+					</NcButton>
+
 					<div class="ext-account-form__actions">
 						<NcButton variant="secondary" @click="showExtAccountForm = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
-						<NcButton variant="primary" @click="addExtAccount" :disabled="!extForm.email || !extForm.imap_host || !extForm.password">{{ t('souvera_mail', 'Add account') }}</NcButton>
+						<NcButton variant="primary" @click="addExtAccount" :disabled="!extForm.email || !extForm.imap_host || !extForm.smtp_host || !extForm.password">{{ t('souvera_mail', 'Add account') }}</NcButton>
 					</div>
 				</div>
 			</NcDialog>
@@ -559,6 +618,7 @@ export default {
 
 			extAccounts: [],
 			showExtAccountForm: false,
+			extManualMode: false,
 			extForm: { email: '', imap_host: '', imap_port: 993, imap_ssl: 'ssl', smtp_host: '', smtp_port: 465, smtp_ssl: 'ssl', username: '', password: '', provider: '' },
 
 			identityOptions: [],
@@ -719,8 +779,19 @@ export default {
 				this.extAccounts = await list()
 			} catch {}
 		},
+		openExtAccountForm() {
+			this.extManualMode = false
+			this.extForm = { email: '', imap_host: '', imap_port: 993, imap_ssl: 'ssl', smtp_host: '', smtp_port: 465, smtp_ssl: 'ssl', username: '', password: '', provider: '' }
+			this.showExtAccountForm = true
+		},
+		sslLabel(ssl) {
+			if (ssl === 'starttls') return 'STARTTLS'
+			if (ssl === 'none') return this.t('souvera_mail', 'None')
+			return 'SSL/TLS'
+		},
 		async onExtEmailChange(email) {
 			if (!email || !email.includes('@')) return
+			if (this.extManualMode) return
 			try {
 				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
 				const { preset } = useExternalAccounts()
@@ -741,8 +812,11 @@ export default {
 			try {
 				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
 				const { create } = useExternalAccounts()
+				// Username defaults to the email address when empty
+				if (!this.extForm.username) this.extForm.username = this.extForm.email
 				await create({ ...this.extForm })
 				this.showExtAccountForm = false
+				this.extManualMode = false
 				this.extForm = { email: '', imap_host: '', imap_port: 993, imap_ssl: 'ssl', smtp_host: '', smtp_port: 465, smtp_ssl: 'ssl', username: '', password: '', provider: '' }
 				await this.loadExternalAccounts()
 				showSuccess(this.t('souvera_mail', 'External account added'))
@@ -1129,4 +1203,20 @@ export default {
 .ext-account-form__row { display: flex; gap: 12px; }
 .ext-account-form__row .ext-account-form__field { flex: 1; }
 .ext-account-form__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.ext-account-form__preset-summary {
+	display: flex; flex-direction: column; gap: 4px;
+	padding: 8px 12px; border-radius: 6px;
+	background: var(--color-background-dark);
+}
+.ext-account-form__preset-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.ext-account-form__preset-label { width: 48px; font-weight: 600; color: var(--color-text-maxcontrast); flex-shrink: 0; }
+.ext-account-form__preset-row code { font-family: monospace; font-size: 12px; }
+.ext-account-form__section { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; }
+.ext-account-form__section-title { font-size: 13px; font-weight: 700; color: var(--color-main-text); }
+.ext-account-form .native-select {
+	width: 100%; min-height: 34px; padding: 4px 8px;
+	border: 1px solid var(--color-border); border-radius: 6px;
+	background: var(--color-main-background); color: var(--color-main-text);
+	font-size: 13px;
+}
 </style>
