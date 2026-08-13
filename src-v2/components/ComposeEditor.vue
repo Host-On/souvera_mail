@@ -341,7 +341,7 @@ export default {
 		async loadIdentities() {
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/identities'))
-				const list = (data.identities || []).map(i => ({ id: i.id, label: `${i.name || ''} <${i.email}>`, name: i.name, email: i.email }))
+				const list = (data.identities || []).map(i => ({ id: i.id, label: i.name ? `${i.name} <${i.email}>` : i.email, name: i.name, email: i.email }))
 				this.identities = list
 				if (list.length > 0) {
 					const pref = this.defaultIdentityId ? list.find(i => i.id === this.defaultIdentityId) : null

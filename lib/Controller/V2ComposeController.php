@@ -54,13 +54,15 @@ class V2ComposeController extends Controller
 
         // Add aliases from souvera_central (email addresses that deliver
         // to this mailbox but are NOT JMAP identities).
+        $user = \OCP\Server::get(\OCP\IUserSession::class)->getUser();
+        $uid = $user !== null ? $user->getUID() : '';
         $aliases = $this->resolveAliases();
         $knownEmails = \array_map(fn($i) => \strtolower((string) $i['email']), $identities);
         foreach ($aliases as $alias) {
             if (\in_array(\strtolower($alias), $knownEmails, true)) continue;
             $identities[] = [
                 'id' => 'alias:' . $alias,
-                'name' => '',
+                'name' => $uid !== '' ? ($this->resolveAliasDisplayName($uid, $alias) ?? '') : '',
                 'email' => $alias,
                 'isAlias' => true,
             ];
@@ -129,6 +131,27 @@ class V2ComposeController extends Controller
     }
 
     /**
+     * Look up a user-defined display name for an alias address.
+     * Aliases are not JMAP identities, so the name is stored in user
+     * preferences (pref_alias_names — JSON map alias email → name).
+     */
+    private function resolveAliasDisplayName(string $uid, string $alias): ?string
+    {
+        try {
+            $config = \OCP\Server::get(\OCP\IConfig::class);
+            $raw = $config->getUserValue($uid, 'souvera_mail', 'pref_alias_names', '');
+            $map = \json_decode($raw, true);
+            if (!\is_array($map)) return null;
+            $value = $map[\strtolower($alias)] ?? null;
+            if (!\is_string($value)) return null;
+            $name = \trim($value);
+            return $name !== '' ? $name : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
      * POST /apps/souvera_mail/api/v2/send
      */
     #[NoAdminRequired]
@@ -168,6 +191,7 @@ class V2ComposeController extends Controller
         // the primary JMAP identity. The alias MUST be one of the user's
         // real aliases — never trust the client-provided address verbatim.
         $fromEmail = $userEmail;
+        $fromName = null;
         if ($identityId !== null && \str_starts_with((string) $identityId, 'alias:')) {
             $alias = \strtolower(\trim(\substr((string) $identityId, 6)));
             $allowedAliases = \array_map('strtolower', $this->resolveAliases());
@@ -175,6 +199,7 @@ class V2ComposeController extends Controller
                 return new JSONResponse(['error' => 'Unknown alias address'], 400);
             }
             $fromEmail = $alias;
+            $fromName = $this->resolveAliasDisplayName($user->getUID(), $alias);
             $identityId = $this->resolveIdentityId($accountId);
             if ($identityId === null) {
                 return new JSONResponse(['error' => 'No JMAP identity found'], 500);
@@ -228,7 +253,7 @@ class V2ComposeController extends Controller
             $fromEmail, $toAddr, $ccAddr, $bccAddr,
             $subject, $bodyHtml, $bodyPlain,
             \array_merge($blobIds, $fwdBlobIds),
-            $inReplyTo, $references, $draftsId
+            $inReplyTo, $references, $draftsId, $fromName
         );
 
         // Step 1: Email/set — create in drafts, then patch to sent
@@ -441,10 +466,15 @@ class V2ComposeController extends Controller
         array $attachmentBlobs,
         ?string $inReplyTo, ?string $references,
         ?string $draftsId,
+        ?string $fromName = null,
     ): array {
+        $fromHeader = ['email' => $userEmail];
+        if ($fromName !== null && $fromName !== '') {
+            $fromHeader['name'] = $fromName;
+        }
         $emailObj = [
             'subject' => $subject,
-            'from' => [['email' => $userEmail]],
+            'from' => [$fromHeader],
             'to' => \array_map(fn($e) => ['email' => \trim($e)], $toAddr),
             'keywords' => ['$draft' => true, '$seen' => true],
         ];

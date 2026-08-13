@@ -119,12 +119,12 @@
 										</template>
 										<template v-else>
 											{{ i.name || t('souvera_mail', '(no display name)') }}
-											<NcButton v-if="!i.isAlias" variant="tertiary" size="small"
+											<NcButton variant="tertiary" size="small"
 												:title="t('souvera_mail', 'Edit name')"
 												@click="startEditIdentity(i)">
 												<template #icon><Pencil :size="12" /></template>
 											</NcButton>
-											<span v-else class="identity-row__alias-tag">{{ t('souvera_mail', 'Alias') }}</span>
+											<span v-if="i.isAlias" class="identity-row__alias-tag">{{ t('souvera_mail', 'Alias') }}</span>
 										</template>
 									</div>
 								</div>
@@ -651,6 +651,7 @@ export default {
 			defaultIdentityOption: null,
 			editingIdentityId: null,
 			editingIdentityName: '',
+			aliasDisplayNames: {},
 		}
 	},
 	mounted() {
@@ -766,6 +767,7 @@ export default {
 				const pp = this.pageSizeOptions.find(o => o.value === p.messagesPerPage)
 				if (pp) this.messagesPerPageOption = pp
 				this._prefsDefaultIdentityId = p.defaultIdentityId || ''
+				this.aliasDisplayNames = p.aliasDisplayNames || {}
 			} catch {}
 			this.loaded = true
 			this.loadIdentityOptions()
@@ -782,7 +784,11 @@ export default {
 		async loadIdentityOptions() {
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/identities'))
-				const list = (data.identities || []).map(i => ({ id: i.id, label: `${i.name ? i.name + ' <' + i.email + '>' : i.email}`, value: i.id, name: i.name, email: i.email, isAlias: !!i.isAlias }))
+				const list = (data.identities || []).map(i => {
+					const isAlias = !!i.isAlias
+					const name = (i.name || '').trim() || (isAlias ? (this.aliasDisplayNames[(i.email || '').toLowerCase()] || '') : '')
+					return { id: i.id, label: name ? `${name} <${i.email}>` : i.email, value: i.id, name, email: i.email, isAlias }
+				})
 				this.identityOptions = list
 				const prefId = this._prefsDefaultIdentityId
 				const found = prefId ? list.find(i => i.id === prefId) : null
@@ -802,8 +808,19 @@ export default {
 		},
 		async saveIdentityName(identity) {
 			try {
-				await axios.put(generateUrl('/apps/souvera_mail/api/v2/identities/' + identity.id), { name: this.editingIdentityName })
-				identity.name = this.editingIdentityName
+				if (identity.isAlias) {
+					const names = { ...this.aliasDisplayNames }
+					const key = (identity.email || '').toLowerCase()
+					const name = this.editingIdentityName.trim()
+					if (name) names[key] = name
+					else delete names[key]
+					await API.savePrefs({ aliasDisplayNames: names })
+					this.aliasDisplayNames = names
+				} else {
+					await axios.put(generateUrl('/apps/souvera_mail/api/v2/identities/' + identity.id), { name: this.editingIdentityName })
+				}
+				identity.name = this.editingIdentityName.trim()
+				identity.label = identity.name ? `${identity.name} <${identity.email}>` : identity.email
 				this.editingIdentityId = null
 				showSuccess(this.t('souvera_mail', 'Identity saved'))
 			} catch (e) {

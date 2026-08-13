@@ -128,6 +128,7 @@ class V2SettingsController extends Controller
             'notificationSound' => $this->getPref($uid, 'pref_notification_sound', 'none'),
             'defaultIdentityId' => $this->getPref($uid, 'pref_default_identity', ''),
             'navCollapsedGroups' => \json_decode($this->getPref($uid, 'pref_nav_collapsed_groups', '[]'), true) ?: [],
+            'aliasDisplayNames' => \json_decode($this->getPref($uid, 'pref_alias_names', '{}'), true) ?: [],
             'account' => [
                 'email' => $user->getSystemEMailAddress() ?? $uid,
                 'server' => '',
@@ -171,6 +172,7 @@ class V2SettingsController extends Controller
             'notificationSound' => 'pref_notification_sound',
             'defaultIdentityId' => 'pref_default_identity',
             'navCollapsedGroups' => 'pref_nav_collapsed_groups',
+            'aliasDisplayNames' => 'pref_alias_names',
         ];
 
         // The signature HTML is stored as a FILE (64 KB DB limit would
