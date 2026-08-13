@@ -1,6 +1,6 @@
 <template>
 	<NcModal v-model:show="visible" :size="fullscreen ? '' : 'large'" @close="onClose"
-		:class="{ 'compose-modal--fullscreen': fullscreen }">
+		:class="['compose-modal', { 'compose-modal--fullscreen': fullscreen }]">
 		<div class="compose-layout">
 			<div class="compose-layout__header">
 				<h3>{{ composeTitle }}</h3>
@@ -14,40 +14,53 @@
 				</NcButton>
 			</div>
 
-			<div v-if="identities.length > 1" class="compose-field compose-field--from">
-				<label class="compose-field__label">{{ t('souvera_mail', 'From') }}</label>
-				<div class="compose-field__select-wrap">
+			<div v-if="identities.length > 1" class="compose-row">
+				<span class="compose-row__label">{{ t('souvera_mail', 'From') }}</span>
+				<div class="compose-row__select-wrap">
 					<select v-model="fromIdentityId" class="native-select">
 						<option v-for="identity in identities" :key="identity.id" :value="identity.id">
 							{{ identity.label }}
 						</option>
 					</select>
-					<ChevronDown :size="18" class="compose-field__select-icon" />
+					<ChevronDown :size="16" class="compose-row__select-icon" />
 				</div>
 			</div>
-			<div v-else-if="identities.length === 1" class="compose-field compose-field--from">
-				<label class="compose-field__label">{{ t('souvera_mail', 'From') }}</label>
-				<div class="compose-field__select-wrap">
-					<div class="compose-field__static-text">{{ identities[0].label }}</div>
-					<ChevronDown :size="18" class="compose-field__select-icon" />
+			<div v-else-if="identities.length === 1" class="compose-row">
+				<span class="compose-row__label">{{ t('souvera_mail', 'From') }}</span>
+				<div class="compose-row__select-wrap">
+					<div class="compose-row__static-text">{{ identities[0].label }}</div>
 				</div>
 			</div>
 
-			<div class="compose-field">
-				<label class="compose-field__label">{{ t('souvera_mail', 'To') }}</label>
-				<RecipientField v-model="to" :placeholder="t('souvera_mail', 'To') + '…'" />
-				<div class="compose-toggle-row">
+			<div class="compose-row">
+				<span class="compose-row__label">{{ t('souvera_mail', 'To') }}</span>
+				<div class="compose-row__input-wrap">
+					<RecipientField v-model="to" :placeholder="t('souvera_mail', 'To') + '…'" />
+				</div>
+				<div class="compose-row__toggles">
 					<button class="toggle-btn" :class="{ 'toggle-btn--active': showCc }" @click="showCc = !showCc">{{ t('souvera_mail', 'Cc') }}</button>
 					<button class="toggle-btn" :class="{ 'toggle-btn--active': showBcc }" @click="showBcc = !showBcc">{{ t('souvera_mail', 'Bcc') }}</button>
 				</div>
-				<RecipientField v-if="showCc || cc.length > 0" v-model="cc" :placeholder="t('souvera_mail', 'Cc') + '…'" />
-				<RecipientField v-if="showBcc || bcc.length > 0" v-model="bcc" :placeholder="t('souvera_mail', 'Bcc') + '…'" />
+			</div>
+			<div class="compose-row" v-if="showCc || cc.length > 0">
+				<span class="compose-row__label">{{ t('souvera_mail', 'Cc') }}</span>
+				<div class="compose-row__input-wrap">
+					<RecipientField v-model="cc" :placeholder="t('souvera_mail', 'Cc') + '…'" />
+				</div>
+			</div>
+			<div class="compose-row" v-if="showBcc || bcc.length > 0">
+				<span class="compose-row__label">{{ t('souvera_mail', 'Bcc') }}</span>
+				<div class="compose-row__input-wrap">
+					<RecipientField v-model="bcc" :placeholder="t('souvera_mail', 'Bcc') + '…'" />
+				</div>
 			</div>
 
-			<div class="compose-field">
-				<label class="compose-field__label">{{ t('souvera_mail', 'Subject') }}</label>
-				<NcTextField v-model="subject"
-					:placeholder="t('souvera_mail', 'Subject') + '…'" />
+			<div class="compose-row">
+				<span class="compose-row__label">{{ t('souvera_mail', 'Subject') }}</span>
+				<div class="compose-row__input-wrap">
+					<NcTextField v-model="subject"
+						:placeholder="t('souvera_mail', 'Subject') + '…'" />
+				</div>
 			</div>
 
 			<div class="compose-field compose-field--body">
@@ -471,9 +484,68 @@ export default {
 <style scoped>
 .compose-layout { display: flex; flex-direction: column; height: 85vh; max-height: 85vh; overflow: hidden; }
 
-.compose-layout__header { padding: 12px 20px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
-.compose-layout__header h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.compose-layout__header { padding: 10px 16px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
+.compose-layout__header h3 { margin: 0; font-size: 15px; font-weight: 600; }
 .compose-modal--fullscreen :deep(.modal-container) { max-width: calc(100vw - 32px) !important; max-height: calc(100vh - 32px) !important; width: calc(100vw - 32px) !important; }
+/* Narrower compose window by default */
+.compose-modal :deep(.modal-container) { max-width: 640px !important; }
+
+/* Compact single-line rows for From/To/Cc/Bcc/Subject — Thunderbird style */
+.compose-row {
+	display: flex; align-items: center; gap: 8px;
+	padding: 4px 16px;
+	border-bottom: 1px solid var(--color-border);
+	flex-shrink: 0;
+	min-height: 36px;
+}
+.compose-row__label {
+	flex-shrink: 0;
+	width: 48px;
+	font-size: 12px;
+	color: var(--color-text-maxcontrast);
+	font-weight: 600;
+}
+.compose-row__select-wrap { position: relative; flex: 1; max-width: 420px; }
+.compose-row__select-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none; color: var(--color-text-maxcontrast); }
+.compose-row__static-text { padding: 5px 10px; font-size: 13px; color: var(--color-main-text); }
+.compose-row__input-wrap { flex: 1; min-width: 0; }
+.compose-row__toggles { display: flex; gap: 4px; flex-shrink: 0; }
+
+.compose-row :deep(.native-select) {
+	width: 100%;
+	border: none;
+	background: transparent;
+	font-size: 13px;
+	padding: 5px 24px 5px 10px;
+	appearance: none;
+	cursor: pointer;
+	color: var(--color-main-text);
+	border-radius: var(--border-radius);
+}
+.compose-row :deep(.native-select:hover) { background: var(--color-background-hover); }
+.compose-row :deep(.native-select:focus) { outline: 2px solid var(--color-primary-element); outline-offset: -2px; }
+
+.compose-row :deep(.recipient-field__input) {
+	border: none !important;
+	background: transparent !important;
+	width: 100% !important;
+	min-width: 60px !important;
+	min-height: 0 !important;
+	padding: 5px 0 !important;
+	font-size: 13px !important;
+	flex: 1 !important;
+}
+
+.compose-row :deep(.input-field) {
+	width: 100% !important;
+	--input-border-color: transparent;
+	margin: 0 !important;
+}
+.compose-row :deep(.input-field__input) {
+	padding: 5px 0 !important;
+	font-size: 13px !important;
+	height: auto !important;
+}
 
 .compose-field {
 	padding: 10px 20px;
@@ -589,9 +661,9 @@ export default {
 /* #3: Cc/Bcc pill buttons */
 .compose-toggle-row { display: flex; gap: 6px; margin-top: 8px; }
 .toggle-btn {
-	padding: 3px 10px;
+	padding: 3px 8px;
 	border: 1px solid var(--color-border);
-	border-radius: var(--border-radius-large);
+	border-radius: var(--border-radius);
 	background: transparent;
 	color: var(--color-text-maxcontrast);
 	font: inherit; font-size: 12px;
