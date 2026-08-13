@@ -133,8 +133,9 @@ class V2ComposeController extends Controller
      * PUT /apps/souvera_mail/api/v2/identities/{id}/signature
      * Body: {html: "...", enabled: bool}
      *
-     * Per-identity signature OVERRIDE. Aliases are accepted (alias:...).
-     * Empty html removes the override so the global signature applies again.
+     * Per-identity signature settings. Aliases and external accounts are
+     * accepted (alias:... / ext:...). Empty html = no signature for this
+     * identity, but the position settings are kept.
      */
     #[NoAdminRequired]
     public function updateIdentitySignature(string $id): JSONResponse
@@ -177,6 +178,10 @@ class V2ComposeController extends Controller
         $body = \json_decode(\file_get_contents('php://input'), true) ?? [];
         $html = \trim((string) ($body['html'] ?? ''));
         $enabled = (bool) ($body['enabled'] ?? false);
+        $signaturePosition = \in_array((string) ($body['signaturePosition'] ?? ''), ['above', 'below'], true)
+            ? (string) $body['signaturePosition'] : 'above';
+        $replyPosition = \in_array((string) ($body['replyPosition'] ?? ''), ['above', 'below'], true)
+            ? (string) $body['replyPosition'] : 'above';
 
         $raw = $this->config->getUserValue($uid, 'souvera_mail', 'pref_identity_signatures', '');
         $map = \json_decode($raw, true);
@@ -184,16 +189,26 @@ class V2ComposeController extends Controller
             $map = [];
         }
 
+        // Empty html = no signature for this identity, but the position
+        // settings are kept so they still apply when replying.
         if ($html === '') {
-            unset($map[$id]);
             $this->signatureStore->deleteFor($uid, $id);
+            $map[$id] = [
+                'enabled' => 0,
+                'signaturePosition' => $signaturePosition,
+                'replyPosition' => $replyPosition,
+            ];
         } else {
             try {
                 $this->signatureStore->writeFor($uid, $id, $html);
             } catch (\Throwable $e) {
                 return new JSONResponse(['error' => 'Failed to save signature'], 500);
             }
-            $map[$id] = $enabled ? 1 : 0;
+            $map[$id] = [
+                'enabled' => $enabled ? 1 : 0,
+                'signaturePosition' => $signaturePosition,
+                'replyPosition' => $replyPosition,
+            ];
         }
 
         $this->config->setUserValue(

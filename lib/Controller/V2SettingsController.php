@@ -213,11 +213,13 @@ class V2SettingsController extends Controller
     }
 
     /**
-     * Per-identity signature overrides: map identityId => {html, enabled}.
-     * Sources: the enabled-flag map from the user preference and the
-     * signature HTML files from SignatureStoreService.
+     * Per-identity signature overrides: map identityId => {html, enabled,
+     * signaturePosition, replyPosition}. Sources: the enabled/position map
+     * from the user preference and the signature HTML files from
+     * SignatureStoreService. Legacy map values (bare 0/1 ints) are
+     * normalised to the object shape.
      *
-     * @return array<string, array{html: string, enabled: bool}>
+     * @return array<string, array{html: string, enabled: bool, signaturePosition: string, replyPosition: string}>
      */
     private function readIdentitySignatures(string $uid): array
     {
@@ -227,12 +229,26 @@ class V2SettingsController extends Controller
             return [];
         }
         $out = [];
-        foreach ($map as $id => $enabled) {
-            $html = $this->signatureStore->readFor($uid, (string) $id);
-            if ($html === '') {
-                continue;
+        foreach ($map as $id => $entry) {
+            $id = (string) $id;
+            if (\is_array($entry)) {
+                $enabled = (bool) ($entry['enabled'] ?? false);
+                $sigPos = \in_array((string) ($entry['signaturePosition'] ?? ''), ['above', 'below'], true)
+                    ? (string) $entry['signaturePosition'] : 'above';
+                $replyPos = \in_array((string) ($entry['replyPosition'] ?? ''), ['above', 'below'], true)
+                    ? (string) $entry['replyPosition'] : 'above';
+            } else {
+                // Legacy shape: bare int flag.
+                $enabled = (bool) $entry;
+                $sigPos = 'above';
+                $replyPos = 'above';
             }
-            $out[(string) $id] = ['html' => $html, 'enabled' => (bool) $enabled];
+            $out[$id] = [
+                'html' => $this->signatureStore->readFor($uid, $id),
+                'enabled' => $enabled,
+                'signaturePosition' => $sigPos,
+                'replyPosition' => $replyPos,
+            ];
         }
         return $out;
     }

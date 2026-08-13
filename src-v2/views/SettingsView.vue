@@ -142,86 +142,55 @@
 					</div>
 					<NcDialog v-if="sigIdentity" :name="t('souvera_mail', 'Signature for') + ' ' + sigIdentity.email"
 						:open.sync="true"
+						size="large"
 						@update:open="sigIdentity = null">
 						<div class="identity-sig-dialog">
 							<NcCheckboxRadioSwitch :model-value="sigDialogEnabled"
 								@update:modelValue="sigDialogEnabled = $event">
-								{{ t('souvera_mail', 'Use this signature for this identity') }}
+								{{ t('souvera_mail', 'Append this signature to messages from this identity') }}
 							</NcCheckboxRadioSwitch>
-							<NcTextArea v-model="sigDialogHtml" :label="t('souvera_mail', 'Signature (HTML)')"
-								:placeholder="t('souvera_mail', 'Leave empty to fall back to the global signature')" />
+
+							<div class="identity-sig-dialog__grid">
+								<div>
+									<span class="setting-label">{{ t('souvera_mail', 'Write replies') }}</span>
+									<NcSelect v-model="sigDialogReplyPos" :options="replyPositionOptions" :clearable="false"
+										label="label" class="setting-select" />
+								</div>
+								<div>
+									<span class="setting-label">{{ t('souvera_mail', 'Signature position') }}</span>
+									<NcSelect v-model="sigDialogSigPos" :options="signaturePositionOptions" :clearable="false"
+										label="label" class="setting-select" />
+								</div>
+							</div>
+
+							<span class="setting-label">{{ t('souvera_mail', 'Signature') }}</span>
+							<div class="signature-editor">
+								<template v-if="sigDialogShowSource">
+									<textarea class="signature-textarea signature-textarea--source" v-model="sigDialogHtml"
+										:placeholder="t('souvera_mail', 'HTML source code…')" rows="8" spellcheck="false" />
+								</template>
+								<div v-else class="signature-preview" v-html="sigDialogPreview"></div>
+							</div>
+							<div class="signature-editor__actions">
+								<NcButton variant="tertiary" size="small" @click="sigDialogShowSource = !sigDialogShowSource">
+									<template #icon><CodeTags :size="16" /></template>
+									{{ sigDialogShowSource ? t('souvera_mail', 'Show preview') : t('souvera_mail', 'HTML source code') }}
+								</NcButton>
+								<NcButton variant="tertiary" size="small" @click="pickIdentitySignatureFile">
+									<template #icon><FileUpload :size="16" /></template>
+									{{ t('souvera_mail', 'Import HTML file…') }}
+								</NcButton>
+								<input ref="identitySigFileInput" type="file" accept=".html,.htm,text/html"
+									class="hidden-file-input" @change="onIdentitySignatureFileSelected" />
+							</div>
+							<p class="settings-muted">{{ t('souvera_mail', 'Leave the signature empty to send without signature from this identity.') }}</p>
+
 							<div class="identity-sig-dialog__actions">
 								<NcButton variant="primary" @click="saveIdentitySignature">{{ t('souvera_mail', 'Save') }}</NcButton>
 								<NcButton variant="tertiary" @click="sigIdentity = null">{{ t('souvera_mail', 'Cancel') }}</NcButton>
 							</div>
 						</div>
 					</NcDialog>
-				</div>
-			</div>
-
-			<div class="settings-card">
-				<h2 class="settings-card__title">
-					<Pencil :size="20" />
-					{{ t('souvera_mail', 'Signature') }}
-				</h2>
-				<div class="settings-card__body">
-					<NcCheckboxRadioSwitch :model-value="sigEnabled"
-						@update:modelValue="sigEnabled = $event">
-						{{ t('souvera_mail', 'Append signature to messages') }}
-					</NcCheckboxRadioSwitch>
-					<p class="settings-muted">{{ t('souvera_mail', 'Individual identities can override this signature — use the signature icon next to an identity in the Identities section above.') }}</p>
-					<div v-if="sigEnabled" class="setting-row setting-row--column">
-						<span class="setting-label">{{ t('souvera_mail', 'Signature') }}</span>
-						<div class="signature-editor">
-							<template v-if="showSigSource">
-								<textarea class="signature-textarea signature-textarea--source" v-model="sigHtml"
-									:placeholder="t('souvera_mail', 'HTML source code…')" rows="10" spellcheck="false" />
-							</template>
-							<div v-else class="signature-preview" v-html="sigPreviewHtml"></div>
-						</div>
-						<div class="signature-editor__actions">
-							<NcButton variant="tertiary" size="small" @click="toggleSigSource">
-								<template #icon><CodeTags :size="16" /></template>
-								{{ showSigSource ? t('souvera_mail', 'Show preview') : t('souvera_mail', 'HTML source code') }}
-							</NcButton>
-							<NcButton variant="tertiary" size="small" @click="pickSignatureFile">
-								<template #icon><FileUpload :size="16" /></template>
-								{{ t('souvera_mail', 'Import HTML file…') }}
-							</NcButton>
-							<input ref="signatureFileInput" type="file" accept=".html,.htm,text/html"
-								class="hidden-file-input" @change="onSignatureFileSelected" />
-						</div>
-					</div>
-					<div v-if="sigEnabled" class="setting-row">
-						<div>
-							<span class="setting-label">{{ t('souvera_mail', 'Signature position') }}</span>
-						</div>
-						<NcSelect v-model="signaturePositionOption" :options="signaturePositionOptions" :clearable="false"
-							label="label" class="setting-select"
-							@update:modelValue="saveSig" />
-					</div>
-					<div v-if="sigEnabled" class="setting-row">
-						<NcButton variant="primary" @click="saveSig">
-							{{ t('souvera_mail', 'Save signature') }}
-						</NcButton>
-					</div>
-				</div>
-			</div>
-
-			<div class="settings-card">
-				<h2 class="settings-card__title">
-					<Pencil :size="20" />
-					{{ t('souvera_mail', 'Reply settings') }}
-				</h2>
-				<div class="settings-card__body">
-					<div class="setting-row">
-						<div>
-							<span class="setting-label">{{ t('souvera_mail', 'Write replies') }}</span>
-						</div>
-						<NcSelect v-model="replyPositionOption" :options="replyPositionOptions" :clearable="false"
-							label="label" class="setting-select"
-							@update:modelValue="saveSig" />
-					</div>
 				</div>
 			</div>
 
@@ -558,7 +527,7 @@
 </template>
 
 <script>
-import { NcButton, NcTextField, NcTextArea, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog } from '@nextcloud/vue'
+import { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog } from '@nextcloud/vue'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 import Plus from 'vue-material-design-icons/Plus.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
@@ -602,7 +571,7 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcTextArea, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog, Plus, TrashCan, Account, Palette, Pencil, Star, SignatureText, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Refresh, Play, FolderPlus, Filter, Check, ContentCopy, Email, QuotaDonut, SieveFilterEditor },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog, Plus, TrashCan, Account, Palette, Pencil, Star, SignatureText, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Refresh, Play, FolderPlus, Filter, Check, ContentCopy, Email, QuotaDonut, SieveFilterEditor },
 	data() {
 		return {
 			accountEmail: '',
@@ -610,18 +579,14 @@ export default {
 			appVersion: '',
 			passwords: [], showCreate: false, newName: '', newSecret: null,
 			sharedAbove: true,
-			sigHtml: '', sigEnabled: false, showSigSource: false,
-			replyPosition: 'above', signaturePosition: 'above',
 			replyPositionOptions: [
 				{ value: 'above', label: this.t ? this.t('souvera_mail', 'Above the quoted text') : 'Above the quoted text' },
 				{ value: 'below', label: this.t ? this.t('souvera_mail', 'Below the quoted text') : 'Below the quoted text' },
 			],
-			replyPositionOption: { value: 'above', label: 'Above the quoted text' },
 			signaturePositionOptions: [
 				{ value: 'above', label: this.t ? this.t('souvera_mail', 'Above the quoted text') : 'Above the quoted text' },
 				{ value: 'below', label: this.t ? this.t('souvera_mail', 'Below the quoted text') : 'Below the quoted text' },
 			],
-			signaturePositionOption: { value: 'above', label: 'Above the quoted text' },
 			loaded: false,
 			migrationCompleted: false,
 			remoteImageOptions: [
@@ -684,6 +649,9 @@ export default {
 			sigIdentity: null,
 			sigDialogHtml: '',
 			sigDialogEnabled: false,
+			sigDialogShowSource: false,
+			sigDialogReplyPos: null,
+			sigDialogSigPos: null,
 		}
 	},
 	mounted() {
@@ -692,8 +660,8 @@ export default {
 		this.loadAll()
 	},
 	computed: {
-		sigPreviewHtml() {
-			return DOMPurify.sanitize(this.sigHtml || '', { USE_PROFILES: { html: true } })
+		sigDialogPreview() {
+			return DOMPurify.sanitize(this.sigDialogHtml || '', { USE_PROFILES: { html: true } })
 		},
 		// Flattened tree: roots first, then children nested under parents.
 		// System folders (inbox, sent, …) are included as anchor nodes so
@@ -782,14 +750,10 @@ export default {
 				const r = await API.prefs(); const p = r.data
 				this.accountEmail = (p.account && p.account.email) || ''
 				this.appVersion = (p.account && p.account.version) || ''
-				this.sigHtml = p.signatureHtml || ''
-				this.sigEnabled = p.signatureEnabled || false
-				this.replyPosition = p.replyPosition === 'below' ? 'below' : 'above'
-				this.signaturePosition = p.signaturePosition === 'below' ? 'below' : 'above'
-				const rp = this.replyPositionOptions.find(o => o.value === this.replyPosition)
-				if (rp) this.replyPositionOption = rp
-				const sp = this.signaturePositionOptions.find(o => o.value === this.signaturePosition)
-				if (sp) this.signaturePositionOption = sp
+				// Legacy global signature: migrated into the primary identity
+				// on first load (see loadIdentityOptions).
+				this._pendingGlobalSig = p.signatureHtml || ''
+				this._pendingGlobalSigEnabled = !!p.signatureEnabled
 				if (p.remoteImages === 'always') this.remoteImagesOption = this.remoteImageOptions[1]
 				this.verticalLayout = p.verticalLayout || false
 				const ar = this.autoRefreshOptions.find(o => o.value === (p.autoRefresh || 60))
@@ -823,6 +787,38 @@ export default {
 					return { id: i.id, label: name ? `${name} <${i.email}>` : i.email, value: i.id, name, email: i.email, isAlias, isExternal: !!i.isExternal }
 				})
 				this.identityOptions = list
+				await this.migrateLegacySignature(list)
+			} catch {}
+		},
+		// The old GLOBAL signature (pre per-identity era) is moved into the
+		// primary identity once, so existing users keep their signature.
+		async migrateLegacySignature(list) {
+			if (this._sigMigrated || !this._pendingGlobalSig || list.length === 0) return
+			this._sigMigrated = true
+			// Fresh server snapshot right before writing — another tab may
+			// have stored identity signatures in the meantime.
+			try {
+				const { data } = await API.prefs()
+				if (Object.keys(data.identitySignatures || {}).length > 0) return
+			} catch { return }
+			const primary = list.find(i => !i.isAlias && !i.isExternal) || list[0]
+			try {
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/identities/' + encodeURIComponent(primary.id) + '/signature'), {
+					html: this._pendingGlobalSig,
+					enabled: !!this._pendingGlobalSigEnabled,
+					signaturePosition: 'above',
+					replyPosition: 'above',
+				})
+				this.identitySignatures = {
+					...this.identitySignatures,
+					[primary.id]: {
+						html: this._pendingGlobalSig,
+						enabled: !!this._pendingGlobalSigEnabled,
+						signaturePosition: 'above',
+						replyPosition: 'above',
+					},
+				}
+				showSuccess(this.t('souvera_mail', 'Your previous signature was moved to the identity') + ' ' + primary.email)
 			} catch {}
 		},
 		isDefaultIdentity(i) {
@@ -844,6 +840,9 @@ export default {
 			this.sigIdentity = i
 			this.sigDialogHtml = entry ? entry.html : ''
 			this.sigDialogEnabled = !!(entry && entry.enabled)
+			this.sigDialogShowSource = false
+			this.sigDialogReplyPos = this.replyPositionOptions.find(o => o.value === (entry?.replyPosition || 'above')) || this.replyPositionOptions[0]
+			this.sigDialogSigPos = this.signaturePositionOptions.find(o => o.value === (entry?.signaturePosition || 'above')) || this.signaturePositionOptions[0]
 		},
 		async saveIdentitySignature() {
 			if (!this.sigIdentity) return
@@ -852,12 +851,15 @@ export default {
 				await axios.put(generateUrl('/apps/souvera_mail/api/v2/identities/' + encodeURIComponent(id) + '/signature'), {
 					html: this.sigDialogHtml,
 					enabled: this.sigDialogEnabled,
+					signaturePosition: this.sigDialogSigPos?.value || 'above',
+					replyPosition: this.sigDialogReplyPos?.value || 'above',
 				})
 				const names = { ...this.identitySignatures }
-				if (this.sigDialogHtml.trim() === '') {
-					delete names[id]
-				} else {
-					names[id] = { html: this.sigDialogHtml, enabled: this.sigDialogEnabled }
+				names[id] = {
+					html: this.sigDialogHtml,
+					enabled: this.sigDialogHtml.trim() !== '' && this.sigDialogEnabled,
+					signaturePosition: this.sigDialogSigPos?.value || 'above',
+					replyPosition: this.sigDialogReplyPos?.value || 'above',
 				}
 				this.identitySignatures = names
 				this.sigIdentity = null
@@ -865,6 +867,27 @@ export default {
 			} catch (e) {
 				showError(e?.response?.data?.error || this.t('souvera_mail', 'Failed to save signature'))
 			}
+		},
+		pickIdentitySignatureFile() { this.$refs.identitySigFileInput?.click() },
+		onIdentitySignatureFileSelected(e) {
+			const file = e.target.files?.[0]
+			e.target.value = ''
+			if (!file) return
+			if (file.size === 0 || file.size > 2 * 1024 * 1024) {
+				showError(this.t('souvera_mail', 'Signature file ignored (empty or larger than 2 MB)'))
+				return
+			}
+			const reader = new FileReader()
+			reader.onload = () => {
+				const raw = String(reader.result || '')
+				this.sigDialogHtml = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
+				this.sigDialogShowSource = false
+			}
+			reader.onerror = () => {
+				console.error('Failed to read signature file')
+				showError(this.t('souvera_mail', 'Failed to read signature file'))
+			}
+			reader.readAsText(file)
 		},
 		startEditIdentity(identity) {
 			this.editingIdentityId = identity.id
@@ -1140,24 +1163,6 @@ export default {
 			} catch (e) { console.error('Folder move failed', e); showError(this.t('souvera_mail', 'Failed to move folder')) }
 		},
 		onFolderDragEnd() { this.dragId = null; this.dragOverId = null },
-		async saveSig() {
-			try {
-				const replyPosition = this.replyPositionOption?.value === 'below' ? 'below' : 'above'
-				const signaturePosition = this.signaturePositionOption?.value === 'below' ? 'below' : 'above'
-				await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), {
-					signatureHtml: this.sigHtml,
-					signatureEnabled: this.sigEnabled,
-					replyPosition,
-					signaturePosition,
-				})
-				this.replyPosition = replyPosition
-				this.signaturePosition = signaturePosition
-				showSuccess(this.t('souvera_mail', 'Signature saved'))
-			} catch (e) {
-				console.error('Failed to save signature', e)
-				showError(this.t('souvera_mail', 'Failed to save signature') + ': ' + (e.response?.data?.error || e.message))
-			}
-		},
 		openMigration() {
 			// The migration assistant (provider.tools IMAP import) is a
 			// separate bundle; the event forces it open even when it was
@@ -1174,31 +1179,6 @@ export default {
 				console.error('Migration reset failed', e)
 				showError(this.t('souvera_mail', 'Failed to reset migration'))
 			}
-		},
-		toggleSigSource() {
-			this.showSigSource = !this.showSigSource
-			if (!this.showSigSource) this.saveSig()
-		},
-		pickSignatureFile() { this.$refs.signatureFileInput?.click() },
-		onSignatureFileSelected(e) {
-			const file = e.target.files?.[0]
-			e.target.value = ''
-			if (!file) return
-			if (file.size === 0 || file.size > 2 * 1024 * 1024) {
-				showError(this.t('souvera_mail', 'Signature file ignored (empty or larger than 2 MB)'))
-				return
-			}
-			const reader = new FileReader()
-			reader.onload = () => {
-				const raw = String(reader.result || '')
-				this.sigHtml = DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
-				this.saveSig()
-			}
-			reader.onerror = () => {
-				console.error('Failed to read signature file')
-				showError(this.t('souvera_mail', 'Failed to read signature file'))
-			}
-			reader.readAsText(file)
 		},
 	},
 }
@@ -1300,6 +1280,7 @@ export default {
 .identity-row__alias-tag { font-size: 10px; padding: 0 6px; border-radius: 3px; background: var(--color-primary-element); color: #fff; }
 .identity-row__ext-tag { background: var(--color-background-darker); color: var(--color-text-maxcontrast); }
 .identity-sig-dialog { display: flex; flex-direction: column; gap: 12px; min-width: 420px; max-width: 90vw; }
+.identity-sig-dialog__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .identity-sig-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .signature-editor {
 	border: 1px solid var(--color-border);

@@ -188,14 +188,29 @@ export default {
 		canSend() {
 			return (this.to.length > 0 || this.cc.length > 0 || this.bcc.length > 0) && !this.sending
 		},
-		// The signature that applies for the currently selected sender:
-		// a per-identity override when active, otherwise the global one.
+		// The signature that applies for the currently selected sender.
+		// Precedence: per-identity entry (enabled) → per-identity entry
+		// (disabled = explicit opt-out) → legacy GLOBAL signature as
+		// fallback for identities the user never customized.
 		effectiveSignature() {
 			const entry = this.identitySignatures[this.fromIdentityId]
-			if (entry && entry.enabled && entry.html) {
-				return { html: entry.html, enabled: true }
+			if (entry) {
+				if (entry.enabled && entry.html) {
+					return { html: entry.html, enabled: true }
+				}
+				return { html: '', enabled: false }
 			}
 			return { html: this.signatureHtml, enabled: this.signatureEnabled }
+		},
+		// Position settings are per identity; identities without a stored
+		// entry fall back to the (legacy) global preferences.
+		effectiveSignaturePosition() {
+			const entry = this.identitySignatures[this.fromIdentityId]
+			return entry && entry.signaturePosition ? entry.signaturePosition : this.signaturePosition
+		},
+		effectiveReplyPosition() {
+			const entry = this.identitySignatures[this.fromIdentityId]
+			return entry && entry.replyPosition ? entry.replyPosition : this.replyPosition
 		},
 	},
 	watch: {
@@ -204,7 +219,8 @@ export default {
 		bcc: { deep: true, handler() { this.markDirty() } },
 		subject() { this.markDirty() },
 		// Switching the sender swaps the signature in the editor to the one
-		// configured for the newly selected identity (fallback: global).
+		// configured for the newly selected identity (per-identity entry,
+		// or the legacy global signature when the identity has no entry).
 		fromIdentityId(newId, oldId) {
 			if (oldId !== null && newId !== oldId) this.swapSignature()
 		},
@@ -311,24 +327,85 @@ export default {
 		// Rebuild the signature node in the editor when the sender identity
 		// changes. The body is serialized (marker node only), so the swap is
 		// a marker replacement — the same format serializeBody() uses.
-		// No marker (user deleted the signature) → do nothing: never insert
-		// content at a guessed position, never touch a typed "--" line.
+		// A missing marker (e.g. deleted signature) gets the new block
+		// appended at the end; never touch a typed "--" line when no marker
+		// was found.
 		swapSignature() {
 			if (!this.$refs.editor) return
 			const eff = this.effectiveSignature
 			const raw = eff.enabled ? this.sanitizedSignature(eff.html) : ''
 			let html = this.bodyHtml || ''
 			const markerRe = /<div data-signature(?:="")?><\/div>/
-			if (!markerRe.test(html)) return
+			const hasMarker = markerRe.test(html)
+
 			if (raw) {
+				if (hasMarker) {
+					// Move the tiny marker to the position required by the
+					// per-identity layout settings, then fill its content.
+					html = this.moveMarker(html, markerRe)
+				} else {
+					// No signature node yet — append the block at the end.
+					html = (html.trim() === '' ? '' : html + '<p>--</p>') + `<div data-signature="">${raw}</div>`
+				}
 				html = html.replace(markerRe, `<div data-signature="">${raw}</div>`)
-			} else {
+			} else if (hasMarker) {
 				html = html.replace(markerRe, '')
 				// The "--" separator belongs to the signature block —
 				// only remove it together with a found marker.
 				html = html.replace(/<p>\s*--\s*<\/p>/, '')
 			}
 			if (html !== this.bodyHtml) this.$refs.editor?.setContent(html)
+		},
+		// Move the signature block (marker + its "--" separator) relative to
+		// the quoted text so the per-identity position settings apply after
+		// a sender switch. Only makes sense for replies with a <blockquote>.
+		moveMarker(html, markerRe) {
+			if (this.mode !== 'reply' && this.mode !== 'replyAll') return html
+			const marker = html.match(markerRe)[0]
+			const markerIdx = html.indexOf(marker)
+			if (markerIdx === -1) return html
+
+			// The "--" separator (if present immediately before the marker)
+			// travels with the signature block.
+			const prefix = html.slice(0, markerIdx)
+			const sepMatch = prefix.match(/<p>\s*--\s*<\/p>\s*$/)
+			const unit = (sepMatch ? sepMatch[0] : '') + marker
+			const unitStart = markerIdx - (sepMatch ? sepMatch[0].length : 0)
+			const rest = html.slice(0, unitStart) + html.slice(unitStart + unit.length)
+
+			const quoteIdx = rest.indexOf('<blockquote')
+			if (quoteIdx === -1) return html
+
+			if (this.effectiveReplyPosition === 'below') {
+				// Quote on top → signature always at the end.
+				return rest + unit
+			}
+			if (this.effectiveSignaturePosition === 'below') {
+				// Signature below the quote — after the MATCHING closing
+				// tag (nested blockquotes are counted).
+				const end = this.findBlockquoteEnd(rest, quoteIdx)
+				if (end === -1) return html
+				return rest.slice(0, end) + unit + rest.slice(end)
+			}
+			// Signature above the quote.
+			return rest.slice(0, quoteIdx) + unit + rest.slice(quoteIdx)
+		},
+		// Index after the closing tag that matches the blockquote opening
+		// at startIdx (depth-aware for nested quotes).
+		findBlockquoteEnd(html, startIdx) {
+			const re = /<blockquote[^>]*>|<\/blockquote>/g
+			re.lastIndex = startIdx
+			let depth = 0
+			let m
+			while ((m = re.exec(html)) !== null) {
+				if (m[0].startsWith('</')) {
+					depth--
+					if (depth === 0) return m.index + m[0].length
+				} else {
+					depth++
+				}
+			}
+			return -1
 		},
 		// Replaces the editor content only while it is still untouched
 		// (re-checked at execution time), and suppresses the dirty flag for
@@ -413,11 +490,18 @@ export default {
 			// exactly what will be sent. The empty answer paragraph is the
 			// cursor target.
 			const sig = this.signatureBlock()
-			if (this.replyPosition === 'below') {
-				this.initContent(`${quote}${answer}${sig}`, 'empty')
+			let content
+			if (this.effectiveReplyPosition === 'below') {
+				// Quote on top, answer + signature at the end.
+				content = `${quote}${answer}${sig}`
+			} else if (this.effectiveSignaturePosition === 'below') {
+				// Answer on top, signature at the very bottom (below quote).
+				content = `${answer}${quote}${sig}`
 			} else {
-				this.initContent(`${answer}${sig}${quote}`, 'empty')
+				// Answer, then signature, then quote.
+				content = `${answer}${sig}${quote}`
 			}
+			this.initContent(content, 'empty')
 		},
 		buildForwardContent() {
 			const email = this.originalEmail
