@@ -117,6 +117,51 @@ class V2ExternalAccountsController extends Controller
         return new JSONResponse($result);
     }
 
+    /**
+     * POST /apps/souvera_mail/api/v2/external/accounts/test-connection
+     *
+     * Test IMAP credentials WITHOUT saving the account. The form data is
+     * validated server-side first, then the connection is attempted.
+     * The add flow requires a successful test before it saves.
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function testConnection(): JSONResponse
+    {
+        $uid = $this->getUserId();
+        if ($uid === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
+        }
+
+        $body = \json_decode(\file_get_contents('php://input'), true) ?? [];
+
+        // Validate the same fields add() would require.
+        $email = \strtolower(\trim((string) ($body['email'] ?? '')));
+        if ($email === '' || !\filter_var($email, \FILTER_VALIDATE_EMAIL)) {
+            return new JSONResponse(['ok' => false, 'error' => 'Invalid email address'], Http::STATUS_BAD_REQUEST);
+        }
+        $entry = [
+            'email' => $email,
+            'imap_host' => \trim((string) ($body['imap_host'] ?? '')),
+            'imap_port' => (int) ($body['imap_port'] ?? 993),
+            'imap_ssl' => (string) ($body['imap_ssl'] ?? 'ssl'),
+            'smtp_host' => \trim((string) ($body['smtp_host'] ?? '')),
+            'smtp_port' => (int) ($body['smtp_port'] ?? 465),
+            'smtp_ssl' => (string) ($body['smtp_ssl'] ?? 'ssl'),
+            'username' => \trim((string) ($body['username'] ?? $email)),
+            'password' => (string) ($body['password'] ?? ''),
+        ];
+        if ($entry['imap_host'] === '') {
+            return new JSONResponse(['ok' => false, 'error' => 'IMAP host is required'], Http::STATUS_BAD_REQUEST);
+        }
+        if ($entry['password'] === '') {
+            return new JSONResponse(['ok' => false, 'error' => 'Password is required'], Http::STATUS_BAD_REQUEST);
+        }
+
+        $result = $this->accountService->testImap($entry);
+        return new JSONResponse($result);
+    }
+
     private function getUserId(): ?string
     {
         $user = $this->userSession->getUser();

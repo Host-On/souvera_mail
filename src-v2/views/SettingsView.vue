@@ -475,8 +475,22 @@
 					</NcButton>
 
 					<div class="ext-account-form__actions">
-						<NcButton variant="secondary" @click="showExtAccountForm = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
-						<NcButton variant="primary" @click="addExtAccount" :disabled="!extForm.email || !extForm.imap_host || !extForm.smtp_host || !extForm.password">{{ t('souvera_mail', 'Add account') }}</NcButton>
+						<div class="ext-account-form__test-result" :class="{ 'ext-account-form__test-result--ok': extTestOk, 'ext-account-form__test-result--err': extTestError }">
+							<span v-if="extTestError">{{ extTestError }}</span>
+							<span v-else-if="extTestOk">✓ {{ t('souvera_mail', 'Connection successful') }}</span>
+						</div>
+						<div class="ext-account-form__buttons">
+							<NcButton variant="secondary" @click="showExtAccountForm = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+							<NcButton variant="tertiary" @click="testExtConnection"
+								:disabled="!extForm.email || !extForm.imap_host || !extForm.password || extTesting">
+								<template #icon><Check :size="16" /></template>
+								{{ extTesting ? t('souvera_mail', 'Testing…') : t('souvera_mail', 'Test connection') }}
+							</NcButton>
+							<NcButton variant="primary" @click="addExtAccount"
+								:disabled="!extTestOk || extTesting">
+								{{ t('souvera_mail', 'Add account') }}
+							</NcButton>
+						</div>
 					</div>
 				</div>
 			</NcDialog>
@@ -626,6 +640,9 @@ export default {
 			extAccounts: [],
 			showExtAccountForm: false,
 			extManualMode: false,
+			extTestOk: false,
+			extTestError: '',
+			extTesting: false,
 			extForm: { email: '', imap_host: '', imap_port: 993, imap_ssl: 'ssl', smtp_host: '', smtp_port: 465, smtp_ssl: 'ssl', username: '', password: '', provider: '' },
 
 			identityOptions: [],
@@ -703,6 +720,19 @@ export default {
 		quotaPercent() {
 			if (this.quotaTotal <= 0) return 0
 			return Math.min(100, Math.round((this.quotaUsed / this.quotaTotal) * 100))
+		},
+	},
+	watch: {
+		// Any change to the external-account form invalidates the
+		// successful connection test — the user must re-test.
+		extForm: {
+			deep: true,
+			handler() {
+				if (this.extTestOk || this.extTestError) {
+					this.extTestOk = false
+					this.extTestError = ''
+				}
+			},
 		},
 	},
 	methods: {
@@ -788,6 +818,8 @@ export default {
 		},
 		openExtAccountForm() {
 			this.extManualMode = false
+			this.extTestOk = false
+			this.extTestError = ''
 			this.extForm = { email: '', imap_host: '', imap_port: 993, imap_ssl: 'ssl', smtp_host: '', smtp_port: 465, smtp_ssl: 'ssl', username: '', password: '', provider: '' }
 			this.showExtAccountForm = true
 		},
@@ -815,6 +847,26 @@ export default {
 				}
 			} catch {}
 		},
+		async testExtConnection() {
+			this.extTesting = true
+			this.extTestOk = false
+			this.extTestError = ''
+			try {
+				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
+				const { testConnection } = useExternalAccounts()
+				const r = await testConnection({ ...this.extForm })
+				if (r.ok) {
+					this.extTestOk = true
+					showSuccess(this.t('souvera_mail', 'Connection successful'))
+				} else {
+					this.extTestError = r.error || this.t('souvera_mail', 'Connection failed')
+				}
+			} catch (e) {
+				this.extTestError = e?.response?.data?.error || e?.message || this.t('souvera_mail', 'Connection failed')
+			} finally {
+				this.extTesting = false
+			}
+		},
 		async addExtAccount() {
 			try {
 				const { useExternalAccounts } = await import('../composables/useExternalAccounts.js')
@@ -824,6 +876,8 @@ export default {
 				await create({ ...this.extForm })
 				this.showExtAccountForm = false
 				this.extManualMode = false
+				this.extTestOk = false
+				this.extTestError = ''
 				this.extForm = { email: '', imap_host: '', imap_port: 993, imap_ssl: 'ssl', smtp_host: '', smtp_port: 465, smtp_ssl: 'ssl', username: '', password: '', provider: '' }
 				await this.loadExternalAccounts()
 				showSuccess(this.t('souvera_mail', 'External account added'))
@@ -1226,7 +1280,11 @@ export default {
 .ext-account-form__field label { font-size: 13px; font-weight: 600; color: var(--color-text-maxcontrast); }
 .ext-account-form__row { display: flex; gap: 12px; }
 .ext-account-form__row .ext-account-form__field { flex: 1; }
-.ext-account-form__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.ext-account-form__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.ext-account-form__buttons { display: flex; justify-content: flex-end; gap: 8px; }
+.ext-account-form__test-result { font-size: 12px; min-height: 16px; }
+.ext-account-form__test-result--ok { color: #2e7d32; font-weight: 600; }
+.ext-account-form__test-result--err { color: #c62828; }
 .ext-account-form__preset-summary {
 	display: flex; flex-direction: column; gap: 4px;
 	padding: 8px 12px; border-radius: 6px;

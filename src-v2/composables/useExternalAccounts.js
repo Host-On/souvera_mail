@@ -20,6 +20,11 @@ export function useExternalAccounts() {
 			const { data } = await axios.post(generateUrl(BASE + '/' + id + '/test'))
 			return data
 		},
+		// Test credentials BEFORE saving (form data, no account id).
+		async testConnection(account) {
+			const { data } = await axios.post(generateUrl(BASE + '/test-connection'), account)
+			return data
+		},
 		// Provider presets (existing endpoint)
 		async providers() {
 			const { data } = await axios.get(generateUrl('/apps/souvera_mail/external/providers'))

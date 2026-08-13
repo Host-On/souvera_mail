@@ -455,6 +455,11 @@ return [
 			'verb' => 'POST',
 		],
 		[
+			'name' => 'v2_external_accounts#testConnection',
+			'url' => '/api/v2/external/accounts/test-connection',
+			'verb' => 'POST',
+		],
+		[
 			'name' => 'v2_external_accounts#delete',
 			'url' => '/api/v2/external/accounts/{id}',
 			'verb' => 'DELETE',
