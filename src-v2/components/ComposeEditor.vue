@@ -53,9 +53,6 @@
 			<div class="compose-field compose-field--body">
 				<RichTextEditor ref="editor" v-model="bodyHtml"
 					:placeholder="t('souvera_mail', 'Write your message…')" />
-				<div v-if="showSignaturePreview" class="compose-signature" @click.stop>
-					<div class="compose-signature__content" v-html="signaturePreviewHtml"></div>
-				</div>
 			</div>
 
 			<AttachmentList v-if="attachments.length > 0"
@@ -176,12 +173,6 @@ export default {
 		canSend() {
 			return (this.to.length > 0 || this.cc.length > 0 || this.bcc.length > 0) && !this.sending
 		},
-		showSignaturePreview() {
-			return this.signatureEnabled && !!this.signatureHtml
-		},
-		signaturePreviewHtml() {
-			return this.signatureBlock()
-		},
 	},
 	watch: {
 		to: { deep: true, handler() { this.markDirty() } },
@@ -215,10 +206,11 @@ export default {
 		this._prefsLoaded = true
 		if (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward') {
 			this.buildReplyOrForward()
+		} else if (this.signatureEnabled) {
+			// New message: signature directly in the editor, cursor in the
+			// empty paragraph above it.
+			this.initContent(`<p></p>${this.signatureBlock()}`, 'empty')
 		}
-		// Note: the signature is NOT inserted into the editor — Tiptap would
-		// normalise complex HTML (tables, images, layout). It is attached
-		// verbatim (sanitized) in buildPayload at send/draft time instead.
 	},
 	beforeUnmount() { clearTimeout(draftTimer) },
 	methods: {
@@ -246,54 +238,13 @@ export default {
 			if (!this.signatureHtml) return ''
 			return DOMPurify.sanitize(this.signatureHtml, { USE_PROFILES: { html: true } })
 		},
-		// Appends the (sanitized) signature. For replies the outer quote is
-		// always the first <blockquote> of the document (built by
-		// buildReplyContent before any quoted content), so 'above' inserts
-		// before it and 'below' right after it — even with nested quotes in
-		// the quoted body. Forward/new mails have no own quote: the signature
-		// goes to the end. Keeps the raw HTML intact (no Tiptap normalisation).
-		attachSignature(html) {
-			if (!this.signatureEnabled) return html
-			const sig = this.signatureBlock()
-			if (!sig) return html
-			if (this.mode !== 'reply' && this.mode !== 'replyAll') return html + sig
-			const quote = this.findOuterQuote(html)
-			if (!quote) return html + sig
-			if (this.signaturePosition === 'below') {
-				return html.slice(0, quote.closeEndIdx) + sig + html.slice(quote.closeEndIdx)
-			}
-			return html.slice(0, quote.openIdx) + sig + html.slice(quote.openIdx)
-		},
 		// Thunderbird-style signature block: RFC 3676 separator "--" line
-		// followed by the sanitized signature HTML. Used both for the
-		// visible preview below the editor and for attaching at send time.
+		// followed by the sanitized signature HTML. Inserted directly into
+		// the editor on init (new/reply/forward).
 		signatureBlock() {
 			const sig = this.sanitizedSignature()
 			if (!sig) return ''
 			return `<p>--</p>${sig}`
-		},
-		// Locates the OUTER <blockquote>…</blockquote> span with correct
-		// nesting, so nested quotes inside the quoted body can never break
-		// the insertion point.
-		findOuterQuote(html) {
-			const openIdx = html.indexOf('<blockquote')
-			if (openIdx === -1) return null
-			let depth = 0
-			let i = openIdx
-			while (i < html.length) {
-				const nextOpen = html.indexOf('<blockquote', i)
-				const nextClose = html.indexOf('</blockquote>', i)
-				if (nextClose === -1) return null
-				if (nextOpen !== -1 && nextOpen < nextClose) {
-					depth++
-					i = nextOpen + '<blockquote'.length
-				} else {
-					depth--
-					i = nextClose + '</blockquote>'.length
-					if (depth === 0) return { openIdx, closeEndIdx: i }
-				}
-			}
-			return null
 		},
 		// Replaces the editor content only while it is still untouched
 		// (re-checked at execution time), and suppresses the dirty flag for
@@ -307,7 +258,8 @@ export default {
 					try {
 						this.$refs.editor?.setContent(html)
 						if (cursor === 'end') this.$refs.editor?.setCursorAtEnd()
-						else this.$refs.editor?.setCursorAtStart()
+						else if (cursor === 'start') this.$refs.editor?.setCursorAtStart()
+						else if (cursor === 'empty') this.$refs.editor?.setCursorInLastEmptyParagraph()
 						this.$refs.editor?.focus()
 					} finally {
 						// Reset after the pre-flush watcher has run, so the
@@ -372,12 +324,14 @@ export default {
 			const { html } = sanitizeMailHtml(body, { attachments: email.attachments || [], blockRemote: false })
 			const quote = buildReplyQuote(email, html)
 			const answer = '<p></p>'
-			// The signature is attached at send time (attachSignature), so the
-			// editor only carries the answer paragraph and the quote.
+			// Signature is inserted DIRECTLY into the editor so the user sees
+			// exactly what will be sent. The empty answer paragraph is the
+			// cursor target.
+			const sig = this.signatureEnabled ? this.signatureBlock() : ''
 			if (this.replyPosition === 'below') {
-				this.initContent(`${quote}${answer}`, 'end')
+				this.initContent(`${quote}${answer}${sig}`, 'empty')
 			} else {
-				this.initContent(`${answer}${quote}`, 'start')
+				this.initContent(`${answer}${sig}${quote}`, 'empty')
 			}
 		},
 		buildForwardContent() {
@@ -389,7 +343,8 @@ export default {
 			this.forwardAttachments = (email.attachments || []).map(a => ({
 				blobId: a.blobId, name: a.name, type: a.type, size: a.size,
 			}))
-			this.initContent(`<p></p>${quote}`, 'start')
+			const sig = this.signatureEnabled ? this.signatureBlock() : ''
+			this.initContent(`<p></p>${sig}${quote}`, 'empty')
 		},
 		markDirty() {
 			this.dirty = true
@@ -412,7 +367,9 @@ export default {
 			}
 		},
 		buildPayload() {
-			const bodyHtml = this.attachSignature(this.bodyHtml)
+			// The signature is already part of this.bodyHtml (inserted into
+			// the editor on init) — no second attachment here.
+			const bodyHtml = this.bodyHtml
 			return {
 				identityId: this.fromIdentityId,
 				to: this.to.map(r => r.email),
@@ -640,27 +597,4 @@ export default {
 .compose-layout__status { flex: 1; text-align: center; }
 .draft-saved { font-size: 12px; color: var(--color-text-maxcontrast); }
 .hidden-file-input { display: none; }
-
-/* Signature preview below the editor — visible like Thunderbird, but not
-   part of the editable document (attached verbatim at send time). */
-.compose-signature {
-	margin: 0 16px 12px;
-	padding: 6px 12px;
-	border: 1px dashed var(--color-border);
-	border-radius: var(--border-radius);
-	background: var(--color-background-dark);
-	pointer-events: none;
-	user-select: none;
-	flex-shrink: 0;
-	max-height: 100px;
-	overflow-y: auto;
-	overflow-x: hidden;
-}
-.compose-signature__content {
-	margin-top: 0;
-	font-size: 13px;
-	color: var(--color-text-maxcontrast);
-	line-height: 1.5;
-	overflow-wrap: break-word;
-}
 </style>

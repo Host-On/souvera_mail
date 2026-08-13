@@ -130,6 +130,24 @@ export default {
 		setCursorAtEnd() {
 			this.editor?.commands.setTextSelection(this.editor.state.doc.content.size)
 		},
+		// Places the cursor inside the LAST empty paragraph of the document.
+		// Used after inserting the signature so the user starts typing in the
+		// answer paragraph (above the signature for new/forward, between
+		// quote and signature for replies).
+		setCursorInLastEmptyParagraph() {
+			const doc = this.editor.state.doc
+			let lastEmptyPos = -1
+			doc.descendants((node, pos) => {
+				if (node.type.name === 'paragraph' && node.childCount === 0) {
+					lastEmptyPos = pos + 1
+				}
+			})
+			if (lastEmptyPos >= 0) {
+				this.editor.commands.setTextSelection(lastEmptyPos)
+			} else {
+				this.editor.commands.setTextSelection(doc.content.size)
+			}
+		},
 		toggleLink() {
 			const prev = this.editor.getAttributes('link')
 			if (prev.href) {
