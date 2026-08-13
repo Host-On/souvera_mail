@@ -3,16 +3,6 @@
 	<id>souvera_mail</id>
 	<name>Souvera Mail</name>
 	<summary>Nextcloud-native webmail with Nextcloud as the OIDC Provider — CLI-configurable for automated deploys</summary>
-	<version>1.0.166</version>
-	<licence>AGPL-3.0-or-later</licence>
-	<author homepage="https://github.com/PhiGi87/souvera_mail">Souvera</author>
-	<website>https://github.com/PhiGi87/souvera_mail</website>
-	<repository type="git">https://github.com/PhiGi87/souvera_mail</repository>
-	<bugs>https://github.com/PhiGi87/souvera_mail/issues</bugs>
-	<documentation>
-		<admin>https://github.com/PhiGi87/souvera_mail#quick-start-automated-deploy</admin>
-		<developer>https://github.com/PhiGi87/souvera_mail</developer>
-	</documentation>
 	<description><![CDATA[**Souvera Mail** — Nextcloud-native webmail with Nextcloud as the OIDC Provider.
 
 Built for automated, declarative deployments (Ansible, Helm, OCI containers, Nextcloud-AIO addons). Every configuration step is reachable through `occ` — there is no browser-based setup wizard. A read-only status panel exists for diagnostics only.
@@ -50,9 +40,19 @@ All write commands accept `--json` and `--dry-run`.
 - [H2CK/oidc](https://github.com/H2CK/oidc) 1.17+ (Nextcloud OIDC Provider — install via `occ app:install oidc`)
 - Mail server with OAUTHBEARER / XOAUTH2 (Stalwart 0.16+ or Dovecot 2.4+ + Postfix 3.7+)
 	]]></description>
+	<version>1.0.167</version>
+	<licence>AGPL-3.0-or-later</licence>
+	<author homepage="https://github.com/PhiGi87/souvera_mail">Souvera</author>
 	<namespace>SouveraMail</namespace>
+	<documentation>
+		<admin>https://github.com/PhiGi87/souvera_mail#quick-start-automated-deploy</admin>
+		<developer>https://github.com/PhiGi87/souvera_mail</developer>
+	</documentation>
 	<category>integration</category>
 	<category>office</category>
+	<website>https://github.com/PhiGi87/souvera_mail</website>
+	<bugs>https://github.com/PhiGi87/souvera_mail/issues</bugs>
+	<repository type="git">https://github.com/PhiGi87/souvera_mail</repository>
 	<dependencies>
 		<php min-version="8.3" min-int-size="64" />
 		<lib>mbstring</lib>
@@ -60,25 +60,28 @@ All write commands accept `--json` and `--dry-run`.
 		<lib>zlib</lib>
 		<nextcloud min-version="33" max-version="35" />
 	</dependencies>
-	<settings>
-		<admin>OCA\SouveraMail\Settings\AdminSettings</admin>
-		<admin-section>OCA\SouveraMail\Settings\AdminSection</admin-section>
-	</settings>
+	<background-jobs>
+		<job>OCA\SouveraMail\Cron\MigrationPoller</job>
+		<job>OCA\SouveraMail\Cron\MigrationCleanup</job>
+		<job>OCA\SouveraMail\Cron\MailPushPoller</job>
+		<job>OCA\SouveraMail\DevOps\SelfUpdateJob</job>
+	</background-jobs>
 	<repair-steps>
-		<pre-update>
+		<pre-migration>
 			<!-- v0.22.10: `occ app:update souvera_mail` pulls the newest
 			     GitHub releases for all managed apps BEFORE the migration
-			     machinery runs — no manual git pull needed. -->
+			     machinery runs — no manual git pull needed.
+			     NC 31+ renamed pre-update → pre-migration. -->
 			<step>OCA\SouveraMail\Repair\SelfUpdateNowStep</step>
-		</pre-update>
+		</pre-migration>
+		<post-migration>
+			<step>OCA\SouveraMail\Migration\InstallStep</step>
+			<step>OCA\SouveraMail\Migration\EnforceGroupRestriction</step>
+		</post-migration>
 		<install>
 			<step>OCA\SouveraMail\Migration\InstallStep</step>
 			<step>OCA\SouveraMail\Migration\EnforceGroupRestriction</step>
 		</install>
-		<post-update>
-			<step>OCA\SouveraMail\Migration\InstallStep</step>
-			<step>OCA\SouveraMail\Migration\EnforceGroupRestriction</step>
-		</post-update>
 	</repair-steps>
 	<commands>
 		<command>OCA\SouveraMail\Command\Bootstrap</command>
@@ -98,10 +101,8 @@ All write commands accept `--json` and `--dry-run`.
 		<command>OCA\SouveraMail\Command\Push\Test</command>
 		<command>OCA\SouveraMail\Command\DevopsChannel</command>
 	</commands>
-	<background-jobs>
-		<job>OCA\SouveraMail\Cron\MigrationPoller</job>
-		<job>OCA\SouveraMail\Cron\MigrationCleanup</job>
-		<job>OCA\SouveraMail\Cron\MailPushPoller</job>
-		<job>OCA\SouveraMail\DevOps\SelfUpdateJob</job>
-	</background-jobs>
+	<settings>
+		<admin>OCA\SouveraMail\Settings\AdminSettings</admin>
+		<admin-section>OCA\SouveraMail\Settings\AdminSection</admin-section>
+	</settings>
 </info>

@@ -408,14 +408,28 @@ export default {
 	padding-left: 30px !important;
 	padding-right: var(--app-navigation-padding);
 }
+/* "External accounts" header — visually identical to the NcAppNavigationCaption
+   sections ("Mailboxes", "Folders", "Shared with me"). The component styles
+   are scoped and don't reach a hand-rolled <li>, so they are mirrored here —
+   including the section spacing (margin-top). */
 :deep(.ext-caption) {
 	display: flex;
-	align-items: center;
-	gap: 6px;
-	padding-left: var(--app-navigation-padding);
-	padding-right: var(--app-navigation-padding);
+	justify-content: space-between;
+	margin-top: calc(var(--default-clickable-area, 44px) / 2);
 }
 :deep(.ext-caption .app-navigation-caption__name) {
+	font-weight: var(--font-weight-heading, bold);
+	color: var(--color-main-text);
+	font-size: var(--default-font-size);
+	line-height: var(--default-clickable-area, 44px);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	box-shadow: none !important;
+	flex-shrink: 0;
+	padding-inline: calc(var(--default-grid-baseline, 4px) * 2) 0;
+	margin-top: 0;
+	margin-bottom: var(--default-grid-baseline, 4px);
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
