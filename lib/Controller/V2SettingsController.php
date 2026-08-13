@@ -127,6 +127,7 @@ class V2SettingsController extends Controller
             'autoRefresh' => (int) $this->getPref($uid, 'pref_auto_refresh', '60'),
             'notificationSound' => $this->getPref($uid, 'pref_notification_sound', 'none'),
             'defaultIdentityId' => $this->getPref($uid, 'pref_default_identity', ''),
+            'navCollapsedGroups' => \json_decode($this->getPref($uid, 'pref_nav_collapsed_groups', '[]'), true) ?: [],
             'account' => [
                 'email' => $user->getSystemEMailAddress() ?? $uid,
                 'server' => '',
@@ -169,6 +170,7 @@ class V2SettingsController extends Controller
             'autoRefresh' => 'pref_auto_refresh',
             'notificationSound' => 'pref_notification_sound',
             'defaultIdentityId' => 'pref_default_identity',
+            'navCollapsedGroups' => 'pref_nav_collapsed_groups',
         ];
 
         // The signature HTML is stored as a FILE (64 KB DB limit would
@@ -187,7 +189,10 @@ class V2SettingsController extends Controller
 
         foreach ($allowed as $field => $key) {
             if (\array_key_exists($field, $body)) {
-                $this->setPref($uid, $key, (string) $body[$field]);
+                $value = \is_array($body[$field])
+                    ? \json_encode($body[$field], \JSON_UNESCAPED_SLASHES)
+                    : (string) $body[$field];
+                $this->setPref($uid, $key, $value);
             }
         }
 

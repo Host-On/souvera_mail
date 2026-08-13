@@ -24,11 +24,18 @@
 				<template v-if="sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
 					<template v-for="group in sharedAccountGroups" :key="group.accountId">
-						<NcAppNavigationCaption class="shared-group-caption" :name="group.accountName" />
-						<MailboxItem v-for="mp in group.roots" :key="mp.id"
-							:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="sharedSelected(mp)" :depth="0"
-							@select="onSharedSelect(mp._accountId, $event)"
-							@drop-email="onDropEmail" />
+						<NcAppNavigationItem :name="group.accountName" @click="toggleGroup(group.accountId)">
+							<template #icon>
+								<ChevronDown v-if="!isGroupCollapsed(group.accountId)" :size="16" />
+								<ChevronRight v-else :size="16" />
+							</template>
+						</NcAppNavigationItem>
+						<template v-if="!isGroupCollapsed(group.accountId)">
+							<MailboxItem v-for="mp in group.roots" :key="mp.id"
+								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="sharedSelected(mp)" :depth="0"
+								@select="onSharedSelect(mp._accountId, $event)"
+								@drop-email="onDropEmail" />
+						</template>
 					</template>
 				</template>
 
@@ -43,11 +50,18 @@
 				<template v-if="!sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
 					<template v-for="group in sharedAccountGroups" :key="'low-'+group.accountId">
-						<NcAppNavigationCaption class="shared-group-caption" :name="group.accountName" />
-						<MailboxItem v-for="mp in group.roots" :key="mp.id"
-							:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="sharedSelected(mp)" :depth="0"
-							@select="onSharedSelect(mp._accountId, $event)"
-							@drop-email="onDropEmail" />
+						<NcAppNavigationItem :name="group.accountName" @click="toggleGroup(group.accountId)">
+							<template #icon>
+								<ChevronDown v-if="!isGroupCollapsed(group.accountId)" :size="16" />
+								<ChevronRight v-else :size="16" />
+							</template>
+						</NcAppNavigationItem>
+						<template v-if="!isGroupCollapsed(group.accountId)">
+							<MailboxItem v-for="mp in group.roots" :key="mp.id"
+								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="sharedSelected(mp)" :depth="0"
+								@select="onSharedSelect(mp._accountId, $event)"
+								@drop-email="onDropEmail" />
+						</template>
 					</template>
 				</template>
 			</template>
@@ -84,6 +98,8 @@ import Cog from 'vue-material-design-icons/Cog.vue'
 import Share from 'vue-material-design-icons/Share.vue'
 import Archive from 'vue-material-design-icons/Archive.vue'
 import Contacts from 'vue-material-design-icons/Contacts.vue'
+import ChevronDown from 'vue-material-design-icons/ChevronDown.vue'
+import ChevronRight from 'vue-material-design-icons/ChevronRight.vue'
 import MailboxItem from './components/MailboxItem.vue'
 import QuotaDonut from './components/QuotaDonut.vue'
 import ContactPicker from './components/ContactPicker.vue'
@@ -96,9 +112,9 @@ const ROLE_ORDER = { inbox:0, drafts:1, sent:2, junk:3, trash:4 }
 
 export default {
 	name: 'MailV2App',
-	components: { NcContent, NcAppNavigation, NcAppNavigationToggle, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, Contacts, MailboxItem, QuotaDonut, ContactPicker },
+	components: { NcContent, NcAppNavigation, NcAppNavigationToggle, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, MailboxItem, QuotaDonut, ContactPicker },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false, navOpen: true }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false, navOpen: true, navCollapsedGroups: [] }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },
@@ -166,6 +182,22 @@ export default {
 		return false
 	},
 	methods: {
+		isGroupCollapsed(accountId) {
+			return this.navCollapsedGroups.includes(accountId)
+		},
+		async toggleGroup(accountId) {
+			if (this.isGroupCollapsed(accountId)) {
+				this.navCollapsedGroups = this.navCollapsedGroups.filter(id => id !== accountId)
+			} else {
+				this.navCollapsedGroups = [...this.navCollapsedGroups, accountId]
+			}
+			// Persist per user — fire and forget.
+			try {
+				const { default: axios } = await import('@nextcloud/axios')
+				const { generateUrl } = await import('@nextcloud/router')
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { navCollapsedGroups: this.navCollapsedGroups })
+			} catch {}
+		},
 		async onRefreshMailboxes() {
 			try {
 				this.mailboxes = await fetchMailboxes()
@@ -254,6 +286,7 @@ export default {
 				const { generateUrl } = await import('@nextcloud/router')
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
 				this.isVertical = data.verticalLayout || false
+				this.navCollapsedGroups = data.navCollapsedGroups || []
 			} catch (e) { console.error('Failed to load layout pref', e) }
 		},
 	},
