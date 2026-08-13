@@ -89,7 +89,7 @@
 					<NcButton variant="tertiary" size="small" @click="folderPath = ''; loadFolders()">
 						{{ t('souvera_mail', 'Files') }}
 					</NcButton>
-					<template v-for="(part, i) in folderBreadcrumbs">
+					<template v-for="(part, i) in folderBreadcrumbs" :key="part.path">
 						<span class="folder-picker__sep">/</span>
 						<NcButton variant="tertiary" size="small" @click="folderPath = part.path; loadFolders()">
 							{{ part.label }}

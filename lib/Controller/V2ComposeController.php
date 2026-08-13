@@ -165,10 +165,16 @@ class V2ComposeController extends Controller
 
         // Alias identities (id "alias:foo@bar.com") are not JMAP identities —
         // the FROM header gets the alias address while the submission uses
-        // the primary JMAP identity.
+        // the primary JMAP identity. The alias MUST be one of the user's
+        // real aliases — never trust the client-provided address verbatim.
         $fromEmail = $userEmail;
         if ($identityId !== null && \str_starts_with((string) $identityId, 'alias:')) {
-            $fromEmail = \substr((string) $identityId, 6);
+            $alias = \strtolower(\trim(\substr((string) $identityId, 6)));
+            $allowedAliases = \array_map('strtolower', $this->resolveAliases());
+            if ($alias === '' || !\in_array($alias, $allowedAliases, true)) {
+                return new JSONResponse(['error' => 'Unknown alias address'], 400);
+            }
+            $fromEmail = $alias;
             $identityId = $this->resolveIdentityId($accountId);
             if ($identityId === null) {
                 return new JSONResponse(['error' => 'No JMAP identity found'], 500);
@@ -413,7 +419,6 @@ class V2ComposeController extends Controller
      * DELETE /apps/souvera_mail/api/v2/drafts/{id}
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function deleteDraft(string $id): JSONResponse
     {
         $accountId = $this->jmap->getCurrentAccountId();
@@ -427,42 +432,6 @@ class V2ComposeController extends Controller
         ]);
 
         return new JSONResponse(['success' => true]);
-    }
-
-    /**
-     * DELETE /apps/souvera_mail/api/v2/drafts — delete ALL drafts.
-     *
-     * Called when a new compose window opens: stale drafts from abandoned
-     * sessions are cleaned up so the Drafts folder does not fill up.
-     */
-    #[NoAdminRequired]
-    #[NoCSRFRequired]
-    public function cleanupDrafts(): JSONResponse
-    {
-        $accountId = $this->jmap->getCurrentAccountId();
-        if ($accountId === null) {
-            return new JSONResponse(['error' => 'Not authenticated'], 401);
-        }
-
-        try {
-            $query = $this->jmap->singleCall('Email/query', [
-                'accountId' => $accountId,
-                'filter' => ['hasKeyword' => '$draft'],
-                'limit' => 200,
-            ]);
-
-            $ids = $query['data']['ids'] ?? [];
-            if ($ids !== []) {
-                $this->jmap->singleCall('Email/set', [
-                    'accountId' => $accountId,
-                    'destroy' => $ids,
-                ]);
-            }
-
-            return new JSONResponse(['success' => true, 'removed' => \count($ids)]);
-        } catch (\Throwable $e) {
-            return new JSONResponse(['success' => false, 'error' => $e->getMessage()], 500);
-        }
     }
 
     private function buildEmailObject(

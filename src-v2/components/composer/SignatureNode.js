@@ -31,7 +31,7 @@ export const Signature = Node.create({
 	},
 
 	renderHTML() {
-		return ['div', { 'data-signature': '' }, 0]
+		return ['div', { 'data-signature': '' }]
 	},
 
 	addNodeView() {

@@ -415,11 +415,6 @@ return [
             'url' => '/api/v2/shield/quarantine',
             'verb' => 'GET',
         ],
-		[
-			'name' => 'v2_spam#delete',
-			'url' => '/api/v2/spam/delete',
-			'verb' => 'POST',
-		],
 
 		// Sieve filter management
 		[
@@ -548,11 +543,6 @@ return [
         [
             'name' => 'v2_compose#deleteDraft',
             'url' => '/api/v2/drafts/{id}',
-            'verb' => 'DELETE',
-        ],
-        [
-            'name' => 'v2_compose#cleanupDrafts',
-            'url' => '/api/v2/drafts',
             'verb' => 'DELETE',
         ],
         [

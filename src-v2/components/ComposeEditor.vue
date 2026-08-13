@@ -220,8 +220,9 @@ export default {
 		if (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward') {
 			this.buildReplyOrForward()
 		} else {
-			// New message: clean up stale drafts from abandoned sessions
-			// (the Drafts folder must not fill up), then insert signature.
+			// New message: clean up drafts that THIS app created in
+			// previous abandoned sessions (browser close / crash) — never
+			// touch drafts created by other clients.
 			this.cleanupStaleDrafts()
 			if (this.signatureEnabled) {
 				this.initContent(`<p></p>${this.signatureBlock()}`, 'empty')
@@ -274,10 +275,12 @@ export default {
 		serializeBody() {
 			const raw = this.signatureEnabled ? this.sanitizedSignature() : ''
 			let html = this.bodyHtml
+			// Tolerant marker match: attribute may or may not carry =""
+			const markerRe = /<div data-signature(?:="")?><\/div>/
 			if (raw) {
-				html = html.replace(/<div data-signature=""><\/div>/, `<div data-signature="">${raw}</div>`)
+				html = html.replace(markerRe, `<div data-signature="">${raw}</div>`)
 			} else {
-				html = html.replace(/<div data-signature=""><\/div>/, '')
+				html = html.replace(markerRe, '')
 				// Also drop a leftover standalone "--" separator line
 				html = html.replace(/<p>\s*--\s*<\/p>/, '')
 			}
@@ -398,6 +401,7 @@ export default {
 				} else {
 					const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/drafts'), payload)
 					this.savedDraftId = data.draftId
+					this.trackDraft(data.draftId)
 				}
 			} catch (e) {
 				console.error('Draft save failed', e)
@@ -435,6 +439,7 @@ export default {
 				await axios.post(generateUrl('/apps/souvera_mail/api/v2/send'), payload)
 				if (this.savedDraftId) {
 					try { await axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId)) } catch {}
+					this.trackDraft(null, this.savedDraftId)
 					this.savedDraftId = null
 				}
 				showSuccess(this.t('souvera_mail', 'Message sent'))
@@ -490,12 +495,33 @@ export default {
 			if (this.savedDraftId) {
 				this.discardingDraftId = this.savedDraftId
 				axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId)).catch(() => {})
+				this.trackDraft(null, this.savedDraftId)
 				this.savedDraftId = null
 			}
 		},
-		async cleanupStaleDrafts() {
+		// Track draft ids THIS app created so abandoned sessions can be
+		// cleaned up without touching drafts from other clients (IMAP).
+		trackDraft(addId, removeId = null) {
 			try {
-				await axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts'))
+				const KEY = 'souvera_mail.tracked_drafts'
+				let ids = JSON.parse(localStorage.getItem(KEY) || '[]')
+				ids = ids.filter(id => id !== removeId)
+				if (addId) ids.push(addId)
+				// Cap the list — only the most recent 20 drafts matter.
+				ids = ids.slice(-20)
+				localStorage.setItem(KEY, JSON.stringify(ids))
+			} catch {}
+		},
+		async cleanupStaleDrafts() {
+			// Only delete drafts that this app tracked in previous sessions.
+			try {
+				const KEY = 'souvera_mail.tracked_drafts'
+				const ids = JSON.parse(localStorage.getItem(KEY) || '[]')
+				if (ids.length === 0) return
+				for (const id of ids) {
+					await axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts/' + encodeURIComponent(id))).catch(() => {})
+				}
+				localStorage.setItem(KEY, '[]')
 			} catch (e) {
 				console.error('Draft cleanup failed', e)
 			}

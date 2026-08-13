@@ -5,6 +5,7 @@
 			ref="frame"
 			:srcdoc="srcdoc"
 			class="html-mail-frame__iframe"
+			:class="{ 'html-mail-frame__iframe--dark': darkMode }"
 			:style="{ height: frameHeight + 'px' }"
 			:sandbox="'allow-same-origin allow-popups allow-popups-to-escape-sandbox'"
 			@load="onFrameLoad"
@@ -122,5 +123,8 @@ export default {
 	border: 0;
 	display: block;
 	background: #fff;
+}
+.html-mail-frame__iframe--dark {
+	background: #1e2227;
 }
 </style>
