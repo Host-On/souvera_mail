@@ -24,10 +24,15 @@
 				<template v-if="sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
 					<template v-for="group in sharedAccountGroups" :key="group.accountId">
-						<NcAppNavigationItem class="nav-group-toggle" :name="group.accountName" @click="toggleGroup(group.accountId)">
+						<NcAppNavigationItem class="nav-group-toggle" :name="group.accountName"
+							:active="groupActive(group.accountId)"
+							@click="toggleGroup(group.accountId)">
 							<template #icon>
 								<ChevronDown v-if="!isGroupCollapsed(group.accountId)" :size="16" />
 								<ChevronRight v-else :size="16" />
+							</template>
+							<template #counter v-if="groupUnread(group.accountId) > 0">
+								<NcCounterBubble :count="groupUnread(group.accountId)" />
 							</template>
 						</NcAppNavigationItem>
 						<template v-if="!isGroupCollapsed(group.accountId)">
@@ -50,10 +55,15 @@
 				<template v-if="!sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
 					<template v-for="group in sharedAccountGroups" :key="'low-'+group.accountId">
-						<NcAppNavigationItem class="nav-group-toggle" :name="group.accountName" @click="toggleGroup(group.accountId)">
+						<NcAppNavigationItem class="nav-group-toggle" :name="group.accountName"
+							:active="groupActive(group.accountId)"
+							@click="toggleGroup(group.accountId)">
 							<template #icon>
 								<ChevronDown v-if="!isGroupCollapsed(group.accountId)" :size="16" />
 								<ChevronRight v-else :size="16" />
+							</template>
+							<template #counter v-if="groupUnread(group.accountId) > 0">
+								<NcCounterBubble :count="groupUnread(group.accountId)" />
 							</template>
 						</NcAppNavigationItem>
 						<template v-if="!isGroupCollapsed(group.accountId)">
@@ -92,7 +102,7 @@
 </template>
 
 <script>
-import { NcContent, NcAppNavigation, NcAppNavigationToggle, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton } from '@nextcloud/vue'
+import { NcContent, NcAppNavigation, NcAppNavigationToggle, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble } from '@nextcloud/vue'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
 import Cog from 'vue-material-design-icons/Cog.vue'
 import Share from 'vue-material-design-icons/Share.vue'
@@ -112,7 +122,7 @@ const ROLE_ORDER = { inbox:0, drafts:1, sent:2, junk:3, trash:4 }
 
 export default {
 	name: 'MailV2App',
-	components: { NcContent, NcAppNavigation, NcAppNavigationToggle, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, MailboxItem, QuotaDonut, ContactPicker },
+	components: { NcContent, NcAppNavigation, NcAppNavigationToggle, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, MailboxItem, QuotaDonut, ContactPicker },
 	data() {
 		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false, navOpen: true, navCollapsedGroups: [] }
 	},
@@ -184,6 +194,16 @@ export default {
 	methods: {
 		isGroupCollapsed(accountId) {
 			return this.navCollapsedGroups.includes(accountId)
+		},
+		// Total unread across all mailboxes of a shared account group.
+		groupUnread(accountId) {
+			return this.sharedMailboxes
+				.filter(m => m._accountId === accountId)
+				.reduce((sum, m) => sum + (m.unread || 0), 0)
+		},
+		// True when the currently selected mailbox belongs to this account.
+		groupActive(accountId) {
+			return this.selectedMailbox?.startsWith(accountId + '|') || false
 		},
 		async toggleGroup(accountId) {
 			if (this.isGroupCollapsed(accountId)) {
@@ -324,17 +344,18 @@ export default {
 }
 
 /* Collapsible account group headers — visually distinct from mailbox
-   entries: bold name, subtle background, slight indentation. */
-:deep(.nav-group-toggle) {
-	padding-left: 18px !important;
-}
+   entries: bold name, subtle background. */
 :deep(.nav-group-toggle .app-navigation-entry__title) {
 	font-weight: 700 !important;
 	font-size: 13px !important;
 	letter-spacing: 0.3px;
 }
-:deep(.nav-group-toggle .app-navigation-entry) {
+:deep(.nav-group-toggle:not(.active) .app-navigation-entry) {
 	background: var(--color-background-hover) !important;
+	border-radius: var(--border-radius);
+	margin: 2px 6px;
+}
+:deep(.nav-group-toggle .app-navigation-entry) {
 	border-radius: var(--border-radius);
 	margin: 2px 6px;
 }
