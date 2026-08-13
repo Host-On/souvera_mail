@@ -62,7 +62,59 @@ class SignatureStoreService
         $this->config->deleteUserValue($uid, 'souvera_mail', self::LEGACY_PREF);
     }
 
+    /**
+     * Per-identity signature file. Identity ids are strings like
+     * "alias:foo@bar.com" — they are hashed into a safe file name.
+     */
+    public function readFor(string $uid, string $identityId): string
+    {
+        $file = $this->openIdentityFile($uid, $identityId, false);
+        if ($file === null) {
+            return '';
+        }
+        $content = $file->getContent();
+        return \is_string($content) ? $content : '';
+    }
+
+    public function writeFor(string $uid, string $identityId, string $html): void
+    {
+        $file = $this->openIdentityFile($uid, $identityId, true);
+        if ($file === null) {
+            $this->logger->warning(
+                'Souvera Mail: cannot open identity signature file for user ' . $uid,
+                ['app' => 'souvera_mail']
+            );
+            throw new \RuntimeException('Cannot write identity signature file');
+        }
+        $file->putContent($html);
+    }
+
+    public function deleteFor(string $uid, string $identityId): void
+    {
+        try {
+            $file = $this->openIdentityFile($uid, $identityId, false);
+            if ($file !== null) {
+                $file->delete();
+            }
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail: identity signature delete failed for ' . $uid . ': ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
+        }
+    }
+
+    private function openIdentityFile(string $uid, string $identityId, bool $create): ?\OCP\Files\File
+    {
+        return $this->openFileNamed($uid, 'signature-' . \md5($identityId) . '.html', $create);
+    }
+
     private function openFile(string $uid, bool $create): ?\OCP\Files\File
+    {
+        return $this->openFileNamed($uid, self::FILE, $create);
+    }
+
+    private function openFileNamed(string $uid, string $fileName, bool $create): ?\OCP\Files\File
     {
         try {
             $home = $this->rootFolder->get($uid);
@@ -79,13 +131,13 @@ class SignatureStoreService
             if (!$folder instanceof \OCP\Files\Folder) {
                 return null;
             }
-            if (!$folder->nodeExists(self::FILE)) {
+            if (!$folder->nodeExists($fileName)) {
                 if (!$create) {
                     return null;
                 }
-                $folder->newFile(self::FILE);
+                $folder->newFile($fileName);
             }
-            $node = $folder->get(self::FILE);
+            $node = $folder->get($fileName);
             return $node instanceof \OCP\Files\File ? $node : null;
         } catch (\Throwable $e) {
             $this->logger->warning(

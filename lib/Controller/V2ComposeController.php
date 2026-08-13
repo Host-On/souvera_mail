@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace OCA\SouveraMail\Controller;
 
+use OCA\SouveraMail\Service\SignatureStoreService;
 use OCA\SouveraMail\Service\StalwartUserContext;
 use OCA\SouveraMail\Service\V2JmapProxy;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
@@ -22,6 +24,8 @@ class V2ComposeController extends Controller
         private V2JmapProxy $jmap,
         private StalwartUserContext $userContext,
         private IUserSession $userSession,
+        private SignatureStoreService $signatureStore,
+        private IConfig $config,
         private LoggerInterface $logger,
     ) {
         parent::__construct($appName, $request);
@@ -105,6 +109,77 @@ class V2ComposeController extends Controller
             return new JSONResponse(['error' => 'Update not applied'], 500);
         }
         return new JSONResponse(['success' => true, 'name' => $name]);
+    }
+
+    /**
+     * PUT /apps/souvera_mail/api/v2/identities/{id}/signature
+     * Body: {html: "...", enabled: bool}
+     *
+     * Per-identity signature OVERRIDE. Aliases are accepted (alias:...).
+     * Empty html removes the override so the global signature applies again.
+     */
+    #[NoAdminRequired]
+    public function updateIdentitySignature(string $id): JSONResponse
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+        $user = $this->userSession->getUser();
+        if ($user === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+        $uid = $user->getUID();
+
+        // The id must be a REAL identity of this user (JMAP identity or
+        // alias) — never trust the client-provided id verbatim.
+        if (\str_starts_with((string) $id, 'alias:')) {
+            $alias = \strtolower(\trim(\substr((string) $id, 6)));
+            $allowedAliases = \array_map('strtolower', $this->resolveAliases());
+            if ($alias === '' || !\in_array($alias, $allowedAliases, true)) {
+                return new JSONResponse(['error' => 'Unknown alias address'], 400);
+            }
+            // Canonical form — same key as used by identities() and send().
+            $id = 'alias:' . $alias;
+        } else {
+            $result = $this->jmap->singleCall('Identity/get', ['accountId' => $accountId]);
+            $list = $result['data']['list'] ?? [];
+            $known = \array_map(fn($i) => $i['id'] ?? '', $list);
+            if (!\in_array((string) $id, $known, true)) {
+                return new JSONResponse(['error' => 'Unknown identity'], 400);
+            }
+        }
+
+        $body = \json_decode(\file_get_contents('php://input'), true) ?? [];
+        $html = \trim((string) ($body['html'] ?? ''));
+        $enabled = (bool) ($body['enabled'] ?? false);
+
+        $raw = $this->config->getUserValue($uid, 'souvera_mail', 'pref_identity_signatures', '');
+        $map = \json_decode($raw, true);
+        if (!\is_array($map)) {
+            $map = [];
+        }
+
+        if ($html === '') {
+            unset($map[$id]);
+            $this->signatureStore->deleteFor($uid, $id);
+        } else {
+            try {
+                $this->signatureStore->writeFor($uid, $id, $html);
+            } catch (\Throwable $e) {
+                return new JSONResponse(['error' => 'Failed to save signature'], 500);
+            }
+            $map[$id] = $enabled ? 1 : 0;
+        }
+
+        $this->config->setUserValue(
+            $uid,
+            'souvera_mail',
+            'pref_identity_signatures',
+            \json_encode($map, \JSON_UNESCAPED_SLASHES)
+        );
+
+        return new JSONResponse(['success' => true]);
     }
 
     /**

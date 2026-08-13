@@ -172,6 +172,7 @@ export default {
 			discardingDraftId: null,
 			signatureHtml: '',
 			signatureEnabled: false,
+			identitySignatures: {},
 			replyPosition: 'above',
 			signaturePosition: 'above',
 		}
@@ -186,12 +187,26 @@ export default {
 		canSend() {
 			return (this.to.length > 0 || this.cc.length > 0 || this.bcc.length > 0) && !this.sending
 		},
+		// The signature that applies for the currently selected sender:
+		// a per-identity override when active, otherwise the global one.
+		effectiveSignature() {
+			const entry = this.identitySignatures[this.fromIdentityId]
+			if (entry && entry.enabled && entry.html) {
+				return { html: entry.html, enabled: true }
+			}
+			return { html: this.signatureHtml, enabled: this.signatureEnabled }
+		},
 	},
 	watch: {
 		to: { deep: true, handler() { this.markDirty() } },
 		cc: { deep: true, handler() { this.markDirty() } },
 		bcc: { deep: true, handler() { this.markDirty() } },
 		subject() { this.markDirty() },
+		// Switching the sender swaps the signature in the editor to the one
+		// configured for the newly selected identity (fallback: global).
+		fromIdentityId(newId, oldId) {
+			if (oldId !== null && newId !== oldId) this.swapSignature()
+		},
 		bodyHtml() { if (!this._suppressDirty) this.markDirty() },
 		// originalEmail arrives asynchronously (ComposeView fetches the body
 		// after mount) — build the reply/forward content, prefill recipients
@@ -214,8 +229,10 @@ export default {
 		},
 	},
 	async mounted() {
-		await this.loadIdentities()
+		// Preferences FIRST: loadIdentities() picks the default identity
+		// (star) from defaultIdentityId, so it must already be loaded.
 		await this.loadPreferences()
+		await this.loadIdentities()
 		this._prefsLoaded = true
 		if (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward') {
 			this.buildReplyOrForward()
@@ -224,7 +241,7 @@ export default {
 			// previous abandoned sessions (browser close / crash) — never
 			// touch drafts created by other clients.
 			this.cleanupStaleDrafts()
-			if (this.signatureEnabled) {
+			if (this.effectiveSignature.enabled) {
 				this.initContent(`<p></p>${this.signatureBlock()}`, 'empty')
 			}
 		}
@@ -249,6 +266,7 @@ export default {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
 				this.signatureHtml = data.signatureHtml || ''
 				this.signatureEnabled = !!data.signatureEnabled
+				this.identitySignatures = data.identitySignatures || {}
 				this.replyPosition = data.replyPosition === 'below' ? 'below' : 'above'
 				this.signaturePosition = data.signaturePosition === 'below' ? 'below' : 'above'
 				this.defaultIdentityId = data.defaultIdentityId || ''
@@ -256,16 +274,18 @@ export default {
 				console.error('Failed to load preferences', e)
 			}
 		},
-		sanitizedSignature() {
-			if (!this.signatureHtml) return ''
-			return DOMPurify.sanitize(this.signatureHtml, { USE_PROFILES: { html: true } })
+		sanitizedSignature(html) {
+			if (!html) return ''
+			return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } })
 		},
 		// Thunderbird-style signature block: RFC 3676 separator "--" line
 		// followed by the signature. The signature HTML is wrapped in a
 		// <div data-signature> so the editor renders it RAW (tables, images,
 		// inline styles) via the custom SignatureNode without normalising it.
 		signatureBlock() {
-			const sig = this.sanitizedSignature()
+			const eff = this.effectiveSignature
+			if (!eff.enabled) return ''
+			const sig = this.sanitizedSignature(eff.html)
 			if (!sig) return ''
 			return `<p>--</p><div data-signature="">${sig}</div>`
 		},
@@ -273,7 +293,8 @@ export default {
 		// <div data-signature=""></div> marker for each signature node —
 		// replace it with the sanitized raw HTML (or strip when disabled).
 		serializeBody() {
-			const raw = this.signatureEnabled ? this.sanitizedSignature() : ''
+			const eff = this.effectiveSignature
+			const raw = eff.enabled ? this.sanitizedSignature(eff.html) : ''
 			let html = this.bodyHtml
 			// Tolerant marker match: attribute may or may not carry =""
 			const markerRe = /<div data-signature(?:="")?><\/div>/
@@ -285,6 +306,28 @@ export default {
 				html = html.replace(/<p>\s*--\s*<\/p>/, '')
 			}
 			return html
+		},
+		// Rebuild the signature node in the editor when the sender identity
+		// changes. The body is serialized (marker node only), so the swap is
+		// a marker replacement — the same format serializeBody() uses.
+		// No marker (user deleted the signature) → do nothing: never insert
+		// content at a guessed position, never touch a typed "--" line.
+		swapSignature() {
+			if (!this.$refs.editor) return
+			const eff = this.effectiveSignature
+			const raw = eff.enabled ? this.sanitizedSignature(eff.html) : ''
+			let html = this.bodyHtml || ''
+			const markerRe = /<div data-signature(?:="")?><\/div>/
+			if (!markerRe.test(html)) return
+			if (raw) {
+				html = html.replace(markerRe, `<div data-signature="">${raw}</div>`)
+			} else {
+				html = html.replace(markerRe, '')
+				// The "--" separator belongs to the signature block —
+				// only remove it together with a found marker.
+				html = html.replace(/<p>\s*--\s*<\/p>/, '')
+			}
+			if (html !== this.bodyHtml) this.$refs.editor?.setContent(html)
 		},
 		// Replaces the editor content only while it is still untouched
 		// (re-checked at execution time), and suppresses the dirty flag for
@@ -367,7 +410,7 @@ export default {
 			// Signature is inserted DIRECTLY into the editor so the user sees
 			// exactly what will be sent. The empty answer paragraph is the
 			// cursor target.
-			const sig = this.signatureEnabled ? this.signatureBlock() : ''
+			const sig = this.signatureBlock()
 			if (this.replyPosition === 'below') {
 				this.initContent(`${quote}${answer}${sig}`, 'empty')
 			} else {
@@ -383,7 +426,7 @@ export default {
 			this.forwardAttachments = (email.attachments || []).map(a => ({
 				blobId: a.blobId, name: a.name, type: a.type, size: a.size,
 			}))
-			const sig = this.signatureEnabled ? this.signatureBlock() : ''
+			const sig = this.signatureBlock()
 			this.initContent(`<p></p>${sig}${quote}`, 'empty')
 		},
 		markDirty() {

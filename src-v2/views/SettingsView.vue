@@ -97,18 +97,19 @@
 								@update:modelValue="onSoundChange" />
 						</div>
 					</div>
-					<div class="setting-row">
-						<div>
-							<span class="setting-label">{{ t('souvera_mail', 'Default sender') }}</span>
-						</div>
-						<NcSelect v-model="defaultIdentityOption" :options="identityOptions"
-							label="label" class="setting-select" :clearable="false"
-							@update:modelValue="onDefaultIdentityChange" />
-					</div>
 					<div class="setting-row setting-row--column" v-if="identityOptions.length > 0">
 						<span class="setting-label">{{ t('souvera_mail', 'Identities') }}</span>
+						<span class="settings-muted">{{ t('souvera_mail', 'Tap the star to set the default sender. The signature icon stores a signature for this identity only.') }}</span>
 						<div class="identity-list">
 							<div v-for="i in identityOptions" :key="i.id" class="identity-row">
+								<NcButton variant="tertiary" size="small"
+									class="identity-row__default"
+									:title="isDefaultIdentity(i) ? t('souvera_mail', 'Default sender') : t('souvera_mail', 'Set as default sender')"
+									@click="setDefaultIdentity(i)">
+									<template #icon>
+										<Star :size="16" :class="{ 'identity-row__star--active': isDefaultIdentity(i) }" />
+									</template>
+								</NcButton>
 								<div class="identity-row__info">
 									<div class="identity-row__email">{{ i.email }}</div>
 									<div class="identity-row__name">
@@ -124,6 +125,13 @@
 												@click="startEditIdentity(i)">
 												<template #icon><Pencil :size="12" /></template>
 											</NcButton>
+											<NcButton variant="tertiary" size="small"
+												:title="t('souvera_mail', 'Signature for this identity')"
+												@click="openIdentitySignature(i)">
+												<template #icon>
+													<SignatureText :size="14" :class="{ 'identity-row__sig--active': hasIdentitySignature(i) }" />
+												</template>
+											</NcButton>
 											<span v-if="i.isAlias" class="identity-row__alias-tag">{{ t('souvera_mail', 'Alias') }}</span>
 										</template>
 									</div>
@@ -131,6 +139,22 @@
 							</div>
 						</div>
 					</div>
+					<NcDialog v-if="sigIdentity" :name="t('souvera_mail', 'Signature for') + ' ' + sigIdentity.email"
+						:open.sync="true"
+						@update:open="sigIdentity = null">
+						<div class="identity-sig-dialog">
+							<NcCheckboxRadioSwitch :model-value="sigDialogEnabled"
+								@update:modelValue="sigDialogEnabled = $event">
+								{{ t('souvera_mail', 'Use this signature for this identity') }}
+							</NcCheckboxRadioSwitch>
+							<NcTextArea v-model="sigDialogHtml" :label="t('souvera_mail', 'Signature (HTML)')"
+								:placeholder="t('souvera_mail', 'Leave empty to fall back to the global signature')" />
+							<div class="identity-sig-dialog__actions">
+								<NcButton variant="primary" @click="saveIdentitySignature">{{ t('souvera_mail', 'Save') }}</NcButton>
+								<NcButton variant="tertiary" @click="sigIdentity = null">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+							</div>
+						</div>
+					</NcDialog>
 				</div>
 			</div>
 
@@ -144,6 +168,7 @@
 						@update:modelValue="sigEnabled = $event">
 						{{ t('souvera_mail', 'Append signature to messages') }}
 					</NcCheckboxRadioSwitch>
+					<p class="settings-muted">{{ t('souvera_mail', 'Individual identities can override this signature — use the signature icon next to an identity in the Identities section above.') }}</p>
 					<div v-if="sigEnabled" class="setting-row setting-row--column">
 						<span class="setting-label">{{ t('souvera_mail', 'Signature') }}</span>
 						<div class="signature-editor">
@@ -532,13 +557,15 @@
 </template>
 
 <script>
-import { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog } from '@nextcloud/vue'
+import { NcButton, NcTextField, NcTextArea, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog } from '@nextcloud/vue'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 import Plus from 'vue-material-design-icons/Plus.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
 import Account from 'vue-material-design-icons/Account.vue'
 import Palette from 'vue-material-design-icons/Palette.vue'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
+import Star from 'vue-material-design-icons/Star.vue'
+import SignatureText from 'vue-material-design-icons/SignatureText.vue'
 import ShareVariant from 'vue-material-design-icons/ShareVariant.vue'
 import Key from 'vue-material-design-icons/Key.vue'
 import Folder from 'vue-material-design-icons/Folder.vue'
@@ -574,7 +601,7 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Refresh, Play, FolderPlus, Filter, Check, ContentCopy, Email, QuotaDonut, SieveFilterEditor },
+	components: { NcButton, NcTextField, NcTextArea, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog, Plus, TrashCan, Account, Palette, Pencil, Star, SignatureText, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Refresh, Play, FolderPlus, Filter, Check, ContentCopy, Email, QuotaDonut, SieveFilterEditor },
 	data() {
 		return {
 			accountEmail: '',
@@ -648,10 +675,14 @@ export default {
 			extForm: { email: '', imap_host: '', imap_port: 993, imap_ssl: 'ssl', smtp_host: '', smtp_port: 465, smtp_ssl: 'ssl', username: '', password: '', provider: '' },
 
 			identityOptions: [],
-			defaultIdentityOption: null,
+			_prefsDefaultIdentityId: '',
 			editingIdentityId: null,
 			editingIdentityName: '',
 			aliasDisplayNames: {},
+			identitySignatures: {},
+			sigIdentity: null,
+			sigDialogHtml: '',
+			sigDialogEnabled: false,
 		}
 	},
 	mounted() {
@@ -768,6 +799,7 @@ export default {
 				if (pp) this.messagesPerPageOption = pp
 				this._prefsDefaultIdentityId = p.defaultIdentityId || ''
 				this.aliasDisplayNames = p.aliasDisplayNames || {}
+				this.identitySignatures = p.identitySignatures || {}
 			} catch {}
 			this.loaded = true
 			this.loadIdentityOptions()
@@ -790,17 +822,48 @@ export default {
 					return { id: i.id, label: name ? `${name} <${i.email}>` : i.email, value: i.id, name, email: i.email, isAlias }
 				})
 				this.identityOptions = list
-				const prefId = this._prefsDefaultIdentityId
-				const found = prefId ? list.find(i => i.id === prefId) : null
-				this.defaultIdentityOption = found || list[0] || null
 			} catch {}
 		},
-		async onDefaultIdentityChange(opt) {
-			if (!opt) return
+		isDefaultIdentity(i) {
+			return this._prefsDefaultIdentityId === i.id
+		},
+		async setDefaultIdentity(i) {
 			try {
-				await API.savePrefs({ defaultIdentityId: opt.value || opt.id })
+				await API.savePrefs({ defaultIdentityId: i.id })
+				this._prefsDefaultIdentityId = i.id
 				showSuccess(this.t('souvera_mail', 'Default sender saved'))
 			} catch { showError(this.t('souvera_mail', 'Failed to save')) }
+		},
+		hasIdentitySignature(i) {
+			const entry = this.identitySignatures[i.id]
+			return !!(entry && entry.enabled && entry.html)
+		},
+		openIdentitySignature(i) {
+			const entry = this.identitySignatures[i.id] || null
+			this.sigIdentity = i
+			this.sigDialogHtml = entry ? entry.html : ''
+			this.sigDialogEnabled = !!(entry && entry.enabled)
+		},
+		async saveIdentitySignature() {
+			if (!this.sigIdentity) return
+			const id = this.sigIdentity.id
+			try {
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/identities/' + encodeURIComponent(id) + '/signature'), {
+					html: this.sigDialogHtml,
+					enabled: this.sigDialogEnabled,
+				})
+				const names = { ...this.identitySignatures }
+				if (this.sigDialogHtml.trim() === '') {
+					delete names[id]
+				} else {
+					names[id] = { html: this.sigDialogHtml, enabled: this.sigDialogEnabled }
+				}
+				this.identitySignatures = names
+				this.sigIdentity = null
+				showSuccess(this.t('souvera_mail', 'Signature saved'))
+			} catch (e) {
+				showError(e?.response?.data?.error || this.t('souvera_mail', 'Failed to save signature'))
+			}
 		},
 		startEditIdentity(identity) {
 			this.editingIdentityId = identity.id
@@ -1224,11 +1287,16 @@ export default {
 .setting-row--column { flex-direction: column; align-items: stretch; }
 
 .identity-list { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
-.identity-row { display: flex; align-items: center; padding: 6px 8px; border-radius: 6px; background: var(--color-background-dark); }
+.identity-row { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; background: var(--color-background-dark); }
+.identity-row__default { flex-shrink: 0; }
+.identity-row__star--active { color: var(--color-primary-element); fill: var(--color-primary-element); }
+.identity-row__sig--active { color: var(--color-success); }
 .identity-row__info { flex: 1; min-width: 0; }
 .identity-row__email { font-weight: 600; font-size: 13px; }
 .identity-row__name { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-maxcontrast); margin-top: 2px; }
 .identity-row__alias-tag { font-size: 10px; padding: 0 6px; border-radius: 3px; background: var(--color-primary-element); color: #fff; }
+.identity-sig-dialog { display: flex; flex-direction: column; gap: 12px; min-width: 420px; max-width: 90vw; }
+.identity-sig-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; }
 .signature-editor {
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius);

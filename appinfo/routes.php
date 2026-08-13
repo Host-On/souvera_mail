@@ -536,6 +536,11 @@ return [
             'verb' => 'PUT',
         ],
         [
+            'name' => 'v2_compose#updateIdentitySignature',
+            'url' => '/api/v2/identities/{id}/signature',
+            'verb' => 'PUT',
+        ],
+        [
             'name' => 'v2_compose#createDraft',
             'url' => '/api/v2/drafts',
             'verb' => 'POST',

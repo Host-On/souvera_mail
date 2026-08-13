@@ -118,6 +118,7 @@ class V2SettingsController extends Controller
         return new JSONResponse([
             'signatureHtml' => $this->signatureStore->read($uid),
             'signatureEnabled' => $this->getPref($uid, 'pref_signature_enabled', '0') === '1',
+            'identitySignatures' => $this->readIdentitySignatures($uid),
             'replyPosition' => $this->getPref($uid, 'pref_reply_position', 'above'),
             'signaturePosition' => $this->getPref($uid, 'pref_signature_position', 'above'),
             'messagesPerPage' => (int) $this->getPref($uid, 'pref_messages_per_page', '50'),
@@ -209,5 +210,30 @@ class V2SettingsController extends Controller
     private function setPref(string $uid, string $key, string $value): void
     {
         $this->config->setUserValue($uid, 'souvera_mail', $key, $value);
+    }
+
+    /**
+     * Per-identity signature overrides: map identityId => {html, enabled}.
+     * Sources: the enabled-flag map from the user preference and the
+     * signature HTML files from SignatureStoreService.
+     *
+     * @return array<string, array{html: string, enabled: bool}>
+     */
+    private function readIdentitySignatures(string $uid): array
+    {
+        $raw = $this->getPref($uid, 'pref_identity_signatures', '');
+        $map = \json_decode($raw, true);
+        if (!\is_array($map)) {
+            return [];
+        }
+        $out = [];
+        foreach ($map as $id => $enabled) {
+            $html = $this->signatureStore->readFor($uid, (string) $id);
+            if ($html === '') {
+                continue;
+            }
+            $out[(string) $id] = ['html' => $html, 'enabled' => (bool) $enabled];
+        }
+        return $out;
     }
 }
