@@ -134,10 +134,21 @@
 		</NcDialog>
 
 		<div class="email-detail__body">
+			<div v-if="displayHtml" class="email-detail__theme-toggle">
+				<NcButton variant="tertiary" size="small"
+					:title="contentDark ? t('souvera_mail', 'Light content background') : t('souvera_mail', 'Dark content background')"
+					@click="contentDark = !contentDark">
+					<template #icon>
+						<WeatherNight v-if="!contentDark" :size="16" />
+						<WeatherSunny v-else :size="16" />
+					</template>
+				</NcButton>
+			</div>
 			<HtmlMailFrame v-if="displayHtml"
 				:html="displayHtml"
 				:attachments="email.attachments || []"
 				:remote-allowed="remoteAllowed"
+				:dark-mode="contentDark"
 				@mailto="$emit('mailto', $event)"
 				@blocked="onBlocked" />
 			<pre v-else-if="displayPlain" class="email-detail__plaintext">{{ displayPlain }}</pre>
@@ -151,6 +162,8 @@
 <script>
 import { NcButton, NcActions, NcActionButton, NcDialog, NcTextField, NcEmptyContent } from '@nextcloud/vue'
 import ArrowLeft from 'vue-material-design-icons/ArrowLeft.vue'
+import WeatherNight from 'vue-material-design-icons/WeatherNight.vue'
+import WeatherSunny from 'vue-material-design-icons/WeatherSunny.vue'
 import Reply from 'vue-material-design-icons/Reply.vue'
 import ReplyAll from 'vue-material-design-icons/ReplyAll.vue'
 import Forward from 'vue-material-design-icons/Forward.vue'
@@ -172,7 +185,7 @@ import { generateUrl } from '@nextcloud/router'
 
 export default {
 	name: 'EmailDetail',
-	components: { NcButton, NcActions, NcActionButton, NcDialog, NcTextField, NcEmptyContent, ArrowLeft, Reply, ReplyAll, Forward, TrashCan, Download, Paperclip, FolderMove, Folder, FolderOpen, FolderPlus, FolderDownload, ContentSave, HtmlMailFrame, BimiLogo },
+	components: { NcButton, NcActions, NcActionButton, NcDialog, NcTextField, NcEmptyContent, ArrowLeft, WeatherNight, WeatherSunny, Reply, ReplyAll, Forward, TrashCan, Download, Paperclip, FolderMove, Folder, FolderOpen, FolderPlus, FolderDownload, ContentSave, HtmlMailFrame, BimiLogo },
 	props: {
 		email: { type: Object, default: null },
 		htmlBody: { type: String, default: '' },
@@ -182,7 +195,11 @@ export default {
 		remoteAlways: { type: Boolean, default: false },
 	},
 	emits: ['close', 'reply', 'replyAll', 'forward', 'delete', 'move', 'mailto'],
-	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: this.remoteAlways } },
+	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: this.remoteAlways, contentDark: false } },
+	watch: {
+		// Reset the content theme toggle when switching to another email.
+		'email.id'() { this.contentDark = false },
+	},
 	computed: {
 		// Convert plain text to displayable HTML (newlines → <br>, safe)
 		displayHtml() {
@@ -353,6 +370,10 @@ export default {
 .attachment-chip__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; font-size: 13px; }
 .attachment-chip__size { font-size: 11px; color: var(--color-text-maxcontrast); white-space: nowrap; margin-left: 4px; }
 .email-detail__body { line-height: 1.7; word-break: break-word; margin: 0 -20px; }
+.email-detail__theme-toggle {
+	display: flex; justify-content: flex-end;
+	padding: 0 20px 4px 20px;
+}
 .email-body-text { white-space: pre-wrap; }
 .email-detail__loading { display: flex; justify-content: center; padding: 48px; }
 .email-detail__empty { color: var(--color-text-maxcontrast); text-align: center; padding: 48px; }

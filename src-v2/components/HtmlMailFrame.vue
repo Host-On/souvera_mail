@@ -15,7 +15,9 @@
 <script>
 import { sanitizeMailHtml } from '../utils/mailSanitizer.js'
 
-const BASE_CSS = `:root{color-scheme:light}html,body{margin:0;padding:0}body{background:#fff;color:#222;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;word-break:break-word;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}blockquote{margin:0 0 0 8px;padding-left:12px;border-left:2px solid #c9c9c9;color:#555}a{color:#0b6cbd}td[height],table[height]{height:auto!important}`
+const BASE_CSS_LIGHT = `:root{color-scheme:light}html,body{margin:0;padding:0}body{background:#fff;color:#222;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;word-break:break-word;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}blockquote{margin:0 0 0 8px;padding-left:12px;border-left:2px solid #c9c9c9;color:#555}a{color:#0b6cbd}td[height],table[height]{height:auto!important}`
+
+const BASE_CSS_DARK = `:root{color-scheme:dark}html,body{margin:0;padding:0}body{background:#1e2227;color:#d8dee4;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;word-break:break-word;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}blockquote{margin:0 0 0 8px;padding-left:12px;border-left:2px solid #4a5058;color:#9aa5b1}a{color:#4da3ff}td[height],table[height]{height:auto!important}`
 
 export default {
 	name: 'HtmlMailFrame',
@@ -25,6 +27,9 @@ export default {
 		attachments: { type: Array, default: () => [] },
 		defaultAllowRemote: { type: Boolean, default: false },
 		remoteAllowed: { type: Boolean, default: false },
+		// Thunderbird-style content background toggle: false = light,
+		// true = dark (for emails that are unreadable in the current mode).
+		darkMode: { type: Boolean, default: false },
 	},
 	emits: ['mailto', 'blocked'],
 	data() {
@@ -42,6 +47,7 @@ export default {
 		html: { immediate: true, handler: 'rebuildContent' },
 		attachments: { handler: 'rebuildContent' },
 		remoteAllowed: { immediate: true, handler: 'loadRemoteImages' },
+		darkMode: { handler: 'refreshTheme' },
 	},
 	methods: {
 		rebuildContent() {
@@ -59,6 +65,10 @@ export default {
 		loadRemoteImages() {
 			if (!this.remoteAllowed) return
 			this.rebuildContent()
+		},
+		refreshTheme() {
+			// Rebuild the frame with the other theme CSS.
+			this.frameKey++
 		},
 		onFrameLoad() {
 			const doc = this.$refs.frame?.contentDocument
@@ -96,7 +106,8 @@ export default {
 	},
 	computed: {
 		srcdoc() {
-			return `<!doctype html><head><meta charset="utf-8"><base target="_blank"><style>${BASE_CSS}</style></head><body>${this._displayHtml}</body>`
+			const css = this.darkMode ? BASE_CSS_DARK : BASE_CSS_LIGHT
+			return `<!doctype html><head><meta charset="utf-8"><base target="_blank"><style>${css}</style></head><body>${this._displayHtml}</body>`
 		},
 	},
 	beforeUnmount() {
