@@ -2,6 +2,19 @@
 	<div v-if="editor" class="richtext-editor">
 		<div class="richtext-editor__toolbar">
 			<NcButton variant="tertiary"
+				:aria-label="t('souvera_mail', 'Undo')"
+				:disabled="!editor.can().undo()"
+				@click="editor.chain().focus().undo().run()">
+				<template #icon><Undo :size="18" /></template>
+			</NcButton>
+			<NcButton variant="tertiary"
+				:aria-label="t('souvera_mail', 'Redo')"
+				:disabled="!editor.can().redo()"
+				@click="editor.chain().focus().redo().run()">
+				<template #icon><Redo :size="18" /></template>
+			</NcButton>
+			<span class="richtext-editor__separator" />
+			<NcButton variant="tertiary"
 				:aria-label="t('souvera_mail', 'Bold')"
 				:class="{ 'richtext-editor__btn--active': editor.isActive('bold') }"
 				@click="editor.chain().focus().toggleBold().run()">
@@ -19,6 +32,31 @@
 				@click="editor.chain().focus().toggleUnderline().run()">
 				<template #icon><FormatUnderline :size="18" /></template>
 			</NcButton>
+			<NcButton variant="tertiary"
+				:aria-label="t('souvera_mail', 'Strikethrough')"
+				:class="{ 'richtext-editor__btn--active': editor.isActive('strike') }"
+				@click="editor.chain().focus().toggleStrike().run()">
+				<template #icon><FormatStrikethrough :size="18" /></template>
+			</NcButton>
+			<span class="richtext-editor__separator" />
+			<NcButton variant="tertiary"
+				:aria-label="t('souvera_mail', 'Heading 1')"
+				:class="{ 'richtext-editor__btn--active': editor.isActive('heading', { level: 1 }) }"
+				@click="editor.chain().focus().toggleHeading({ level: 1 }).run()">
+				<template #icon><FormatHeader1 :size="18" /></template>
+			</NcButton>
+			<NcButton variant="tertiary"
+				:aria-label="t('souvera_mail', 'Heading 2')"
+				:class="{ 'richtext-editor__btn--active': editor.isActive('heading', { level: 2 }) }"
+				@click="editor.chain().focus().toggleHeading({ level: 2 }).run()">
+				<template #icon><FormatHeader2 :size="18" /></template>
+			</NcButton>
+			<NcButton variant="tertiary"
+				:aria-label="t('souvera_mail', 'Heading 3')"
+				:class="{ 'richtext-editor__btn--active': editor.isActive('heading', { level: 3 }) }"
+				@click="editor.chain().focus().toggleHeading({ level: 3 }).run()">
+				<template #icon><FormatHeader3 :size="18" /></template>
+			</NcButton>
 			<span class="richtext-editor__separator" />
 			<NcButton variant="tertiary"
 				:aria-label="t('souvera_mail', 'Bullet list')"
@@ -33,12 +71,29 @@
 				<template #icon><FormatListNumbered :size="18" /></template>
 			</NcButton>
 			<NcButton variant="tertiary"
+				:aria-label="t('souvera_mail', 'Quote')"
+				:class="{ 'richtext-editor__btn--active': editor.isActive('blockquote') }"
+				@click="editor.chain().focus().toggleBlockquote().run()">
+				<template #icon><FormatQuoteClose :size="18" /></template>
+			</NcButton>
+			<NcButton variant="tertiary"
+				:aria-label="t('souvera_mail', 'Code block')"
+				:class="{ 'richtext-editor__btn--active': editor.isActive('codeBlock') }"
+				@click="editor.chain().focus().toggleCodeBlock().run()">
+				<template #icon><CodeTags :size="18" /></template>
+			</NcButton>
+			<span class="richtext-editor__separator" />
+			<NcButton variant="tertiary"
 				:aria-label="t('souvera_mail', 'Link')"
 				:class="{ 'richtext-editor__btn--active': editor.isActive('link') }"
 				@click="toggleLink">
 				<template #icon><Link :size="18" /></template>
 			</NcButton>
-			<span class="richtext-editor__separator" />
+			<NcButton variant="tertiary"
+				:aria-label="t('souvera_mail', 'Horizontal line')"
+				@click="editor.chain().focus().setHorizontalRule().run()">
+				<template #icon><Minus :size="18" /></template>
+			</NcButton>
 			<NcButton variant="tertiary"
 				:aria-label="t('souvera_mail', 'Clear formatting')"
 				@click="editor.chain().focus().clearNodes().unsetAllMarks().run()">
@@ -58,10 +113,19 @@ import { NcButton } from '@nextcloud/vue'
 import FormatBold from 'vue-material-design-icons/FormatBold.vue'
 import FormatItalic from 'vue-material-design-icons/FormatItalic.vue'
 import FormatUnderline from 'vue-material-design-icons/FormatUnderline.vue'
+import FormatStrikethrough from 'vue-material-design-icons/FormatStrikethrough.vue'
 import FormatListBulleted from 'vue-material-design-icons/FormatListBulleted.vue'
 import FormatListNumbered from 'vue-material-design-icons/FormatListNumbered.vue'
+import FormatHeader1 from 'vue-material-design-icons/FormatHeader1.vue'
+import FormatHeader2 from 'vue-material-design-icons/FormatHeader2.vue'
+import FormatHeader3 from 'vue-material-design-icons/FormatHeader3.vue'
+import FormatQuoteClose from 'vue-material-design-icons/FormatQuoteClose.vue'
 import Link from 'vue-material-design-icons/Link.vue'
+import Minus from 'vue-material-design-icons/Minus.vue'
 import FormatClear from 'vue-material-design-icons/FormatClear.vue'
+import Undo from 'vue-material-design-icons/Undo.vue'
+import Redo from 'vue-material-design-icons/Redo.vue'
+import CodeTags from 'vue-material-design-icons/CodeTags.vue'
 import { Editor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import LinkExtension from '@tiptap/extension-link'
@@ -70,7 +134,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 
 export default {
 	name: 'RichTextEditor',
-	components: { EditorContent, NcButton, FormatBold, FormatItalic, FormatUnderline, FormatListBulleted, FormatListNumbered, Link, FormatClear },
+	components: { EditorContent, NcButton, FormatBold, FormatItalic, FormatUnderline, FormatStrikethrough, FormatListBulleted, FormatListNumbered, FormatHeader1, FormatHeader2, FormatHeader3, FormatQuoteClose, Link, Minus, FormatClear, Undo, Redo, CodeTags },
 	props: {
 		modelValue: { type: String, default: '' },
 		placeholder: { type: String, default: '' },
@@ -130,10 +194,6 @@ export default {
 		setCursorAtEnd() {
 			this.editor?.commands.setTextSelection(this.editor.state.doc.content.size)
 		},
-		// Places the cursor inside the LAST empty paragraph of the document.
-		// Used after inserting the signature so the user starts typing in the
-		// answer paragraph (above the signature for new/forward, between
-		// quote and signature for replies).
 		setCursorInLastEmptyParagraph() {
 			const doc = this.editor.state.doc
 			let lastEmptyPos = -1
@@ -210,10 +270,91 @@ export default {
 	color: var(--color-text-maxcontrast);
 	pointer-events: none; float: left; height: 0;
 }
+
+/* ── Paragraph & break spacing ─────────────────────────────────────── */
+.richtext-editor__content :deep(p) { margin: 0 0 8px 0; }
+.richtext-editor__content :deep(p:last-child) { margin-bottom: 0; }
+.richtext-editor__content :deep(br) { line-height: 1.2; }
+
+/* ── Headings ──────────────────────────────────────────────────────── */
+.richtext-editor__content :deep(h1) {
+	font-size: 22px; font-weight: 700; line-height: 1.3;
+	margin: 16px 0 8px 0;
+}
+.richtext-editor__content :deep(h2) {
+	font-size: 19px; font-weight: 700; line-height: 1.3;
+	margin: 14px 0 6px 0;
+}
+.richtext-editor__content :deep(h3) {
+	font-size: 16px; font-weight: 600; line-height: 1.3;
+	margin: 12px 0 6px 0;
+}
+
+/* ── Lists — bullets/numbers are the key WYSIWYG requirement ───────── */
+.richtext-editor__content :deep(ul), .richtext-editor__content :deep(ol) {
+	margin: 4px 0 8px 0;
+	padding-left: 26px;
+}
+.richtext-editor__content :deep(ul) { list-style: disc; }
+.richtext-editor__content :deep(ul ul) { list-style: circle; margin: 0; }
+.richtext-editor__content :deep(ul ul ul) { list-style: square; margin: 0; }
+.richtext-editor__content :deep(ol) { list-style: decimal; }
+.richtext-editor__content :deep(ol ol) { list-style: lower-alpha; margin: 0; }
+.richtext-editor__content :deep(ol ol ol) { list-style: lower-roman; margin: 0; }
+.richtext-editor__content :deep(li) { margin-bottom: 2px; }
+.richtext-editor__content :deep(li p) { margin: 0; }
+.richtext-editor__content :deep(li > ul), .richtext-editor__content :deep(li > ol) { margin-top: 2px; }
+
+/* ── Quote ─────────────────────────────────────────────────────────── */
 .richtext-editor__content :deep(blockquote) {
-	margin: 0 0 0 8px; padding-left: 12px;
-	border-left: 2px solid var(--color-border);
+	margin: 8px 0;
+	padding: 2px 0 2px 14px;
+	border-left: 3px solid var(--color-border);
 	color: var(--color-text-maxcontrast);
 }
+.richtext-editor__content :deep(blockquote p) { margin: 0 0 4px 0; }
+
+/* ── Code ──────────────────────────────────────────────────────────── */
+.richtext-editor__content :deep(code) {
+	background: var(--color-background-dark);
+	border-radius: 3px;
+	padding: 1px 5px;
+	font-family: 'JetBrains Mono', 'Fira Code', monospace;
+	font-size: 0.9em;
+}
+.richtext-editor__content :deep(pre) {
+	background: var(--color-background-dark);
+	border-radius: 6px;
+	padding: 10px 12px;
+	margin: 8px 0;
+	overflow-x: auto;
+}
+.richtext-editor__content :deep(pre code) {
+	background: none; padding: 0; font-size: 13px;
+	display: block; white-space: pre;
+}
+
+/* ── Horizontal rule ───────────────────────────────────────────────── */
+.richtext-editor__content :deep(hr) {
+	border: none;
+	border-top: 1px solid var(--color-border);
+	margin: 12px 0;
+}
+
+/* ── Links ─────────────────────────────────────────────────────────── */
+.richtext-editor__content :deep(a) {
+	color: var(--color-primary-element);
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+/* ── Inline marks ──────────────────────────────────────────────────── */
+.richtext-editor__content :deep(s), .richtext-editor__content :deep(strike) {
+	text-decoration: line-through;
+}
+.richtext-editor__content :deep(u) { text-decoration: underline; }
+.richtext-editor__content :deep(strong) { font-weight: 700; }
+.richtext-editor__content :deep(em) { font-style: italic; }
+
 .richtext-editor__loading { display: flex; justify-content: center; padding: 48px; }
 </style>
