@@ -1,7 +1,10 @@
 <template>
 	<div class="ext-view">
 		<div class="ext-view__toolbar">
-			<h2 class="ext-view__title">{{ account ? account.email : t('souvera_mail', 'External account') }}</h2>
+			<h2 class="ext-view__title">
+				{{ account ? account.email : t('souvera_mail', 'External account') }}
+				<span v-if="activeFolder" class="ext-view__folder">/ {{ activeFolder }}</span>
+			</h2>
 			<NcButton variant="primary" @click="compose">
 				<template #icon><Pencil :size="18" /></template>
 				{{ t('souvera_mail', 'New message') }}
@@ -11,24 +14,12 @@
 		<div v-if="loadError" class="ext-view__error">
 			<NcEmptyContent :name="loadError">
 				<template #action>
-					<NcButton variant="primary" @click="loadFolders">{{ t('souvera_mail', 'Retry') }}</NcButton>
+					<NcButton variant="primary" @click="loadMessages">{{ t('souvera_mail', 'Retry') }}</NcButton>
 				</template>
 			</NcEmptyContent>
 		</div>
 
 		<div v-else class="ext-view__body">
-			<div class="ext-view__folders">
-				<div v-for="f in folders" :key="f.path"
-					class="ext-folder"
-					:class="{ 'ext-folder--active': activeFolder === f.path }"
-					@click="selectFolder(f)">
-					<span class="ext-folder__name">{{ f.name }}</span>
-					<span v-if="f.unread > 0" class="ext-folder__unread">{{ f.unread }}</span>
-				</div>
-				<NcEmptyContent v-if="!loadingFolders && folders.length === 0"
-					:name="t('souvera_mail', 'No folders')" />
-			</div>
-
 			<div class="ext-view__list">
 				<div v-if="loadingMessages" class="ext-view__loading">{{ t('souvera_mail', 'Loading…') }}</div>
 				<NcEmptyContent v-else-if="messages.length === 0"
@@ -86,10 +77,8 @@ export default {
 		return {
 			accounts: [],
 			account: null,
-			folders: [],
-			loadingFolders: false,
 			loadError: '',
-			activeFolder: 'INBOX',
+			activeFolder: '',
 			messages: [],
 			loadingMessages: false,
 			total: 0,
@@ -112,45 +101,18 @@ export default {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/external/accounts'))
 				this.accounts = data.accounts || []
 				this.account = this.accounts.find(a => String(a.id) === this.accountId) || null
-				if (this.account) await this.loadFolders()
+				if (this.account) await this.loadMessages()
 				else this.loadError = this.t('souvera_mail', 'Account not found')
 			} catch (e) {
 				this.loadError = e?.response?.data?.error || this.t('souvera_mail', 'Failed to load account')
 			}
 		},
-		async loadFolders() {
-			this.loadingFolders = true
+		async loadMessages() {
 			this.loadError = ''
-			try {
-				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/external/accounts/' + this.accountId + '/folders'))
-				if (data.ok === false) {
-					this.loadError = data.error || this.t('souvera_mail', 'Failed to load folders')
-					return
-				}
-				this.folders = data.folders || []
-				if (this.folders.length > 0) {
-					const inbox = this.folders.find(f => f.path.toUpperCase() === 'INBOX')
-					this.activeFolder = inbox ? inbox.path : this.folders[0].path
-				} else {
-					this.activeFolder = 'INBOX'
-				}
-				await this.loadMessages()
-			} catch (e) {
-				this.loadError = e?.response?.data?.error || this.t('souvera_mail', 'Failed to load folders')
-			} finally {
-				this.loadingFolders = false
-			}
-		},
-		async selectFolder(f) {
-			if (this.activeFolder === f.path) return
-			this.activeFolder = f.path
+			this.activeFolder = this.$route.query.folder || 'INBOX'
 			this.activeMessage = null
 			this.displayHtml = ''
 			this.messagePlain = ''
-			this.offset = 0
-			await this.loadMessages()
-		},
-		async loadMessages() {
 			this.loadingMessages = true
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/external/accounts/' + this.accountId + '/messages'), {
@@ -216,14 +178,10 @@ export default {
 <style scoped>
 .ext-view { display: flex; flex-direction: column; height: 100%; }
 .ext-view__toolbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--color-border); }
-.ext-view__title { margin: 0; font-size: 18px; }
+.ext-view__title { margin: 0; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ext-view__folder { font-size: 13px; color: var(--color-text-maxcontrast); font-weight: 400; }
 .ext-view__error { padding: 24px; }
-.ext-view__body { flex: 1; display: grid; grid-template-columns: 200px 320px 1fr; min-height: 0; }
-.ext-view__folders { overflow-y: auto; border-right: 1px solid var(--color-border); padding: 8px; }
-.ext-folder { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
-.ext-folder:hover { background: var(--color-background-hover); }
-.ext-folder--active { background: var(--color-primary-element-light); }
-.ext-folder__unread { background: var(--color-primary-element); color: #fff; font-size: 10px; border-radius: 10px; padding: 1px 6px; }
+.ext-view__body { flex: 1; display: grid; grid-template-columns: 320px 1fr; min-height: 0; }
 .ext-view__list { overflow-y: auto; border-right: 1px solid var(--color-border); }
 .ext-view__loading { padding: 16px; color: var(--color-text-maxcontrast); }
 .ext-msg { padding: 10px 12px; border-bottom: 1px solid var(--color-border); cursor: pointer; }
@@ -241,7 +199,7 @@ export default {
 .ext-detail__body { font-size: 14px; line-height: 1.5; }
 .ext-detail__plain { white-space: pre-wrap; word-break: break-word; margin: 0; }
 @media (max-width: 900px) {
-	.ext-view__body { grid-template-columns: 160px 1fr; }
+	.ext-view__body { grid-template-columns: 1fr; }
 	.ext-view__detail { grid-column: 1 / -1; }
 }
 </style>

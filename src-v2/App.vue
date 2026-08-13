@@ -54,12 +54,33 @@
 
 				<template v-if="externalAccounts.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'External accounts')" />
-					<NcAppNavigationItem v-for="acc in externalAccounts" :key="'ext-'+acc.id"
-						:name="acc.email"
-						:to="{ name: 'external', params: { id: acc.id } }"
-						:active="$route.name === 'external' && String($route.params.id) === String(acc.id)">
-						<template #icon><LanConnect :size="18" /></template>
-					</NcAppNavigationItem>
+					<template v-for="acc in externalAccounts" :key="'ext-'+acc.id">
+						<NcAppNavigationItem class="nav-group-toggle" :name="acc.email"
+							:active="$route.name === 'external' && String($route.params.id) === String(acc.id)"
+							@click.prevent="toggleExtAccount(acc)">
+							<template #icon>
+								<LanConnect v-if="!extExpanded[acc.id]" :size="18" />
+								<ChevronDown v-else :size="16" />
+							</template>
+							<template #counter v-if="extUnread(acc.id) > 0">
+								<NcCounterBubble :count="extUnread(acc.id)" />
+							</template>
+						</NcAppNavigationItem>
+						<template v-if="extExpanded[acc.id]">
+							<NcAppNavigationItem v-if="extFoldersLoading[acc.id]"
+								:name="t('souvera_mail', 'Loading…')" />
+							<NcAppNavigationItem v-for="f in extFolders[acc.id] || []" :key="'extf-'+acc.id+'-'+f.path"
+								:name="f.name"
+								:active="$route.name === 'external' && String($route.params.id) === String(acc.id) && $route.query.folder === f.path"
+								@click.prevent="openExtFolder(acc, f)">
+								<template #counter v-if="f.unread > 0">
+									<NcCounterBubble :count="f.unread" />
+								</template>
+							</NcAppNavigationItem>
+							<NcAppNavigationItem v-if="!extFoldersLoading[acc.id] && (extFolders[acc.id] || []).length === 0"
+								:name="t('souvera_mail', 'No folders')" />
+						</template>
+					</template>
 				</template>
 
 				<template v-if="!sharedAbove && sharedFolders.length > 0">
@@ -137,7 +158,7 @@ export default {
 	name: 'MailV2App',
 	components: { NcContent, NcAppNavigation, NcAppNavigationToggle, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, LanConnect, MailboxItem, QuotaDonut, ContactPicker },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false, navOpen: true, navCollapsedGroups: [] }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], extFolders: {}, extFoldersLoading: {}, extExpanded: {}, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false, navOpen: true, navCollapsedGroups: [] }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },
@@ -325,6 +346,32 @@ export default {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/external/accounts'))
 				this.externalAccounts = data.accounts || []
 			} catch (e) { console.error('Failed to load external accounts', e) }
+		},
+		async toggleExtAccount(acc) {
+			if (this.extExpanded[acc.id]) {
+				this.extExpanded = { ...this.extExpanded, [acc.id]: false }
+				return
+			}
+			this.extExpanded = { ...this.extExpanded, [acc.id]: true }
+			// Load once; guard against parallel fetches on quick toggling.
+			if (!this.extFolders[acc.id] && !this.extFoldersLoading[acc.id]) await this.loadExtFolders(acc)
+		},
+		async loadExtFolders(acc) {
+			this.extFoldersLoading = { ...this.extFoldersLoading, [acc.id]: true }
+			try {
+				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/external/accounts/' + acc.id + '/folders'))
+				this.extFolders = { ...this.extFolders, [acc.id]: (data.ok === false ? [] : (data.folders || [])) }
+			} catch (e) {
+				this.extFolders = { ...this.extFolders, [acc.id]: [] }
+			} finally {
+				this.extFoldersLoading = { ...this.extFoldersLoading, [acc.id]: false }
+			}
+		},
+		extUnread(id) {
+			return (this.extFolders[id] || []).reduce((sum, f) => sum + (f.unread || 0), 0)
+		},
+		openExtFolder(acc, f) {
+			this.$router.push({ name: 'external', params: { id: acc.id }, query: { folder: f.path } })
 		},
 	},
 }
