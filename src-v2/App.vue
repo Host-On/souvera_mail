@@ -37,7 +37,7 @@
 						</NcAppNavigationItem>
 						<template v-if="!isGroupCollapsed(group.accountId)">
 							<MailboxItem v-for="mp in group.roots" :key="mp.id"
-								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="sharedSelected(mp)" :depth="0"
+								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
 								@select="onSharedSelect(mp._accountId, $event)"
 								@drop-email="onDropEmail" />
 						</template>
@@ -75,7 +75,7 @@
 							<NcAppNavigationItem v-if="extFoldersLoading[acc.id]"
 								:name="t('souvera_mail', 'Loading…')" />
 							<NcAppNavigationItem v-for="f in extFolders[acc.id] || []" :key="'extf-'+acc.id+'-'+f.path"
-								:name="f.name"
+								:name="extFolderDisplayName(f)"
 								:active="$route.name === 'external' && String($route.params.id) === String(acc.id) && $route.query.folder === f.path"
 								@click.prevent="openExtFolder(acc, f)">
 								<template #counter v-if="f.unread > 0">
@@ -104,7 +104,7 @@
 						</NcAppNavigationItem>
 						<template v-if="!isGroupCollapsed(group.accountId)">
 							<MailboxItem v-for="mp in group.roots" :key="mp.id"
-								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="sharedSelected(mp)" :depth="0"
+								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
 								@select="onSharedSelect(mp._accountId, $event)"
 								@drop-email="onDropEmail" />
 						</template>
@@ -151,6 +151,7 @@ import MailboxItem from './components/MailboxItem.vue'
 import QuotaDonut from './components/QuotaDonut.vue'
 import ContactPicker from './components/ContactPicker.vue'
 import { useJmapClient } from './composables/useJmapClient.js'
+import { extFolderDisplayName } from './utils/mailboxNames.js'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { useHotkeys } from './composables/useHotkeys.js'
@@ -234,6 +235,7 @@ export default {
 		return false
 	},
 	methods: {
+		extFolderDisplayName,
 		isGroupCollapsed(accountId) {
 			return this.navCollapsedGroups.includes(accountId)
 		},
@@ -297,9 +299,6 @@ export default {
 			} else {
 				this.$router.push({ name: 'inbox' })
 			}
-		},
-		sharedSelected(mp) {
-			return this.selectedMailbox === (mp._accountId + '|' + mp.id)
 		},
 		openArchive() {
 			window.location.href = this.OC?.generateUrl?.('/apps/souvera_mailarchiv') || '/index.php/apps/souvera_mailarchiv'

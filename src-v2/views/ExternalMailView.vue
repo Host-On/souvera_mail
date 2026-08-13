@@ -3,7 +3,7 @@
 		<div class="ext-view__toolbar">
 			<h2 class="ext-view__title">
 				{{ account ? account.email : t('souvera_mail', 'External account') }}
-				<span v-if="activeFolder" class="ext-view__folder">/ {{ activeFolder }}</span>
+				<span v-if="activeFolder" class="ext-view__folder">/ {{ activeFolderLabel }}</span>
 			</h2>
 			<NcButton variant="primary" @click="compose">
 				<template #icon><Pencil :size="18" /></template>
@@ -64,6 +64,7 @@ import Pencil from 'vue-material-design-icons/Pencil.vue'
 import EmailListItem from '../components/EmailListItem.vue'
 import EmailDetail from '../components/EmailDetail.vue'
 import { sanitizeMailHtml } from '../utils/mailSanitizer.js'
+import { extFolderDisplayName } from '../utils/mailboxNames.js'
 
 export default {
 	name: 'ExternalMailView',
@@ -86,6 +87,9 @@ export default {
 	},
 	computed: {
 		accountId() { return String(this.$route.params.id || '') },
+		activeFolderLabel() {
+			return extFolderDisplayName({ path: this.activeFolder, name: this.activeFolder })
+		},
 	},
 	async mounted() {
 		await this.loadAccounts()
