@@ -1,17 +1,18 @@
 <template>
 	<NcContent app-name="souvera_mail">
-		<NcAppNavigationToggle :open="navOpen" @update:open="navOpen = $event" />
 		<NcAppNavigation>
-			<div class="compose-row">
-				<NcButton variant="primary" class="compose-btn" @click="startCompose">
-					<template #icon><Pencil :size="20" /></template>
-					{{ t('souvera_mail', 'New message') }}
-				</NcButton>
-				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Contacts')"
-					@click="showContactPicker = true">
-					<template #icon><Contacts :size="20" /></template>
-				</NcButton>
-			</div>
+			<template #search>
+				<div class="compose-row">
+					<NcButton variant="primary" class="compose-btn" @click="startCompose">
+						<template #icon><Pencil :size="20" /></template>
+						{{ t('souvera_mail', 'New message') }}
+					</NcButton>
+					<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Contacts')"
+						@click="showContactPicker = true">
+						<template #icon><Contacts :size="20" /></template>
+					</NcButton>
+				</div>
+			</template>
 
 			<template #list>
 				<NcAppNavigationCaption :name="t('souvera_mail', 'Mailboxes')" />
@@ -137,7 +138,7 @@
 </template>
 
 <script>
-import { NcContent, NcAppNavigation, NcAppNavigationToggle, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble } from '@nextcloud/vue'
+import { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble } from '@nextcloud/vue'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
 import Cog from 'vue-material-design-icons/Cog.vue'
 import Share from 'vue-material-design-icons/Share.vue'
@@ -154,6 +155,7 @@ import { extFolderDisplayName } from './utils/mailboxNames.js'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { useHotkeys } from './composables/useHotkeys.js'
+import { emit } from '@nextcloud/event-bus'
 
 const { fetchMailboxes } = useJmapClient()
 const SYSTEM_ROLES = ['inbox', 'drafts', 'sent', 'junk', 'trash']
@@ -161,13 +163,12 @@ const ROLE_ORDER = { inbox:0, drafts:1, sent:2, junk:3, trash:4 }
 
 export default {
 	name: 'MailV2App',
-	components: { NcContent, NcAppNavigation, NcAppNavigationToggle, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, LanConnect, MailboxItem, QuotaDonut, ContactPicker },
+	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, LanConnect, MailboxItem, QuotaDonut, ContactPicker },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], extFolders: {}, extFoldersLoading: {}, extExpanded: {}, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false, navOpen: true, navCollapsedGroups: [] }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], extFolders: {}, extFoldersLoading: {}, extExpanded: {}, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false, navCollapsedGroups: [] }
 	},
 	computed: {
-		currentRoute() { return this.$route.name || 'inbox' },
-		systemFolders() { return this.mailboxes.filter(m => SYSTEM_ROLES.includes(m.role)).sort((a,b) => (ROLE_ORDER[a.role]??99) - (ROLE_ORDER[b.role]??99)) },
+		currentRoute() { return this.$route.name || 'inbox' },		systemFolders() { return this.mailboxes.filter(m => SYSTEM_ROLES.includes(m.role)).sort((a,b) => (ROLE_ORDER[a.role]??99) - (ROLE_ORDER[b.role]??99)) },
 		routeProps() {
 			if (this.$route.name === 'inbox') {
 				return { selectedMailbox: this.selectedMailbox, allMailboxes: [...this.mailboxes, ...this.sharedMailboxes], verticalLayout: this._responsiveVertical || this.isVertical }
@@ -195,6 +196,19 @@ export default {
 				g.roots.sort((a, b) => (ROLE_ORDER[a.role] ?? 99) - (ROLE_ORDER[b.role] ?? 99))
 			}
 			return [...map.values()]
+		},
+	},
+	watch: {
+		// Responsive: after picking an entry in the navigation, close the
+		// slide-in menu automatically so the content is visible again.
+		// NcAppNavigation keeps its open state internally and syncs it via
+		// the "toggle-navigation" event-bus.
+		'$route.fullPath'() {
+			if (window.innerWidth < 1024) emit('toggle-navigation', { open: false })
+		},
+		// Mailbox switches inside the inbox route don't change the path.
+		selectedMailbox() {
+			if (window.innerWidth < 1024) emit('toggle-navigation', { open: false })
 		},
 	},
 	async mounted() {
@@ -380,9 +394,9 @@ export default {
 </script>
 
 <style scoped>
-.compose-row { display: flex; gap: 4px; margin: 4px 8px; position: sticky; top: 0; background: var(--color-main-background); z-index: 2; flex-shrink: 0; min-height: 48px; align-items: center; overflow: hidden; }
-/* Prevent the compose row from shrinking (scrollable nav must not eat it) */
-:deep(.app-navigation) > :first-child { flex-shrink: 0; }
+/* The compose row lives in NcAppNavigation's #search slot — OUTSIDE the
+   scrollable list area — so it can never scroll away or show a bar. */
+.compose-row { display: flex; gap: 4px; margin: 0; padding: 8px var(--app-navigation-padding, 12px) 4px; align-items: center; width: 100%; box-sizing: border-box; }
 .compose-btn { flex: 1; }
 .compose-row :deep(button[aria-label="Contacts"]) { min-width: 44px; padding: 0; }
 
