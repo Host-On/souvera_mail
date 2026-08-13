@@ -206,11 +206,17 @@
 				</h2>
 				<div class="settings-card__body">
 					<p class="settings-muted">{{ t('souvera_mail', 'Import your old emails from another provider.') }}</p>
-					<NcButton variant="primary" @click="openMigration"
-						:disabled="migrationCompleted">
-						<template #icon><Import :size="20" /></template>
-						{{ migrationCompleted ? t('souvera_mail', 'Import already completed') : t('souvera_mail', 'Start migration assistant') }}
-					</NcButton>
+					<div class="migration-actions">
+						<NcButton variant="primary" @click="openMigration"
+							:disabled="migrationCompleted">
+							<template #icon><Import :size="20" /></template>
+							{{ migrationCompleted ? t('souvera_mail', 'Import already completed') : t('souvera_mail', 'Start migration assistant') }}
+						</NcButton>
+						<NcButton v-if="migrationCompleted" variant="tertiary" @click="resetMigration">
+							<template #icon><Refresh :size="20" /></template>
+							{{ t('souvera_mail', 'Start another migration') }}
+						</NcButton>
+					</div>
 				</div>
 			</div>
 
@@ -526,6 +532,7 @@ import CodeTags from 'vue-material-design-icons/CodeTags.vue'
 import FileUpload from 'vue-material-design-icons/FileUpload.vue'
 import Download from 'vue-material-design-icons/Download.vue'
 import Import from 'vue-material-design-icons/Import.vue'
+import Refresh from 'vue-material-design-icons/Refresh.vue'
 import Play from 'vue-material-design-icons/Play.vue'
 import FolderPlus from 'vue-material-design-icons/FolderPlus.vue'
 import Filter from 'vue-material-design-icons/Filter.vue'
@@ -551,7 +558,7 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Play, FolderPlus, Filter, Check, ContentCopy, Email, QuotaDonut, SieveFilterEditor },
+	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog, Plus, TrashCan, Account, Palette, Pencil, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Refresh, Play, FolderPlus, Filter, Check, ContentCopy, Email, QuotaDonut, SieveFilterEditor },
 	data() {
 		return {
 			accountEmail: '',
@@ -1020,6 +1027,17 @@ export default {
 			// previously dismissed.
 			window.dispatchEvent(new CustomEvent('souvera-mail:open-migration'))
 		},
+		async resetMigration() {
+			if (!confirm(this.t('souvera_mail', 'Reset migration state? This allows starting a new import.'))) return
+			try {
+				await axios.post(generateUrl('/apps/souvera_mail/migration/reset'))
+				this.migrationCompleted = false
+				showSuccess(this.t('souvera_mail', 'Migration state reset — you can start a new import'))
+			} catch (e) {
+				console.error('Migration reset failed', e)
+				showError(this.t('souvera_mail', 'Failed to reset migration'))
+			}
+		},
 		toggleSigSource() {
 			this.showSigSource = !this.showSigSource
 			if (!this.showSigSource) this.saveSig()
@@ -1119,6 +1137,7 @@ export default {
 .create-row { display: flex; align-items: center; gap: 8px; }
 .create-row :deep(input) { min-width: 200px; }
 .password-list { display: flex; flex-direction: column; gap: 6px; }
+.migration-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .password-row {
 	display: flex; justify-content: space-between; align-items: center; gap: 8px;
 	padding: 10px 14px; border: 1px solid var(--color-border);

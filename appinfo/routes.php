@@ -157,7 +157,12 @@ return [
         [
             'name' => 'migration#dismissWelcome',
             'url' => '/migration/dismiss-welcome',
-            'verb' => 'POST'
+            'verb' => 'POST',
+        ],
+        [
+            'name' => 'migration#reset',
+            'url' => '/migration/reset',
+            'verb' => 'POST',
         ],
         [
             'name' => 'migration#testConnection',

@@ -65,6 +65,22 @@ class MigrationController extends Controller
         return new DataResponse(['status' => 'ok']);
     }
 
+    /**
+     * POST /apps/souvera_mail/migration/reset
+     *
+     * Self-service reset: clears the completed/dismissed state so the
+     * migration assistant becomes available again for this user.
+     */
+    #[NoAdminRequired]
+    public function reset(): DataResponse
+    {
+        if ($this->userId === null) {
+            return $this->error('unauthenticated', Http::STATUS_UNAUTHORIZED);
+        }
+        $this->migrations->resetForUser($this->userId);
+        return new DataResponse(['status' => 'ok', 'message' => 'Migration state reset']);
+    }
+
     #[NoAdminRequired]
     public function testConnection(
         string $host = '',
