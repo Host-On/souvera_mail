@@ -15,14 +15,14 @@
 				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Forward')" @click="$emit('forward')">
 					<template #icon><Forward :size="20" /></template>
 				</NcButton>
-				<NcActions :aria-label="t('souvera_mail', 'More actions')">
+				<NcActions v-if="!readonly" :aria-label="t('souvera_mail', 'More actions')">
 					<template #icon><FolderMove :size="20" /></template>
 					<NcActionButton v-for="mb in moveMailboxes" :key="mb.id">
 						<template #icon><Folder :size="20" /></template>
 						<span @click.stop="moveTo(mb.id)">{{ mailboxDisplayName(mb) }}</span>
 					</NcActionButton>
 				</NcActions>
-				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Delete')" @click="$emit('delete')">
+				<NcButton v-if="!readonly" variant="tertiary" :aria-label="t('souvera_mail', 'Delete')" @click="$emit('delete')">
 					<template #icon><TrashCan :size="20" /></template>
 				</NcButton>
 			</div>
@@ -193,6 +193,8 @@ export default {
 		loading: { type: Boolean, default: false },
 		mailboxes: { type: Array, default: () => [] },
 		remoteAlways: { type: Boolean, default: false },
+		// External IMAP messages: hide JMAP-only actions (move/delete).
+		readonly: { type: Boolean, default: false },
 	},
 	emits: ['close', 'reply', 'replyAll', 'forward', 'delete', 'move', 'mailto'],
 	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: this.remoteAlways, contentDark: false } },

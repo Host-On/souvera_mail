@@ -140,7 +140,7 @@ export default {
 		if (this.replyTo?.fromAddress) {
 			idPrefill.push({ name: this.replyTo.fromName || '', email: this.replyTo.fromAddress })
 		}
-		if (this.forwardOf?.fromAddress) {
+		if (this.forwardOf?.fromAddress && !this.forwardOf.noPrefillRecipients) {
 			idPrefill.push({ name: this.forwardOf.fromName || '', email: this.forwardOf.fromAddress })
 		}
 		// Deduplicate for replyAll scenario

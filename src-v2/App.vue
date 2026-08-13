@@ -53,14 +53,19 @@
 				</template>
 
 				<template v-if="externalAccounts.length > 0">
-					<NcAppNavigationCaption :name="t('souvera_mail', 'External accounts')" />
+					<li class="app-navigation-caption ext-caption">
+						<span class="app-navigation-caption__name">
+							<LanConnect :size="14" class="ext-caption__icon" />
+							{{ t('souvera_mail', 'External accounts') }}
+						</span>
+					</li>
 					<template v-for="acc in externalAccounts" :key="'ext-'+acc.id">
 						<NcAppNavigationItem class="nav-group-toggle" :name="acc.email"
 							:active="$route.name === 'external' && String($route.params.id) === String(acc.id)"
 							@click.prevent="toggleExtAccount(acc)">
 							<template #icon>
-								<LanConnect v-if="!extExpanded[acc.id]" :size="18" />
-								<ChevronDown v-else :size="16" />
+								<ChevronDown v-if="extExpanded[acc.id]" :size="16" />
+								<ChevronRight v-else :size="16" />
 							</template>
 							<template #counter v-if="extUnread(acc.id) > 0">
 								<NcCounterBubble :count="extUnread(acc.id)" />
@@ -391,6 +396,21 @@ export default {
 :deep(.shared-group-caption) {
 	padding-left: 30px !important;
 	padding-right: var(--app-navigation-padding);
+}
+:deep(.ext-caption) {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding-left: var(--app-navigation-padding);
+	padding-right: var(--app-navigation-padding);
+}
+:deep(.ext-caption .app-navigation-caption__name) {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+.ext-caption__icon {
+	color: var(--color-text-maxcontrast);
 }
 :deep(.shared-group-caption .app-navigation-caption__name) {
 	font-size: 12px !important;
