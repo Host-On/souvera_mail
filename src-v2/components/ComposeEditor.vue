@@ -219,13 +219,21 @@ export default {
 		this._prefsLoaded = true
 		if (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward') {
 			this.buildReplyOrForward()
-		} else if (this.signatureEnabled) {
-			// New message: signature directly in the editor, cursor in the
-			// empty paragraph above it.
-			this.initContent(`<p></p>${this.signatureBlock()}`, 'empty')
+		} else {
+			// New message: clean up stale drafts from abandoned sessions
+			// (the Drafts folder must not fill up), then insert signature.
+			this.cleanupStaleDrafts()
+			if (this.signatureEnabled) {
+				this.initContent(`<p></p>${this.signatureBlock()}`, 'empty')
+			}
 		}
 	},
-	beforeUnmount() { clearTimeout(draftTimer) },
+	beforeUnmount() {
+		clearTimeout(draftTimer)
+		// Fire-and-forget: if the window is destroyed (router change,
+		// navigate away) without send/discard, drop the autosaved draft.
+		this.deleteSavedDraft()
+	},
 	methods: {
 		prefillSubject() {
 			const s = this.replyTo?.subject || this.originalEmail?.subject || this.forwardOf?.subject || ''
@@ -427,6 +435,7 @@ export default {
 				await axios.post(generateUrl('/apps/souvera_mail/api/v2/send'), payload)
 				if (this.savedDraftId) {
 					try { await axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId)) } catch {}
+					this.savedDraftId = null
 				}
 				showSuccess(this.t('souvera_mail', 'Message sent'))
 				this.$emit('sent')
@@ -466,15 +475,29 @@ export default {
 			if (this.dirty) {
 				if (!confirm(this.t('souvera_mail', 'Discard unsaved changes?'))) return
 			}
+			// The compose session is over — the autosaved draft is stale,
+			// remove it so the Drafts folder does not fill up.
+			this.deleteSavedDraft()
 			this.$emit('cancel')
 		},
 		onDiscard() {
 			if (confirm(this.t('souvera_mail', 'Discard this message?'))) {
-				if (this.savedDraftId) {
-					this.discardingDraftId = this.savedDraftId
-					axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId)).catch(() => {})
-				}
+				this.deleteSavedDraft()
 				this.$emit('cancel')
+			}
+		},
+		deleteSavedDraft() {
+			if (this.savedDraftId) {
+				this.discardingDraftId = this.savedDraftId
+				axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId)).catch(() => {})
+				this.savedDraftId = null
+			}
+		},
+		async cleanupStaleDrafts() {
+			try {
+				await axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts'))
+			} catch (e) {
+				console.error('Draft cleanup failed', e)
 			}
 		},
 	},

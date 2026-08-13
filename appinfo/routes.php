@@ -546,6 +546,11 @@ return [
             'verb' => 'DELETE',
         ],
         [
+            'name' => 'v2_compose#cleanupDrafts',
+            'url' => '/api/v2/drafts',
+            'verb' => 'DELETE',
+        ],
+        [
             'name' => 'bimi#resolve',
             'url' => '/api/v2/bimi',
             'verb' => 'GET',

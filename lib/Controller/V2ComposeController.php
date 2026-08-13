@@ -429,6 +429,42 @@ class V2ComposeController extends Controller
         return new JSONResponse(['success' => true]);
     }
 
+    /**
+     * DELETE /apps/souvera_mail/api/v2/drafts — delete ALL drafts.
+     *
+     * Called when a new compose window opens: stale drafts from abandoned
+     * sessions are cleaned up so the Drafts folder does not fill up.
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function cleanupDrafts(): JSONResponse
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+
+        try {
+            $query = $this->jmap->singleCall('Email/query', [
+                'accountId' => $accountId,
+                'filter' => ['hasKeyword' => '$draft'],
+                'limit' => 200,
+            ]);
+
+            $ids = $query['data']['ids'] ?? [];
+            if ($ids !== []) {
+                $this->jmap->singleCall('Email/set', [
+                    'accountId' => $accountId,
+                    'destroy' => $ids,
+                ]);
+            }
+
+            return new JSONResponse(['success' => true, 'removed' => \count($ids)]);
+        } catch (\Throwable $e) {
+            return new JSONResponse(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
     private function buildEmailObject(
         string $userEmail,
         array $toAddr, array $ccAddr, array $bccAddr,
