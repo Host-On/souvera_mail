@@ -272,7 +272,7 @@ export default {
 }
 
 /* ── Paragraph & break spacing ─────────────────────────────────────── */
-.richtext-editor__content :deep(p) { margin: 0 0 8px 0; }
+.richtext-editor__content :deep(p) { margin: 0 0 14px 0; }
 .richtext-editor__content :deep(p:last-child) { margin-bottom: 0; }
 .richtext-editor__content :deep(br) { line-height: 1.2; }
 
