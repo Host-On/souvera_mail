@@ -35,14 +35,15 @@
 		</div>
 
 		<div class="souvera-mapping__list" role="list" data-testid="wizard-mapping-list">
-			<label
+			<div
 				v-for="f in enrichedFolders"
 				:key="f.path"
 				class="souvera-mapping__row"
 				:class="{ 'is-selected': selected.has(f.path), 'is-system': f.isSystem }"
 				role="listitem"
-				:data-testid="`wizard-mapping-row-${f.slug}`">
-				<span class="souvera-mapping__row-check">
+				:data-testid="`wizard-mapping-row-${f.slug}`"
+				@click="toggle(f.path, !selected.has(f.path))">
+				<span class="souvera-mapping__row-check" @click.stop>
 					<NcCheckboxRadioSwitch
 						:model-value="selected.has(f.path)"
 						:aria-label="t('souvera_mail', 'Import folder {p}', { p: f.path })"
@@ -60,7 +61,7 @@
 					<component :is="f.icon" :size="16" class="souvera-mapping__row-icon" />
 					<span class="souvera-mapping__row-name">{{ f.targetName }}</span>
 				</span>
-			</label>
+			</div>
 		</div>
 
 		<NcNoteCard v-if="selectedCount === 0" type="warning" data-testid="wizard-mapping-empty-warning">
