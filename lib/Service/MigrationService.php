@@ -133,8 +133,10 @@ class MigrationService
      * given user — allows re-running the wizard after a completed run.
      * All previous job rows are marked dismissed so they disappear from
      * the wizard state (welcome screen shows again).
+     *
+     * @return int number of job rows dismissed
      */
-    public function resetForUser(string $userId): void
+    public function resetForUser(string $userId): int
     {
         $this->config->deleteUserValue($userId, 'souvera_mail', self::USERCONFIG_WELCOME_DISMISSED);
         try {
@@ -146,7 +148,7 @@ class MigrationService
         }
         // Hide ALL previous runs (including the just-cancelled one) from
         // the wizard so the welcome screen is shown again.
-        $this->jobs->dismissAllForUser($userId);
+        return $this->jobs->dismissAllForUser($userId);
     }
 
     /**

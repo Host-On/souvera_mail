@@ -92,8 +92,10 @@ class MigrationJobMapper extends QBMapper
      * Mark every non-dismissed migration row of a user as dismissed in a
      * single statement. Used by MigrationService::resetForUser() so ALL
      * previous runs disappear from the wizard (welcome screen shows).
+     *
+     * @return int number of affected rows
      */
-    public function dismissAllForUser(string $userId): void
+    public function dismissAllForUser(string $userId): int
     {
         $qb = $this->db->getQueryBuilder();
         $qb->update(self::TABLE)
@@ -103,8 +105,8 @@ class MigrationJobMapper extends QBMapper
             ->andWhere($qb->expr()->neq(
                 'status',
                 $qb->createNamedParameter(MigrationJob::STATUS_DISMISSED)
-            ))
-            ->executeStatement();
+            ));
+        return $qb->executeStatement();
     }
 
     /**

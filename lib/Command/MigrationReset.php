@@ -43,8 +43,8 @@ class MigrationReset extends Command
             return 1;
         }
 
-        $this->migrations->resetForUser($uid);
-        $output->writeln("<info>Migration state reset for user '{$uid}'.</info>");
+        $dismissed = $this->migrations->resetForUser($uid);
+        $output->writeln("<info>Migration state reset for user '{$uid}' ({$dismissed} job row(s) dismissed).</info>");
         $output->writeln('The migration assistant is now available again in the settings.');
         return 0;
     }

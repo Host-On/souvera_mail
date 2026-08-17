@@ -40,8 +40,18 @@ class SignatureStoreService
     {
         $file = $this->openFile($uid, false);
         if ($file !== null) {
-            $content = $file->getContent();
-            return \is_string($content) ? $content : '';
+            try {
+                $content = $file->getContent();
+                return \is_string($content) ? $content : '';
+            } catch (\Throwable $e) {
+                // A broken file must never take down the whole settings
+                // endpoint for this user.
+                $this->logger->warning(
+                    'Souvera Mail: signature file read failed for ' . $uid . ': ' . $e->getMessage(),
+                    ['app' => 'souvera_mail', 'exception' => $e]
+                );
+                return '';
+            }
         }
         // Migration fallback: legacy user-preference value.
         return (string) $this->config->getUserValue($uid, 'souvera_mail', self::LEGACY_PREF, '');
