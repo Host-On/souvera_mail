@@ -84,7 +84,8 @@ class ProviderToolsClient
         $body = $this->decode($resp);
         return [
             'success' => (bool) ($body['success'] ?? false),
-            'message' => (string) ($body['message'] ?? ''),
+            // Success responses carry "message", failures carry "error".
+            'message' => (string) ($body['message'] ?? $body['error'] ?? ''),
         ];
     }
 
@@ -103,8 +104,13 @@ class ProviderToolsClient
     {
         $resp = $this->post('/imap/list-folders', $source, timeout: 30);
         $body = $this->decode($resp);
+        // Current API nests the result in "data" (see provider.tools API
+        // docs §7.2). Older responses carried folders at top level —
+        // tolerate both so a provider.tools change can never empty the
+        // folder mapping again.
+        $data = \is_array($body['data'] ?? null) ? $body['data'] : $body;
         $folders = [];
-        foreach ($body['folders'] ?? [] as $f) {
+        foreach ($data['folders'] ?? [] as $f) {
             if (!\is_array($f)) {
                 continue;
             }
@@ -115,10 +121,10 @@ class ProviderToolsClient
         }
         return [
             'success' => (bool) ($body['success'] ?? false),
-            'totalFolders' => (int) ($body['totalFolders'] ?? \count($folders)),
-            'totalMessages' => (int) ($body['totalMessages'] ?? 0),
+            'totalFolders' => (int) ($data['totalFolders'] ?? \count($folders)),
+            'totalMessages' => (int) ($data['totalMessages'] ?? 0),
             'folders' => $folders,
-            'message' => isset($body['message']) ? (string) $body['message'] : '',
+            'message' => isset($body['message']) ? (string) $body['message'] : (string) ($body['error'] ?? ''),
         ];
     }
 
@@ -157,7 +163,7 @@ class ProviderToolsClient
                 'position' => (int) ($body['queue']['position'] ?? 0),
                 'totalInQueue' => (int) ($body['queue']['totalInQueue'] ?? 0),
             ] : ['position' => 0, 'totalInQueue' => 0],
-            'message' => isset($body['message']) ? (string) $body['message'] : '',
+            'message' => (string) ($body['message'] ?? $body['error'] ?? ''),
         ];
     }
 
