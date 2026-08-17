@@ -105,7 +105,7 @@ class MigrationService
         }
         if ($active === null) {
             try {
-                $last = $this->jobs->findLatestForUser($userId)->toApiArray();
+                $last = $this->jobs->findLatestNotDismissedForUser($userId)->toApiArray();
             } catch (DoesNotExistException) {
             }
         }
@@ -131,6 +131,8 @@ class MigrationService
     /**
      * Reset the welcome state and cancel any active migration for the
      * given user — allows re-running the wizard after a completed run.
+     * All previous job rows are marked dismissed so they disappear from
+     * the wizard state (welcome screen shows again).
      */
     public function resetForUser(string $userId): void
     {
@@ -142,6 +144,9 @@ class MigrationService
         } catch (DoesNotExistException) {
             // No active job — nothing to cancel.
         }
+        // Hide ALL previous runs (including the just-cancelled one) from
+        // the wizard so the welcome screen is shown again.
+        $this->jobs->dismissAllForUser($userId);
     }
 
     /**

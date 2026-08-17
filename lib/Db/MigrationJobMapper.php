@@ -66,6 +66,48 @@ class MigrationJobMapper extends QBMapper
     }
 
     /**
+     * Latest migration that should still be surfaced in the UI. Rows the
+     * user has seen and closed (status "dismissed") are hidden so the
+     * wizard falls back to the welcome screen — that's the documented
+     * contract of MigrationService::dismissJobForUser().
+     *
+     * @throws DoesNotExistException
+     */
+    public function findLatestNotDismissedForUser(string $userId): MigrationJob
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->select('*')
+            ->from(self::TABLE)
+            ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+            ->andWhere($qb->expr()->neq(
+                'status',
+                $qb->createNamedParameter(MigrationJob::STATUS_DISMISSED)
+            ))
+            ->orderBy('created_at', 'DESC')
+            ->setMaxResults(1);
+        return $this->findEntity($qb);
+    }
+
+    /**
+     * Mark every non-dismissed migration row of a user as dismissed in a
+     * single statement. Used by MigrationService::resetForUser() so ALL
+     * previous runs disappear from the wizard (welcome screen shows).
+     */
+    public function dismissAllForUser(string $userId): void
+    {
+        $qb = $this->db->getQueryBuilder();
+        $qb->update(self::TABLE)
+            ->set('status', $qb->createNamedParameter(MigrationJob::STATUS_DISMISSED))
+            ->set('updated_at', $qb->createNamedParameter(\time(), IQueryBuilder::PARAM_INT))
+            ->where($qb->expr()->eq('user_id', $qb->createNamedParameter($userId)))
+            ->andWhere($qb->expr()->neq(
+                'status',
+                $qb->createNamedParameter(MigrationJob::STATUS_DISMISSED)
+            ))
+            ->executeStatement();
+    }
+
+    /**
      * Currently-active migration for a user (pending or running). Used
      * to enforce the "max one concurrent migration per user" rate limit.
      *
