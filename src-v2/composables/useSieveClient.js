@@ -29,5 +29,12 @@ export function useSieveClient() {
 			const { data } = await axios.post(generateUrl(BASE + '/validate'), { body })
 			return data
 		},
+
+		// Rebuild + activate the combined main script. `disabled` is the
+		// optional list of filter names the user switched off.
+		async rebuild(disabled) {
+			const { data } = await axios.post(generateUrl(BASE + '/rebuild'), { disabled: disabled ?? null })
+			return data
+		},
 	}
 }

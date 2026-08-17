@@ -54,11 +54,19 @@ class SieveScriptService
     public const CAPABILITY_SIEVE = 'urn:ietf:params:jmap:sieve';
     private const HTTP_TIMEOUT_SECONDS = 10;
 
+    /** Reserved script name for the combined active script (one active
+     *  script per account is a Stalwart hard limit — see rebuildActiveScript). */
+    public const MAIN_SCRIPT_NAME = 'souvera_filters';
+    /** User-pref (JSON array of script names) for filters the user
+     *  explicitly switched OFF. */
+    private const PREF_DISABLED = 'pref_sieve_disabled';
+
     public function __construct(
         private StalwartAdminService $stalwart,
         private StalwartUserContext $userContext,
         private IClientService $clientService,
         private LoggerInterface $logger,
+        private \OCP\IConfig $config,
     ) {
     }
 
@@ -138,16 +146,22 @@ class SieveScriptService
         }
 
         $scripts = [];
+        $disabled = $this->getDisabledFilters($userId);
         foreach ($rawList as $entry) {
             if (!\is_array($entry) || !isset($entry['id'])) {
                 continue;
             }
             $blobId = (string) ($entry['blobId'] ?? '');
+            $name = (string) ($entry['name'] ?? '');
             $scripts[] = [
                 'id' => (string) $entry['id'],
-                'name' => (string) ($entry['name'] ?? ''),
+                'name' => $name,
                 'blobId' => $blobId,
                 'isActive' => (bool) ($entry['isActive'] ?? false),
+                // Individual scripts are only EXECUTED as part of the
+                // combined main script — "enabled" is the UI-visible state.
+                'enabled' => $name !== self::MAIN_SCRIPT_NAME && !\in_array($name, $disabled, true),
+                'isMain' => $name === self::MAIN_SCRIPT_NAME,
                 'body' => $bodiesById[$blobId] ?? '',
             ];
         }
@@ -157,6 +171,138 @@ class SieveScriptService
             'accountId' => $accountId,
             'bearer' => $bearer,
         ];
+    }
+
+    /** @return list<string> */
+    public function getDisabledFilters(string $userId): array
+    {
+        $raw = (string) $this->config->getUserValue($userId, 'souvera_mail', self::PREF_DISABLED, '');
+        $list = \json_decode($raw, true);
+        if (!\is_array($list)) {
+            return [];
+        }
+        return \array_values(\array_filter(\array_map('strval', $list), fn($n) => \trim($n) !== ''));
+    }
+
+    /** @param list<string> $names */
+    public function setDisabledFilters(string $userId, array $names): void
+    {
+        $clean = \array_values(\array_unique(\array_filter(\array_map('strval', $names), fn($n) => \trim($n) !== '')));
+        $this->config->setUserValue(
+            $userId,
+            'souvera_mail',
+            self::PREF_DISABLED,
+            \json_encode($clean, JSON_UNESCAPED_SLASHES)
+        );
+    }
+
+    /**
+     * Rebuild and activate the COMBINED script from all enabled filter
+     * scripts. Stalwart executes at most ONE active script per account,
+     * so per-filter scripts are merged (in their stored order) into the
+     * reserved main script which is then activated. Individual scripts
+     * become inactive — their UI state is carried by the "enabled" flag
+     * (user pref) instead of Stalwart's isActive.
+     *
+     * The managed VACATION block (VacationService) is carried over from
+     * whichever script currently holds it, so a rebuild never drops the
+     * out-of-office responder.
+     *
+     * @return array{success: bool, filters: int, active: bool}
+     */
+    public function rebuildActiveScript(string $userId): array
+    {
+        $scripts = $this->listScriptsWithBodies($userId)['scripts'];
+        $disabled = $this->getDisabledFilters($userId);
+
+        $blocks = [];
+        $capabilities = [];
+        $count = 0;
+        $vacationRequire = '';
+        $vacationBody = '';
+        // Vacation lives in the MAIN script — the fallback to other
+        // scripts runs EXACTLY ONCE: only while no main script exists
+        // yet (first rebuild after the merge model was introduced).
+        // Once the main script exists it is the single source of truth,
+        // so a VacationService::set(false) that strips the responder
+        // from the main script can never be reverted by stale legacy
+        // content in old per-filter scripts.
+        $hasMain = false;
+        foreach ($scripts as $s) {
+            if ($s['isMain']) $hasMain = true;
+        }
+        foreach ($scripts as $s) {
+            if (!$s['isMain']) continue;
+            $vacationRequire = \OCA\SouveraMail\Service\VacationService::extractManagedRequire((string) ($s['body'] ?? ''));
+            $vacationBody = \OCA\SouveraMail\Service\VacationService::extractManagedBody((string) ($s['body'] ?? ''));
+        }
+        if (!$hasMain && $vacationRequire === '' && $vacationBody === '') {
+            foreach ($scripts as $s) {
+                if ($s['isMain']) continue;
+                $vacationRequire = \OCA\SouveraMail\Service\VacationService::extractManagedRequire((string) ($s['body'] ?? ''));
+                $vacationBody = \OCA\SouveraMail\Service\VacationService::extractManagedBody((string) ($s['body'] ?? ''));
+                if ($vacationRequire !== '' || $vacationBody !== '') break;
+            }
+        }
+
+        foreach ($scripts as $s) {
+            if ($s['isMain']) continue;
+            if (\in_array($s['name'], $disabled, true)) continue;
+            $body = \trim((string) ($s['body']));
+            if ($body === '') continue;
+            // Never carry vacation parts through the FILTER section —
+            // they are re-appended once at the end of the merged script.
+            $vReq = \OCA\SouveraMail\Service\VacationService::extractManagedRequire($body);
+            $vBody = \OCA\SouveraMail\Service\VacationService::extractManagedBody($body);
+            if ($vReq !== '') {
+                $body = \str_replace(\rtrim($vReq), '', $body);
+            }
+            if ($vBody !== '') {
+                $body = \str_replace(\rtrim($vBody), '', $body);
+            }
+            $body = \trim($body);
+            if ($body === '') continue;
+            // A single `require` must head the combined script — collect
+            // every capability and strip the per-script require lines
+            // (a second require after executable rules is invalid Sieve).
+            if (\preg_match_all('/^\s*require\s*\[([^\]]*)\]\s*;.*$/m', $body, $m) > 0) {
+                foreach ($m[1] as $caps) {
+                    foreach (\preg_split('/,\s*/', \trim($caps)) as $cap) {
+                        $cap = \trim($cap, " \t\"'");
+                        if ($cap !== '') $capabilities[$cap] = true;
+                    }
+                }
+                $body = \preg_replace('/^\s*require\s*\[[^\]]*\]\s*;.*\n?/m', '', $body);
+                $body = \trim($body);
+                if ($body === '') continue;
+            }
+            $blocks[] = '# --- ' . $s['name'] . " ---\n" . $body;
+            $count++;
+        }
+
+        // Composition (RFC 5228: ALL requires before any other command):
+        //   vacation's marker require line first, then the capability
+        //   union, then the filter blocks, then the vacation block.
+        $merged = '';
+        if ($vacationRequire !== '') {
+            $merged .= $vacationRequire; // already ends with "\n"
+        }
+        if ($capabilities !== []) {
+            $merged .= 'require ["' . \implode('", "', \array_keys($capabilities)) . "\"];\n";
+        }
+        if ($merged !== '') {
+            $merged .= "\n";
+        }
+        $merged .= $blocks !== []
+            ? \implode("\n\n", $blocks)
+            : '# Souvera Mail — no active filters';
+        if ($vacationBody !== '') {
+            $merged .= "\n\n" . \rtrim($vacationBody);
+        }
+
+        $this->saveScript($userId, self::MAIN_SCRIPT_NAME, $merged);
+        $this->activateScript($userId, self::MAIN_SCRIPT_NAME);
+        return ['success' => true, 'filters' => $count, 'active' => $count > 0];
     }
 
     /**

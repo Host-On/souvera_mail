@@ -154,7 +154,12 @@ final class JmapSieveStorage implements FiltersInterface
     public function Activate(Account $oAccount, string $sScriptName): bool
     {
         try {
-            $this->sieve->activateScript($this->resolveUid($oAccount), $sScriptName);
+            // Stalwart runs only ONE active script per account. The v2
+            // filter UI therefore merges all enabled filters into the
+            // reserved main script — any legacy activation request must
+            // rebuild that main script instead of activating a single
+            // script (which would silently deactivate all other filters).
+            $this->sieve->rebuildActiveScript($this->resolveUid($oAccount));
         } catch (\Throwable $e) {
             $this->logger->warning(
                 'Souvera Mail: JmapSieveStorage::Activate failed: ' . $e->getMessage(),

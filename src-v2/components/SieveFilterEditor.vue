@@ -117,7 +117,7 @@ import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { useSieveClient } from '../composables/useSieveClient.js'
 
-const { saveScript, validateScript } = useSieveClient()
+const { saveScript, validateScript, rebuild } = useSieveClient()
 
 export default {
 	name: 'SieveFilterEditor',
@@ -279,6 +279,14 @@ export default {
 			this.saving = true
 			try {
 				await saveScript(this.filterName.trim(), body)
+				// Saving alone does not make Stalwart run the filter —
+				// the combined main script must be rebuilt and activated.
+				try {
+					await rebuild()
+				} catch (e2) {
+					console.error('Sieve rebuild error', e2)
+					showError(this.t('souvera_mail', 'Filter saved, but activation failed') + ': ' + (e2?.response?.data?.error || e2?.message || ''))
+				}
 				showSuccess(this.t('souvera_mail', 'Filter saved'))
 				this.$emit('saved'); this.$emit('close')
 			} catch (e) {

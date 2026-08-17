@@ -202,6 +202,36 @@ class V2SieveController extends Controller
         }
     }
 
+    /**
+     * POST /apps/souvera_mail/api/v2/sieve/rebuild
+     *
+     * Rebuilds and activates the combined main script from all enabled
+     * filters. Optional body {disabled: ["name", ...]} persists which
+     * filters the user switched OFF before rebuilding.
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function rebuild(): JSONResponse
+    {
+        $userId = $this->getUserId();
+        if ($userId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], Http::STATUS_UNAUTHORIZED);
+        }
+
+        $payload = \json_decode(\file_get_contents('php://input'), true) ?? [];
+        if (\is_array($payload['disabled'] ?? null)) {
+            $this->sieve->setDisabledFilters($userId, $payload['disabled']);
+        }
+
+        try {
+            $result = $this->sieve->rebuildActiveScript($userId);
+            return new JSONResponse($result);
+        } catch (\Throwable $e) {
+            $this->logger->error('Sieve rebuild failed: ' . $e->getMessage(), ['exception' => $e]);
+            return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+    }
+
     // ---------------------------------------------------------------
 
     private function getUserId(): ?string

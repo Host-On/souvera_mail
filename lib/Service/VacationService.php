@@ -58,6 +58,46 @@ class VacationService
     ) {
     }
 
+    /**
+     * Extract the managed vacation parts (marker require line + BEGIN/END
+     * block) from an arbitrary script body. Used by
+     * SieveScriptService::rebuildActiveScript() so a filter rebuild can
+     * carry the auto-responder over into the newly merged main script.
+     *
+     * Returns '' when the body contains no managed vacation parts.
+     */
+    public static function extractManagedBlock(string $body): string
+    {
+        return self::extractManagedRequire($body) . self::extractManagedBody($body);
+    }
+
+    /**
+     * Only the marker require line (without trailing newline semantics
+     * guaranteed) — '' when absent.
+     */
+    public static function extractManagedRequire(string $body): string
+    {
+        if (\preg_match('/^.*' . \preg_quote(self::REQUIRE_MARKER, '/') . '.*$/m', $body, $m) === 1) {
+            return \rtrim((string) $m[0]) . "\n";
+        }
+        return '';
+    }
+
+    /**
+     * Only the BEGIN/END vacation block — '' when absent.
+     */
+    public static function extractManagedBody(string $body): string
+    {
+        $begin = \strpos($body, self::BLOCK_BEGIN);
+        if ($begin !== false) {
+            $end = \strpos($body, self::BLOCK_END, $begin);
+            if ($end !== false) {
+                return \substr($body, $begin, $end + \strlen(self::BLOCK_END) - $begin) . "\n";
+            }
+        }
+        return '';
+    }
+
     public function isAvailable(): bool
     {
         return $this->sieveScripts->isAvailable();

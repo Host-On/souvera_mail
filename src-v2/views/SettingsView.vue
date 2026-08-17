@@ -251,15 +251,15 @@
 					</NcEmptyContent>
 
 					<div v-else class="sieve-list">
-						<div v-for="s in sieveScripts" :key="s.id" class="sieve-list__item">
+						<div v-for="s in sieveScripts.filter(x => !x.isMain)" :key="s.id" class="sieve-list__item">
 							<span class="sieve-list__name">{{ s.name }}</span>
-							<span class="sieve-list__active" v-if="s.isActive">{{ t('souvera_mail', 'active') }}</span>
+							<span class="sieve-list__active" v-if="s.enabled">{{ t('souvera_mail', 'active') }}</span>
 							<div class="sieve-list__actions">
 								<NcButton variant="tertiary" :title="t('souvera_mail', 'Edit')" @click="editSieve(s)">
 									<template #icon><Pencil :size="16" /></template>
 								</NcButton>
-								<NcButton variant="tertiary" :title="s.isActive ? t('souvera_mail', 'Deactivate') : t('souvera_mail', 'Activate')" @click="toggleSieve(s)">
-									<template #icon><component :is="s.isActive ? 'Check' : 'Play' " :size="16" /></template>
+								<NcButton variant="tertiary" :title="s.enabled ? t('souvera_mail', 'Deactivate') : t('souvera_mail', 'Activate')" @click="toggleSieve(s)">
+									<template #icon><component :is="s.enabled ? 'Check' : 'Play' " :size="16" /></template>
 								</NcButton>
 								<NcButton variant="tertiary" :title="t('souvera_mail', 'Delete')" @click="deleteSieve(s)">
 									<template #icon><TrashCan :size="16" /></template>
@@ -556,7 +556,7 @@ import SieveFilterEditor from '../components/SieveFilterEditor.vue'
 import { useSieveClient } from '../composables/useSieveClient.js'
 import { useExternalAccounts } from '../composables/useExternalAccounts.js'
 
-const { fetchScripts, activateScript, deleteScript } = useSieveClient()
+const { fetchScripts, deleteScript, rebuild } = useSieveClient()
 const extAccountsApi = useExternalAccounts()
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
@@ -1017,8 +1017,15 @@ export default {
 		},
 		async toggleSieve(filter) {
 			try {
-				await activateScript(filter.name, !filter.isActive)
-				filter.isActive = !filter.isActive
+				// Flipping a filter means adding/removing it from the
+				// disabled list, then rebuilding the combined main script.
+				const disabled = this.sieveScripts
+					.filter(s => !s.isMain && !s.enabled)
+					.map(s => s.name)
+				const target = filter.enabled ? [...disabled, filter.name] : disabled.filter(n => n !== filter.name)
+				await rebuild(target)
+				await this.loadSieve()
+				showSuccess(this.t('souvera_mail', 'Filters updated'))
 			} catch (e) {
 				showError(this.t('souvera_mail', 'Failed to update filter'))
 			}
@@ -1026,7 +1033,8 @@ export default {
 		async deleteSieve(filter) {
 			try {
 				await deleteScript(filter.name)
-				this.sieveScripts = this.sieveScripts.filter(s => s.id !== filter.id)
+				await rebuild()
+				await this.loadSieve()
 				showSuccess(this.t('souvera_mail', 'Filter deleted'))
 			} catch (e) {
 				showError(this.t('souvera_mail', 'Failed to delete filter'))

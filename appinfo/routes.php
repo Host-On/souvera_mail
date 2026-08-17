@@ -442,6 +442,11 @@ return [
 			'url' => '/api/v2/sieve/validate',
 			'verb' => 'POST',
 		],
+		[
+			'name' => 'v2_sieve#rebuild',
+			'url' => '/api/v2/sieve/rebuild',
+			'verb' => 'POST',
+		],
 
 		// External accounts
 		[
