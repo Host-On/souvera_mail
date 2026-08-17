@@ -353,31 +353,60 @@ class V2MailboxController extends Controller
             return new JSONResponse(['error' => 'Not authenticated'], 401);
         }
 
-        // Query all email IDs in the mailbox.
-        $query = $this->jmap->singleCall('Email/query', [
-            'accountId' => $accountId,
-            'filter' => ['inMailbox' => $id],
-            'limit' => 500,
-        ]);
-
-        $ids = $query['data']['ids'] ?? [];
-        if ($ids === []) {
-            return new JSONResponse(['success' => true, 'total' => 0]);
+        // Stalwart rejects Email/query.limit >= 500 (exclusive cap) and
+        // large destroys in one envelope are risky — paginate both.
+        $pageSize = 250;
+        $allIds = [];
+        $position = 0;
+        while (true) {
+            $query = $this->jmap->singleCall('Email/query', [
+                'accountId' => $accountId,
+                'filter' => ['inMailbox' => $id],
+                'position' => $position,
+                'limit' => $pageSize,
+            ]);
+            if (isset($query['error'])) {
+                // NEVER report success on a failed query — that made the
+                // empty-trash button pretend the folder was emptied.
+                return new JSONResponse(['error' => 'Query failed', 'detail' => $query], 500);
+            }
+            $ids = $query['data']['ids'] ?? [];
+            if ($ids === []) {
+                break;
+            }
+            $allIds = \array_merge($allIds, $ids);
+            if (\count($ids) < $pageSize) {
+                break;
+            }
+            $position += $pageSize;
         }
 
-        $result = $this->jmap->singleCall('Email/set', [
-            'accountId' => $accountId,
-            'destroy' => $ids,
-        ]);
+        if ($allIds === []) {
+            return new JSONResponse(['success' => true, 'total' => 0, 'destroyed' => 0]);
+        }
 
-        if (isset($result['error'])) {
-            return new JSONResponse($result, 500);
+        $destroyed = 0;
+        foreach (\array_chunk($allIds, $pageSize) as $chunk) {
+            $result = $this->jmap->singleCall('Email/set', [
+                'accountId' => $accountId,
+                'destroy' => $chunk,
+            ]);
+            if (isset($result['error'])) {
+                return new JSONResponse(['error' => 'Destroy failed', 'detail' => $result], 500);
+            }
+            if (!empty($result['data']['notDestroyed'] ?? null)) {
+                return new JSONResponse([
+                    'error' => 'Some emails could not be destroyed',
+                    'detail' => $result['data']['notDestroyed'],
+                ], 500);
+            }
+            $destroyed += \count($result['data']['destroyed'] ?? []);
         }
 
         return new JSONResponse([
             'success' => true,
-            'total' => \count($ids),
-            'destroyed' => \count($result['data']['destroyed'] ?? []),
+            'total' => \count($allIds),
+            'destroyed' => $destroyed,
         ]);
     }
 

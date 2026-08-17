@@ -371,11 +371,6 @@ return [
             'verb' => 'DELETE',
         ],
         [
-            'name' => 'v2_mailbox_crud#emptyMailbox',
-            'url' => '/api/v2/mailboxes/{id}/empty',
-            'verb' => 'GET',
-        ],
-        [
             'name' => 'v2_compose#send',
             'url' => '/api/v2/send',
             'verb' => 'POST',

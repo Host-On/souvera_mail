@@ -135,47 +135,4 @@ class V2MailboxCrudController extends Controller
         return new JSONResponse(['success' => true]);
     }
 
-    /**
-     * GET /apps/souvera_mail/api/v2/mailboxes/{id}/empty
-     * Destroys all emails in a mailbox (empty trash/junk).
-     */
-    #[NoAdminRequired]
-    #[NoCSRFRequired]
-    public function emptyMailbox(string $id): JSONResponse
-    {
-        $accountId = $this->jmap->getCurrentAccountId();
-        if ($accountId === null) {
-            return new JSONResponse(['error' => 'Not authenticated'], 401);
-        }
-
-        // Query all emails in the mailbox.
-        $qResult = $this->jmap->singleCall('Email/query', [
-            'accountId' => $accountId,
-            'filter' => ['inMailbox' => $id],
-            'position' => 0,
-            'limit' => 1000,
-        ]);
-
-        if (isset($qResult['error'])) {
-            return new JSONResponse($qResult, 500);
-        }
-
-        $emailIds = $qResult['data']['ids'] ?? [];
-        if ($emailIds === []) {
-            return new JSONResponse(['success' => true, 'destroyed' => 0]);
-        }
-
-        $result = $this->jmap->call([
-            ['Email/set', [
-                'accountId' => $accountId,
-                'destroy' => $emailIds,
-            ]],
-        ]);
-
-        if (isset($result['error'])) {
-            return new JSONResponse($result, 500);
-        }
-
-        return new JSONResponse(['success' => true, 'destroyed' => \count($emailIds)]);
-    }
 }
