@@ -73,20 +73,34 @@
 
 		<Teleport to="body" :disabled="!fullscreenDetail">
 			<div v-if="selectedEmail" class="mail-detail-panel" :class="{ 'mail-detail-panel--fullscreen': fullscreenDetail, 'mail-detail-panel--focus': focusLayout && !this.isMobile }">
-				<EmailDetail
-					:email="selectedEmail"
-					:html-body="emailBodyHtml"
-					:plain-body="emailBodyPlain"
-					:loading="loadingBody"
-					:mailboxes="allMailboxes"
-					:remote-always="_remoteAlways"
-					@close="selectedEmail = null"
-					@reply="onReply"
-					@reply-all="onReplyAll"
-					@forward="onForward"
-					@move="onMove"
-					@delete="deleteEmail"
-					@mailto="onMailto" />
+				<Transition :name="pageTransitionName" :mode="pageTransitionName !== 'none' ? 'out-in' : undefined">
+					<div :key="selectedEmail.id" class="mail-detail-card">
+						<EmailDetail
+							:email="selectedEmail"
+							:html-body="emailBodyHtml"
+							:plain-body="emailBodyPlain"
+							:loading="loadingBody"
+							:mailboxes="allMailboxes"
+							:remote-always="_remoteAlways"
+							@close="selectedEmail = null"
+							@reply="onReply"
+							@reply-all="onReplyAll"
+							@forward="onForward"
+							@move="onMove"
+							@delete="deleteEmail"
+							@mailto="onMailto" />
+					</div>
+				</Transition>
+				<div v-if="fullscreenDetail && !isMobile" class="mail-nav-arrows">
+					<NcButton class="mail-nav-arrow" :disabled="!canPrev" :aria-label="t('souvera_mail', 'Previous message')"
+						@click="navigateEmail(-1)">
+						<template #icon><ChevronLeft :size="22" /></template>
+					</NcButton>
+					<NcButton class="mail-nav-arrow" :disabled="!canNext" :aria-label="t('souvera_mail', 'Next message')"
+						@click="navigateEmail(1)">
+						<template #icon><ChevronRight :size="22" /></template>
+					</NcButton>
+				</div>
 			</div>
 		</Teleport>
 
@@ -100,6 +114,8 @@
 <script>
 import { NcEmptyContent, NcButton } from '@nextcloud/vue'
 import EmailOutline from 'vue-material-design-icons/EmailOutline.vue'
+import ChevronLeft from 'vue-material-design-icons/ChevronLeft.vue'
+import ChevronRight from 'vue-material-design-icons/ChevronRight.vue'
 import { useJmapClient } from '../composables/useJmapClient.js'
 import EmailListToolbar from '../components/EmailListToolbar.vue'
 import EmailListItem from '../components/EmailListItem.vue'
@@ -114,7 +130,7 @@ const { fetchEmails, fetchEmailBody, deleteEmailApi, moveEmail, markEmailRead, t
 
 export default {
 	name: 'MailHomeView',
-	components: { EmailListToolbar, EmailListItem, EmailListSkeleton, EmailDetail, NcEmptyContent, NcButton, EmailOutline },
+	components: { EmailListToolbar, EmailListItem, EmailListSkeleton, EmailDetail, NcEmptyContent, NcButton, EmailOutline, ChevronLeft, ChevronRight },
 	props: {
 		selectedMailbox: { type: String, default: '' },
 		allMailboxes: { type: Array, default: () => [] },
@@ -158,6 +174,10 @@ export default {
 			return this.allMailboxes.filter(m => m.role !== 'trash' && m.role !== 'junk')
 		},
 		fullscreenDetail() { return this.isMobile || this.listOnlyLayout || this.focusLayout },
+		pageTransitionName() { return this.focusLayout && !this.isMobile ? 'focus-page' : 'none' },
+		mailIndex() { return this.emails.findIndex(e => e.id === this.selectedEmail?.id) },
+		canPrev() { return this.mailIndex > 0 },
+		canNext() { return this.mailIndex !== -1 && this.mailIndex < this.emails.length - 1 },
 		panelStyle() {
 			if (this.listOnlyLayout || this.focusLayout) return {}
 			if (this.verticalLayout) {
@@ -798,11 +818,13 @@ body.resize-active { user-select: none; cursor: col-resize; }
 
 /* ── Focus reader: centered card over a dimmed backdrop ── */
 .mail-detail-panel--focus {
-	background: rgba(0, 0, 0, 0.55);
+	background: rgba(0, 0, 0, 0.72);
 	padding: 32px 12px;
+	/* Backdrop fades in — it must never slide along with the card. */
+	animation: mail-backdrop-fade 0.2s ease;
 }
 .mail-detail-panel--focus :deep(.email-detail) {
-	max-width: 920px;
+	max-width: 1060px;
 	margin: 0 auto;
 	min-height: 100%;
 	background: var(--color-main-background);
@@ -814,6 +836,39 @@ body.resize-active { user-select: none; cursor: col-resize; }
 	from { transform: translateX(100%); }
 	to { transform: translateX(0); }
 }
+@keyframes mail-backdrop-fade {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+.mail-detail-card { min-height: 100%; }
+
+/* Page-turn: current card flies out to the LEFT, the next one enters from
+   the RIGHT (out-in keeps them sequential). */
+.focus-page-enter-active, .focus-page-leave-active {
+	transition: transform 0.22s ease, opacity 0.22s ease;
+}
+.focus-page-enter-from { transform: translateX(70px); opacity: 0; }
+.focus-page-leave-to { transform: translateX(-70px); opacity: 0; }
+
+.mail-nav-arrows {
+	position: fixed;
+	top: 50%;
+	transform: translateY(-50%);
+	left: 0;
+	right: 0;
+	pointer-events: none;
+	z-index: 5100;
+	display: flex;
+	justify-content: space-between;
+	padding: 0 12px;
+}
+.mail-nav-arrow {
+	pointer-events: auto;
+	border-radius: 50%;
+	background: var(--color-background-dark);
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+.mail-nav-arrow:disabled { opacity: 0.35; }
 </style>
 
 <style>

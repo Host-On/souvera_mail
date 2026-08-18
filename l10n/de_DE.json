@@ -545,6 +545,8 @@
         "Focus reader": "Fokus-Leser",
         "Failed to save layout": "Layout konnte nicht gespeichert werden",
         "Do you want to keep this draft?": "Möchtest du diesen Entwurf behalten?",
-        "Keep draft": "Entwurf behalten"
+        "Keep draft": "Entwurf behalten",
+        "Previous message": "Vorherige Nachricht",
+        "Next message": "Nächste Nachricht"
     }
 }
