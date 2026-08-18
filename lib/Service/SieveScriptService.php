@@ -302,7 +302,7 @@ class SieveScriptService
 
         $this->saveScript($userId, self::MAIN_SCRIPT_NAME, $merged);
         $this->activateScript($userId, self::MAIN_SCRIPT_NAME);
-        return ['success' => true, 'filters' => $count, 'active' => $count > 0];
+        return ['success' => true, 'filters' => $count, 'active' => $count > 0, 'skipped' => $skipped];
     }
 
     /**

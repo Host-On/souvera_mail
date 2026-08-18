@@ -40,7 +40,7 @@ All write commands accept `--json` and `--dry-run`.
 - [H2CK/oidc](https://github.com/H2CK/oidc) 1.17+ (Nextcloud OIDC Provider — install via `occ app:install oidc`)
 - Mail server with OAUTHBEARER / XOAUTH2 (Stalwart 0.16+ or Dovecot 2.4+ + Postfix 3.7+)
 	]]></description>
-	<version>1.1.31</version>
+	<version>1.1.32</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author homepage="https://github.com/PhiGi87/souvera_mail">Souvera</author>
 	<namespace>SouveraMail</namespace>
@@ -89,6 +89,7 @@ All write commands accept `--json` and `--dry-run`.
 		<command>OCA\SouveraMail\Command\Status</command>
 		<command>OCA\SouveraMail\Command\Whoami</command>
 		<command>OCA\SouveraMail\Command\MigrationReset</command>
+		<command>OCA\SouveraMail\Command\SieveDebug</command>
 		<command>OCA\SouveraMail\Command\L10nCheck</command>
 		<command>OCA\SouveraMail\Command\Reset</command>
 		<command>OCA\SouveraMail\Command\WarmupOidc</command>
