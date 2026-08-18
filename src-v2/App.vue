@@ -115,7 +115,7 @@
 			<template #footer>
 				<div class="app-footer">
 					<QuotaDonut v-if="quotaTotal > 0 || quotaUnlimited" :inline="true" :light-track="true" :size="22" :used="quotaUsed" :total="quotaTotal" :unlimited="quotaUnlimited" />
-					<NcAppNavigationItem :name="t('souvera_mail', 'Mail archive')"
+					<NcAppNavigationItem v-if="mailArchiveEnabled" :name="t('souvera_mail', 'Mail archive')"
 						@click="openArchive">
 						<template #icon><Archive :size="20" /></template>
 					</NcAppNavigationItem>
@@ -165,7 +165,7 @@ export default {
 	name: 'MailV2App',
 	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, LanConnect, MailboxItem, QuotaDonut, ContactPicker },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], extFolders: {}, extFoldersLoading: {}, extExpanded: {}, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, showContactPicker: false, navCollapsedGroups: [] }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], extFolders: {}, extFoldersLoading: {}, extExpanded: {}, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, mailArchiveEnabled: false, showContactPicker: false, navCollapsedGroups: [] }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },		systemFolders() { return this.mailboxes.filter(m => SYSTEM_ROLES.includes(m.role)).sort((a,b) => (ROLE_ORDER[a.role]??99) - (ROLE_ORDER[b.role]??99)) },
@@ -352,6 +352,7 @@ export default {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
 				this.isVertical = data.verticalLayout || false
 				this.navCollapsedGroups = data.navCollapsedGroups || []
+				this.mailArchiveEnabled = !!data.mailArchiveEnabled
 			} catch (e) { console.error('Failed to load layout pref', e) }
 		},
 		async loadExternalAccounts() {

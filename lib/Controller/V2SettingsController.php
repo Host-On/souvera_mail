@@ -130,6 +130,9 @@ class V2SettingsController extends Controller
             'defaultIdentityId' => $this->getPref($uid, 'pref_default_identity', ''),
             'navCollapsedGroups' => \json_decode($this->getPref($uid, 'pref_nav_collapsed_groups', '[]'), true) ?: [],
             'aliasDisplayNames' => \json_decode($this->getPref($uid, 'pref_alias_names', '{}'), true) ?: [],
+            // Whether the Mailarchiv app is installed AND enabled for this
+            // user — the sidebar link is hidden otherwise.
+            'mailArchiveEnabled' => \OCP\Server::get(\OCP\App\IAppManager::class)->isEnabledForUser('souvera_mailarchiv'),
             'account' => [
                 'email' => $user->getSystemEMailAddress() ?? $uid,
                 'server' => '',
