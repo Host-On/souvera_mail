@@ -193,6 +193,8 @@ export default {
 		this._hotkeys = useHotkeys({
 			k: () => this.navigateEmail(1),
 			j: () => this.navigateEmail(-1),
+			arrowright: () => { if (this.fullscreenDetail) this.navigateEmail(1) },
+			arrowleft: () => { if (this.fullscreenDetail) this.navigateEmail(-1) },
 			r: () => { if (this.selectedEmail) this.onReply() },
 			a: () => { if (this.selectedEmail) this.onReplyAll() },
 			f: () => { if (this.selectedEmail) this.onForward() },
@@ -796,11 +798,11 @@ body.resize-active { user-select: none; cursor: col-resize; }
 
 /* ── Focus reader: centered card over a dimmed backdrop ── */
 .mail-detail-panel--focus {
-	background: rgba(0, 0, 0, 0.35);
+	background: rgba(0, 0, 0, 0.55);
 	padding: 32px 12px;
 }
 .mail-detail-panel--focus :deep(.email-detail) {
-	max-width: 760px;
+	max-width: 920px;
 	margin: 0 auto;
 	min-height: 100%;
 	background: var(--color-main-background);
