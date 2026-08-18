@@ -145,7 +145,10 @@
 		</NcDialog>
 
 		<div class="email-detail__body">
-			<HtmlMailFrame v-if="displayHtml"
+			<div v-if="loading" class="email-detail__loading">
+				<NcLoadingIcon :size="52" />
+			</div>
+			<HtmlMailFrame v-else-if="displayHtml"
 				:html="displayHtml"
 				:attachments="email.attachments || []"
 				:remote-allowed="remoteAllowed"
@@ -161,7 +164,7 @@
 </template>
 
 <script>
-import { NcButton, NcActions, NcActionButton, NcDialog, NcTextField, NcEmptyContent } from '@nextcloud/vue'
+import { NcButton, NcActions, NcActionButton, NcDialog, NcTextField, NcEmptyContent, NcLoadingIcon } from '@nextcloud/vue'
 import ArrowLeft from 'vue-material-design-icons/ArrowLeft.vue'
 import WeatherNight from 'vue-material-design-icons/WeatherNight.vue'
 import WeatherSunny from 'vue-material-design-icons/WeatherSunny.vue'
