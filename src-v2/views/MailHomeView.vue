@@ -2,7 +2,7 @@
 	<div class="mail-home"
 		:class="{
 			'mail-home--vertical': verticalLayout,
-			'mail-home--list-only': listOnlyLayout,
+			'mail-home--list-only': listOnlyLayout || focusLayout,
 			'mail-home--mobile': isMobile,
 			'mail-home--detail-open': isMobile && selectedEmail,
 		}">
@@ -72,7 +72,7 @@
 		</div>
 
 		<Teleport to="body" :disabled="!fullscreenDetail">
-			<div v-if="selectedEmail" class="mail-detail-panel" :class="{ 'mail-detail-panel--fullscreen': fullscreenDetail }">
+			<div v-if="selectedEmail" class="mail-detail-panel" :class="{ 'mail-detail-panel--fullscreen': fullscreenDetail, 'mail-detail-panel--focus': focusLayout && !this.isMobile }">
 				<EmailDetail
 					:email="selectedEmail"
 					:html-body="emailBodyHtml"
@@ -120,6 +120,7 @@ export default {
 		allMailboxes: { type: Array, default: () => [] },
 		verticalLayout: { type: Boolean, default: false },
 		listOnlyLayout: { type: Boolean, default: false },
+		focusLayout: { type: Boolean, default: false },
 	},
 	data() {
 		return {
@@ -156,9 +157,9 @@ export default {
 		moveMailboxes() {
 			return this.allMailboxes.filter(m => m.role !== 'trash' && m.role !== 'junk')
 		},
-		fullscreenDetail() { return this.isMobile || this.listOnlyLayout },
+		fullscreenDetail() { return this.isMobile || this.listOnlyLayout || this.focusLayout },
 		panelStyle() {
-			if (this.listOnlyLayout) return {}
+			if (this.listOnlyLayout || this.focusLayout) return {}
 			if (this.verticalLayout) {
 				// Mobile: list takes full height (detail is a full-screen
 				// overlay when an email is open).
@@ -179,6 +180,7 @@ export default {
 		// is open (SnappyMail-style reading mode).
 		isMobile() { this.syncBodyScrollLock() },
 		listOnlyLayout() { this.syncBodyScrollLock() },
+		focusLayout() { this.syncBodyScrollLock() },
 		selectedEmail() { this.syncBodyScrollLock() },
 	},
 	async mounted() {
@@ -791,6 +793,21 @@ body.resize-active { user-select: none; cursor: col-resize; }
 	animation: mail-detail-slide-in 0.18s ease-out;
 }
 /* EmailDetail is edge-to-edge by default now (padding/margins removed globally) — the fullscreen overlay needs no extra overrides. */
+
+/* ── Focus reader: centered card over a dimmed backdrop ── */
+.mail-detail-panel--focus {
+	background: rgba(0, 0, 0, 0.35);
+	padding: 32px 12px;
+}
+.mail-detail-panel--focus :deep(.email-detail) {
+	max-width: 760px;
+	margin: 0 auto;
+	min-height: 100%;
+	background: var(--color-main-background);
+	border-radius: 10px;
+	box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3);
+	overflow: hidden;
+}
 @keyframes mail-detail-slide-in {
 	from { transform: translateX(100%); }
 	to { transform: translateX(0); }

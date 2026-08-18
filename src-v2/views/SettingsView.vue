@@ -57,12 +57,20 @@
 							</div>
 							<span class="layout-option__label">{{ t('souvera_mail', 'List above, detail below') }}</span>
 						</label>
-						<label class="layout-option" :class="{ 'layout-option--active': listOnlyLayout }"
+						<label class="layout-option" :class="{ 'layout-option--active': listOnlyLayout && !focusLayout }"
 							@click="setLayout('list')">
 							<div class="layout-preview layout-preview--list">
 								<div class="layout-preview__sidebar"></div>
 							</div>
 							<span class="layout-option__label">{{ t('souvera_mail', 'List only') }}</span>
+						</label>
+						<label class="layout-option" :class="{ 'layout-option--active': focusLayout }"
+							@click="setLayout('focus')">
+							<div class="layout-preview layout-preview--focus">
+								<div class="layout-preview__sidebar"></div>
+								<div class="layout-preview__detail"></div>
+							</div>
+							<span class="layout-option__label">{{ t('souvera_mail', 'Focus reader') }}</span>
 						</label>
 					</div>
 					<div class="setting-row">
@@ -609,6 +617,7 @@ export default {
 			messagesPerPageOption: { value: 50, label: '50' },
 			verticalLayout: false,
 			listOnlyLayout: false,
+			focusLayout: false,
 			autoRefreshOptions: [
 				{ value: 0, label: 'Off' },
 				{ value: 30, label: '30s' },
@@ -765,6 +774,7 @@ export default {
 				if (p.remoteImages === 'always') this.remoteImagesOption = this.remoteImageOptions[1]
 				this.verticalLayout = p.verticalLayout || false
 				this.listOnlyLayout = p.listOnlyLayout || false
+				this.focusLayout = p.focusLayout || false
 				const ar = this.autoRefreshOptions.find(o => o.value === (p.autoRefresh || 60))
 				if (ar) this.autoRefreshOption = ar
 				const so = this.soundOptions.find(o => o.value === (p.notificationSound || 'none'))
@@ -1081,14 +1091,23 @@ export default {
 			} catch (e) { console.error('Shared position save failed', e); showError(this.t('souvera_mail', 'Failed to save')) }
 		},
 		async setLayout(mode) {
+			const prev = { verticalLayout: this.verticalLayout, listOnlyLayout: this.listOnlyLayout, focusLayout: this.focusLayout }
 			this.verticalLayout = mode === 'vertical'
-			this.listOnlyLayout = mode === 'list'
+			this.listOnlyLayout = mode === 'list' || mode === 'focus'
+			this.focusLayout = mode === 'focus'
 			try {
 				await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), {
 					verticalLayout: this.verticalLayout,
 					listOnlyLayout: this.listOnlyLayout,
+					focusLayout: this.focusLayout,
 				})
-			} catch {}
+			} catch (e) {
+				// Revert on failure — the user must not see the option jump
+				// back after reload with the save silently lost.
+				Object.assign(this, prev)
+				showError(this.t('souvera_mail', 'Failed to save layout'))
+				return
+			}
 			window.location.reload()
 		},
 		async onSoundChange(val) {
@@ -1267,6 +1286,9 @@ export default {
 
 .layout-preview--vertical { flex-direction: column; }
 .layout-preview--list .layout-preview__sidebar { flex: 1; background: var(--color-background-dark); }
+.layout-preview--focus { position: relative; background: rgba(0, 0, 0, 0.35); }
+.layout-preview--focus .layout-preview__sidebar { position: absolute; inset: 0; background: var(--color-background-dark); }
+.layout-preview--focus .layout-preview__detail { position: absolute; left: 50%; top: 10%; transform: translateX(-50%); width: 55%; height: 80%; background: var(--color-main-background); border: 1px solid var(--color-border); border-radius: 4px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25); }
 .layout-preview--vertical .layout-preview__sidebar { height: 35%; background: var(--color-background-dark); border-bottom: 2px solid var(--color-border); }
 .layout-preview--vertical .layout-preview__detail { flex: 1; background: var(--color-main-background); border: 1px solid var(--color-border); border-top: none; }
 
