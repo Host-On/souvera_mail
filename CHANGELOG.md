@@ -4,6 +4,54 @@ All notable changes to Souvera Mail will be documented in this file.
 
 Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
 
+## [1.1.0] — 2026-08-18 (Release: 0.22.22 → 1.1.0)
+
+Zusammenfassung von 449 Commits (v0.22.23 – v0.22.34, v1.0.0 – v1.0.173).
+
+### Der große Umbau: v2-Client
+- Neuer Vue-3-Mail-Client („v2") ersetzt die SnappyMail-Engine-Oberfläche komplett; Kommunikation direkt per JMAP gegen Stalwart (E-Mail-Liste, Detail, Verfassen, Ordner, Suche, Spam, Shield, Einstellungen).
+- Schrittweise Migration der kompletten Oberfläche (Layout v2, v2.1 Phase D + Polish Sprint), „v2 only"-Client als Standard.
+- Zahlreiche JMAP-v2-Bugfixes (17er-Batch u. a.) sowie JMAP-Permissions-Anpassungen für Stalwart v0.16.15 bis v1.0.x.
+
+### Oberfläche & Mailboxen
+- Responsive Oberfläche (Mobile), vertikales Layout per Toggle, resizable List/Detail-Panels.
+- Ordnerverwaltung: Unterordner unter System-Ordnern, Drag & Drop zum Verschieben, Ordner anlegen/löschen in den Einstellungen, lokalisierte Standard-Ordnernamen (Inbox → Posteingang usw.).
+- Inline-Suche + Filter-Toolbar, Spam-Liste (V2SpamController), Quick-Actions (Alle markieren gelesen/ungelesen), Bulk-Operationen (Auswahl, Löschen, Verschieben), mark-all-read-Endpoint.
+- Shared-Postfächer in der Sidebar (aufklappbare Gruppen, Position über/unter konfigurierbar), aktive Ordner-Markierung, Unread-Bubbles.
+- Kontakte (Suche/Anlegen/Bearbeiten über NC Contacts), ContactPicker, Anhänge aus Nextcloud Files (CloudFilePicker), Anhänge in Files speichern, BIMI-Logos, Quota-Anzeige, Benachrichtigungs-Töne mit Vorschau, Auto-Refresh mit Countdown.
+- Mailarchiv-Link in der Sidebar-Fußzeile.
+
+### Verfassen & Signaturen
+- WYSIWYG-Editor, Thunderbird-Signaturblock, Reply-/Forward-Zitate, Anhang-Chips.
+- Signatur pro Identität (auch Aliases und externe Konten): HTML-Editor mit Quell-/Vorschau-Ansicht, HTML-Datei-Import, Signatur- und Antwort-Position je Identität; die alte globale Signatur wurde abgelöst und wird beim ersten Öffnen automatisch in die Haupt-Identität migriert.
+- Default-Absender per Stern-Icon je Identität (Dropdown entfernt), Display-Namen für Aliases (im FROM-Header wirksam).
+
+### Externe Konten
+- Externe IMAP/SMTP-Konten (CRUD, Verbindungstest mit Pflichtprüfung, Provider-Presets) und Menü-Integration: Konten klappen wie Shared-Postfächer in der Sidebar auf (lazy geladene Ordner, deutsche Namen, Unread-Counter).
+- Lesen (Ordner, Nachrichtenliste, Detail im JMAP-Look mit sandboxed HtmlMailFrame), Senden über das externe SMTP (STARTTLS fail-closed, AUTH LOGIN/PLAIN, MIME multipart mit Anhängen, Header-Injection-Schutz), Absender-Auswahl beim Verfassen, eigene Signatur je externem Konto.
+
+### Sieve / Filter
+- Filter-Editor (Bedingungen, Aktionen, Drag & Drop, Sieve-Vorschau, Validierung).
+- Speichern aktiviert Filter jetzt automatisch; alle aktiven Filter werden in ein kombiniertes Haupt-Script gemergt (Stalwart erlaubt nur ein aktives Script pro Konto); Ein-/Ausschalten je Filter, Löschen/Bearbeiten löst Rebuild aus; Abwesenheitsnotiz (managed Vacation-Block) bleibt über Rebuilds erhalten (einmalige Legacy-Migration).
+
+### Migration / Importer
+- Provider.tools-API-Anpassung (list-folders-Antwort jetzt unter `data`, Fehlermeldungen unter `error`).
+- `occ souvera_mail:migration:reset <uid>` setzt den Wizard jetzt wirklich zurück (alle früheren Job-Zeilen werden verworfen, Welcome-Screen erscheint wieder); Ausgabe zeigt die Anzahl verworfener Einträge.
+- Ordner-Mapping: Checkboxen direkt anklickbar (Label-Doppel-Toggle behoben).
+- Papierkorb leeren löscht endgültig (paginiertes Query mit Limit < 500, chunked Destroy, keine stillen Erfolge bei Query-Fehlern, doppelte GET-Route entfernt).
+
+### Self-Update & Infrastruktur
+- Self-Updater: Staging-Verzeichnis + atomarer Swap (kein halbleerer App-Ordner während Requests), Integritätsprüfung der Kern-Dateien, Selbstheilung halb angewendeter Updates (gleiche Version wird bei fehlenden Dateien neu ausgerollt), vollständige Aufräum-/Rollback-Pfade.
+- `info.xml` XSD-konform (Element-Reihenfolge, pre-migration/post-migration statt der auf NC 31+ wirkungslosen pre-update/post-update-Tags).
+- Navigations-Header sauber (Compose-Reihe im search-Slot, kein Scrollbalken), Responsive-Menü schließt sich nach Auswahl automatisch (Event-Bus), ungültige NcAppNavigationToggle-Nutzung entfernt (Build ist warnungsfrei).
+
+### Lokalisierung
+- Vollständige deutsche Übersetzungen für alle neuen UI-Strings; `de_DE`-Kataloge mit 301+125 fehlenden Einträgen synchronisiert (behebt gemischte englische UI für de_DE-Benutzer); vorbestehender Syntaxfehler in `de.js` behoben.
+
+### Sicherheit & Qualität
+- Codex-Reviews über den gesamten Zeitraum; u. a. behoben: SMTP-Header-Injection, STARTTLS-Downgrade, XSS-Isolation für externe Mails (sandboxed iframe statt v-html), Identity-/Alias-/External-Ownership-Validierung, CSRF-Schutz, Atomarität des Self-Updaters, Sieve-Syntax- und Vacation-Roundtrip-Fehler.
+- Defensives Signatur-Datei-Lesen (kein 500 für einzelne Benutzer mehr).
+
 ## [Unreleased]
 
 ## [0.22.22] — 2026-08-01 (Release-Zusammenfassung: 2026-07-11 bis 2026-08-01)
