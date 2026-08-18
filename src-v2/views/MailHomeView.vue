@@ -33,7 +33,7 @@
 				@update:filter="onFilter" />
 			<EmailListSkeleton v-if="loadingEmails" />
 			<template v-else-if="emails.length > 0">
-				<div class="email-items">
+				<div ref="emailItems" class="email-items" @scroll="onListScroll">
 					<EmailListItem
 						v-for="email in emails"
 						:key="email.id"
@@ -45,12 +45,11 @@
 						@check="toggleCheck(email.id)"
 						@flag="toggleFlag(email.id)" />
 				</div>
-				<PaginationBar
-					:offset="offset"
-					:limit="limit"
-					:total="emailTotal"
-					@prev="goPrev"
-					@next="goNext" />
+				<div v-if="loadingMore" class="mail-load-more">
+					<span class="icon-loading" />
+					{{ t('souvera_mail', 'Loading more…') }}
+				</div>
+				<div v-else-if="hasMore" class="mail-load-more-sentinel" />
 			</template>
 
 			<NcEmptyContent v-else :name="t('souvera_mail', 'No messages')">
@@ -105,7 +104,6 @@ import { useJmapClient } from '../composables/useJmapClient.js'
 import EmailListToolbar from '../components/EmailListToolbar.vue'
 import EmailListItem from '../components/EmailListItem.vue'
 import EmailListSkeleton from '../components/EmailListSkeleton.vue'
-import PaginationBar from '../components/PaginationBar.vue'
 import EmailDetail from '../components/EmailDetail.vue'
 import { useHotkeys } from '../composables/useHotkeys.js'
 import axios from '@nextcloud/axios'
@@ -116,7 +114,7 @@ const { fetchEmails, fetchEmailBody, deleteEmailApi, moveEmail, markEmailRead, t
 
 export default {
 	name: 'MailHomeView',
-	components: { EmailListToolbar, EmailListItem, EmailListSkeleton, PaginationBar, EmailDetail, NcEmptyContent, NcButton, EmailOutline },
+	components: { EmailListToolbar, EmailListItem, EmailListSkeleton, EmailDetail, NcEmptyContent, NcButton, EmailOutline },
 	props: {
 		selectedMailbox: { type: String, default: '' },
 		allMailboxes: { type: Array, default: () => [] },
@@ -127,6 +125,7 @@ export default {
 		return {
 			isMobile: window.innerWidth < 1024,
 			emails: [], emailTotal: 0, offset: 0, limit: 50,
+			loadingMore: false, hasMore: false,
 			loadingEmails: false, loadingBody: false,
 			bulkProcessing: false,
 			selectedEmail: null,
@@ -273,8 +272,18 @@ export default {
 		},
 		async loadEmails(showSkeleton = true) {
 			if (showSkeleton) this.loadingEmails = true
+			// In-flight marker for EVERY (re)load — including silent
+			// background refreshes (showSkeleton=false) — so loadMore()
+			// can never run concurrently with a list replacement.
+			this._reloadInFlight = true
 			const seq = (this._loadSeq || 0) + 1
 			this._loadSeq = seq
+			// A full (re)load always starts at the top — loadMore() advanced
+			// the offset for appending; a refresh must not fetch a later page.
+			// On FAILURE the old (longer) list stays — restore the offset so
+			// the next loadMore() continues where the old list ended.
+			const prevOffset = this.offset
+			this.offset = 0
 			let accountId = null
 			let mailboxId = this.selectedMailbox
 			if (mailboxId && mailboxId.includes('|')) {
@@ -288,13 +297,21 @@ export default {
 				if (seq !== this._loadSeq) return
 				this.emails = r.emails
 				this.emailTotal = r.total
+				this.hasMore = r.emails.length < r.total
 			} catch (e) {
 				console.error('Failed to load emails', e)
+				// Restore the offset only when THIS request is still the
+				// newest — a stale request must never clobber the offset a
+				// newer reload has already established.
+				if (seq === this._loadSeq) this.offset = prevOffset
 				return
 			} finally {
 				// Only the current request controls the loading state; stale
 				// requests must never hide the list or keep the skeleton up
-				if (seq === this._loadSeq) this.loadingEmails = false
+				if (seq === this._loadSeq) {
+					this.loadingEmails = false
+					this._reloadInFlight = false
+				}
 			}
 			// Play sound and notify ONLY during auto-refresh, never on
 			// manual folder switch, filter, pagination, or initial load.
@@ -322,6 +339,9 @@ export default {
 			// list visible (no skeleton flicker) until the debounced search runs
 			this._loadSeq = (this._loadSeq || 0) + 1
 			this.loadingEmails = false
+			// The debounced reload will REPLACE the list — no appends may
+			// mix old/new results in the meantime.
+			this.hasMore = false
 			this.scheduleSearch()
 		},
 		scheduleSearch() {
@@ -333,6 +353,8 @@ export default {
 		onFilter(type) {
 			this.filterType = type
 			this.offset = 0
+			this.hasMore = false
+			this._loadSeq = (this._loadSeq || 0) + 1
 			clearTimeout(this._searchTimer)
 			this.loadEmails()
 		},
@@ -537,8 +559,49 @@ export default {
 			email.isFlagged = newFlag
 			try { await toggleEmailFlag(emailId, newFlag, this.currentAccountId) } catch (e) { console.error('Failed to toggle flag', e); email.isFlagged = !newFlag }
 		},
-		goPrev() { if (this.offset > 0) { clearTimeout(this._searchTimer); this.offset = Math.max(0, this.offset - this.limit); this.loadEmails() } },
-		goNext() { if (this.offset + this.limit < this.emailTotal) { clearTimeout(this._searchTimer); this.offset += this.limit; this.loadEmails() } },
+		// Infinite scroll: fetch the next page and APPEND it when the list
+		// is scrolled to the bottom (pagination UI removed per operator).
+		onListScroll() {
+			if (!this.hasMore || this.loadingMore) return
+			const el = this.$refs.emailItems
+			if (!el) return
+			if (el.scrollTop + el.clientHeight >= el.scrollHeight - 240) {
+				this.loadMore()
+			}
+		},
+		async loadMore() {
+			// Never start while a full (re)load is in flight — it replaces
+			// the list and resets the offset; appending would skip a page.
+			if (!this.hasMore || this.loadingMore || this._reloadInFlight) return
+			this.loadingMore = true
+			const seq = this._loadSeq
+			const mailboxAtStart = this.selectedMailbox
+			const nextOffset = this.offset + this.limit
+			let accountId = null
+			let mailboxId = this.selectedMailbox
+			if (mailboxId && mailboxId.includes('|')) {
+				[accountId, mailboxId] = mailboxId.split('|')
+			}
+			try {
+				const r = await fetchEmails(mailboxId, this.limit, nextOffset, accountId, this.searchQuery, this.filterType)
+				// Discard stale results (mailbox/search changed mid-flight).
+				if (seq !== this._loadSeq || mailboxAtStart !== this.selectedMailbox) return
+				const known = new Set(this.emails.map(e => e.id))
+				const fresh = (r.emails || []).filter(e => !known.has(e.id))
+				this.emails = [...this.emails, ...fresh]
+				this.offset = nextOffset
+				this.emailTotal = r.total
+				// Stop when the mailbox shifted (new mail arrived) and the
+				// next page returned nothing new — avoids an endless loop.
+				this.hasMore = fresh.length > 0 && this.emails.length < r.total
+			} catch (e) {
+				console.error('Failed to load more emails', e)
+			} finally {
+				// Always release the lock — a concurrent full reload bumps
+				// _loadSeq and would otherwise leave the lock held forever.
+				this.loadingMore = false
+			}
+		},
 		navigateEmail(dir) {
 			if (!this.selectedEmail || this.emails.length === 0) return
 			const idx = this.emails.findIndex(e => e.id === this.selectedEmail.id)
@@ -686,6 +749,8 @@ export default {
 .mail-detail-empty { flex: 1; }
 .mail-loading { display: flex; justify-content: center; padding: 48px; }
 .email-items { flex: 1; overflow-y: auto; }
+.mail-load-more { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 14px; color: var(--color-text-maxcontrast); font-size: 13px; }
+.mail-load-more-sentinel { height: 1px; }
 .mail-resize-handle { flex-shrink: 0; background: var(--color-background-dark); transition: background 0.15s; z-index: 5; display: flex; align-items: center; justify-content: center; }
 .mail-resize-handle:hover { background: var(--color-primary-element-light); }
 .mail-resize-handle--h { width: 8px; cursor: col-resize; border-left: 1px solid var(--color-border); border-right: 1px solid var(--color-border); }
