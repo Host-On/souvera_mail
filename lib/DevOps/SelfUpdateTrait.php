@@ -380,6 +380,14 @@ trait SelfUpdateTrait
             'composer/autoload.php',
             'lib/Controller/PageController.php',
             'lib/Service/L10nService.php',
+            // Frequently hit classes — a missing file here manifests as
+            // HTML 500 pages ("Invalid response from server" in the
+            // migration wizard), so they must trigger a heal re-apply too.
+            'lib/AppInfo/Application.php',
+            'lib/Controller/MigrationController.php',
+            'lib/Service/MigrationService.php',
+            'lib/Service/ProviderToolsClient.php',
+            'lib/Db/MigrationJobMapper.php',
         ];
         foreach ($required as $rel) {
             if (!\is_file($appDir . '/' . $rel)) {

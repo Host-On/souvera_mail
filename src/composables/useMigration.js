@@ -59,12 +59,23 @@ async function jsonFetch(url, init = {}) {
 		},
 	})
 	// The backend always returns JSON — even for error branches — so
-	// parse regardless of status.  We surface `body.message` verbatim.
+	// parse regardless of status. When the body is NOT JSON (HTML error
+	// page, proxy hiccup) surface the status + a short snippet instead
+	// of a useless generic message.
 	let body = null
 	try {
 		body = await response.json()
 	} catch (e) {
-		body = { message: 'Invalid response from server.' }
+		let snippet = ''
+		try {
+			const raw = await response.text()
+			snippet = raw.replace(/\s+/g, ' ').trim().slice(0, 240)
+		} catch {}
+		body = {
+			message: snippet
+				? 'Invalid response from server (HTTP ' + response.status + '): ' + snippet
+				: 'Invalid response from server (HTTP ' + response.status + ')',
+		}
 	}
 	if (!response.ok) {
 		const err = new Error(body?.message || `HTTP ${response.status}`)
