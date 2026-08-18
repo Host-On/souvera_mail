@@ -176,7 +176,10 @@ export default {
 			return {}
 		},
 		userFolders() { return this.mailboxes.filter(m => !SYSTEM_ROLES.includes(m.role)) },
-		userFolderRoots() { return this.userFolders.filter(m => !m.parentId || !this.userFolders.find(p => p.id === m.parentId)) },
+		// Only ROOT-level folders belong under "Folders". A folder whose
+		// parent exists in the mailbox tree — including system folders like
+		// Inbox or Trash — is rendered nested under that parent instead.
+		userFolderRoots() { return this.userFolders.filter(m => !m.parentId || !this.mailboxes.some(p => p.id === m.parentId)) },
 		sharedMailboxRoots() { return this.sharedMailboxes.filter(m => (!m.parentId || !this.sharedMailboxes.find(p => p.id === m.parentId)) && m.role !== 'archive') },
 		sharedAccountGroups() {
 			const map = new Map()
