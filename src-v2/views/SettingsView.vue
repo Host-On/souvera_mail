@@ -1108,7 +1108,16 @@ export default {
 				showError(this.t('souvera_mail', 'Failed to save layout'))
 				return
 			}
-			window.location.reload()
+			// No page reload: apply the new layout LIVE via the app shell,
+			// so the change takes effect the moment the user returns to the
+			// inbox (and the active state can never visually jump back).
+			window.dispatchEvent(new CustomEvent('souvera-mail:layout-changed', {
+				detail: {
+					verticalLayout: this.verticalLayout,
+					listOnlyLayout: this.listOnlyLayout,
+					focusLayout: this.focusLayout,
+				},
+			}))
 		},
 		async onSoundChange(val) {
 			if (val?.value) {

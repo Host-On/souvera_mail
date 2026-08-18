@@ -225,6 +225,8 @@ export default {
 		window.addEventListener('souvera-mail:refresh-mailboxes', this.onRefreshMailboxes)
 		// External accounts changed in Settings — refresh the sidebar list.
 		window.addEventListener('souvera-mail:refresh-external', this.loadExternalAccounts)
+		// Layout changed in Settings — apply live without a page reload.
+		window.addEventListener('souvera-mail:layout-changed', this.onLayoutChanged)
 		this._onResize = () => {
 			const wasAuto = this._responsiveVertical
 			this._responsiveVertical = window.innerWidth < 1024
@@ -243,6 +245,7 @@ export default {
 	beforeUnmount() {
 		window.removeEventListener('souvera-mail:refresh-mailboxes', this.onRefreshMailboxes)
 		window.removeEventListener('souvera-mail:refresh-external', this.loadExternalAccounts)
+		window.removeEventListener('souvera-mail:layout-changed', this.onLayoutChanged)
 		window.removeEventListener('resize', this._onResize)
 		this._hotkeys?.destroy()
 	},
@@ -359,6 +362,12 @@ export default {
 				this.navCollapsedGroups = data.navCollapsedGroups || []
 				this.mailArchiveEnabled = !!data.mailArchiveEnabled
 			} catch (e) { console.error('Failed to load layout pref', e) }
+		},
+		onLayoutChanged(e) {
+			const d = e?.detail || {}
+			this.isVertical = !!d.verticalLayout
+			this.listOnlyLayout = !!d.listOnlyLayout
+			this.focusLayout = !!d.focusLayout
 		},
 		async loadExternalAccounts() {
 			try {
