@@ -27,8 +27,10 @@
 				:selected="selected"
 				:depth="depth + 1"
 				:account-scoped="accountScoped"
+				:collapsed-ids="collapsedIds"
 				@select="$emit('select', $event)"
-				@drop-email="$emit('dropEmail', $event)" />
+				@drop-email="$emit('dropEmail', $event)"
+				@toggle-collapse="$emit('toggle-collapse', $event[0], $event[1])" />
 		</template>
 	</NcAppNavigationItem>
 	</div>
@@ -63,11 +65,26 @@ export default {
 		// ('accountId|mailboxId') and must ONLY match that form. Prevents
 		// bare-id collisions across accounts lighting up wrong folders.
 		accountScoped: { type: Boolean, default: false },
+		// Ids of mailboxes the user collapsed (persisted per user).
+		collapsedIds: { type: Array, default: () => [] },
 	},
-	emits: ['select', 'dropEmail'],
-	data() { return { open: false, dragOver: false } },
+	emits: ['select', 'dropEmail', 'toggle-collapse'],
+	data() { return { _open: null, dragOver: false } },
+	watch: {
+		collapsedIds() { this._open = null },
+	},
 	computed: {
 		displayName() { return mailboxDisplayName(this.mailbox) },
+		open: {
+			get() {
+				if (this._open === null) return !this.collapsedIds.includes(this.mailbox.id)
+				return this._open
+			},
+			set(v) {
+				this._open = v
+				this.$emit('toggle-collapse', this.mailbox.id, !v)
+			},
+		},
 		active() {
 			if (!this.selected) return false
 			if (this.accountScoped) {

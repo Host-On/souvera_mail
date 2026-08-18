@@ -19,8 +19,10 @@
 
 				<MailboxItem v-for="mb in systemFolders" :key="'s-'+mb.id"
 					:mailbox="mb" :all-mailboxes="mailboxes" :selected="selectedMailbox" :depth="0"
+					:collapsed-ids="navCollapsedMailboxes"
 					@select="onMailboxSelect"
-					@drop-email="onDropEmail" />
+					@drop-email="onDropEmail"
+					@toggle-collapse="onMailboxCollapseToggle" />
 
 				<template v-if="sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
@@ -39,8 +41,10 @@
 							<MailboxItem v-for="mp in group.roots" :key="mp.id"
 								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="1"
 								account-scoped
+								:collapsed-ids="navCollapsedMailboxes"
 								@select="onSharedSelect(mp._accountId, $event)"
-								@drop-email="onDropEmail" />
+								@drop-email="onDropEmail"
+								@toggle-collapse="onMailboxCollapseToggle" />
 						</template>
 					</template>
 				</template>
@@ -49,8 +53,10 @@
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Folders')" />
 					<MailboxItem v-for="mb in userFolderRoots" :key="'u-'+mb.id"
 						:mailbox="mb" :all-mailboxes="mailboxes" :selected="selectedMailbox" :depth="0"
+						:collapsed-ids="navCollapsedMailboxes"
 						@select="onMailboxSelect"
-						@drop-email="onDropEmail" />
+						@drop-email="onDropEmail"
+						@toggle-collapse="onMailboxCollapseToggle" />
 				</template>
 
 				<template v-if="externalAccounts.length > 0">
@@ -105,8 +111,10 @@
 							<MailboxItem v-for="mp in group.roots" :key="mp.id"
 								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="1"
 								account-scoped
+								:collapsed-ids="navCollapsedMailboxes"
 								@select="onSharedSelect(mp._accountId, $event)"
-								@drop-email="onDropEmail" />
+								@drop-email="onDropEmail"
+								@toggle-collapse="onMailboxCollapseToggle" />
 						</template>
 					</template>
 				</template>
@@ -165,7 +173,7 @@ export default {
 	name: 'MailV2App',
 	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, LanConnect, MailboxItem, QuotaDonut, ContactPicker },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], extFolders: {}, extFoldersLoading: {}, extExpanded: {}, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, listOnlyLayout: false, focusLayout: false, _responsiveVertical: false, mailArchiveEnabled: false, showContactPicker: false, navCollapsedGroups: [] }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], extFolders: {}, extFoldersLoading: {}, extExpanded: {}, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, listOnlyLayout: false, focusLayout: false, _responsiveVertical: false, mailArchiveEnabled: false, showContactPicker: false, navCollapsedGroups: [], navCollapsedMailboxes: [] }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },		systemFolders() { return this.mailboxes.filter(m => SYSTEM_ROLES.includes(m.role)).sort((a,b) => (ROLE_ORDER[a.role]??99) - (ROLE_ORDER[b.role]??99)) },
@@ -356,8 +364,19 @@ export default {
 				this.listOnlyLayout = !!data.listOnlyLayout
 				this.focusLayout = !!data.focusLayout
 				this.navCollapsedGroups = data.navCollapsedGroups || []
+				this.navCollapsedMailboxes = data.navCollapsedMailboxes || []
 				this.mailArchiveEnabled = !!data.mailArchiveEnabled
 			} catch (e) { console.error('Failed to load layout pref', e) }
+		},
+		onMailboxCollapseToggle(id, collapsed) {
+			let list = [...this.navCollapsedMailboxes]
+			if (collapsed && !list.includes(id)) list.push(id)
+			if (!collapsed) list = list.filter(x => x !== id)
+			this.navCollapsedMailboxes = list
+			// Persist per user — fire and forget.
+			try {
+				axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { navCollapsedMailboxes: list })
+			} catch {}
 		},
 		onLayoutChanged(e) {
 			const d = e?.detail || {}

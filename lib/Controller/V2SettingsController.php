@@ -131,6 +131,7 @@ class V2SettingsController extends Controller
             'notificationSound' => $this->getPref($uid, 'pref_notification_sound', 'none'),
             'defaultIdentityId' => $this->getPref($uid, 'pref_default_identity', ''),
             'navCollapsedGroups' => \json_decode($this->getPref($uid, 'pref_nav_collapsed_groups', '[]'), true) ?: [],
+            'navCollapsedMailboxes' => \json_decode($this->getPref($uid, 'pref_nav_collapsed_mailboxes', '[]'), true) ?: [],
             'aliasDisplayNames' => \json_decode($this->getPref($uid, 'pref_alias_names', '{}'), true) ?: [],
             // Whether the Mailarchiv app is installed AND enabled for this
             // user — the sidebar link is hidden otherwise.
@@ -180,6 +181,7 @@ class V2SettingsController extends Controller
             'notificationSound' => 'pref_notification_sound',
             'defaultIdentityId' => 'pref_default_identity',
             'navCollapsedGroups' => 'pref_nav_collapsed_groups',
+            'navCollapsedMailboxes' => 'pref_nav_collapsed_mailboxes',
             'aliasDisplayNames' => 'pref_alias_names',
         ];
 

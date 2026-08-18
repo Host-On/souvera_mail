@@ -73,7 +73,7 @@
 							<span class="layout-option__label">{{ t('souvera_mail', 'Focus reader') }}</span>
 						</label>
 					</div>
-					<div class="setting-row">
+					<div v-if="loaded" class="setting-row">
 						<div>
 							<span class="setting-label">{{ t('souvera_mail', 'External images') }}</span>
 							<p class="settings-muted">{{ t('souvera_mail', 'Remote content can be used to track you.') }}</p>
@@ -83,7 +83,7 @@
 							:clearable="false"
 							@update:modelValue="onRemoteImagesChange" />
 					</div>
-					<div class="setting-row">
+					<div v-if="loaded" class="setting-row">
 						<div>
 							<span class="setting-label">{{ t('souvera_mail', 'Auto-refresh') }}</span>
 							<p class="settings-muted">{{ t('souvera_mail', 'Periodically check for new mail. Disabled when set to 0.') }}</p>
