@@ -696,6 +696,10 @@ body.resize-active { user-select: none; cursor: col-resize; }
 .mail-detail-panel--fullscreen {
 	position: fixed;
 	inset: 0;
+	width: 100vw;
+	max-width: 100vw;
+	margin: 0;
+	padding: 0;
 	/* Above every Nextcloud chrome element (header z-index 2000) — the
 	   panel lives directly under <body>, so no app stacking context can
 	   clip it. */
@@ -715,7 +719,7 @@ body.resize-active { user-select: none; cursor: col-resize; }
 	margin: 0;
 }
 .mail-detail-panel--fullscreen :deep(.email-detail__header) {
-	margin: 0 0 16px 0;
+	margin: 0;
 }
 .mail-detail-panel--fullscreen :deep(.email-detail__body) {
 	margin: 0;

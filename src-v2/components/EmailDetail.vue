@@ -15,15 +15,6 @@
 				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Forward')" @click="$emit('forward')">
 					<template #icon><Forward :size="20" /></template>
 				</NcButton>
-				<NcButton v-if="displayHtml" variant="tertiary"
-					:title="contentDark ? t('souvera_mail', 'Light content background') : t('souvera_mail', 'Dark content background')"
-					:aria-label="contentDark ? t('souvera_mail', 'Light content background') : t('souvera_mail', 'Dark content background')"
-					@click="contentDark = !contentDark">
-					<template #icon>
-						<WeatherNight v-if="!contentDark" :size="20" />
-						<WeatherSunny v-else :size="20" />
-					</template>
-				</NcButton>
 				<NcActions v-if="!readonly" :aria-label="t('souvera_mail', 'More actions')">
 					<template #icon><FolderMove :size="20" /></template>
 					<NcActionButton v-for="mb in moveMailboxes" :key="mb.id">
@@ -46,7 +37,18 @@
 			</div>
 			<div class="email-detail__meta">
 				<span v-if="email.toAddresses">{{ t('souvera_mail', 'To:') }} {{ email.toAddresses }}</span>
-				<span>{{ formatDateTime(email.receivedAt) }}</span>
+				<span class="email-detail__meta-right">
+					<span>{{ formatDateTime(email.receivedAt) }}</span>
+					<NcButton v-if="displayHtml" variant="tertiary" size="small"
+						:title="contentDark ? t('souvera_mail', 'Light content background') : t('souvera_mail', 'Dark content background')"
+						:aria-label="contentDark ? t('souvera_mail', 'Light content background') : t('souvera_mail', 'Dark content background')"
+						@click="contentDark = !contentDark">
+						<template #icon>
+							<WeatherNight v-if="!contentDark" :size="16" />
+							<WeatherSunny v-else :size="16" />
+						</template>
+					</NcButton>
+				</span>
 			</div>
 
 			<div v-if="email.attachments && email.attachments.length > 0" class="email-detail__attachments">
@@ -334,7 +336,7 @@ export default {
 }
 .email-detail__actions { display: flex; gap: 4px; }
 .email-detail__header {
-	margin: 0 -20px 16px -20px;
+	margin: 0 -20px;
 	padding: 14px 20px;
 	background: var(--color-background-hover);
 	border-bottom: 1px solid var(--color-border);
@@ -346,7 +348,8 @@ export default {
 }
 .email-detail__from :deep(.bimi-logo__img) { margin-right: 8px; }
 .email-detail__addr { color: var(--color-text-maxcontrast); margin-left: 6px; font-weight: 400; }
-.email-detail__meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--color-text-maxcontrast); }
+.email-detail__meta { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--color-text-maxcontrast); }
+.email-detail__meta-right { display: flex; align-items: center; gap: 4px; }
 .email-detail__attachments {
 	margin-top: 12px;
 	padding-top: 12px;
