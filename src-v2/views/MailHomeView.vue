@@ -40,7 +40,7 @@
 						:email="email"
 						:active="selectedEmail?.id === email.id"
 						:checked="checkedIds.includes(email.id)"
-						@click="onOpenEmail(email)"
+						@click="openEmailFromList(email)"
 						@dblclick="onOpenEmail(email)"
 						@check="toggleCheck(email.id)"
 						@flag="toggleFlag(email.id)" />
@@ -73,7 +73,9 @@
 
 		<Teleport to="body" :disabled="!fullscreenDetail">
 			<div v-if="selectedEmail" class="mail-detail-panel" :class="{ 'mail-detail-panel--fullscreen': fullscreenDetail, 'mail-detail-panel--focus': focusLayout && !this.isMobile }">
-				<Transition :name="pageTransitionName" :mode="pageTransitionName !== 'none' ? 'out-in' : undefined">
+				<Transition :name="pageTransitionName" :mode="pageTransitionName !== 'none' ? 'out-in' : undefined"
+					:enter-from-class="focusEnterFrom"
+					:leave-to-class="focusLeaveTo">
 					<div :key="selectedEmail.id" class="mail-detail-card">
 						<EmailDetail
 							:email="selectedEmail"
@@ -143,6 +145,7 @@ export default {
 			isMobile: window.innerWidth < 1024,
 			emails: [], emailTotal: 0, offset: 0, limit: 50,
 			loadingMore: false, hasMore: false,
+			navDirection: 0,
 			loadingEmails: false, loadingBody: false,
 			bulkProcessing: false,
 			selectedEmail: null,
@@ -175,6 +178,14 @@ export default {
 		},
 		fullscreenDetail() { return this.isMobile || this.listOnlyLayout || this.focusLayout },
 		pageTransitionName() { return this.focusLayout && !this.isMobile ? 'focus-page' : 'none' },
+		focusEnterFrom() {
+			if (this.navDirection === 0) return ''
+			return this.navDirection > 0 ? 'focus-page-enter-from-next' : 'focus-page-enter-from-prev'
+		},
+		focusLeaveTo() {
+			if (this.navDirection === 0) return ''
+			return this.navDirection > 0 ? 'focus-page-leave-to-next' : 'focus-page-leave-to-prev'
+		},
 		mailIndex() { return this.emails.findIndex(e => e.id === this.selectedEmail?.id) },
 		canPrev() { return this.mailIndex > 0 },
 		canNext() { return this.mailIndex !== -1 && this.mailIndex < this.emails.length - 1 },
@@ -634,7 +645,14 @@ export default {
 			if (!this.selectedEmail || this.emails.length === 0) return
 			const idx = this.emails.findIndex(e => e.id === this.selectedEmail.id)
 			const next = Math.max(0, Math.min(this.emails.length - 1, idx + dir))
-			if (this.emails[next]) this.onOpenEmail(this.emails[next])
+			if (this.emails[next]) {
+				this.navDirection = dir
+				this.onOpenEmail(this.emails[next])
+			}
+		},
+		openEmailFromList(email) {
+			this.navDirection = 0
+			this.onOpenEmail(email)
 		},
 		async startAutoRefresh() {
 			this.stopAutoRefresh()
@@ -843,13 +861,15 @@ body.resize-active { user-select: none; cursor: col-resize; }
 }
 .mail-detail-card { min-height: 100%; }
 
-/* Page-turn: current card flies out to the LEFT, the next one enters from
-   the RIGHT (out-in keeps them sequential). */
+/* Page-turn: direction-aware and pronounced — NEXT flies in from the
+   right while the current one leaves to the left (and vice versa). */
 .focus-page-enter-active, .focus-page-leave-active {
-	transition: transform 0.22s ease, opacity 0.22s ease;
+	transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.3, 1), opacity 0.3s ease;
 }
-.focus-page-enter-from { transform: translateX(70px); opacity: 0; }
-.focus-page-leave-to { transform: translateX(-70px); opacity: 0; }
+.focus-page-enter-from-next { transform: translateX(140px); opacity: 0; }
+.focus-page-leave-to-next { transform: translateX(-140px); opacity: 0; }
+.focus-page-enter-from-prev { transform: translateX(-140px); opacity: 0; }
+.focus-page-leave-to-prev { transform: translateX(140px); opacity: 0; }
 
 .mail-nav-arrows {
 	position: fixed;
