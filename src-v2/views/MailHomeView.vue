@@ -183,6 +183,10 @@ export default {
 	},
 	async mounted() {
 		this._originalTitle = document.title.replace(/^\(\d+\)\s*/, '')
+		try {
+			const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
+			this._remoteAlways = data.remoteImages === 'always'
+		} catch {}
 		if (this.selectedMailbox) await this.loadEmails()
 		this._hotkeys = useHotkeys({
 			k: () => this.navigateEmail(1),

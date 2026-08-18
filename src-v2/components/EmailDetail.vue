@@ -201,7 +201,11 @@ export default {
 	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: this.remoteAlways, contentDark: false } },
 	watch: {
 		// Reset the content theme toggle when switching to another email.
-		'email.id'() { this.contentDark = false },
+		'email.id'() { this.contentDark = false; this.remoteAllowed = this.remoteAlways },
+		// The "Always load remote images" preference may arrive AFTER the
+		// first mail was opened — sync it into the live state so images
+		// that were already blocked get loaded as soon as it arrives.
+		remoteAlways: { immediate: true, handler(v) { if (v) this.remoteAllowed = true } },
 	},
 	computed: {
 		// Convert plain text to displayable HTML (newlines → <br>, safe)
