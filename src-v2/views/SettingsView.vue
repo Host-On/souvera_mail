@@ -80,14 +80,8 @@
 						</div>
 						<NcSelect v-model="remoteImagesOption" :options="remoteImageOptions"
 							label="label" class="setting-select"
-							:clearable="false" />
-					</div>
-					<div class="setting-row">
-						<div>
-							<span class="setting-label">{{ t('souvera_mail', 'Messages per page') }}</span>
-						</div>
-						<NcSelect v-model="messagesPerPageOption" :options="pageSizeOptions"
-							label="label" class="setting-select" :clearable="false" />
+							:clearable="false"
+							@update:modelValue="onRemoteImagesChange" />
 					</div>
 					<div class="setting-row">
 						<div>
@@ -95,7 +89,8 @@
 							<p class="settings-muted">{{ t('souvera_mail', 'Periodically check for new mail. Disabled when set to 0.') }}</p>
 						</div>
 						<NcSelect v-model="autoRefreshOption" :options="autoRefreshOptions"
-							label="label" class="setting-select" :clearable="false" />
+							label="label" class="setting-select" :clearable="false"
+							@update:modelValue="onAutoRefreshChange" />
 					</div>
 					<div class="setting-row">
 						<div>
@@ -609,12 +604,6 @@ export default {
 				{ value: 'always', label: this.t ? this.t('souvera_mail', 'Always load') : 'Always load' },
 			],
 			remoteImagesOption: { value: 'never', label: 'Ask before loading' },
-			pageSizeOptions: [
-				{ value: 25, label: '25' },
-				{ value: 50, label: '50' },
-				{ value: 100, label: '100' },
-			],
-			messagesPerPageOption: { value: 50, label: '50' },
 			verticalLayout: false,
 			listOnlyLayout: false,
 			focusLayout: false,
@@ -771,7 +760,8 @@ export default {
 				// on first load (see loadIdentityOptions).
 				this._pendingGlobalSig = p.signatureHtml || ''
 				this._pendingGlobalSigEnabled = !!p.signatureEnabled
-				if (p.remoteImages === 'always') this.remoteImagesOption = this.remoteImageOptions[1]
+				const ri = this.remoteImageOptions.find(o => o.value === (p.remoteImages || 'never'))
+				if (ri) this.remoteImagesOption = ri
 				this.verticalLayout = p.verticalLayout || false
 				this.listOnlyLayout = p.listOnlyLayout || false
 				this.focusLayout = p.focusLayout || false
@@ -779,8 +769,6 @@ export default {
 				if (ar) this.autoRefreshOption = ar
 				const so = this.soundOptions.find(o => o.value === (p.notificationSound || 'none'))
 				if (so) this.soundOption = so
-				const pp = this.pageSizeOptions.find(o => o.value === p.messagesPerPage)
-				if (pp) this.messagesPerPageOption = pp
 				this._prefsDefaultIdentityId = p.defaultIdentityId || ''
 				this.aliasDisplayNames = p.aliasDisplayNames || {}
 				this.identitySignatures = p.identitySignatures || {}
@@ -1089,6 +1077,20 @@ export default {
 				await axios.put(generateUrl('/apps/souvera_mail/api/v2/shared/position'), { position: above ? 'above' : 'below' })
 				showSuccess(this.t('souvera_mail', 'Shared folder position saved'))
 			} catch (e) { console.error('Shared position save failed', e); showError(this.t('souvera_mail', 'Failed to save')) }
+		},
+		async onRemoteImagesChange(opt) {
+			if (!opt) return
+			try {
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { remoteImages: opt.value })
+				showSuccess(this.t('souvera_mail', 'Saved'))
+			} catch (e) { showError(this.t('souvera_mail', 'Failed to save')) }
+		},
+		async onAutoRefreshChange(opt) {
+			if (!opt) return
+			try {
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { autoRefresh: opt.value })
+				showSuccess(this.t('souvera_mail', 'Saved'))
+			} catch (e) { showError(this.t('souvera_mail', 'Failed to save')) }
 		},
 		async setLayout(mode) {
 			const prev = { verticalLayout: this.verticalLayout, listOnlyLayout: this.listOnlyLayout, focusLayout: this.focusLayout }
