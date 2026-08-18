@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\SouveraMail\Command;
 
 use OCA\SouveraMail\Service\SieveScriptService;
+use OCA\SouveraMail\Service\StalwartAdminService;
 use OCA\SouveraMail\Service\StalwartUserContext;
 use OCP\IUserManager;
 use Symfony\Component\Console\Command\Command;
@@ -26,6 +27,7 @@ class SieveDebug extends Command
     public function __construct(
         private SieveScriptService $sieve,
         private StalwartUserContext $userContext,
+        private StalwartAdminService $stalwart,
         private IUserManager $userManager,
     ) {
         parent::__construct();
@@ -89,6 +91,23 @@ class SieveDebug extends Command
                 $head,
             ));
         }
+        $output->writeln('--- mailboxes (fileinto targets must EXIST) ---');
+        try {
+            $accountId = $this->userContext->resolveAccountId($uid);
+            $bearer = $this->userContext->resolveBearer($uid);
+            $response = $this->stalwart->jmapCall(
+                $bearer,
+                [['Mailbox/get', ['accountId' => $accountId, 'properties' => ['id', 'name', 'role']], 'm0']],
+                ['urn:ietf:params:jmap:mail']
+            );
+            $list = (array) ($this->stalwart->extractMethodResponse($response, 'Mailbox/get')['list'] ?? []);
+            foreach ($list as $mb) {
+                $output->writeln('  - ' . ($mb['name'] ?? '?') . ' (role=' . ($mb['role'] ?? '-') . ')');
+            }
+        } catch (\Throwable $e) {
+            $output->writeln('<error>Mailbox/get failed: ' . $e->getMessage() . '</error>');
+        }
+
         $output->writeln('--- merged main script (what Stalwart executes when active) ---');
         foreach ($result['scripts'] as $s) {
             if (!($s['isMain'] ?? false)) {

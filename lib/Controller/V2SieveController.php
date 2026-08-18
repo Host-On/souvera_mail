@@ -111,10 +111,20 @@ class V2SieveController extends Controller
         $active = (bool) ($payload['active'] ?? true);
 
         try {
+            // Stalwart runs exactly ONE active script per account. The
+            // combined main script owns the activation — enabling or
+            // disabling a single filter MUST go through the merge model,
+            // never through raw single-script activation (that would
+            // silently deactivate every other filter).
+            $disabled = $this->sieve->getDisabledFilters($userId);
             if ($active) {
-                $this->sieve->activateScript($userId, $name);
+                $disabled = \array_values(\array_filter($disabled, fn($n) => $n !== $name));
+            } else {
+                if (!\in_array($name, $disabled, true)) $disabled[] = $name;
             }
-            return new JSONResponse(['success' => true, 'active' => $active]);
+            $this->sieve->setDisabledFilters($userId, $disabled);
+            $result = $this->sieve->rebuildActiveScript($userId);
+            return new JSONResponse(['success' => true, 'active' => $active, 'result' => $result]);
         } catch (\Throwable $e) {
             $this->logger->error('Sieve activate failed: ' . $e->getMessage(), ['exception' => $e]);
             return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
