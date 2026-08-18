@@ -52,6 +52,24 @@ Zusammenfassung von 449 Commits (v0.22.23 – v0.22.34, v1.0.0 – v1.0.173).
 - Codex-Reviews über den gesamten Zeitraum; u. a. behoben: SMTP-Header-Injection, STARTTLS-Downgrade, XSS-Isolation für externe Mails (sandboxed iframe statt v-html), Identity-/Alias-/External-Ownership-Validierung, CSRF-Schutz, Atomarität des Self-Updaters, Sieve-Syntax- und Vacation-Roundtrip-Fehler.
 - Defensives Signatur-Datei-Lesen (kein 500 für einzelne Benutzer mehr).
 
+## [1.2.0] — 2026-08-18 (Release: 1.1.x Polishing → 1.2.0)
+
+### Neue Funktionen
+- Fokus-Leser-Layout (4. Ansicht): zentrierte Leser-Karte über abgedunkelter Liste, richtungsabhängige Blätter-Animation (rein/rechts, raus/links), Pfeil-Buttons + Pfeiltasten zum Durchblättern, 80vh-Mindesthöhe.
+- Infinite Scroll ersetzt die Pagination (automatisches Nachladen von je 50 Mails am Listenende).
+- „Nur Liste"-Layout mit Fullscreen-Detail wie auf Mobile.
+- Entwürfe: ein Entwurf pro Verfassen-Vorgang, Dialog „Entwurf behalten/Verwerfen/Abbrechen" beim Schließen, kein stilles Löschen.
+- Auf/Zu-Zustand von (verschachtelten) Unterordnern wird pro User gespeichert.
+- Sieve: Body-Bedingungen als echter `body`-Test (RFC 5173), regex-Require, Ordner-Dropdown mit vollständigen Hierarchie-Pfaden (INBOX/Unterordner), activate-Endpoint merge-sicher, `occ souvera_mail:sieve:debug <uid>`.
+- Mail-Content: Innenabstände (20/18px), Zeilenumbrüche in plain-HTML-Mails, Lade-Spinner bis Frame gerendert.
+- Mobile: randloses Fullscreen-Detail, Einstellungen gestapelt (Label über Select), Layout-Auswahl 2x2.
+
+### Behoben
+- Externe Bilder + Auto-Refresh speichern jetzt wirklich (fehlende Save-Handler); Layout-Picker wartet auf geladene Prefs (kein Flackern).
+- Signatur-Icon nicht mehr weiß-auf-weiß; Einstellungsänderungen wirken live im Hintergrund.
+- Self-Updater-Heal deckt Migrations-Klassen ab; Wizard zeigt echte HTTP-Fehler.
+- Diverse Deadlocks/Races im Mail-Detail-Rendering und beim Nachladen behoben.
+
 ## [Unreleased]
 
 ## [0.22.22] — 2026-08-01 (Release-Zusammenfassung: 2026-07-11 bis 2026-08-01)
