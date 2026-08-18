@@ -145,17 +145,24 @@
 		</NcDialog>
 
 		<div class="email-detail__body">
-			<div v-if="loading || (displayHtml && !frameReady)" class="email-detail__loading">
+			<div v-if="loading && !displayHtml" class="email-detail__loading">
 				<NcLoadingIcon :size="52" />
 			</div>
-			<HtmlMailFrame v-else-if="displayHtml"
-				:html="displayHtml"
-				:attachments="email.attachments || []"
-				:remote-allowed="remoteAllowed"
-				:dark-mode="contentDark"
-				@mailto="$emit('mailto', $event)"
-				@blocked="onBlocked"
-				@load="frameReady = true" />
+			<div v-else-if="displayHtml" class="email-detail__frame-wrap">
+				<!-- The frame MUST stay mounted while the spinner overlays it —
+				     otherwise it can never emit 'load' (deadlock). -->
+				<div v-if="loading || !frameReady" class="email-detail__loading email-detail__loading--overlay">
+					<NcLoadingIcon :size="52" />
+				</div>
+				<HtmlMailFrame
+					:html="displayHtml"
+					:attachments="email.attachments || []"
+					:remote-allowed="remoteAllowed"
+					:dark-mode="contentDark"
+					@mailto="$emit('mailto', $event)"
+					@blocked="onBlocked"
+					@load="frameReady = true" />
+			</div>
 			<pre v-else-if="displayPlain" class="email-detail__plaintext">{{ displayPlain }}</pre>
 			<NcNoteCard v-else type="warning" class="email-detail__blocked">
 				{{ t('souvera_mail', 'This message has no content or could not be loaded.') }}
@@ -385,6 +392,15 @@ export default {
 .email-detail__body { line-height: 1.7; word-break: break-word; margin: 0; }
 .email-body-text { white-space: pre-wrap; }
 .email-detail__loading { display: flex; justify-content: center; padding: 48px; }
+.email-detail__frame-wrap { position: relative; min-height: 200px; }
+.email-detail__loading--overlay {
+	position: absolute;
+	inset: 0;
+	align-items: flex-start;
+	padding-top: 48px;
+	background: var(--color-main-background);
+	z-index: 2;
+}
 .email-detail__empty { color: var(--color-text-maxcontrast); text-align: center; padding: 48px; }
 .email-detail__blocked { margin-top: 10px; }
 .email-detail__plaintext { white-space: pre-wrap; font-family: monospace; font-size: 13px; line-height: 1.5; padding: 16px; }
