@@ -1275,7 +1275,7 @@ export default {
 .setting-select { min-width: 180px; }
 .setting-row__sound { display: flex; align-items: center; gap: 6px; }
 
-.layout-options { display: flex; gap: 12px; }
+.layout-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .layout-option {
 	flex: 1; cursor: pointer;
 	border: 2px solid var(--color-border);
@@ -1440,7 +1440,7 @@ export default {
 	.setting-row { flex-direction: column; align-items: stretch; gap: 4px; }
 	.setting-row > div { width: 100%; }
 	.setting-select { min-width: 0; width: 100%; }
-	.layout-options { flex-direction: column; }
+	.layout-options { grid-template-columns: 1fr; }
 }
 
 </style>
