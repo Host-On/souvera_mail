@@ -315,10 +315,10 @@ export default {
 </script>
 
 <style scoped>
-.email-detail { padding: 20px 20px 0 20px; }
+.email-detail { padding: 0; }
 .email-detail__toolbar {
 	display: flex; justify-content: space-between; align-items: center;
-	padding: 8px 12px; margin: -20px -20px 0 -20px;
+	padding: 8px 12px;
 	background: var(--color-background-dark);
 	border-bottom: 1px solid var(--color-border);
 }
@@ -336,7 +336,6 @@ export default {
 }
 .email-detail__actions { display: flex; gap: 4px; }
 .email-detail__header {
-	margin: 0 -20px;
 	padding: 14px 20px;
 	background: var(--color-background-hover);
 	border-bottom: 1px solid var(--color-border);
@@ -373,7 +372,7 @@ export default {
 }
 .attachment-chip__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; font-size: 13px; }
 .attachment-chip__size { font-size: 11px; color: var(--color-text-maxcontrast); white-space: nowrap; margin-left: 4px; }
-.email-detail__body { line-height: 1.7; word-break: break-word; margin: 0 -20px; }
+.email-detail__body { line-height: 1.7; word-break: break-word; margin: 0; }
 .email-body-text { white-space: pre-wrap; }
 .email-detail__loading { display: flex; justify-content: center; padding: 48px; }
 .email-detail__empty { color: var(--color-text-maxcontrast); text-align: center; padding: 48px; }

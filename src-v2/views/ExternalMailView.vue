@@ -233,5 +233,5 @@ export default {
 .ext-view__list { overflow-y: auto; border-right: 1px solid var(--color-border); }
 .ext-view__loading { padding: 16px; color: var(--color-text-maxcontrast); }
 .ext-view__pager { display: flex; justify-content: center; gap: 8px; padding: 12px; }
-.ext-view__detail { overflow-y: auto; padding: 16px; }
+.ext-view__detail { overflow-y: auto; padding: 0; }
 </style>

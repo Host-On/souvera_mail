@@ -1375,4 +1375,13 @@ export default {
 	background: var(--color-main-background); color: var(--color-main-text);
 	font-size: 13px;
 }
+
+
+@media (max-width: 768px) {
+	.setting-row { flex-direction: column; align-items: stretch; gap: 4px; }
+	.setting-row > div { width: 100%; }
+	.setting-select { min-width: 0; width: 100%; }
+	.layout-options { flex-direction: column; }
+}
+
 </style>

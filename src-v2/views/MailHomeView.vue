@@ -709,22 +709,7 @@ body.resize-active { user-select: none; cursor: col-resize; }
 	overflow-x: hidden;
 	animation: mail-detail-slide-in 0.18s ease-out;
 }
-/* True edge-to-edge: drop the EmailDetail side padding in fullscreen AND
-   neutralize its negative side margins (they existed to cancel the padding)
-   so nothing is clipped at the viewport edges. */
-.mail-detail-panel--fullscreen :deep(.email-detail) {
-	padding: 0;
-}
-.mail-detail-panel--fullscreen :deep(.email-detail__toolbar) {
-	margin: 0;
-}
-.mail-detail-panel--fullscreen :deep(.email-detail__header) {
-	margin: 0;
-}
-.mail-detail-panel--fullscreen :deep(.email-detail__body) {
-	margin: 0;
-}
-.mail-home--mobile.mail-home--detail-open .mail-resize-handle { display: none; }
+/* EmailDetail is edge-to-edge by default now (padding/margins removed globally) — the fullscreen overlay needs no extra overrides. */
 @keyframes mail-detail-slide-in {
 	from { transform: translateX(100%); }
 	to { transform: translateX(0); }
