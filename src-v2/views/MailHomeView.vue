@@ -826,7 +826,8 @@ body.resize-active { user-select: none; cursor: col-resize; }
 .mail-detail-panel--focus :deep(.email-detail) {
 	max-width: 1060px;
 	margin: 0 auto;
-	min-height: 100%;
+	/* Even short mails get a substantial card — never a tiny sliver. */
+	min-height: 80vh;
 	background: var(--color-main-background);
 	border-radius: 10px;
 	box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3);
