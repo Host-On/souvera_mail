@@ -32,7 +32,7 @@ export default {
 		// true = dark (for emails that are unreadable in the current mode).
 		darkMode: { type: Boolean, default: false },
 	},
-	emits: ['mailto', 'blocked'],
+	emits: ['mailto', 'blocked', 'load'],
 	data() {
 		return {
 			// Do NOT shadow the remoteAllowed prop — the parent controls it
@@ -79,6 +79,7 @@ export default {
 			this.frameKey++
 		},
 		onFrameLoad() {
+			this.$emit('load')
 			const doc = this.$refs.frame?.contentDocument
 			if (!doc) return
 

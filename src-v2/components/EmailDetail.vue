@@ -145,7 +145,7 @@
 		</NcDialog>
 
 		<div class="email-detail__body">
-			<div v-if="loading" class="email-detail__loading">
+			<div v-if="loading || (displayHtml && !frameReady)" class="email-detail__loading">
 				<NcLoadingIcon :size="52" />
 			</div>
 			<HtmlMailFrame v-else-if="displayHtml"
@@ -154,7 +154,8 @@
 				:remote-allowed="remoteAllowed"
 				:dark-mode="contentDark"
 				@mailto="$emit('mailto', $event)"
-				@blocked="onBlocked" />
+				@blocked="onBlocked"
+				@load="frameReady = true" />
 			<pre v-else-if="displayPlain" class="email-detail__plaintext">{{ displayPlain }}</pre>
 			<NcNoteCard v-else type="warning" class="email-detail__blocked">
 				{{ t('souvera_mail', 'This message has no content or could not be loaded.') }}
@@ -201,10 +202,12 @@ export default {
 		readonly: { type: Boolean, default: false },
 	},
 	emits: ['close', 'reply', 'replyAll', 'forward', 'delete', 'move', 'mailto'],
-	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: this.remoteAlways, contentDark: false } },
+	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: this.remoteAlways, contentDark: false, frameReady: false } },
 	watch: {
 		// Reset the content theme toggle when switching to another email.
-		'email.id'() { this.contentDark = false; this.remoteAllowed = this.remoteAlways },
+		'email.id'() { this.contentDark = false; this.remoteAllowed = this.remoteAlways; this.frameReady = false },
+		htmlBody() { this.frameReady = false },
+		plainBody() { this.frameReady = false },
 		// The "Always load remote images" preference may arrive AFTER the
 		// first mail was opened — sync it into the live state so images
 		// that were already blocked get loaded as soon as it arrives.
