@@ -1166,6 +1166,7 @@ export default {
 				const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/mailboxes'), body)
 				this.userFoldersList.push({ id: data.id, name, parentId: this.newSubfolderParentId || null })
 				this.showCreateFolder = false; this.newFolderName = ''; this.newSubfolderParentId = null
+				window.dispatchEvent(new CustomEvent('souvera-mail:refresh-mailboxes'))
 				showSuccess(this.t('souvera_mail', 'Folder created'))
 			} catch (e) { console.error('Folder create failed', e); showError(this.t('souvera_mail', 'Failed to create folder')) }
 		},
@@ -1184,6 +1185,7 @@ export default {
 			try {
 				await axios.delete(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + id))
 				this.userFoldersList = this.userFoldersList.filter(f => f.id !== id)
+				window.dispatchEvent(new CustomEvent('souvera-mail:refresh-mailboxes'))
 				showSuccess(this.t('souvera_mail', 'Folder deleted'))
 			} catch (e) { console.error('Folder delete failed', e); showError(this.t('souvera_mail', 'Failed to delete folder')) }
 		},
@@ -1210,6 +1212,7 @@ export default {
 			try {
 				await axios.put(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + id), { parentId: target.id })
 				moved.parentId = target.id
+				window.dispatchEvent(new CustomEvent('souvera-mail:refresh-mailboxes'))
 				showSuccess(this.t('souvera_mail', 'Folder moved'))
 			} catch (e) { console.error('Folder move failed', e); showError(this.t('souvera_mail', 'Failed to move folder')) }
 		},

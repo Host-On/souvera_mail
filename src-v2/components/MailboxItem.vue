@@ -1,5 +1,6 @@
 <template>
 	<div
+		:style="{ paddingLeft: (depth * 10) + 'px' }"
 		@dragover.prevent="onDragOver"
 		@dragleave="onDragLeave"
 		@drop.prevent="onDrop">

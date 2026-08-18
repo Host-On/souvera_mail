@@ -37,7 +37,7 @@
 						</NcAppNavigationItem>
 						<template v-if="!isGroupCollapsed(group.accountId)">
 							<MailboxItem v-for="mp in group.roots" :key="mp.id"
-								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
+								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="1"
 								account-scoped
 								@select="onSharedSelect(mp._accountId, $event)"
 								@drop-email="onDropEmail" />
@@ -103,7 +103,7 @@
 						</NcAppNavigationItem>
 						<template v-if="!isGroupCollapsed(group.accountId)">
 							<MailboxItem v-for="mp in group.roots" :key="mp.id"
-								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="0"
+								:mailbox="mp" :all-mailboxes="sharedMailboxes" :selected="selectedMailbox" :depth="1"
 								account-scoped
 								@select="onSharedSelect(mp._accountId, $event)"
 								@drop-email="onDropEmail" />
@@ -279,13 +279,9 @@ export default {
 		async onRefreshMailboxes() {
 			try {
 				this.mailboxes = await fetchMailboxes()
-				if (this.sharedFolders.length > 0) {
-					const allShared = []
-					for (const sh of this.sharedFolders) {
-						try { allShared.push(...(await fetchMailboxes(sh.id))) } catch {}
-					}
-					this.sharedMailboxes = allShared
-				}
+				// Reload the shared accounts fully — settings may have
+				// changed the shared position or the account list.
+				await this.loadShared()
 			} catch(e) { console.error(e) }
 		},
 		onMailboxSelect(id) {
