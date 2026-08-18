@@ -16,9 +16,9 @@
 <script>
 import { sanitizeMailHtml } from '../utils/mailSanitizer.js'
 
-const BASE_CSS_LIGHT = `:root{color-scheme:light}html,body{margin:0;padding:0}body{background:#fff;color:#222;padding:30px 18px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;word-break:break-word;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}blockquote{margin:0 0 0 8px;padding-left:12px;border-left:2px solid #c9c9c9;color:#555}a{color:#0b6cbd}td[height],table[height]{height:auto!important}`
+const BASE_CSS_LIGHT = `:root{color-scheme:light}html,body{margin:0;padding:0}body{background:#fff;color:#222;padding:20px 18px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;word-break:break-word;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}blockquote{margin:0 0 0 8px;padding-left:12px;border-left:2px solid #c9c9c9;color:#555}a{color:#0b6cbd}td[height],table[height]{height:auto!important}`
 
-const BASE_CSS_DARK = `:root{color-scheme:dark}html,body{margin:0;padding:0}body{background:#1e2227;color:#d8dee4;padding:30px 18px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;word-break:break-word;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}blockquote{margin:0 0 0 8px;padding-left:12px;border-left:2px solid #4a5058;color:#9aa5b1}a{color:#4da3ff}td[height],table[height]{height:auto!important}`
+const BASE_CSS_DARK = `:root{color-scheme:dark}html,body{margin:0;padding:0}body{background:#1e2227;color:#d8dee4;padding:20px 18px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;word-break:break-word;overflow-wrap:anywhere}img{max-width:100%;height:auto}table{max-width:100%}pre{white-space:pre-wrap}blockquote{margin:0 0 0 8px;padding-left:12px;border-left:2px solid #4a5058;color:#9aa5b1}a{color:#4da3ff}td[height],table[height]{height:auto!important}`
 
 export default {
 	name: 'HtmlMailFrame',
