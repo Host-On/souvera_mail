@@ -15,6 +15,15 @@
 				<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Forward')" @click="$emit('forward')">
 					<template #icon><Forward :size="20" /></template>
 				</NcButton>
+				<NcButton v-if="displayHtml" variant="tertiary"
+					:title="contentDark ? t('souvera_mail', 'Light content background') : t('souvera_mail', 'Dark content background')"
+					:aria-label="contentDark ? t('souvera_mail', 'Light content background') : t('souvera_mail', 'Dark content background')"
+					@click="contentDark = !contentDark">
+					<template #icon>
+						<WeatherNight v-if="!contentDark" :size="20" />
+						<WeatherSunny v-else :size="20" />
+					</template>
+				</NcButton>
 				<NcActions v-if="!readonly" :aria-label="t('souvera_mail', 'More actions')">
 					<template #icon><FolderMove :size="20" /></template>
 					<NcActionButton v-for="mb in moveMailboxes" :key="mb.id">
@@ -134,16 +143,6 @@
 		</NcDialog>
 
 		<div class="email-detail__body">
-			<div v-if="displayHtml" class="email-detail__theme-toggle">
-				<NcButton variant="tertiary" size="small"
-					:title="contentDark ? t('souvera_mail', 'Light content background') : t('souvera_mail', 'Dark content background')"
-					@click="contentDark = !contentDark">
-					<template #icon>
-						<WeatherNight v-if="!contentDark" :size="16" />
-						<WeatherSunny v-else :size="16" />
-					</template>
-				</NcButton>
-			</div>
 			<HtmlMailFrame v-if="displayHtml"
 				:html="displayHtml"
 				:attachments="email.attachments || []"
@@ -372,10 +371,6 @@ export default {
 .attachment-chip__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px; font-size: 13px; }
 .attachment-chip__size { font-size: 11px; color: var(--color-text-maxcontrast); white-space: nowrap; margin-left: 4px; }
 .email-detail__body { line-height: 1.7; word-break: break-word; margin: 0 -20px; }
-.email-detail__theme-toggle {
-	display: flex; justify-content: flex-end;
-	padding: 0 20px 4px 20px;
-}
 .email-body-text { white-space: pre-wrap; }
 .email-detail__loading { display: flex; justify-content: center; padding: 48px; }
 .email-detail__empty { color: var(--color-text-maxcontrast); text-align: center; padding: 48px; }
