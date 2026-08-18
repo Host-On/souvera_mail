@@ -1328,7 +1328,14 @@ export default {
 .identity-row { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 6px; background: var(--color-background-dark); }
 .identity-row__default { flex-shrink: 0; }
 .identity-row__star--active { color: var(--color-primary-element); fill: var(--color-primary-element); }
-.identity-row__sig--active { color: var(--color-success); }
+/* The active signature icon must stay visible in every theme — force the
+   color on the SVG itself, otherwise NcButton's icon styles can override
+   the class (white-on-white in light mode). */
+.identity-row__sig--active,
+.identity-row__sig--active :deep(svg) {
+	color: var(--color-primary-element) !important;
+	fill: var(--color-primary-element) !important;
+}
 .identity-row__info { flex: 1; min-width: 0; }
 .identity-row__email { font-weight: 600; font-size: 13px; }
 .identity-row__name { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-maxcontrast); margin-top: 2px; }
