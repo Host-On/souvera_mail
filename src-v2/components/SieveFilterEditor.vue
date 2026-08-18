@@ -213,12 +213,16 @@ export default {
 		buildSieve() {
 			const lines = []
 			const needed = new Set()
+			const conds = this.conditions.filter(c => c.field && c.value)
 			if (this.actions.some(a => a.type === 'move')) needed.add('"fileinto"')
 			if (this.actions.some(a => a.type === 'markread' || a.type === 'markflag')) needed.add('"imap4flags"')
+			// `body` conditions are NOT header tests — they need the
+			// "body" extension; `:regex` needs the "regex" extension.
+			if (conds.some(c => c.field === 'body')) needed.add('"body"')
+			if (conds.some(c => c.operator === 'regex')) needed.add('"regex"')
 			if (needed.size > 0) lines.push(`require [${[...needed].join(', ')}];`)
 			lines.push('')
 
-			const conds = this.conditions.filter(c => c.field && c.value)
 			if (conds.length === 0) return ''
 
 			const op = this.matchType === 'all' ? 'allof' : 'anyof'
@@ -229,6 +233,9 @@ export default {
 				else if (c.operator === 'ends') { op = ':matches'; val = `"*${this.escapeRegex(val)}"` }
 				else if (c.operator === 'regex') { op = ':regex'; val = `"${val}"` }
 				else { val = `"${val}"` }
+				// Body content is matched via the `body` test (RFC 5173),
+				// never via a pseudo header named "body".
+				if (c.field === 'body') return `body ${op} ${val}`
 				return `header ${op} "${c.field}" ${val}`
 			})
 
@@ -252,15 +259,17 @@ export default {
 			try {
 				const m = body.match(/if ((?:allof|anyof)\s*\(|header\s+\S+\s+"([^"]+)"\s+"([^"]*)"\s*)/s)
 				if (m) { this.matchType = (m[0] && m[0].includes('allof')) ? 'all' : 'any' }
-				const re = /header\s+(:contains|:is|:matches|:regex)\s+"([^"]+)"\s+"([^"]+)"/g
+				const re = /(header|body)\s+(:contains|:is|:matches|:regex)\s+"([^"]+)"\s+"([^"]+)"/g
 				let h; while ((h = re.exec(body)) !== null) {
 					let op = 'contains'
-					if (h[1] === ':is') op = 'equals'
-					else if (h[1] === ':regex') op = 'regex'
-					else if (h[1] === ':matches') {
-						const v = h[3]; if (v.endsWith('*"') && !v.startsWith('"*')) op = 'starts'; else if (v.startsWith('"*') && !v.endsWith('*"')) op = 'ends'
+					if (h[2] === ':is') op = 'equals'
+					else if (h[2] === ':regex') op = 'regex'
+					else if (h[2] === ':matches') {
+						const v = h[4]; if (v.endsWith('*"') && !v.startsWith('"*')) op = 'starts'; else if (v.startsWith('"*') && !v.endsWith('*"')) op = 'ends'
 					}
-					this.conditions.push({ field: h[2], operator: op, value: h[3].replace(/^"|"$/g, '').replace(/^\*|\*$/g, '') })
+					const field = h[1] === 'body' ? 'body' : h[3]
+					const value = (h[1] === 'body' ? h[4] : h[4]).replace(/^"|"$/g, '').replace(/^\*|\*$/g, '')
+					this.conditions.push({ field, operator: op, value })
 				}
 				if (this.conditions.length === 0) this.conditions = [{ field: 'subject', operator: 'contains', value: '' }]
 				if (body.includes('fileinto')) this.actions.push({ type: 'move', value: (body.match(/fileinto\s+"([^"]+)"/) || [])[1] || '' })
