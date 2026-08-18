@@ -165,13 +165,13 @@ export default {
 	name: 'MailV2App',
 	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, LanConnect, MailboxItem, QuotaDonut, ContactPicker },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], extFolders: {}, extFoldersLoading: {}, extExpanded: {}, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, mailArchiveEnabled: false, showContactPicker: false, navCollapsedGroups: [] }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], extFolders: {}, extFoldersLoading: {}, extExpanded: {}, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, listOnlyLayout: false, _responsiveVertical: false, mailArchiveEnabled: false, showContactPicker: false, navCollapsedGroups: [] }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },		systemFolders() { return this.mailboxes.filter(m => SYSTEM_ROLES.includes(m.role)).sort((a,b) => (ROLE_ORDER[a.role]??99) - (ROLE_ORDER[b.role]??99)) },
 		routeProps() {
 			if (this.$route.name === 'inbox') {
-				return { selectedMailbox: this.selectedMailbox, allMailboxes: [...this.mailboxes, ...this.sharedMailboxes], verticalLayout: this._responsiveVertical || this.isVertical }
+				return { selectedMailbox: this.selectedMailbox, allMailboxes: [...this.mailboxes, ...this.sharedMailboxes], verticalLayout: this._responsiveVertical || this.isVertical, listOnlyLayout: this.listOnlyLayout && !this._responsiveVertical }
 			}
 			return {}
 		},
@@ -354,6 +354,7 @@ export default {
 				
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
 				this.isVertical = data.verticalLayout || false
+				this.listOnlyLayout = !!data.listOnlyLayout
 				this.navCollapsedGroups = data.navCollapsedGroups || []
 				this.mailArchiveEnabled = !!data.mailArchiveEnabled
 			} catch (e) { console.error('Failed to load layout pref', e) }

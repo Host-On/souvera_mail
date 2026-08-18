@@ -2,6 +2,7 @@
 	<div class="mail-home"
 		:class="{
 			'mail-home--vertical': verticalLayout,
+			'mail-home--list-only': listOnlyLayout,
 			'mail-home--mobile': isMobile,
 			'mail-home--detail-open': isMobile && selectedEmail,
 		}">
@@ -40,6 +41,7 @@
 						:active="selectedEmail?.id === email.id"
 						:checked="checkedIds.includes(email.id)"
 						@click="onOpenEmail(email)"
+						@dblclick="onOpenEmail(email)"
 						@check="toggleCheck(email.id)"
 						@flag="toggleFlag(email.id)" />
 				</div>
@@ -61,17 +63,17 @@
 			</NcEmptyContent>
 		</div>
 
-		<div v-if="selectedEmail && !verticalLayout" class="mail-resize-handle mail-resize-handle--h"
+		<div v-if="selectedEmail && !verticalLayout && !fullscreenDetail" class="mail-resize-handle mail-resize-handle--h"
 			@mousedown.prevent="onResizeStart($event, 'horizontal')">
 			<div class="mail-resize-handle__grip" />
 		</div>
-		<div v-if="selectedEmail && verticalLayout" class="mail-resize-handle mail-resize-handle--v"
+		<div v-if="selectedEmail && verticalLayout && !fullscreenDetail" class="mail-resize-handle mail-resize-handle--v"
 			@mousedown.prevent="onResizeStart($event, 'vertical')">
 			<div class="mail-resize-handle__grip" />
 		</div>
 
-		<Teleport to="body" :disabled="!isMobile">
-			<div v-if="selectedEmail" class="mail-detail-panel" :class="{ 'mail-detail-panel--fullscreen': isMobile }">
+		<Teleport to="body" :disabled="!fullscreenDetail">
+			<div v-if="selectedEmail" class="mail-detail-panel" :class="{ 'mail-detail-panel--fullscreen': fullscreenDetail }">
 				<EmailDetail
 					:email="selectedEmail"
 					:html-body="emailBodyHtml"
@@ -89,7 +91,7 @@
 			</div>
 		</Teleport>
 
-		<NcEmptyContent v-if="!selectedEmail && !isMobile" :name="t('souvera_mail', 'Select a message')"
+		<NcEmptyContent v-if="!selectedEmail && !fullscreenDetail" :name="t('souvera_mail', 'Select a message')"
 			class="mail-detail-empty">
 			<template #icon><EmailOutline :size="64" /></template>
 		</NcEmptyContent>
@@ -119,6 +121,7 @@ export default {
 		selectedMailbox: { type: String, default: '' },
 		allMailboxes: { type: Array, default: () => [] },
 		verticalLayout: { type: Boolean, default: false },
+		listOnlyLayout: { type: Boolean, default: false },
 	},
 	data() {
 		return {
@@ -154,7 +157,9 @@ export default {
 		moveMailboxes() {
 			return this.allMailboxes.filter(m => m.role !== 'trash' && m.role !== 'junk')
 		},
+		fullscreenDetail() { return this.isMobile || this.listOnlyLayout },
 		panelStyle() {
+			if (this.listOnlyLayout) return {}
 			if (this.verticalLayout) {
 				// Mobile: list takes full height (detail is a full-screen
 				// overlay when an email is open).
@@ -174,6 +179,7 @@ export default {
 		// Lock the body scroll while the fullscreen mobile detail overlay
 		// is open (SnappyMail-style reading mode).
 		isMobile() { this.syncBodyScrollLock() },
+		listOnlyLayout() { this.syncBodyScrollLock() },
 		selectedEmail() { this.syncBodyScrollLock() },
 	},
 	async mounted() {
@@ -246,7 +252,7 @@ export default {
 	},
 	methods: {
 		syncBodyScrollLock() {
-			if (this.isMobile && this.selectedEmail) {
+			if (this.fullscreenDetail && this.selectedEmail) {
 				document.body.classList.add('souvera-mobile-detail-open')
 			} else {
 				document.body.classList.remove('souvera-mobile-detail-open')
@@ -467,6 +473,11 @@ export default {
 			this.bulkProcessing = false
 		},
 		async onOpenEmail(email) {
+			// A double-click fires click,click,dblclick — only the FIRST
+			// open for the same email does any work. A previously FAILED
+			// load (no content, not loading) still retries on re-click.
+			if (this.selectedEmail?.id === email.id
+				&& (this.loadingBody || this.emailBodyHtml || this.emailBodyPlain)) return
 			this.selectedEmail = email
 			this.emailBodyHtml = ''; this.emailBodyPlain = ''; this.loadingBody = true
 			const wasUnread = !email.isRead
@@ -687,6 +698,7 @@ export default {
 .mail-resize-handle--v:hover { opacity: 0.5; }
 body.resize-active { user-select: none; cursor: col-resize; }
 
+.mail-home--list-only .mail-list-panel { width: 100% !important; flex: 1; border-right: none; max-height: 100%; }
 /* ── Mobile (<1024px): full-screen detail overlay, SnappyMail-style ── */
 .mail-home--mobile .mail-resize-handle { display: none; }
 .mail-home--mobile.mail-home--vertical .mail-list-panel { max-height: 100%; }

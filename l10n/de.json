@@ -539,6 +539,7 @@
         "Testing…": "Prüfe…",
         "This password is only shown once. Save it now.": "Dieses Passwort wird nur einmal angezeigt. Jetzt speichern.",
         "Username": "Benutzername",
-        "Your previous signature was moved to the identity": "Deine bisherige Signatur wurde auf die Identität übertragen"
+        "Your previous signature was moved to the identity": "Deine bisherige Signatur wurde auf die Identität übertragen",
+        "List only": "Nur Liste"
     }
 }

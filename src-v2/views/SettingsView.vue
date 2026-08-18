@@ -41,8 +41,8 @@
 						<span class="setting-label">{{ t('souvera_mail', 'Layout') }}</span>
 					</div>
 					<div class="layout-options">
-						<label class="layout-option" :class="{ 'layout-option--active': !verticalLayout }"
-							@click="setVerticalLayout(false)">
+						<label class="layout-option" :class="{ 'layout-option--active': !verticalLayout && !listOnlyLayout }"
+							@click="setLayout('split')">
 							<div class="layout-preview layout-preview--horizontal">
 								<div class="layout-preview__sidebar"></div>
 								<div class="layout-preview__detail"></div>
@@ -50,12 +50,19 @@
 							<span class="layout-option__label">{{ t('souvera_mail', 'Side by side') }}</span>
 						</label>
 						<label class="layout-option" :class="{ 'layout-option--active': verticalLayout }"
-							@click="setVerticalLayout(true)">
+							@click="setLayout('vertical')">
 							<div class="layout-preview layout-preview--vertical">
 								<div class="layout-preview__sidebar"></div>
 								<div class="layout-preview__detail"></div>
 							</div>
 							<span class="layout-option__label">{{ t('souvera_mail', 'List above, detail below') }}</span>
+						</label>
+						<label class="layout-option" :class="{ 'layout-option--active': listOnlyLayout }"
+							@click="setLayout('list')">
+							<div class="layout-preview layout-preview--list">
+								<div class="layout-preview__sidebar"></div>
+							</div>
+							<span class="layout-option__label">{{ t('souvera_mail', 'List only') }}</span>
 						</label>
 					</div>
 					<div class="setting-row">
@@ -601,6 +608,7 @@ export default {
 			],
 			messagesPerPageOption: { value: 50, label: '50' },
 			verticalLayout: false,
+			listOnlyLayout: false,
 			autoRefreshOptions: [
 				{ value: 0, label: 'Off' },
 				{ value: 30, label: '30s' },
@@ -756,6 +764,7 @@ export default {
 				this._pendingGlobalSigEnabled = !!p.signatureEnabled
 				if (p.remoteImages === 'always') this.remoteImagesOption = this.remoteImageOptions[1]
 				this.verticalLayout = p.verticalLayout || false
+				this.listOnlyLayout = p.listOnlyLayout || false
 				const ar = this.autoRefreshOptions.find(o => o.value === (p.autoRefresh || 60))
 				if (ar) this.autoRefreshOption = ar
 				const so = this.soundOptions.find(o => o.value === (p.notificationSound || 'none'))
@@ -1071,9 +1080,15 @@ export default {
 				showSuccess(this.t('souvera_mail', 'Shared folder position saved'))
 			} catch (e) { console.error('Shared position save failed', e); showError(this.t('souvera_mail', 'Failed to save')) }
 		},
-		async setVerticalLayout(val) {
-			this.verticalLayout = val
-			try { await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { verticalLayout: val }) } catch {}
+		async setLayout(mode) {
+			this.verticalLayout = mode === 'vertical'
+			this.listOnlyLayout = mode === 'list'
+			try {
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), {
+					verticalLayout: this.verticalLayout,
+					listOnlyLayout: this.listOnlyLayout,
+				})
+			} catch {}
 			window.location.reload()
 		},
 		async onSoundChange(val) {
@@ -1251,6 +1266,7 @@ export default {
 .layout-preview--horizontal .layout-preview__detail { flex: 1; background: var(--color-main-background); border: 1px solid var(--color-border); border-left: none; }
 
 .layout-preview--vertical { flex-direction: column; }
+.layout-preview--list .layout-preview__sidebar { flex: 1; background: var(--color-background-dark); }
 .layout-preview--vertical .layout-preview__sidebar { height: 35%; background: var(--color-background-dark); border-bottom: 2px solid var(--color-border); }
 .layout-preview--vertical .layout-preview__detail { flex: 1; background: var(--color-main-background); border: 1px solid var(--color-border); border-top: none; }
 
