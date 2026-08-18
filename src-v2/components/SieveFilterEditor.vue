@@ -164,9 +164,27 @@ export default {
 	},
 	computed: {
 		mailboxOptions() {
+			// fileinto needs the FULL hierarchy path ("INBOX/Bloonix") —
+			// a leaf name alone would resolve against the root and miss
+			// subfolders. Build the path from the parentId chain.
+			const byId = new Map((this.mailboxes || []).map(m => [m.id, m]))
+			const fullPath = (m) => {
+				const leaf = (name) => String(name || '').split('/').pop() || ''
+				const parts = [leaf(m.name)]
+				let cur = m
+				let guard = 0
+				while (cur && cur.parentId && byId.has(cur.parentId) && guard++ < 20) {
+					cur = byId.get(cur.parentId)
+					if (leaf(cur.name)) parts.unshift(leaf(cur.name))
+				}
+				return parts.filter(Boolean).join('/')
+			}
 			return this.mailboxes
 				.filter(m => m.role !== 'trash' && m.role !== 'junk')
-				.map(m => ({ value: m.name, label: m.name }))
+				.map(m => {
+					const path = fullPath(m)
+					return { value: path, label: path }
+				})
 		},
 		generatedSieve() { return this.buildSieve() },
 	},
