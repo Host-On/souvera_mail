@@ -30,7 +30,7 @@
 				:collapsed-ids="collapsedIds"
 				@select="$emit('select', $event)"
 				@drop-email="$emit('dropEmail', $event)"
-				@toggle-collapse="$emit('toggle-collapse', $event[0], $event[1])" />
+				@toggle-collapse="onChildToggle" />
 		</template>
 	</NcAppNavigationItem>
 	</div>
@@ -98,6 +98,11 @@ export default {
 		},
 	},
 	methods: {
+		onChildToggle(id, collapsed) {
+			// Forward BOTH arguments — inline $emit with $event[0]/[1] only
+			// passes the first argument in Vue 3 templates.
+			this.$emit('toggle-collapse', id, collapsed)
+		},
 		onDragOver() { this.dragOver = true },
 		onDragLeave() { this.dragOver = false },
 		onDrop(e) {
