@@ -682,8 +682,8 @@ export default {
 .compose-layout__header { padding: 10px 16px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
 .compose-layout__header h3 { margin: 0; font-size: 15px; font-weight: 600; }
 .compose-modal--fullscreen :deep(.modal-container) { max-width: calc(100vw - 32px) !important; max-height: calc(100vh - 32px) !important; width: calc(100vw - 32px) !important; }
-/* Narrower compose window by default */
-.compose-modal :deep(.modal-container) { max-width: 640px !important; }
+/* Generous compose window — wide enough for comfortable writing. */
+.compose-modal :deep(.modal-container) { max-width: 920px !important; width: calc(100vw - 32px) !important; }
 
 /* Compact single-line rows for From/To/Cc/Bcc/Subject — Thunderbird style */
 .compose-row {
