@@ -70,24 +70,26 @@
 			<div class="mail-resize-handle__grip" />
 		</div>
 
-		<div v-if="selectedEmail" class="mail-detail-panel">
-			<EmailDetail
-				:email="selectedEmail"
-				:html-body="emailBodyHtml"
-				:plain-body="emailBodyPlain"
-				:loading="loadingBody"
-				:mailboxes="allMailboxes"
-				:remote-always="_remoteAlways"
-				@close="selectedEmail = null"
-				@reply="onReply"
-				@reply-all="onReplyAll"
-				@forward="onForward"
-				@move="onMove"
-				@delete="deleteEmail"
-				@mailto="onMailto" />
-		</div>
+		<Teleport to="body" :disabled="!isMobile">
+			<div v-if="selectedEmail" class="mail-detail-panel" :class="{ 'mail-detail-panel--fullscreen': isMobile }">
+				<EmailDetail
+					:email="selectedEmail"
+					:html-body="emailBodyHtml"
+					:plain-body="emailBodyPlain"
+					:loading="loadingBody"
+					:mailboxes="allMailboxes"
+					:remote-always="_remoteAlways"
+					@close="selectedEmail = null"
+					@reply="onReply"
+					@reply-all="onReplyAll"
+					@forward="onForward"
+					@move="onMove"
+					@delete="deleteEmail"
+					@mailto="onMailto" />
+			</div>
+		</Teleport>
 
-		<NcEmptyContent v-else-if="!isMobile" :name="t('souvera_mail', 'Select a message')"
+		<NcEmptyContent v-if="!selectedEmail && !isMobile" :name="t('souvera_mail', 'Select a message')"
 			class="mail-detail-empty">
 			<template #icon><EmailOutline :size="64" /></template>
 		</NcEmptyContent>
@@ -169,6 +171,10 @@ export default {
 	watch: {
 		selectedMailbox() { clearTimeout(this._searchTimer); this.checkedIds = []; this.offset = 0; this.selectedEmail = null; this.loadEmails() },
 		allMailboxes: { handler() { this.notifyTitle() }, deep: true },
+		// Lock the body scroll while the fullscreen mobile detail overlay
+		// is open (SnappyMail-style reading mode).
+		isMobile() { this.syncBodyScrollLock() },
+		selectedEmail() { this.syncBodyScrollLock() },
 	},
 	async mounted() {
 		this._originalTitle = document.title.replace(/^\(\d+\)\s*/, '')
@@ -179,8 +185,8 @@ export default {
 			r: () => { if (this.selectedEmail) this.onReply() },
 			a: () => { if (this.selectedEmail) this.onReplyAll() },
 			f: () => { if (this.selectedEmail) this.onForward() },
-			Delete: () => { if (this.selectedEmail) this.deleteEmail() },
-			Escape: () => { this.selectedEmail = null; this.checkedIds = [] },
+			delete: () => { if (this.selectedEmail) this.deleteEmail() },
+			escape: () => { this.selectedEmail = null; this.checkedIds = [] },
 		})
 		this.startAutoRefresh()
 		// AudioContext must be created/resumed during a user gesture;
@@ -229,6 +235,7 @@ export default {
 		this._hotkeys?.destroy()
 		this.stopAutoRefresh()
 		clearTimeout(this._searchTimer)
+		document.body.classList.remove('souvera-mobile-detail-open')
 		document.removeEventListener('click', this._onUserGesture)
 		document.removeEventListener('keydown', this._onUserGesture)
 		window.removeEventListener('souvera-mail:move-email', this._onMoveEmail)
@@ -238,6 +245,13 @@ export default {
 		if (this._mailboxChangeTimer) clearTimeout(this._mailboxChangeTimer)
 	},
 	methods: {
+		syncBodyScrollLock() {
+			if (this.isMobile && this.selectedEmail) {
+				document.body.classList.add('souvera-mobile-detail-open')
+			} else {
+				document.body.classList.remove('souvera-mobile-detail-open')
+			}
+		},
 		wakeAudio() {
 			try {
 				if (!this._audioCtx) {
@@ -677,10 +691,15 @@ body.resize-active { user-select: none; cursor: col-resize; }
 .mail-home--mobile .mail-resize-handle { display: none; }
 .mail-home--mobile.mail-home--vertical .mail-list-panel { max-height: 100%; }
 .mail-home--mobile.mail-home--detail-open .mail-list-panel { max-height: 100%; }
-.mail-home--mobile.mail-home--detail-open .mail-detail-panel {
+/* The panel is teleported to <body> on mobile — the fullscreen class sits
+   on the panel itself so the scoped styles survive the teleport. */
+.mail-detail-panel--fullscreen {
 	position: fixed;
 	inset: 0;
-	z-index: 3000;
+	/* Above every Nextcloud chrome element (header z-index 2000) — the
+	   panel lives directly under <body>, so no app stacking context can
+	   clip it. */
+	z-index: 5000;
 	background: var(--color-main-background);
 	overflow-y: auto;
 	animation: mail-detail-slide-in 0.18s ease-out;
@@ -689,5 +708,12 @@ body.resize-active { user-select: none; cursor: col-resize; }
 @keyframes mail-detail-slide-in {
 	from { transform: translateX(100%); }
 	to { transform: translateX(0); }
+}
+</style>
+
+<style>
+/* Unscoped: locks the page scroll while the mobile reader is open. */
+body.souvera-mobile-detail-open {
+	overflow: hidden;
 }
 </style>
