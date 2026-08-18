@@ -40,7 +40,7 @@
 					<div class="setting-row">
 						<span class="setting-label">{{ t('souvera_mail', 'Layout') }}</span>
 					</div>
-					<div class="layout-options">
+					<div v-if="loaded" class="layout-options">
 						<label class="layout-option" :class="{ 'layout-option--active': !verticalLayout && !listOnlyLayout }"
 							@click="setLayout('split')">
 							<div class="layout-preview layout-preview--horizontal">
