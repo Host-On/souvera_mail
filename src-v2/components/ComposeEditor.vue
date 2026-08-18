@@ -103,12 +103,24 @@
 
 	<NcDialog v-if="showCloseDialog" :name="t('souvera_mail', 'Draft')"
 		:open.sync="true"
+		size="normal"
 		@update:open="showCloseDialog = $event">
-		<p class="compose-close-dialog__text">{{ t('souvera_mail', 'Do you want to keep this draft?') }}</p>
-		<div class="compose-close-dialog__actions">
-			<NcButton variant="primary" @click="keepDraftAndClose">{{ t('souvera_mail', 'Keep draft') }}</NcButton>
-			<NcButton variant="error" @click="discardDraftAndClose">{{ t('souvera_mail', 'Discard') }}</NcButton>
-			<NcButton variant="tertiary" @click="showCloseDialog = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+		<div class="compose-close-dialog">
+			<div class="compose-close-dialog__body">
+				<FileEditOutline :size="42" class="compose-close-dialog__icon" />
+				<p class="compose-close-dialog__text">{{ t('souvera_mail', 'Do you want to keep this draft?') }}</p>
+			</div>
+			<div class="compose-close-dialog__actions">
+				<NcButton variant="tertiary" @click="showCloseDialog = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+				<NcButton variant="error" @click="discardDraftAndClose">
+					<template #icon><TrashCan :size="18" /></template>
+					{{ t('souvera_mail', 'Discard') }}
+				</NcButton>
+				<NcButton variant="primary" @click="keepDraftAndClose">
+					<template #icon><ContentSave :size="18" /></template>
+					{{ t('souvera_mail', 'Keep draft') }}
+				</NcButton>
+			</div>
 		</div>
 	</NcDialog>
 </template>
@@ -118,6 +130,8 @@ import { NcModal, NcDialog, NcButton, NcTextField } from '@nextcloud/vue'
 import Send from 'vue-material-design-icons/Send.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
+import ContentSave from 'vue-material-design-icons/ContentSave.vue'
+import FileEditOutline from 'vue-material-design-icons/FileEditOutline.vue'
 import Cloud from 'vue-material-design-icons/Cloud.vue'
 import ChevronDown from 'vue-material-design-icons/ChevronDown.vue'
 import Fullscreen from 'vue-material-design-icons/Fullscreen.vue'
@@ -676,8 +690,11 @@ export default {
 
 <style scoped>
 .compose-layout { display: flex; flex-direction: column; height: 85vh; max-height: 85vh; overflow: hidden; }
-.compose-close-dialog__text { margin: 0 0 14px; }
-.compose-close-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.compose-close-dialog { display: flex; flex-direction: column; gap: 18px; padding: 6px 2px 0; min-width: 380px; }
+.compose-close-dialog__body { display: flex; align-items: flex-start; gap: 14px; }
+.compose-close-dialog__icon { color: var(--color-text-maxcontrast); flex-shrink: 0; margin-top: 2px; }
+.compose-close-dialog__text { margin: 0; font-size: 14px; line-height: 1.55; padding-top: 8px; }
+.compose-close-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--color-border); padding-top: 14px; }
 
 .compose-layout__header { padding: 10px 16px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
 .compose-layout__header h3 { margin: 0; font-size: 15px; font-weight: 600; }
