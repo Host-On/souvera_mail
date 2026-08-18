@@ -100,10 +100,21 @@
 		<input ref="fileInput" type="file" multiple class="hidden-file-input" @change="onFilesSelected" />
 		<CloudFilePicker v-if="showCloudPicker" @close="showCloudPicker = false" @attach="onCloudFileAttached" />
 	</NcModal>
+
+	<NcDialog v-if="showCloseDialog" :name="t('souvera_mail', 'Draft')"
+		:open.sync="true"
+		@update:open="showCloseDialog = $event">
+		<p class="compose-close-dialog__text">{{ t('souvera_mail', 'Do you want to keep this draft?') }}</p>
+		<div class="compose-close-dialog__actions">
+			<NcButton variant="primary" @click="keepDraftAndClose">{{ t('souvera_mail', 'Keep draft') }}</NcButton>
+			<NcButton variant="error" @click="discardDraftAndClose">{{ t('souvera_mail', 'Discard') }}</NcButton>
+			<NcButton variant="tertiary" @click="showCloseDialog = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+		</div>
+	</NcDialog>
 </template>
 
 <script>
-import { NcModal, NcButton, NcTextField } from '@nextcloud/vue'
+import { NcModal, NcDialog, NcButton, NcTextField } from '@nextcloud/vue'
 import Send from 'vue-material-design-icons/Send.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
@@ -126,7 +137,7 @@ let draftTimer = null
 
 export default {
 	name: 'ComposeEditor',
-	components: { NcModal, NcButton, NcTextField, Send, Paperclip, TrashCan, ChevronDown, Fullscreen, FullscreenExit, Cloud, RecipientField, RichTextEditor, AttachmentList, CloudFilePicker },
+	components: { NcModal, NcDialog, NcButton, NcTextField, Send, Paperclip, TrashCan, ChevronDown, Fullscreen, FullscreenExit, Cloud, RecipientField, RichTextEditor, AttachmentList, CloudFilePicker },
 	props: {
 		replyTo: { type: Object, default: null },
 		forwardOf: { type: Object, default: null },
@@ -171,6 +182,7 @@ export default {
 			showCloudPicker: false,
 			savedDraftId: null,
 			discardingDraftId: null,
+			showCloseDialog: false,
 			signatureHtml: '',
 			signatureEnabled: false,
 			identitySignatures: {},
@@ -254,10 +266,6 @@ export default {
 		if (this.mode === 'reply' || this.mode === 'replyAll' || this.mode === 'forward') {
 			this.buildReplyOrForward()
 		} else {
-			// New message: clean up drafts that THIS app created in
-			// previous abandoned sessions (browser close / crash) — never
-			// touch drafts created by other clients.
-			this.cleanupStaleDrafts()
 			if (this.effectiveSignature.enabled) {
 				this.initContent(`<p></p>${this.signatureBlock()}`, 'empty')
 			}
@@ -265,9 +273,11 @@ export default {
 	},
 	beforeUnmount() {
 		clearTimeout(draftTimer)
-		// Fire-and-forget: if the window is destroyed (router change,
-		// navigate away) without send/discard, drop the autosaved draft.
-		this.deleteSavedDraft()
+		// Never delete silently: the autosaved draft STAYS in the Drafts
+		// folder (crash-safe, like Thunderbird). Untrack it so no cleanup
+		// ever removes it behind the user's back — drafts are managed in
+		// the Drafts folder.
+		if (this.savedDraftId) this.trackDraft(null, this.savedDraftId)
 	},
 	methods: {
 		prefillSubject() {
@@ -521,6 +531,10 @@ export default {
 			draftTimer = setTimeout(() => this.saveDraft(), 3000)
 		},
 		async saveDraft() {
+			// Guard against overlapping autosaves (slow create + fast typing)
+			// which could otherwise create a second draft.
+			if (this._savingDraft) return
+			this._savingDraft = true
 			try {
 				const payload = this.buildPayload()
 				if (this.savedDraftId) {
@@ -534,6 +548,8 @@ export default {
 				}
 			} catch (e) {
 				console.error('Draft save failed', e)
+			} finally {
+				this._savingDraft = false
 			}
 		},
 		buildPayload() {
@@ -606,12 +622,25 @@ export default {
 			})
 		},
 		onClose() {
-			if (this.dirty) {
-				if (!confirm(this.t('souvera_mail', 'Discard unsaved changes?'))) return
+			// Ask BEFORE anything is dropped: keep / discard / stay.
+			if (this.dirty || this.savedDraftId) {
+				this.showCloseDialog = true
+				return
 			}
-			// The compose session is over — the autosaved draft is stale,
-			// remove it so the Drafts folder does not fill up.
+			this.$emit('cancel')
+		},
+		async keepDraftAndClose() {
+			// Flush the latest content into the SAME draft (no new id),
+			// then hand it over to the Drafts folder.
+			try { await this.saveDraft() } catch {}
+			this.trackDraft(null, this.savedDraftId)
+			this.savedDraftId = null
+			this.showCloseDialog = false
+			this.$emit('cancel')
+		},
+		discardDraftAndClose() {
 			this.deleteSavedDraft()
+			this.showCloseDialog = false
 			this.$emit('cancel')
 		},
 		onDiscard() {
@@ -641,26 +670,14 @@ export default {
 				localStorage.setItem(KEY, JSON.stringify(ids))
 			} catch {}
 		},
-		async cleanupStaleDrafts() {
-			// Only delete drafts that this app tracked in previous sessions.
-			try {
-				const KEY = 'souvera_mail.tracked_drafts'
-				const ids = JSON.parse(localStorage.getItem(KEY) || '[]')
-				if (ids.length === 0) return
-				for (const id of ids) {
-					await axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts/' + encodeURIComponent(id))).catch(() => {})
-				}
-				localStorage.setItem(KEY, '[]')
-			} catch (e) {
-				console.error('Draft cleanup failed', e)
-			}
-		},
 	},
 }
 </script>
 
 <style scoped>
 .compose-layout { display: flex; flex-direction: column; height: 85vh; max-height: 85vh; overflow: hidden; }
+.compose-close-dialog__text { margin: 0 0 14px; }
+.compose-close-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 .compose-layout__header { padding: 10px 16px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
 .compose-layout__header h3 { margin: 0; font-size: 15px; font-weight: 600; }
