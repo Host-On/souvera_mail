@@ -475,9 +475,9 @@ trait SelfUpdateTrait
     private function getRepo(): string
     {
         return match ($this->getAppId()) {
-            'souvera_mail' => 'PhiGi87/souvera_mail',
-            'souvera_central' => 'PhiGi87/souvera_central',
-            'souvera_shield' => 'PhiGi87/souvera_shield',
+            'souvera_mail' => 'Host-On/souvera_mail',
+            'souvera_central' => 'Host-On/souvera_central',
+            'souvera_shield' => 'Host-On/souvera_shield',
             default => '',
         };
     }

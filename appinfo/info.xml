@@ -40,19 +40,19 @@ All write commands accept `--json` and `--dry-run`.
 - [H2CK/oidc](https://github.com/H2CK/oidc) 1.17+ (Nextcloud OIDC Provider — install via `occ app:install oidc`)
 - Mail server with OAUTHBEARER / XOAUTH2 (Stalwart 0.16+ or Dovecot 2.4+ + Postfix 3.7+)
 	]]></description>
-	<version>1.2.0</version>
+	<version>1.2.1</version>
 	<licence>AGPL-3.0-or-later</licence>
-	<author homepage="https://github.com/PhiGi87/souvera_mail">Souvera</author>
+	<author homepage="https://github.com/Host-On/souvera_mail">Souvera</author>
 	<namespace>SouveraMail</namespace>
 	<documentation>
-		<admin>https://github.com/PhiGi87/souvera_mail#quick-start-automated-deploy</admin>
-		<developer>https://github.com/PhiGi87/souvera_mail</developer>
+		<admin>https://github.com/Host-On/souvera_mail#quick-start-automated-deploy</admin>
+		<developer>https://github.com/Host-On/souvera_mail</developer>
 	</documentation>
 	<category>integration</category>
 	<category>office</category>
-	<website>https://github.com/PhiGi87/souvera_mail</website>
-	<bugs>https://github.com/PhiGi87/souvera_mail/issues</bugs>
-	<repository type="git">https://github.com/PhiGi87/souvera_mail</repository>
+	<website>https://github.com/Host-On/souvera_mail</website>
+	<bugs>https://github.com/Host-On/souvera_mail/issues</bugs>
+	<repository type="git">https://github.com/Host-On/souvera_mail</repository>
 	<dependencies>
 		<php min-version="8.3" min-int-size="64" />
 		<lib>mbstring</lib>
