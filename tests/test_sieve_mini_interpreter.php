@@ -67,23 +67,23 @@ SIEVE;
 
 $engine = (new MiniInterpreter())->parse($script);
 $rules = $engine->getRules();
-$check(\count($rules) === 3, 'parses 3 top-level rules (Emergent, Newsletter, Spam)');
+$check(\count($rules) === 3, 'parses 3 top-level rules (Newsletter, News, Spam)');
 
 // -------------------------------------------------------------------
-// Emergent rule fires on matching From
+// Newsletter rule fires on matching From
 // -------------------------------------------------------------------
 $m = new MessageFacts(
     'M1',
     ['From' => 'CI Bot <ci@example.com>', 'Subject' => 'Build 1234'],
     'ci@example.com',
-    ['philip@grassegger.souvera.work'],
+    ['user@example.com'],
     2048
 );
 $r = $engine->evaluate($m);
-$check($r->fileintoTarget() === 'Emergent',
-    'Emergent rule → fileinto "Newsletters"');
+$check($r->fileintoTarget() === 'Newsletters',
+    'Newsletter rule → fileinto "Newsletters"');
 $check($r->redirectTargets() === ['user@extern.de'],
-    'Emergent rule → redirect user@extern.de');
+    'Newsletter rule → redirect user@example.org');
 // Because `stop;` fired, later rules must NOT contribute — verify by
 // giving the message ALSO a newsletter-like header:
 $m2 = new MessageFacts(
@@ -94,7 +94,7 @@ $m2 = new MessageFacts(
     3072
 );
 $r2 = $engine->evaluate($m2);
-$check($r2->fileintoTarget() === 'Emergent',
+$check($r2->fileintoTarget() === 'Newsletters',
     'stop; short-circuits — Newsletter rule does NOT overwrite fileinto target');
 
 // -------------------------------------------------------------------

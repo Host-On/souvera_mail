@@ -95,7 +95,7 @@ return [
             // Used by native clients right after the login-flow call to:
             //   - resolve the SASL user for IMAP/SMTP (may differ from
             //     `loginName`);
-            //   - display "Signed in as Philip Grassegger" in the UI;
+            //   - display "Signed in as Max Mustermann" in the UI;
             //   - schedule automatic password rotation according to the
             //     server-side `rotation_days` app config (see
             //     docs/PASSWORD_ROTATION.txt for the admin playbook).

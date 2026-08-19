@@ -29,7 +29,7 @@ use Psr\Log\LoggerInterface;
  *   1. The user's canonical mail address (may DIFFER from the
  *      Nextcloud loginName — e.g. loginName is `philip` but the
  *      IMAP/SMTP SASL user is `user@example.com`).
- *   2. The user's display name for the UI ("Philip Grassegger"
+ *   2. The user's display name for the UI ("Max Mustermann"
  *      rather than the raw uid).
  *   3. A machine-readable hint for the server's password-rotation
  *      policy so the client can schedule its automatic rotation
@@ -63,7 +63,7 @@ use Psr\Log\LoggerInterface;
  *     "status":      "ok",
  *     "uid":         "philip",
  *     "loginName":   "philip",
- *     "displayName": "Philip Grassegger",
+ *     "displayName": "Max Mustermann",
  *     "email":       "user@example.com",
  *     "server":      "https://mail.example.com",
  *     "rotation": {

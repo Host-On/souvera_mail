@@ -54,7 +54,7 @@ ok(str_contains($src, 'extends Command'),
     $passes, $failures);
 
 ok(str_contains($src, "->setName('souvera_mail:warmup-oidc')"),
-    "Command name is 'souvera_mail:warmup-oidc' (verbatim — deploy-agent scripts grep for it)",
+    "Command name is 'souvera_mail:warmup-oidc' (verbatim — deployment scripts grep for it)",
     $passes, $failures);
 
 ok(str_contains($src, "->addOption('json'"),

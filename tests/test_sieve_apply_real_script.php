@@ -6,7 +6,7 @@ declare(strict_types=1);
  * (report 2026-07-15, after the dispatcher limit fix).
  *
  * Root cause: Snappymail's filter UI emits the MIXED argument form
- *   `if header :contains ["From"] "emergent"`
+ *   `if header :contains ["From"] "newsletter"`
  * (bracketed header-list + single quoted needle). MiniInterpreter only
  * had regexes for both-quoted and both-list, so the mixed form parsed
  * to TestNode('false') → 4836 scanned, 0 moved.
@@ -48,10 +48,10 @@ eyJJRCI6Ijg4NDM1MDAwNzk1MDAwMDQyMDA3MTAi
 END:HEADER
 */
 
-if header :contains ["From"] "emergent"
+if header :contains ["From"] "newsletter"
 {
     addflag "\\Seen";
-    fileinto "INBOX/Emergent";
+    fileinto "INBOX/Newsletters";
 }
 
 /* END:FILTER */
@@ -76,9 +76,9 @@ foreach ($rules as $i => $r) {
 $facts = static fn (array $headers): MessageFacts =>
     new MessageFacts('m1', $headers, null, [], 1000);
 
-// Rule 1: :contains "emergent" against a normalised From value.
-$r1 = $engine->evaluate($facts(['From' => 'Emergent <billing@emergent.sh>']));
-$check($r1->fileintoTarget() === 'INBOX/Emergent', ':contains match → fileinto INBOX/Emergent');
+// Rule 1: :contains "newsletter" against a normalised From value.
+$r1 = $engine->evaluate($facts(['From' => 'Newsletter <billing@example.com>']));
+$check($r1->fileintoTarget() === 'INBOX/Newsletters', ':contains match → fileinto INBOX/Newsletters');
 $check($r1->addedFlags() === ['\\Seen'], ':contains match → addflag \\Seen');
 
 // Rule 2: :is exact-match semantics (RFC 5228 — full header value).

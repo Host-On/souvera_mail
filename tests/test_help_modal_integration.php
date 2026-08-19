@@ -448,7 +448,7 @@ assertTrue(str_contains($plugin, "getValueString('souvera_mail', 'shield_url'"),
     "buildHelpData() keeps the app-config `souvera_mail.shield_url` override as a fallback",
     $passes, $failures);
 
-// CRITICAL — internal cluster IPs (e.g. 10.20.0.129) must NEVER surface to
+// CRITICAL — internal cluster IPs (e.g. 10.0.0.10) must NEVER surface to
 // end users. Overwrite IMAP/POP3/SMTP/Sieve host with the public FQDN
 // extracted from the WebDAV base URL (same host the user reaches NC on).
 assertTrue(str_contains($plugin, "\$parsedHost = \\parse_url(\$sWebDAV, PHP_URL_HOST)"),

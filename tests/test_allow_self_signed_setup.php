@@ -15,8 +15,8 @@
  *
  * The fix path proven live:
  *   1. Point the IMAP/SMTP/Sieve host directly at the cluster-internal
- *      Stalwart IP (`10.20.0.153`).
- *   2. Stalwart's cert binds CN=buxte.souvera.work; connecting via IP
+ *      Stalwart IP (`10.0.0.10`).
+ *   2. Stalwart's cert binds CN=mail.example.com; connecting via IP
  *      fails strict cert-name verification. Relax verify_peer +
  *      verify_peer_name + allow_self_signed for the affected protocols.
  *
@@ -122,9 +122,9 @@ namespace OCA\SouveraMail\Service {
 
     // Build A: backwards-compatible (no flags) — must produce verify_peer=true.
     $a = $svc->buildDomainConfig(
-        'buxte.souvera.work', 993, 'ssl',
-        'buxte.souvera.work', 465, 'ssl',
-        'buxte.souvera.work', 4190, 'starttls',
+        'mail.example.com', 993, 'ssl',
+        'mail.example.com', 465, 'ssl',
+        'mail.example.com', 4190, 'starttls',
         true,
     );
     $ok = $a['IMAP']['ssl']['verify_peer'] === true
@@ -136,9 +136,9 @@ namespace OCA\SouveraMail\Service {
 
     // Build B: ALL self-signed — every protocol flips.
     $b = $svc->buildDomainConfig(
-        '10.20.0.153', 993, 'ssl',
-        '10.20.0.153', 465, 'ssl',
-        '10.20.0.153', 4190, 'starttls',
+        '10.0.0.10', 993, 'ssl',
+        '10.0.0.10', 465, 'ssl',
+        '10.0.0.10', 4190, 'starttls',
         true,
         true, true, true,
     );
@@ -149,17 +149,17 @@ namespace OCA\SouveraMail\Service {
             fwrite(STDERR, "FAIL all-relaxed for $p: " . json_encode($b[$p]['ssl']) . "\n");
             exit(2);
         }
-        if ($b[$p]['host'] !== '10.20.0.153') {
-            fwrite(STDERR, "FAIL host not 10.20.0.153 for $p\n");
+        if ($b[$p]['host'] !== '10.0.0.10') {
+            fwrite(STDERR, "FAIL host not 10.0.0.10 for $p\n");
             exit(3);
         }
     }
 
     // Build C: ONLY IMAP relaxed — SMTP+Sieve must stay strict.
     $c = $svc->buildDomainConfig(
-        '10.20.0.153', 993, 'ssl',
-        'buxte.souvera.work', 465, 'ssl',
-        'buxte.souvera.work', 4190, 'starttls',
+        '10.0.0.10', 993, 'ssl',
+        'mail.example.com', 465, 'ssl',
+        'mail.example.com', 4190, 'starttls',
         true,
         true, false, false,
     );

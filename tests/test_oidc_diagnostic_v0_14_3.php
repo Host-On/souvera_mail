@@ -5,7 +5,7 @@
  *
  * Context
  * -------
- * Real-world incident (2026-02-18, seg-marburg.souvera.work):
+ * Real-world incident (2026-02-18):
  *   $ occ souvera_mail:warmup-oidc
  *   Stalwart OIDC warmup failed.
  *     ! failed to mint OIDC JWT for user 'admin@seg-marburg.de':

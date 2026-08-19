@@ -43,7 +43,7 @@ function assertTrue(bool $c, string $m, array &$p, array &$f): void {
 // 1. Nav icon file
 // ---------------------------------------------------------------
 // NOTE: 0.13.22 — the operator swapped the previous monochrome
-// theme-friendly SVG for a branded logo hosted at host-on.dev.
+// theme-friendly SVG for a branded logo hosted on the instance.
 // We no longer enforce viewBox="0 0 24 24" / `currentColor` /
 // zero hex colours — those constraints reflected the older
 // nav-icon design goal. We DO still enforce that the file
