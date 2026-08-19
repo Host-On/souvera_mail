@@ -215,6 +215,16 @@ return [
         ],
         [
             // Out-of-office — standalone user-friendly form (no webmail needed).
+        [
+            'name' => 'vacation#state',
+            'url' => '/vacation/state',
+            'verb' => 'GET'
+        ],
+        [
+            'name' => 'vacation#sync',
+            'url' => '/vacation/sync',
+            'verb' => 'POST'
+        ],
             // GET /apps/souvera_mail/vacation/form → HTML page
             'name' => 'vacation#form',
             'url' => '/vacation/form',

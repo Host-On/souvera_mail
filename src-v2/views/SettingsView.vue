@@ -206,6 +206,73 @@
 
 			<div class="settings-card">
 				<h2 class="settings-card__title">
+					<CalendarBlank :size="20" />
+					{{ t('souvera_mail', 'Out-of-office (vacation)') }}
+				</h2>
+				<div class="settings-card__body">
+					<NcCheckboxRadioSwitch :model-value="vacationSync"
+						@update:modelValue="onVacationSyncToggle">
+						{{ t('souvera_mail', 'Adopt from Nextcloud') }}
+					</NcCheckboxRadioSwitch>
+					<p class="settings-muted">{{ t('souvera_mail', 'The absence configured in Nextcloud (personal availability) is used as the automatic reply.') }}</p>
+
+					<div v-if="vacationState.supported === false" class="vacation-status vacation-status--warn">
+						{{ t('souvera_mail', 'Not available on this Nextcloud version (NC 28+ required)') }}
+					</div>
+					<div v-else-if="!vacationSync" class="vacation-status">
+						{{ t('souvera_mail', 'Sync is disabled — no out-of-office reply is sent') }}
+					</div>
+					<div v-else-if="vacationState.ncActive && vacationState.inEffect" class="vacation-status vacation-status--active">
+						{{ t('souvera_mail', 'Active until {date}', { date: vacationState.end }) }}
+						<span v-if="vacationState.replacement" class="vacation-status__meta"> · {{ t('souvera_mail', 'Replacement: {name}', { name: vacationState.replacement }) }}</span>
+					</div>
+					<div v-else-if="vacationState.ncActive" class="vacation-status">
+						{{ t('souvera_mail', 'Planned from {date}', { date: vacationState.start }) }}
+					</div>
+					<div v-else class="vacation-status">
+						{{ t('souvera_mail', 'No absence configured in Nextcloud') }}
+					</div>
+
+					<div class="setting-row setting-row--column" v-if="showVacationEditor">
+						<div class="vacation-editor">
+							<div class="vacation-editor__row">
+								<NcDateTimePicker v-model="vacationForm.from" type="date"
+									:label="t('souvera_mail', 'From')" />
+								<NcDateTimePicker v-model="vacationForm.to" type="date"
+									:label="t('souvera_mail', 'Until')" />
+							</div>
+							<NcTextField v-model="vacationForm.short"
+								:label="t('souvera_mail', 'Short text')" />
+							<NcTextArea v-model="vacationForm.long"
+								:label="t('souvera_mail', 'Long text (auto-reply body)')" />
+							<p class="settings-muted">{{ t('souvera_mail', 'The replacement person is managed in Nextcloud.') }}</p>
+							<div class="vacation-editor__actions">
+								<NcButton variant="primary" :disabled="vacationSaving" @click="saveVacationToNextcloud">{{ t('souvera_mail', 'Save') }}</NcButton>
+								<NcButton variant="error" :disabled="vacationSaving" @click="clearVacationInNextcloud">{{ t('souvera_mail', 'Delete') }}</NcButton>
+								<NcButton variant="tertiary" @click="showVacationEditor = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+							</div>
+						</div>
+					</div>
+
+					<div class="vacation-actions">
+						<NcButton variant="primary" @click="openAvailabilitySettings">
+							<template #icon><OpenInNew :size="16" /></template>
+							{{ t('souvera_mail', 'Manage in Nextcloud') }}
+						</NcButton>
+						<NcButton variant="tertiary" @click="toggleVacationEditor">
+							<template #icon><Pencil :size="16" /></template>
+							{{ t('souvera_mail', 'Edit here') }}
+						</NcButton>
+						<NcButton variant="tertiary" @click="syncVacationNow">
+							<template #icon><Refresh :size="16" /></template>
+							{{ t('souvera_mail', 'Sync now') }}
+						</NcButton>
+					</div>
+				</div>
+			</div>
+
+			<div class="settings-card">
+				<h2 class="settings-card__title">
 					<Download :size="20" />
 					{{ t('souvera_mail', 'Email migration') }}
 				</h2>
@@ -537,13 +604,15 @@
 </template>
 
 <script>
-import { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog } from '@nextcloud/vue'
+import { NcButton, NcTextField, NcTextArea, NcDateTimePicker, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog } from '@nextcloud/vue'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 import Plus from 'vue-material-design-icons/Plus.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
 import Account from 'vue-material-design-icons/Account.vue'
 import Palette from 'vue-material-design-icons/Palette.vue'
 import Pencil from 'vue-material-design-icons/Pencil.vue'
+import CalendarBlank from 'vue-material-design-icons/CalendarBlank.vue'
+import OpenInNew from 'vue-material-design-icons/OpenInNew.vue'
 import Star from 'vue-material-design-icons/Star.vue'
 import SignatureText from 'vue-material-design-icons/SignatureText.vue'
 import ShareVariant from 'vue-material-design-icons/ShareVariant.vue'
@@ -569,7 +638,7 @@ import { useExternalAccounts } from '../composables/useExternalAccounts.js'
 const { fetchScripts, deleteScript, rebuild } = useSieveClient()
 const extAccountsApi = useExternalAccounts()
 import axios from '@nextcloud/axios'
-import { generateUrl } from '@nextcloud/router'
+import { generateUrl, generateOcsUrl } from '@nextcloud/router'
 
 const API = {
 	quota: () => axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/quota')),
@@ -581,7 +650,7 @@ const API = {
 
 export default {
 	name: 'SettingsView',
-	components: { NcButton, NcTextField, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog, Plus, TrashCan, Account, Palette, Pencil, Star, SignatureText, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Refresh, Play, FolderPlus, Filter, Check, ContentCopy, Email, QuotaDonut, SieveFilterEditor },
+	components: { NcButton, NcTextField, NcTextArea, NcDateTimePicker, NcCheckboxRadioSwitch, NcSelect, NcEmptyContent, NcDialog, Plus, TrashCan, Account, Palette, Pencil, Star, SignatureText, ShareVariant, Key, Folder, CodeTags, FileUpload, Download, Import, Refresh, Play, FolderPlus, Filter, Check, ContentCopy, Email, CalendarBlank, OpenInNew, QuotaDonut, SieveFilterEditor },
 	data() {
 		return {
 			accountEmail: '',
@@ -652,6 +721,11 @@ export default {
 			editingIdentityName: '',
 			aliasDisplayNames: {},
 			identitySignatures: {},
+			vacationSync: true,
+			vacationState: { supported: true, ncActive: false, inEffect: false, start: '', end: '', short: '', long: '', replacement: '' },
+			showVacationEditor: false,
+			vacationSaving: false,
+			vacationForm: { from: null, to: null, short: '', long: '' },
 			sigIdentity: null,
 			sigDialogHtml: '',
 			sigDialogEnabled: false,
@@ -769,6 +843,8 @@ export default {
 				if (ar) this.autoRefreshOption = ar
 				const so = this.soundOptions.find(o => o.value === (p.notificationSound || 'none'))
 				if (so) this.soundOption = so
+				this.vacationSync = p.vacationSync !== false
+				this.accountUid = (p.account && p.account.uid) || ''
 				this._prefsDefaultIdentityId = p.defaultIdentityId || ''
 				this.aliasDisplayNames = p.aliasDisplayNames || {}
 				this.identitySignatures = p.identitySignatures || {}
@@ -776,6 +852,7 @@ export default {
 			this.loaded = true
 			this.loadIdentityOptions()
 			this.loadExternalAccounts()
+			this.loadVacationState()
 		},
 		async loadSieve() {
 			this.loadingSieve = true
@@ -1077,6 +1154,85 @@ export default {
 				await axios.put(generateUrl('/apps/souvera_mail/api/v2/shared/position'), { position: above ? 'above' : 'below' })
 				showSuccess(this.t('souvera_mail', 'Shared folder position saved'))
 			} catch (e) { console.error('Shared position save failed', e); showError(this.t('souvera_mail', 'Failed to save')) }
+		},
+		async loadVacationState() {
+			try {
+				const { data } = await axios.get(generateUrl('/apps/souvera_mail/vacation/state'))
+				this.vacationState = data.state || this.vacationState
+			} catch {}
+		},
+		async onVacationSyncToggle(val) {
+			this.vacationSync = !!val
+			try {
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'), { vacationSync: this.vacationSync })
+			} catch {}
+			await this.syncVacationNow()
+		},
+		async syncVacationNow() {
+			try {
+				await axios.post(generateUrl('/apps/souvera_mail/vacation/sync'))
+			} catch {}
+			await this.loadVacationState()
+			showSuccess(this.t('souvera_mail', 'Synchronized'))
+		},
+		openAvailabilitySettings() {
+			window.open(OC.generateUrl('/settings/user/availability'), '_blank')
+		},
+		toggleVacationEditor() {
+			if (this.showVacationEditor) {
+				this.showVacationEditor = false
+				return
+			}
+			const st = this.vacationState
+			this.vacationForm = {
+				from: st.start ? new Date(st.start + 'T00:00:00').getTime() / 1000 : null,
+				to: st.end ? new Date(st.end + 'T00:00:00').getTime() / 1000 : null,
+				short: st.short || '',
+				long: st.long || '',
+			}
+			this.showVacationEditor = true
+		},
+		async saveVacationToNextcloud() {
+			if (!this.accountUid) { showError(this.t('souvera_mail', 'Cannot resolve user id')); return }
+			const fmt = (ts) => {
+				if (!ts) return ''
+				const d = new Date(ts * 1000)
+				return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+			}
+			const firstDay = fmt(this.vacationForm.from)
+			const lastDay = fmt(this.vacationForm.to)
+			if (!firstDay || !lastDay) { showError(this.t('souvera_mail', 'From and until are required')); return }
+			this.vacationSaving = true
+			try {
+				await axios.post(generateOcsUrl('apps/dav/api/v1/outOfOffice/{uid}', 2).replace('{uid}', encodeURIComponent(this.accountUid)), {
+					firstDay, lastDay,
+					status: this.vacationForm.short || '',
+					message: this.vacationForm.long || '',
+				}, { headers: { 'OCS-APIRequest': 'true' } })
+				this.showVacationEditor = false
+				await this.syncVacationNow()
+				showSuccess(this.t('souvera_mail', 'Saved'))
+			} catch (e) {
+				console.error('Out-of-office write failed', e)
+				showError(e?.response?.data?.ocs?.meta?.message || this.t('souvera_mail', 'Failed to save'))
+			} finally {
+				this.vacationSaving = false
+			}
+		},
+		async clearVacationInNextcloud() {
+			if (!this.accountUid) { showError(this.t('souvera_mail', 'Cannot resolve user id')); return }
+			this.vacationSaving = true
+			try {
+				await axios.delete(generateOcsUrl('apps/dav/api/v1/outOfOffice/{uid}', 2).replace('{uid}', encodeURIComponent(this.accountUid)), { headers: { 'OCS-APIRequest': 'true' } })
+				this.showVacationEditor = false
+				await this.syncVacationNow()
+				showSuccess(this.t('souvera_mail', 'Deleted'))
+			} catch (e) {
+				console.error('Out-of-office delete failed', e)
+				showError(e?.response?.data?.ocs?.meta?.message || this.t('souvera_mail', 'Failed to delete'))
+			} finally {
+				this.vacationSaving = false
+			}
 		},
 		async onRemoteImagesChange(opt) {
 			if (!opt) return
@@ -1436,11 +1592,21 @@ export default {
 }
 
 
+.vacation-status { font-size: 13px; color: var(--color-text-maxcontrast); }
+.vacation-status--active { color: var(--color-success); font-weight: 600; }
+.vacation-status--warn { color: var(--color-warning); }
+.vacation-status__meta { font-weight: 400; }
+.vacation-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.vacation-editor { display: flex; flex-direction: column; gap: 10px; }
+.vacation-editor__row { display: flex; gap: 10px; flex-wrap: wrap; }
+.vacation-editor__actions { display: flex; gap: 8px; justify-content: flex-end; }
+
 @media (max-width: 768px) {
 	.setting-row { flex-direction: column; align-items: stretch; gap: 4px; }
 	.setting-row > div { width: 100%; }
 	.setting-select { min-width: 0; width: 100%; }
 	.layout-options { grid-template-columns: 1fr; }
+	.vacation-editor__row { flex-direction: column; }
 }
 
 </style>

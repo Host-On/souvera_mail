@@ -7,6 +7,7 @@ namespace OCA\SouveraMail\Controller;
 use OCA\SouveraMail\Service\AppPasswordService;
 use OCA\SouveraMail\Service\QuotaService;
 use OCA\SouveraMail\Service\SignatureStoreService;
+use OCA\SouveraMail\Service\VacationSyncService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
@@ -25,6 +26,7 @@ class V2SettingsController extends Controller
         private AppPasswordService $appPasswordService,
         private QuotaService $quotaService,
         private SignatureStoreService $signatureStore,
+        private VacationSyncService $vacationSync,
         private IConfig $config,
         private LoggerInterface $logger,
     ) {
@@ -115,6 +117,15 @@ class V2SettingsController extends Controller
         }
         $uid = $user->getUID();
 
+        // Keep the Sieve auto-responder in sync with the NC out-of-office
+        // data on every preferences read (cheap: hash-guarded, no-op when
+        // nothing changed).
+        try {
+            $this->vacationSync->syncNow($uid);
+        } catch (\Throwable $e) {
+            $this->logger->debug('vacation sync during preferences read failed: ' . $e->getMessage());
+        }
+
         return new JSONResponse([
             'signatureHtml' => $this->signatureStore->read($uid),
             'signatureEnabled' => $this->getPref($uid, 'pref_signature_enabled', '0') === '1',
@@ -133,10 +144,12 @@ class V2SettingsController extends Controller
             'navCollapsedGroups' => \json_decode($this->getPref($uid, 'pref_nav_collapsed_groups', '[]'), true) ?: [],
             'navCollapsedMailboxes' => \json_decode($this->getPref($uid, 'pref_nav_collapsed_mailboxes', '[]'), true) ?: [],
             'aliasDisplayNames' => \json_decode($this->getPref($uid, 'pref_alias_names', '{}'), true) ?: [],
+            'vacationSync' => $this->getPref($uid, 'pref_vacation_sync', '1') === '1',
             // Whether the Mailarchiv app is installed AND enabled for this
             // user — the sidebar link is hidden otherwise.
             'mailArchiveEnabled' => \OCP\Server::get(\OCP\App\IAppManager::class)->isEnabledForUser('souvera_mailarchiv'),
             'account' => [
+                'uid' => $uid,
                 'email' => $user->getSystemEMailAddress() ?? $uid,
                 'server' => '',
                 'version' => \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion('souvera_mail'),
@@ -183,6 +196,7 @@ class V2SettingsController extends Controller
             'navCollapsedGroups' => 'pref_nav_collapsed_groups',
             'navCollapsedMailboxes' => 'pref_nav_collapsed_mailboxes',
             'aliasDisplayNames' => 'pref_alias_names',
+            'vacationSync' => 'pref_vacation_sync',
         ];
 
         // The signature HTML is stored as a FILE (64 KB DB limit would

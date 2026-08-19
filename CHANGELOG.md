@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.2] — 2026-08
+
+### Added
+
+- Out-of-office replies synced with the Nextcloud availability feature:
+  adopt the absence configured at /settings/user/availability as the Sieve
+  auto-responder (short text → subject, long text → body, replacement line,
+  date window), edit it in Mail settings via the official dav OCS API
+  (two-way sync), hourly background job turns the responder off when the
+  absence ends.
+
 All notable changes to Souvera Mail will be documented in this file.
 
 Format: [Semantic Versioning](https://semver.org/) — MAJOR.MINOR.PATCH
