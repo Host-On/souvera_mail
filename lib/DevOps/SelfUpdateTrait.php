@@ -1,0 +1,556 @@
+<?php
+
+declare(strict_types=1);
+
+namespace OCA\SouveraMail\DevOps;
+
+/**
+ * Self-update via GitHub Releases API (ZIP download).
+ * No git, no gh CLI, no webhooks required.
+ *
+ * Reads token from config.php: 'souvera.devops_token'
+ * Runs as a Nextcloud background job every 5 minutes
+ * (see SelfUpdateJob — one instance per managed app).
+ *
+ * v0.22.13: HTTP via Nextcloud's IClientService (Guzzle) with a real
+ * connect_timeout; exec() is guarded so a disabled exec cannot silently
+ * fail an update; failure responses are reported instead of swallowed.
+ */
+trait SelfUpdateTrait
+{
+    abstract protected function getAppId(): string;
+
+    public function checkAndUpdate(): array
+    {
+        $appId = $this->getAppId();
+        $config = \OCP\Server::get(\OCP\IConfig::class);
+        $channel = trim((string) $config->getAppValue($appId, 'devops.channel', 'stable'));
+
+        $installed = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId);
+        if ($installed === '0') {
+            return ['error' => 'No version'];
+        }
+
+        // Reset detection: some deployments restore an OLD app version
+        // externally. We remember what we installed (devops.last_version);
+        // when the installed version no longer matches, the updater must
+        // run immediately (no 24h rate limit, no maintenance window) to
+        // heal the app back to the current version.
+        $lastVersion = trim((string) $config->getAppValue($appId, 'devops.last_version', ''));
+        $resetDetected = $lastVersion !== '' && $installed !== $lastVersion;
+
+        if ($channel === 'stable' && !$resetDetected) {
+            // Release channel: check/install at most once per 24h and only
+            // inside the maintenance window (config.php:
+            // 'maintenance_window_start' => hour 0-23, window length 1h).
+            if (!$this->inMaintenanceWindow()) {
+                return ['skipped' => true, 'reason' => 'Outside maintenance window'];
+            }
+            $last = (int) $config->getAppValue($appId, 'devops.last_check', '0');
+            if ($last > time() - 24 * 3600) {
+                return ['skipped' => true, 'reason' => 'Rate-limited (24h)'];
+            }
+        }
+
+        $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath($appId);
+        if ($appPath === null) {
+            return ['error' => 'App not found'];
+        }
+
+        // Abort early on read-only filesystems (Docker/K8s with immutable containers).
+        if (!is_writable($appPath)) {
+            return ['error' => 'App directory is not writable'];
+        }
+
+        // Lock to prevent concurrent updates.
+        $lockFp = $this->acquireLock($appId);
+        if ($lockFp === null) {
+            return ['skipped' => true, 'reason' => 'Another update is running'];
+        }
+
+        try {
+            $branch = trim((string) $config->getAppValue($appId, 'devops.branch', 'main'));
+
+            if ($channel === 'dev') {
+                $result = $this->downloadBranch($appId, $appPath, $branch, $installed);
+            } else {
+                $latest = $this->latestReleaseTag();
+                if ($latest === null) {
+                    return ['error' => 'Cannot fetch releases'];
+                }
+                if (version_compare($latest, $installed, '<=')) {
+                    $config->setAppValue($appId, 'devops.last_check', (string) time());
+                    // Baseline for reset detection: what we accept as installed.
+                    $config->setAppValue($appId, 'devops.last_version', $installed);
+                    return ['up_to_date' => true, 'installed' => $installed, 'latest' => $latest];
+                }
+                $result = $this->downloadTag($appId, $appPath, $latest, $installed);
+            }
+            if (empty($result['error']) && !isset($result['up_to_date'])) {
+                $config->setAppValue($appId, 'devops.last_version',
+                    \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId));
+            }
+
+            // Only write the timestamp after a successful check (or real update).
+            if (empty($result['error'])) {
+                $config->setAppValue($appId, 'devops.last_check', (string) time());
+            }
+            return $result;
+        } finally {
+            $this->releaseLock($lockFp);
+        }
+    }
+
+    private function inMaintenanceWindow(): bool
+    {
+        // Config value = first hour of the maintenance window; the window is
+        // exactly 1 hour long (operator-defined semantics — Nextcloud core
+        // uses start..start+4h, this app intentionally deviates).
+        $start = (int) \OCP\Server::get(\OCP\IConfig::class)
+            ->getSystemValue('maintenance_window_start', 0);
+        $hour = (int) date('G');
+        $end = ($start + 1) % 24;
+        return $start < $end
+            ? $hour >= $start && $hour < $end
+            : $hour >= $start || $hour < $end;
+    }
+
+    private function latestReleaseTag(): ?string
+    {
+        $repo = $this->getRepo();
+        if ($repo === '') {
+            return null;
+        }
+        $data = $this->apiGet("https://api.github.com/repos/$repo/releases/latest");
+        if ($data === null || !isset($data['tag_name'])) {
+            return null;
+        }
+        // Keep the raw tag (e.g. "v1.2.3") for downloading; version_compare
+        // handles the optional "v" prefix itself since PHP 7.1.
+        return ltrim((string) $data['tag_name'], 'v');
+    }
+
+    private function downloadBranch(string $appId, string $appPath, string $branch, string $installedVersion): array
+    {
+        $repo = $this->getRepo();
+        if ($repo === '') {
+            return ['error' => 'Unknown app'];
+        }
+
+        // Dev channel: download when the branch HEAD changed OR the
+        // installed app no longer matches what we last installed. The
+        // second check heals external resets (e.g. a deployment tool
+        // restoring an OLD app version while devops.last_sha still points
+        // at the current branch — without it the updater would wrongly
+        // report "up_to_date" although the installed code is ancient).
+        $config = \OCP\Server::get(\OCP\IConfig::class);
+        $latestSha = $this->fetchBranchSha($repo, $branch);
+        if ($latestSha === null) {
+            return ['error' => 'Cannot fetch branch HEAD'];
+        }
+        $lastSha = trim((string) $config->getAppValue($appId, 'devops.last_sha', ''));
+        $lastVersion = trim((string) $config->getAppValue($appId, 'devops.last_version', ''));
+        if ($latestSha === $lastSha && $lastVersion !== '' && $installedVersion === $lastVersion) {
+            return ['up_to_date' => true, 'sha' => $latestSha, 'version' => $installedVersion];
+        }
+
+        $url = "https://api.github.com/repos/$repo/zipball/$branch";
+        $result = $this->downloadAndApply($appId, $appPath, $url, $installedVersion);
+        if (empty($result['error'])) {
+            \OCP\Server::get(\OCP\IConfig::class)
+                ->setAppValue($appId, 'devops.last_sha', $latestSha);
+            // Remember which version we installed — a later reset to an
+            // OLD version must be detected and healed on the next run.
+            $newVersion = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId);
+            \OCP\Server::get(\OCP\IConfig::class)
+                ->setAppValue($appId, 'devops.last_version', $newVersion);
+        }
+        return $result;
+    }
+
+    private function downloadTag(string $appId, string $appPath, string $tag, string $installedVersion): array
+    {
+        $repo = $this->getRepo();
+        if ($repo === '') {
+            return ['error' => 'Unknown app'];
+        }
+        // GitHub zipball expects the tag exactly as stored (with or without "v").
+        $data = $this->apiGet("https://api.github.com/repos/$repo/releases/latest");
+        $rawTag = '';
+        if ($data !== null && isset($data['tag_name'])) {
+            $rawTag = (string) $data['tag_name'];
+        }
+        $url = "https://api.github.com/repos/$repo/zipball/" . ($rawTag !== '' ? $rawTag : "v$tag");
+        return $this->downloadAndApply($appId, $appPath, $url, $installedVersion);
+    }
+
+    /**
+     * Fetches the latest commit SHA of a branch via GitHub API.
+     */
+    private function fetchBranchSha(string $repo, string $branch): ?string
+    {
+        $data = $this->apiGet("https://api.github.com/repos/$repo/commits/$branch");
+        if ($data === null || !isset($data['sha'])) {
+            return null;
+        }
+        return (string) $data['sha'];
+    }
+
+    private function downloadAndApply(string $appId, string $appPath, string $url, ?string $installedVersion = null): array
+    {
+        $token = $this->readToken();
+        if ($token === '') {
+            return ['error' => 'No devops token configured'];
+        }
+
+        $client = \OCP\Server::get(\OCP\Http\Client\IClientService::class)->newClient();
+        try {
+            $response = $client->get($url, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'User-Agent' => 'Souvera-DevOps',
+                    'Accept' => 'application/vnd.github+json',
+                ],
+                'timeout' => 60,
+                'connect_timeout' => 15,
+                'http_errors' => false,
+            ]);
+        } catch (\Throwable $e) {
+            return ['error' => 'Download failed: ' . $e->getMessage()];
+        }
+        if ($response->getStatusCode() >= 400) {
+            return [
+                'error' => 'Download returned HTTP ' . $response->getStatusCode(),
+                'hint' => \mb_substr((string) $response->getBody(), 0, 300),
+            ];
+        }
+
+        $zipContent = (string) $response->getBody();
+        // GitHub zipball responses are ZIP archives (magic bytes "PK");
+        // anything else is an API error body (auth/rate-limit/not-found).
+        if (strlen($zipContent) < 100 || !str_starts_with($zipContent, 'PK')) {
+            return [
+                'error' => 'Download returned no ZIP archive',
+                'hint' => \mb_substr($zipContent, 0, 300),
+            ];
+        }
+
+        $tmpZip = sys_get_temp_dir() . "/{$appId}_update.zip";
+        if (file_put_contents($tmpZip, $zipContent) === false) {
+            return ['error' => 'Cannot write temp ZIP'];
+        }
+
+        $zip = new \ZipArchive();
+        if ($zip->open($tmpZip) !== true) {
+            unlink($tmpZip);
+            return ['error' => 'ZIP open failed'];
+        }
+
+        $extractDir = sys_get_temp_dir() . "/{$appId}_extract";
+        @mkdir($extractDir, 0755, true);
+        $zip->extractTo($extractDir);
+        $zip->close();
+        unlink($tmpZip);
+
+        $dirs = glob("$extractDir/*", GLOB_ONLYDIR);
+        if (empty($dirs)) {
+            $this->rmdirRecursive($extractDir);
+            return ['error' => 'Empty archive'];
+        }
+        $sourceDir = $dirs[0];
+
+        // Downgrade guard: verify the version of the EXTRACTED code BEFORE
+        // touching the installed app. If the archive does not actually
+        // contain a newer version (stale cache, wrong tag, mix-up) — or its
+        // version cannot be verified at all — abort (fail closed).
+        $extractedVersion = $this->readAppVersion($sourceDir);
+        if ($installedVersion !== null) {
+            if ($extractedVersion === null) {
+                $this->rmdirRecursive($extractDir);
+                return [
+                    'error' => 'Cannot verify extracted app version — update aborted',
+                    'installed_version' => $installedVersion,
+                ];
+            }
+            $needsReapply = false;
+            if ($extractedVersion === $installedVersion) {
+                // Identical version — normally up to date. BUT: a previous
+                // update may have left the installed app in a broken,
+                // half-copied state (missing files) with the same version
+                // number. Heal it instead of reporting up_to_date forever.
+                if ($this->appHasCoreFiles($appPath)) {
+                    $this->rmdirRecursive($extractDir);
+                    return [
+                        'up_to_date' => true,
+                        'extracted_version' => $extractedVersion,
+                        'installed_version' => $installedVersion,
+                    ];
+                }
+                \OCP\Server::get(\Psr\Log\LoggerInterface::class)->warning(
+                    'SelfUpdate: installed app ' . $appId . ' reports version '
+                    . $installedVersion . ' but core files are missing — re-applying.',
+                    ['app' => $appId]
+                );
+                $needsReapply = true;
+            }
+            if (!$needsReapply && version_compare($extractedVersion, $installedVersion, '<=')) {
+                $this->rmdirRecursive($extractDir);
+                return [
+                    'error' => "Downgrade blocked: extracted app version {$extractedVersion} "
+                        . "is not newer than installed version {$installedVersion}",
+                    'extracted_version' => $extractedVersion,
+                    'installed_version' => $installedVersion,
+                ];
+            }
+        }
+
+        // Atomic swap: stage the new tree NEXT TO the live app first (the
+        // slow file-by-file copy then never affects running requests),
+        // then swap two sibling renames on the same filesystem.
+        $backupDir = $appPath . '.bak';
+        if (is_dir($backupDir)) {
+            $this->rmdirRecursive($backupDir);
+        }
+        $stagingDir = $appPath . '.new';
+        if (is_dir($stagingDir)) {
+            $this->rmdirRecursive($stagingDir);
+        }
+        // EXDEV-safe: the extract dir lives on the local filesystem
+        // (/tmp), the app dir possibly on NFS — rename() across mounts
+        // fails with "Invalid cross-device link". Copy file-by-file into
+        // the staging dir (same filesystem as the final app dir).
+        try {
+            $this->copyRecursive($sourceDir, $stagingDir);
+        } catch (\Throwable $e) {
+            $this->rmdirRecursive($stagingDir);
+            $this->rmdirRecursive($extractDir);
+            return ['error' => 'Cannot copy extracted app into staging: ' . $e->getMessage()];
+        }
+        if (!$this->appHasCoreFiles($stagingDir)) {
+            $this->rmdirRecursive($stagingDir);
+            $this->rmdirRecursive($extractDir);
+            return ['error' => 'Staged app is incomplete — update aborted'];
+        }
+        if (!rename($appPath, $backupDir)) {
+            $this->rmdirRecursive($stagingDir);
+            $this->rmdirRecursive($extractDir);
+            return ['error' => 'Cannot move current app to backup'];
+        }
+        if (!rename($stagingDir, $appPath)) {
+            // Restore backup, clean up staging.
+            if (!rename($backupDir, $appPath)) {
+                $this->rmdirRecursive($stagingDir);
+                $this->rmdirRecursive($extractDir);
+                return ['error' => 'FATAL: cannot move app to backup AND cannot restore it — app dir missing'];
+            }
+            $this->rmdirRecursive($stagingDir);
+            $this->rmdirRecursive($extractDir);
+            return ['error' => 'Cannot move staged app into place'];
+        }
+        $this->rmdirRecursive($sourceDir);
+
+        $enableResult = $this->enableApp($appId);
+        if (!empty($enableResult['error'])) {
+            // Rollback: restore backup, remove broken new version.
+            $this->rmdirRecursive($appPath);
+            if (!rename($backupDir, $appPath)) {
+                $this->rmdirRecursive($extractDir);
+                return ['error' => 'FATAL: enable failed AND backup restore failed — app dir missing'];
+            }
+            $this->rmdirRecursive($extractDir);
+            return $enableResult;
+        }
+
+        // Success: clean up backup.
+        $this->rmdirRecursive($backupDir);
+        $this->rmdirRecursive($extractDir);
+        return $enableResult;
+    }
+
+    /**
+     * Sanity check that an app directory contains the files the app needs
+     * to boot (autoload bootstrap + main entry points). Used to detect a
+     * half-copied install and to validate the staging directory before
+     * the atomic swap.
+     */
+    private function appHasCoreFiles(string $appDir): bool
+    {
+        $required = [
+            'appinfo/info.xml',
+            'composer/autoload.php',
+            'lib/Controller/PageController.php',
+            'lib/Service/L10nService.php',
+            // Frequently hit classes — a missing file here manifests as
+            // HTML 500 pages ("Invalid response from server" in the
+            // migration wizard), so they must trigger a heal re-apply too.
+            'lib/AppInfo/Application.php',
+            'lib/Controller/MigrationController.php',
+            'lib/Service/MigrationService.php',
+            'lib/Service/ProviderToolsClient.php',
+            'lib/Db/MigrationJobMapper.php',
+        ];
+        foreach ($required as $rel) {
+            if (!\is_file($appDir . '/' . $rel)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private function readAppVersion(string $appDir): ?string
+    {
+        $infoPath = $appDir . '/appinfo/info.xml';
+        if (!\is_file($infoPath)) {
+            return null;
+        }
+        $raw = @\file_get_contents($infoPath);
+        if ($raw === false) {
+            return null;
+        }
+        if (\preg_match('/<version>([^<]+)<\/version>/', $raw, $m) === 1) {
+            $v = \trim((string) ($m[1] ?? ''));
+            return $v !== '' ? $v : null;
+        }
+        return null;
+    }
+
+    private function enableApp(string $appId): array
+    {
+        if (!\function_exists('exec')) {
+            return ['error' => 'exec() is disabled — cannot run occ app:enable'];
+        }
+        $occOut = [];
+        $occExit = 0;
+        $occPath = \OC::$SERVERROOT . '/occ';
+        // PHP_BINARY instead of "php": cron often runs with a minimal PATH
+        // where the interpreter is not resolvable, failing every update.
+        exec(sprintf(
+            '%s %s app:enable %s 2>&1',
+            escapeshellarg(\PHP_BINARY),
+            escapeshellarg($occPath),
+            escapeshellarg($appId)
+        ), $occOut, $occExit);
+
+        $log = implode("\n", $occOut);
+        if ($occExit !== 0) {
+            return ['error' => "occ app:enable failed (exit $occExit)", 'occ_log' => $log];
+        }
+        return ['success' => true, 'occ_log' => $log, 'occ_exit' => $occExit];
+    }
+
+    private function acquireLock(string $appId): mixed
+    {
+        $lockFile = sys_get_temp_dir() . "/{$appId}_update.lock";
+        $fp = @fopen($lockFile, 'w+');
+        if ($fp === false) {
+            return null;
+        }
+        if (!flock($fp, LOCK_EX | LOCK_NB)) {
+            fclose($fp);
+            return null;
+        }
+        return $fp;
+    }
+
+    private function releaseLock(mixed $fp): void
+    {
+        if ($fp === null) {
+            return;
+        }
+        flock($fp, LOCK_UN);
+        fclose($fp);
+    }
+
+    private function readToken(): string
+    {
+        try {
+            $token = \OCP\Server::get(\OCP\IConfig::class)
+                ->getSystemValue('souvera.devops_token', '');
+            return trim((string) $token);
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
+    private function getRepo(): string
+    {
+        return match ($this->getAppId()) {
+            'souvera_mail' => 'Host-On/souvera_mail',
+            'souvera_central' => 'Host-On/souvera_central',
+            'souvera_shield' => 'Host-On/souvera_shield',
+            default => '',
+        };
+    }
+
+    private function apiGet(string $url): ?array
+    {
+        $token = $this->readToken();
+        if ($token === '') {
+            return null;
+        }
+        $client = \OCP\Server::get(\OCP\Http\Client\IClientService::class)->newClient();
+        try {
+            $response = $client->get($url, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $token,
+                    'User-Agent' => 'Souvera-DevOps',
+                    'Accept' => 'application/vnd.github+json',
+                ],
+                'timeout' => 15,
+                'connect_timeout' => 10,
+                'http_errors' => false,
+            ]);
+        } catch (\Throwable) {
+            return null;
+        }
+        if ($response->getStatusCode() >= 400) {
+            return null;
+        }
+        $data = json_decode((string) $response->getBody(), true);
+        return is_array($data) ? $data : null;
+    }
+
+    private function copyRecursive(string $src, string $dst): void
+    {
+        $dir = @opendir($src);
+        if ($dir === false) {
+            throw new \RuntimeException("Cannot open source directory $src");
+        }
+        @mkdir($dst, 0755, true);
+        while (($file = readdir($dir)) !== false) {
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+            $sp = "$src/$file";
+            $dp = "$dst/$file";
+            if (is_dir($sp)) {
+                $this->copyRecursive($sp, $dp);
+            } else {
+                if (!copy($sp, $dp)) {
+                    throw new \RuntimeException("Failed to copy $sp to $dp");
+                }
+                // Preserve executable bits from source.
+                $spPerms = @fileperms($sp);
+                if ($spPerms !== false) {
+                    @chmod($dp, $spPerms);
+                }
+            }
+        }
+        closedir($dir);
+    }
+
+    private function rmdirRecursive(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+        foreach (scandir($dir) as $f) {
+            if ($f === '.' || $f === '..') {
+                continue;
+            }
+            $p = "$dir/$f";
+            is_dir($p) ? $this->rmdirRecursive($p) : unlink($p);
+        }
+        rmdir($dir);
+    }
+}

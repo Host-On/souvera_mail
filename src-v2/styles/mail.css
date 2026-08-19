@@ -1,0 +1,52 @@
+/* souvera_mail v2 — Design Tokens & Responsive */
+
+#souvera-mail-v2-app {
+	height: 100%;
+	width: 100%;
+	--mail-transition: 0.2s ease;
+}
+
+.mail-loading {
+	display: flex;
+	justify-content: center;
+	padding: 48px;
+}
+
+/* TODO D.5: ersetzen durch clamp-Layout + matchMedia */
+@media (max-width: 1024px) {
+	.mail-list-panel {
+		width: 100% !important;
+		border-right: none !important;
+	}
+	/* Detail overlay is handled by MailHomeView (.mail-home--mobile .mail-home--detail-open) */
+	.compose-overlay {
+		z-index: 4000;
+	}
+	/* Force solid background on sidebar when it overlays content */
+	#souvera-mail-v2-app .app-navigation {
+		background-color: var(--color-main-background) !important;
+	}
+	/* Detail toolbar: no negative margins, wrap actions */
+	.email-detail {
+		padding: 0 !important;
+	}
+	.email-detail__toolbar {
+		flex-wrap: wrap; gap: 4px;
+		margin: 0 !important;
+		padding: 8px 12px;
+		border-radius: 0;
+	}
+	.email-detail__header {
+		margin: 0 !important;
+		padding: 12px 20px;
+	}
+	.email-detail__actions {
+		flex-wrap: wrap;
+	}
+	.email-detail__header h2 {
+		font-size: 17px;
+	}
+	.email-detail__body {
+		margin: 0 !important;
+	}
+}

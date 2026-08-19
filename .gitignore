@@ -1,0 +1,15 @@
+.env
+.env.*
+*.env
+credentials.json
+*.pem
+*.key
+.credentials
+
+# Operator live-debug access — never push to GitHub
+memory/operator_access.md
+
+# Vue 3 build artefacts (compiled bundles are committed, deps aren't)
+node_modules/
+yarn-error.log
+npm-debug.log

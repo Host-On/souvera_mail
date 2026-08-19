@@ -1,0 +1,418 @@
+================================================================================
+  Souvera Mail — Login-Flow Client Integration Guide
+  Endpoint: POST /apps/souvera_mail/app-passwords/login-flow
+  Introduced in: v0.18.0 (2026-02)
+================================================================================
+
+WHY THIS ENDPOINT EXISTS
+--------------------------------------------------------------------------------
+
+Souvera's mail backend (Stalwart 0.16) does NOT accept a caller-supplied
+plaintext when creating an Application Password — it always generates its own.
+Nextcloud's stock `/login/v2/poll` flow does the same but with ITS own CSPRNG,
+so two independent secrets come out.
+
+That means: a client that uses NC's stock login-flow ends up with a Nextcloud
+credential that DOES NOT WORK for IMAP/SMTP/Sieve, and vice-versa. Users would
+need to type two separate passwords into their device.
+
+This endpoint solves that: ONE call, ONE plaintext secret, works for BOTH
+Nextcloud (files/DAV/CalDAV/CardDAV) AND Mail (IMAP/SMTP/Sieve). The Stalwart
+side owns the plaintext; the NC side is paired to the SAME plaintext via
+Souvera Mail's `AppPasswordService::createForUser()`.
+
+For the WEB flow (browser → Souvera Mail settings page) users already have this
+capability. This document is ONLY for native/headless clients that cannot open
+a browser.
+
+================================================================================
+  RELATED ENDPOINTS — WHICH ONE TO USE
+================================================================================
+
+  /apps/souvera_mail/app-passwords/login-flow   ← this document
+      General-purpose endpoint. Any authenticated user provisions a
+      NEW paired credential from scratch. Use for:
+        - First provisioning (no prior NC session)
+        - Session-cookie or OIDC-bearer auth flows
+        - Programmatic tools (curl scripts, backup runners)
+        - Password ROTATION (see docs/PASSWORD_ROTATION.txt)
+
+  /apps/souvera_mail/app-passwords/upgrade      ← see CLIENT_UPGRADE_PATTERN.txt
+      OPTIMIZED sub-case for native clients that just went through
+      NC's stock `/login/v2/*` flow and hold an NC-only X they
+      want to atomically upgrade to a paired Y (with automatic
+      X-invalidation). Prefer this over /login-flow when applicable —
+      it prevents "zombie NC tokens" in the user's device list.
+
+  /apps/souvera_mail/me
+      Identity + server-hint endpoint. Returns email, displayName,
+      server URL, rotation policy. Call after login-flow / upgrade
+      to complete client bootstrap.
+
+
+================================================================================
+  REQUEST
+================================================================================
+
+    POST https://<your-nextcloud-host>/apps/souvera_mail/app-passwords/login-flow
+
+Required headers (pick ONE authentication mechanism):
+
+    a) Basic-Auth (recommended for first-time device setup):
+       Authorization: Basic base64(<username>:<user-password>)
+
+    b) Session cookie (recommended after a prior OIDC/WebView login):
+       Cookie: nc_session_id=...; oc_sessionPassphrase=...
+
+    c) OIDC Bearer token (recommended when your app already speaks OIDC):
+       Authorization: Bearer <access-token>
+
+Optional headers:
+
+    Content-Type: application/json         (only if you send a body)
+    User-Agent:   Souvera-android/1.0.2    (also becomes part of the
+                                            token description if you
+                                            omit `description` — makes
+                                            multiple devices distinguishable
+                                            in the connected-devices list)
+
+Optional body (JSON):
+
+    {
+      "description": "My Souvera Phone"
+    }
+
+The `description` is what shows up next to the device in Nextcloud's
+`/settings/user/security` connected-devices list, and in Souvera Mail's
+own App-Passwords list. Max 120 chars (silently truncated). If omitted,
+we auto-generate: `Souvera Client — <User-Agent> — YYYY-MM-DD`.
+
+================================================================================
+  RESPONSE
+================================================================================
+
+  200 OK — success
+
+    Content-Type: application/json
+
+    {
+      "status":      "ok",
+      "server":      "https://mail.example.com",
+      "loginName":   "philip",
+      "appPassword": "app_kQhx3nMs7bL9pRt2vY6zJ8fW1cE4dA5oIuP",
+      "stalwartId":  "1a2b3c4d5e6f",
+      "description": "Souvera Client — Souvera-android/1.0.2 — 2026-02-20",
+      "createdAt":   "2026-02-20T15:42:03Z"
+    }
+
+  Field guarantees:
+
+    - `server`      — the base URL for building DAV / CalDAV / CardDAV
+                      endpoints. No trailing slash. Concat like:
+                        `<server>/remote.php/dav/files/<loginName>/`
+    - `loginName`   — the user id to use as the SASL username for both
+                      IMAP/SMTP and NC Basic-Auth.
+    - `appPassword` — plaintext secret. RETURNED ONLY ONCE. If the
+                      client loses it, the user must generate a new one.
+                      Persist immediately in secure OS storage:
+                        Android → EncryptedSharedPreferences / Keystore
+                        iOS     → Keychain (kSecClassGenericPassword)
+                        Desktop → libsecret (Linux) / DPAPI (Win) / Keychain (macOS)
+    - `stalwartId`  — Stalwart's App-Password id. Store this too — you
+                      need it to call `DELETE /apps/souvera_mail/app-passwords/<id>`
+                      when the user logs out or removes the device.
+    - `createdAt`   — ISO-8601 UTC. Parse with Instant.parse (Kotlin),
+                      ISO8601DateFormatter (iOS), datetime.fromisoformat
+                      (Python).
+
+  400 Bad Request — description too long or empty after trim
+
+    { "status": "error", "message": "description must not be empty" }
+
+  401 Unauthorized — auth missing or wrong
+
+    { "status": "error",
+      "message": "unauthenticated — send Authorization: Basic ..." }
+
+    NOTE: Every 401 also increments a brute-force counter for the source
+    IP. After ~10 failures within 12 hours, subsequent requests are
+    throttled with exponential delay (Nextcloud's built-in protection).
+
+  429 Too Many Requests — brute-force throttle active
+
+    Wait 12+ hours or clear via `occ security:bruteforce:reset <ip>`
+    (admin only).
+
+  502 Bad Gateway — Stalwart or NC token creation failed
+
+    { "status": "error", "message": "<details>" }
+
+  503 Service Unavailable — server not configured for combined passwords
+
+    { "status": "error",
+      "message": "App passwords are unavailable on this instance: ..." }
+
+================================================================================
+  USING THE SECRET (once you have it)
+================================================================================
+
+The single `appPassword` is the credential for:
+
+  Nextcloud files / DAV / CalDAV / CardDAV:
+      Basic-Auth on `<server>/remote.php/dav/…`
+      Username = `loginName`, Password = `appPassword`
+
+  Mail (IMAP receive):
+      Host    = <mail-host>              (typically same as `server` host,
+                                          verify via your admin / SRV records)
+      Port    = 993 (IMAPS) or 143 (STARTTLS)
+      SASL    = LOGIN or PLAIN
+      User    = <user-email>             (NOT necessarily `loginName` — for
+                                          the exact address, call
+                                          `GET /apps/souvera_mail/me` — returns
+                                          `email`, `displayName`, `server`,
+                                          and the rotation-policy hint. See
+                                          docs/PASSWORD_ROTATION.txt.)
+      Pass    = `appPassword`
+
+  Mail (SMTP send):
+      Host    = <mail-host>
+      Port    = 465 (implicit TLS) or 587 (STARTTLS)
+      SASL    = LOGIN or PLAIN
+      User    = <user-email>
+      Pass    = `appPassword`
+
+  Sieve (server-side filters, optional):
+      Host    = <mail-host>
+      Port    = 4190
+      SASL    = PLAIN
+      Pass    = `appPassword`
+
+  The permission set that the paired Stalwart password grants is
+  comprehensive on purpose — see AppPasswordService::APP_PASSWORD_PERMISSIONS
+  in the backend source for the exact list (JMAP + IMAP + POP3 + Sieve).
+
+================================================================================
+  EXAMPLE — cURL / Desktop
+================================================================================
+
+    USER='philip'
+    PASS='<user-plaintext-password>'
+    HOST='https://mail.example.com'
+
+    curl -X POST \
+         -u "$USER:$PASS" \
+         -H "Content-Type: application/json" \
+         -H "User-Agent: Souvera-desktop/1.0.0" \
+         -d '{"description":"My Linux Desktop"}' \
+         "$HOST/apps/souvera_mail/app-passwords/login-flow"
+
+Response (indented for readability):
+
+    {
+      "status":      "ok",
+      "server":      "https://mail.example.com",
+      "loginName":   "philip",
+      "appPassword": "app_kQhx3nMs7bL9pRt2vY6zJ8fW1cE4dA5oIuP",
+      "stalwartId":  "1a2b3c4d5e6f",
+      "createdAt":   "2026-02-20T15:42:03Z"
+    }
+
+Store the `appPassword` (e.g. `secret-tool store ...` on Linux with libsecret,
+`security add-generic-password` on macOS) and use it as the password field for
+BOTH `davfs2` mounts and your mail client (Thunderbird, mbsync, isync, etc.).
+
+================================================================================
+  EXAMPLE — Kotlin / Android (OkHttp)
+================================================================================
+
+    // build.gradle: implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
+    import okhttp3.Credentials
+    import okhttp3.MediaType.Companion.toMediaType
+    import okhttp3.OkHttpClient
+    import okhttp3.Request
+    import okhttp3.RequestBody.Companion.toRequestBody
+    import org.json.JSONObject
+
+    data class SouveraLoginResult(
+        val server: String,
+        val loginName: String,
+        val appPassword: String,
+        val stalwartId: String,
+    )
+
+    suspend fun souveraLogin(
+        host: String,          // e.g. "https://mail.example.com"
+        username: String,
+        userPassword: String,
+        description: String? = null,
+    ): SouveraLoginResult {
+        val client = OkHttpClient()
+        val bodyJson = JSONObject().apply {
+            if (description != null) put("description", description)
+        }.toString()
+        val request = Request.Builder()
+            .url("$host/apps/souvera_mail/app-passwords/login-flow")
+            .header("Authorization", Credentials.basic(username, userPassword))
+            .header("User-Agent", "Souvera-android/1.0.2 (${android.os.Build.MODEL})")
+            .header("Content-Type", "application/json")
+            .post(bodyJson.toRequestBody("application/json".toMediaType()))
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            val bodyStr = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                throw RuntimeException("Souvera login-flow failed: HTTP ${response.code} — $bodyStr")
+            }
+            val json = JSONObject(bodyStr)
+            return SouveraLoginResult(
+                server      = json.getString("server"),
+                loginName   = json.getString("loginName"),
+                appPassword = json.getString("appPassword"),
+                stalwartId  = json.getString("stalwartId"),
+            )
+        }
+    }
+
+    // Persist immediately:
+    //   EncryptedSharedPreferences.create(context, "souvera",
+    //       MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC),
+    //       PrefKeyEncryptionScheme.AES256_SIV,
+    //       PrefValueEncryptionScheme.AES256_GCM)
+    //     .edit()
+    //     .putString("app_password", result.appPassword)
+    //     .putString("stalwart_id",  result.stalwartId)
+    //     .apply()
+
+================================================================================
+  EXAMPLE — Swift / iOS (URLSession)
+================================================================================
+
+    import Foundation
+
+    struct SouveraLoginResult: Decodable {
+        let server:      String
+        let loginName:   String
+        let appPassword: String
+        let stalwartId:  String
+    }
+
+    enum SouveraLoginError: Error { case http(Int, String); case decode }
+
+    func souveraLogin(
+        host: URL,
+        username: String,
+        userPassword: String,
+        description: String? = nil
+    ) async throws -> SouveraLoginResult {
+        let url = host.appendingPathComponent("apps/souvera_mail/app-passwords/login-flow")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+
+        let credData = "\(username):\(userPassword)".data(using: .utf8)!
+        req.setValue("Basic \(credData.base64EncodedString())",
+                     forHTTPHeaderField: "Authorization")
+        req.setValue("Souvera-ios/1.0.0",  forHTTPHeaderField: "User-Agent")
+        req.setValue("application/json",   forHTTPHeaderField: "Content-Type")
+
+        if let description = description {
+            req.httpBody = try JSONEncoder().encode(["description": description])
+        } else {
+            req.httpBody = "{}".data(using: .utf8)
+        }
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? "<binary>"
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw SouveraLoginError.http(code, body)
+        }
+        return try JSONDecoder().decode(SouveraLoginResult.self, from: data)
+    }
+
+    // Persist immediately in Keychain (kSecClassGenericPassword,
+    // kSecAttrService = "souvera-mail", kSecAttrAccount = loginName,
+    // kSecValueData = appPassword.data(using: .utf8)).
+
+================================================================================
+  EXAMPLE — Rust / Desktop (reqwest, blocking)
+================================================================================
+
+    // Cargo.toml:
+    //   reqwest = { version = "0.12", features = ["blocking", "json"] }
+    //   serde   = { version = "1", features = ["derive"] }
+
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct SouveraLoginResult {
+        server: String,
+        #[serde(rename = "loginName")]  login_name: String,
+        #[serde(rename = "appPassword")] app_password: String,
+        #[serde(rename = "stalwartId")]  stalwart_id: String,
+    }
+
+    fn souvera_login(host: &str, user: &str, pass: &str, desc: Option<&str>)
+        -> Result<SouveraLoginResult, Box<dyn std::error::Error>>
+    {
+        let url = format!("{host}/apps/souvera_mail/app-passwords/login-flow");
+        let body = serde_json::json!({ "description": desc.unwrap_or("") });
+        let client = reqwest::blocking::Client::new();
+        let resp = client.post(&url)
+            .basic_auth(user, Some(pass))
+            .header("User-Agent", "Souvera-desktop/1.0.0")
+            .json(&body)
+            .send()?;
+        if !resp.status().is_success() {
+            return Err(format!("HTTP {} — {}", resp.status(), resp.text()?).into());
+        }
+        Ok(resp.json()?)
+    }
+
+    // Persist immediately via keyring crate:
+    //   let entry = keyring::Entry::new("souvera-mail", &result.login_name)?;
+    //   entry.set_password(&result.app_password)?;
+
+================================================================================
+  REVOCATION
+================================================================================
+
+When the user logs out, unpairs the device, or wants to rotate credentials:
+
+    DELETE https://<host>/apps/souvera_mail/app-passwords/<stalwartId>
+
+Auth: Basic-Auth with the SAME `appPassword` you were issued (or the user's
+main password, or a session cookie / OIDC token). The delete cascades to
+BOTH sides — the NC token and the Stalwart password disappear together.
+
+For "sign out from all other devices" use:
+
+    POST https://<host>/apps/souvera_mail/connected-devices/sign-out-others
+
+================================================================================
+  BRUTE-FORCE PROTECTION
+================================================================================
+
+The endpoint is guarded by NC's built-in `BruteForceMiddleware`:
+  - Action: `souvera_mail_login_flow`
+  - Every 401 (bad credentials) increments the counter for the source IP.
+  - After ~10 failures in 12 h, subsequent requests are delayed
+    exponentially (up to ~30 s).
+  - After more failures, requests are rejected outright with 429.
+
+An admin can reset the counter for a specific IP:
+
+    sudo -u www-data php /var/www/nextcloud/occ security:bruteforce:reset <ip>
+
+Successful requests do NOT increment the counter.
+
+================================================================================
+  CHANGELOG
+================================================================================
+
+v0.18.0 (2026-02) — endpoint introduced.
+v0.18.0            — fixed `AppPasswordService::$inRevoke` undeclared property
+                    (log-spam on every revoke call, PHP 8.2+ deprecation).
+
+================================================================================

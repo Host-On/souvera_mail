@@ -1,0 +1,92 @@
+/*
+ * Souvera Mail — /settings/user/security hijack CSS.
+ *
+ * Hides Nextcloud's built-in "Create new app password" form for
+ * members of the souvera-users group and makes room for our
+ * SouveraMail-branded notice card injected by
+ * security-page-hijack.js.
+ *
+ * Selectors are intentionally SPECIFIC and defensive. NC 33-35 uses
+ * a Vue-rendered section under `#security` with the Vue component
+ * class `.new-token`. We ALSO target the well-known input id
+ * `#new-token-name` as a hardening measure — if Vue class names
+ * change but the input persists, we still hide correctly.
+ *
+ * The list of existing tokens is DELIBERATELY LEFT VISIBLE so users
+ * can revoke individual tokens if needed.
+ */
+
+/* Hide the "Create new app password" form outright. */
+#security .new-token,
+#security form[data-testid="new-token"],
+#security #new-token-name,
+#security button[data-testid="add-token-button"] {
+    display: none !important;
+}
+
+/* Any lingering label / hint text next to the removed input. */
+#security .new-token + p,
+#security .new-token + .hint {
+    display: none !important;
+}
+
+/*
+ * The Souvera-branded notice card — injected by the JS above the
+ * list of existing tokens.
+ */
+.souvera-mail-security-notice {
+    background: var(--color-primary-element-light, #e3f2fd);
+    color: var(--color-primary-element-text, #1e2b3a);
+    border: 1px solid var(--color-primary-element, #1976d2);
+    border-radius: var(--border-radius-large, 12px);
+    padding: 16px 20px;
+    margin: 12px 0 24px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    line-height: 1.5;
+}
+
+.souvera-mail-security-notice .icon {
+    font-size: 24px;
+    flex: 0 0 24px;
+    line-height: 1;
+    padding-top: 2px;
+}
+
+.souvera-mail-security-notice .body {
+    flex: 1 1 auto;
+}
+
+.souvera-mail-security-notice h3 {
+    margin: 0 0 6px 0;
+    font-size: 1.05em;
+    font-weight: 600;
+}
+
+.souvera-mail-security-notice p {
+    margin: 0 0 12px 0;
+}
+
+.souvera-mail-security-notice .actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.souvera-mail-security-notice a.button.primary {
+    background: var(--color-primary-element, #1976d2);
+    color: var(--color-primary-element-text-inverted, #fff);
+    padding: 6px 14px;
+    border-radius: var(--border-radius, 6px);
+    text-decoration: none;
+    font-weight: 600;
+    display: inline-block;
+    line-height: 1.4;
+}
+
+.souvera-mail-security-notice a.button.primary:hover {
+    filter: brightness(1.05);
+    text-decoration: none;
+}
