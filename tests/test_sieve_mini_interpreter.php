@@ -35,18 +35,18 @@ $check = static function (bool $cond, string $msg) use (&$passes, &$failures): v
 };
 
 // -------------------------------------------------------------------
-// Real-world script from the operator's screenshot ("Emergent —
-// Weiterleiten nach s.grassegger@…"). Snappymail generates a flat
+// Real-world script from the operator's screenshot ("Newsletters —
+// Weiterleiten nach user@…"). Snappymail generates a flat
 // `if allof (...) { fileinto; redirect; stop; }` pattern.
 // -------------------------------------------------------------------
 $script = <<<'SIEVE'
 require ["fileinto","imap4flags","envelope","body"];
 
-# Emergent (Weiterleiten nach s.grassegger@)
-if allof (header :contains "From" "@emergent.com")
+# Newsletters (Weiterleiten nach user@)
+if allof (header :contains "From" "@example.com")
 {
-    fileinto "Emergent";
-    redirect "s.grassegger@extern.de";
+    fileinto "Newsletters";
+    redirect "user@extern.de";
     stop;
 }
 
@@ -74,22 +74,22 @@ $check(\count($rules) === 3, 'parses 3 top-level rules (Emergent, Newsletter, Sp
 // -------------------------------------------------------------------
 $m = new MessageFacts(
     'M1',
-    ['From' => 'CI Bot <ci@emergent.com>', 'Subject' => 'Build 1234'],
-    'ci@emergent.com',
+    ['From' => 'CI Bot <ci@example.com>', 'Subject' => 'Build 1234'],
+    'ci@example.com',
     ['philip@grassegger.souvera.work'],
     2048
 );
 $r = $engine->evaluate($m);
 $check($r->fileintoTarget() === 'Emergent',
-    'Emergent rule → fileinto "Emergent"');
-$check($r->redirectTargets() === ['s.grassegger@extern.de'],
-    'Emergent rule → redirect s.grassegger@extern.de');
+    'Emergent rule → fileinto "Newsletters"');
+$check($r->redirectTargets() === ['user@extern.de'],
+    'Emergent rule → redirect user@extern.de');
 // Because `stop;` fired, later rules must NOT contribute — verify by
 // giving the message ALSO a newsletter-like header:
 $m2 = new MessageFacts(
     'M2',
-    ['From' => 'ci@emergent.com', 'List-Unsubscribe' => '<https://foo/unsubscribe>'],
-    'ci@emergent.com',
+    ['From' => 'ci@example.com', 'List-Unsubscribe' => '<https://foo/unsubscribe>'],
+    'ci@example.com',
     ['philip@…'],
     3072
 );

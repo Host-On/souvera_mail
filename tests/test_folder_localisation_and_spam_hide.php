@@ -3,7 +3,7 @@
  * Regression test for the folder-name localisation + Spam/Junk
  * auto-hide shipped in Souvera Mail 0.13.13.
  *
- * Operator report (2026-07-01)
+ * Report (2026-07-01)
  * ----------------------------
  *  - Shared-mailbox folders show their raw English IMAP leaf names
  *    ("Deleted Items", "INBOX", "Sent Items", "Drafts") because

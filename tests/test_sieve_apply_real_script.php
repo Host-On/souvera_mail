@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /**
  * v0.14.48 — Regression suite for "meine Filter werden völlig ignoriert"
- * (operator report 2026-07-15, after the dispatcher limit fix).
+ * (report 2026-07-15, after the dispatcher limit fix).
  *
  * Root cause: Snappymail's filter UI emits the MIXED argument form
  *   `if header :contains ["From"] "emergent"`

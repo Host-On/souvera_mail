@@ -80,7 +80,7 @@ $check(\str_contains($svcSrc, 'urn:ietf:params:jmap:submission'),
 // v0.14.42: every Mailbox/*, Email/query|get|set call must add the mail
 // capability to the top-level `using` array. Stalwart 0.16 rejects
 // method invocations whose required capability is missing from `using`
-// with `unknownMethod` (operator report 2026-02-19).
+// with `unknownMethod` (report 2026-02-19).
 $check(\str_contains($svcSrc, "CAP_MAIL = 'urn:ietf:params:jmap:mail'"),
     "service declares CAP_MAIL constant for Mailbox/*, Email/* JMAP capability");
 $check(

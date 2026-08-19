@@ -2,7 +2,7 @@
 /**
  * v0.17.2 — Regression pin for the /embed AJAX 404 fix.
  *
- * Operator report to v0.17.1:
+ * Report to v0.17.1:
  *   „/embed liefert weiterhin: 'An error occurred. Please refresh
  *    the page and try again. Error: Network response error: 404'"
  *

@@ -2,7 +2,7 @@
 /**
  * v0.17.3 — Regression pin for the /embed top-gap layout fix.
  *
- * Operator report to v0.17.2 (translated):
+ * Report to v0.17.2 (translated):
  *   „The /embed route works, but there's an empty gap at the top of the
  *    screen where the Nextcloud menu used to be. The mail client should
  *    sit flush against the top edge of the window."

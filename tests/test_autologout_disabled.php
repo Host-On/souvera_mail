@@ -3,7 +3,7 @@
  * Regression test for the auto-logout disable fix shipped in
  * Souvera Mail 0.13.13.
  *
- * Operator report (2026-07-01, follow-up)
+ * Report (2026-07-01, follow-up)
  * ---------------------------------------
  * "Nach einer ganzen Weile kommt plötzlich Folders error:
  *  AuthError[102]" + "grad hab ich plötzlich nochmal nen kurzen

@@ -74,7 +74,7 @@ assertTrue(str_contains($svc, "'/jmap/upload/'") && str_contains($svc, "\\rawurl
     $passes, $failures);
 // Negative guard against the broken query-param form ever coming back.
 assertTrue(!str_contains($svc, "'/jmap/upload?account='"),
-    "SieveScriptService MUST NOT use the query-param form '?account=' (partner-agent diagnosis 2026-02-19)",
+    "SieveScriptService MUST NOT use the query-param form '?account=' (diagnosis 2026-02-19)",
     $passes, $failures);
 
 // ---------------------------------------------------------------

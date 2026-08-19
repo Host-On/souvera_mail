@@ -9,7 +9,7 @@
  *
  * `SEARCH ALL` returns UIDs ascending per RFC 3501 §7.2.5, which puts
  * OLDEST messages at the top of the list — the exact "Sortieren nach
- * Datum funktioniert gar nicht" bug the operator reported on their
+ * Datum funktioniert gar nicht" bug the reported on their
  * live cluster.
  *
  * Our patch (in

@@ -340,7 +340,7 @@ foreach ([
 // -------------------------------------------------------------------
 // H. Stalwart 0.16 pagination guard — Email/query.limit is capped at
 //    500 per JMAP call ("Parameter limit must be between 1 and 500",
-//    operator report 2026-02-19). Service MUST paginate — a single
+//    report 2026-02-19). Service MUST paginate — a single
 //    call with limit=5000 gets rejected with a JMAP error, which
 //    (pre-pagination) bubbled up as a raw HTML 500 because it
 //    happened at the entry point of apply() and one particular
@@ -357,7 +357,7 @@ $check(
 );
 $check(
     \str_contains($svcSrc, 'JMAP_PAGE_LIMIT = 250'),
-    'queryMessageIds() page-limit constant is 250 (safely below Stalwart 0.16 cap of ~500; v0.14.45 tightened from 500 → 250 after operator report that limit=500 still hit "must be between 1 and 500")'
+    'queryMessageIds() page-limit constant is 250 (safely below Stalwart 0.16 cap of ~500; v0.14.45 tightened from 500 → 250 after report that limit=500 still hit "must be between 1 and 500")'
 );
 $check(
     \preg_match(

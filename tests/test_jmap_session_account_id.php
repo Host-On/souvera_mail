@@ -4,7 +4,7 @@ declare(strict_types=1);
 /**
  * v0.14.36 — JMAP session-based accountId resolution.
  *
- * Partner-agent diagnosis (2026-02-19): the Shield/Sieve UI surfaced
+ * Diagnosis (2026-02-19): the Shield/Sieve UI surfaced
  * `CantSaveFilters[351]` because the previous `resolveAccountId()`
  * delegated to `souvera_central::StalwartService::findAccountId($email)`
  * — that call returned a truncated single character (`'d'` instead of

@@ -3,7 +3,7 @@
  * Regression test for the 0.13.20 Settings-tab dark-mode + AppPassword-
  * shape fixes.
  *
- * Two operator reports on 2026-07-01 (buxte cluster `fccec267`) drove
+ * Two reports on 2026-07-01 (buxte cluster `fccec267`) drove
  * this release:
  *
  * 1) Dark mode: the Settings tab's section titles and the "Verbundene
