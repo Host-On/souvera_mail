@@ -360,7 +360,7 @@ class SieveApplyService
     /**
      * Best-effort case-insensitive lookup — also strips a leading `INBOX/`
      * for shared/namespaced folders where Snappymail's sieve.js emits e.g.
-     * `fileinto "INBOX/Emergent";`.
+     * `fileinto "INBOX/Newsletters";`.
      * @param array<int, array{id:string,name:string,role:?string}> $mailboxes
      */
     private function findMailboxByName(array $mailboxes, string $name): ?string
