@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.5] — 2026-08
+
+### Fixed
+
+- Mail-Push-Vorschau: Stalwart liefert bodyValues nur, wenn "bodyValues" in
+  den Email/get-properties steht — Webhook und Poller fordern die
+  Text-Vorschau jetzt korrekt an (fetchTextBodyValues + maxBodyValueBytes)
+  und extrahieren sie robust aus bodyValues (live verifiziert).
+
 ## [1.2.4] — 2026-08
 
 ### Changed

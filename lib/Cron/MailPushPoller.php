@@ -156,6 +156,28 @@ class MailPushPoller extends TimedJob
      * on the second call.
      */
     /**
+     * Extrahiert eine Text-Vorschau aus den bodyValues einer Email/get-Antwort.
+     * Stalwart liefert bodyValues nur, wenn "bodyValues" in properties steht.
+     *
+     * @param array<string, mixed> $email Email-Objekt aus Email/get
+     */
+    private function extractPreview(array $email): string
+    {
+        $bodyValues = $email['bodyValues'] ?? null;
+        if (!\is_array($bodyValues)) {
+            return '';
+        }
+        $parts = [];
+        foreach ($bodyValues as $part) {
+            if (\is_array($part) && isset($part['value']) && \is_string($part['value'])) {
+                $parts[] = $part['value'];
+            }
+        }
+        $text = \trim(\preg_replace('/\s+/u', ' ', \implode(' ', $parts)) ?? '');
+        return \mb_substr($text, 0, 300);
+    }
+
+    /**
      * Holt Betreff + Absender der neuesten Inbox-Mail für die Push-Ansicht.
      * Fehler sind hier unkritisch (der Push geht trotzdem raus, nur mit
      * generischem Text).
@@ -176,8 +198,10 @@ class MailPushPoller extends TimedJob
                     ['Email/get', [
                         'accountId' => $accountId,
                         'ids' => [$emailId],
-                        'properties' => ['subject', 'from'],
+                        'properties' => ['subject', 'from', 'bodyValues'],
                         'bodyProperties' => ['preview'],
+                        'fetchTextBodyValues' => true,
+                        'maxBodyValueBytes' => 512,
                     ], 'g0'],
                 ],
                 ['urn:ietf:params:jmap:mail'],
@@ -192,6 +216,9 @@ class MailPushPoller extends TimedJob
                 $from = (string) ($fromArr[0]['name'] ?? $fromArr[0]['email'] ?? '');
             }
             $preview = (string) ($first['preview'] ?? '');
+            if ($preview === '') {
+                $preview = $this->extractPreview($first);
+            }
             return ['subject' => $subject, 'from' => $from, 'preview' => $preview];
         } catch (\Throwable $e) {
             $this->logger->debug(

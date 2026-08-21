@@ -387,6 +387,28 @@ class StalwartWebhookController extends Controller
     }
 
     /**
+     * Extrahiert eine Text-Vorschau aus den bodyValues einer Email/get-Antwort.
+     * Stalwart liefert bodyValues nur, wenn "bodyValues" in properties steht.
+     *
+     * @param array<string, mixed> $email Email-Objekt aus Email/get
+     */
+    private function extractPreview(array $email): string
+    {
+        $bodyValues = $email['bodyValues'] ?? null;
+        if (!\is_array($bodyValues)) {
+            return '';
+        }
+        $parts = [];
+        foreach ($bodyValues as $part) {
+            if (\is_array($part) && isset($part['value']) && \is_string($part['value'])) {
+                $parts[] = $part['value'];
+            }
+        }
+        $text = \trim(\preg_replace('/\s+/u', ' ', \implode(' ', $parts)) ?? '');
+        return \mb_substr($text, 0, 300);
+    }
+
+    /**
      * Betreff, Absender und Text-Vorschau der neuen Mail per JMAP (als User).
      * Fehler sind bewusst nicht fatal - der Push geht dann ohne Anreicherung
      * raus (z. B. wenn OIDC auf der Instanz gerade nicht verfuegbar ist).
@@ -405,8 +427,10 @@ class StalwartWebhookController extends Controller
                     ['Email/get', [
                         'accountId' => $accountId,
                         'ids' => [$emailId],
-                        'properties' => ['subject', 'from'],
+                        'properties' => ['subject', 'from', 'bodyValues'],
                         'bodyProperties' => ['preview'],
+                        'fetchTextBodyValues' => true,
+                        'maxBodyValueBytes' => 512,
                     ], 'g0'],
                 ],
                 ['urn:ietf:params:jmap:mail'],
@@ -421,6 +445,9 @@ class StalwartWebhookController extends Controller
                 $from = (string) ($fromArr[0]['name'] ?? $fromArr[0]['email'] ?? '');
             }
             $preview = (string) ($first['preview'] ?? '');
+            if ($preview === '') {
+                $preview = $this->extractPreview($first);
+            }
             return ['subject' => $subject, 'from' => $from, 'preview' => $preview];
         } catch (\Throwable $e) {
             $this->logger->debug(
