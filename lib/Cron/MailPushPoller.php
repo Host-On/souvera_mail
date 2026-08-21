@@ -69,10 +69,12 @@ class MailPushPoller extends TimedJob
         }
 
         foreach ($byUser as $userId => $userTokens) {
-            $state = $this->resolveInboxState($userId);
-            if ($state === null) {
+            $snapshot = $this->resolveInboxSnapshot($userId);
+            if ($snapshot === null) {
                 continue;
             }
+            $state = $snapshot['state'];
+            $details = null; // lazy: erst holen, wenn wirklich ein Push rausgeht
             foreach ($userTokens as $token) {
                 if ($token->getLastPushState() === $state) {
                     continue;
@@ -92,11 +94,24 @@ class MailPushPoller extends TimedJob
                 if ($isBaseline) {
                     continue;
                 }
+                if ($details === null) {
+                    $details = $this->fetchEmailDetails($userId, $snapshot['emailId']);
+                }
+                $data = [
+                    'type' => 'new_mail',
+                    'emailId' => $snapshot['emailId'],
+                    'mailboxPath' => 'INBOX',
+                    'subject' => $details['subject'],
+                    'sender' => $details['from'],
+                ];
+                $body = $details['subject'] !== ''
+                    ? $details['subject']
+                    : 'Du hast eine neue Nachricht erhalten.';
                 $this->fcm->send(
                     [$token->getFcmToken()],
                     'Neue E-Mail',
-                    'Du hast eine neue Nachricht erhalten.',
-                    ['type' => 'new_mail'],
+                    $body,
+                    $data,
                 );
             }
         }
@@ -139,7 +154,59 @@ class MailPushPoller extends TimedJob
      * be read back into PHP and spliced into a literal `filter` object
      * on the second call.
      */
-    private function resolveInboxState(string $userId): ?string
+    /**
+     * Holt Betreff + Absender der neuesten Inbox-Mail für die Push-Ansicht.
+     * Fehler sind hier unkritisch (der Push geht trotzdem raus, nur mit
+     * generischem Text).
+     *
+     * @return array{subject: string, from: string}
+     */
+    private function fetchEmailDetails(string $userId, string $emailId): array
+    {
+        if ($emailId === '') {
+            return ['subject' => '', 'from' => ''];
+        }
+        try {
+            $bearer = $this->userContext->resolveBearer($userId);
+            $accountId = $this->userContext->resolveAccountId($userId);
+            $response = $this->stalwartAdmin->jmapCall(
+                $bearer,
+                [
+                    ['Email/get', [
+                        'accountId' => $accountId,
+                        'ids' => [$emailId],
+                        'properties' => ['subject', 'from'],
+                    ], 'g0'],
+                ],
+                ['urn:ietf:params:jmap:mail'],
+            );
+            $get = $this->stalwartAdmin->extractMethodResponse($response, 'Email/get');
+            $list = $get['list'] ?? [];
+            $first = \is_array($list) && isset($list[0]) && \is_array($list[0]) ? $list[0] : [];
+            $subject = (string) ($first['subject'] ?? '');
+            $from = '';
+            $fromArr = $first['from'] ?? null;
+            if (\is_array($fromArr) && isset($fromArr[0]) && \is_array($fromArr[0])) {
+                $from = (string) ($fromArr[0]['name'] ?? $fromArr[0]['email'] ?? '');
+            }
+            return ['subject' => $subject, 'from' => $from];
+        } catch (\Throwable $e) {
+            $this->logger->debug(
+                'Souvera Mail: MailPushPoller could not fetch email details for "'
+                . $userId . '": ' . $e->getMessage(),
+                ['app' => 'souvera_mail']
+            );
+            return ['subject' => '', 'from' => ''];
+        }
+    }
+
+    /**
+     * Ermittelt Inbox-queryState UND die JMAP-Id der neuesten Inbox-Mail
+     * in EINEM Durchlauf (das Email/query mit limit=1 liefert beides).
+     *
+     * @return array{state: string, emailId: string}|null
+     */
+    private function resolveInboxSnapshot(string $userId): ?array
     {
         try {
             $bearer = $this->userContext->resolveBearer($userId);
@@ -172,7 +239,12 @@ class MailPushPoller extends TimedJob
             );
             $emailQuery = $this->stalwartAdmin->extractMethodResponse($emailResponse, 'Email/query');
             $state = (string) ($emailQuery['queryState'] ?? '');
-            return $state !== '' ? $state : null;
+            if ($state === '') {
+                return null;
+            }
+            $ids = $emailQuery['ids'] ?? [];
+            $emailId = \is_array($ids) && isset($ids[0]) ? (string) $ids[0] : '';
+            return ['state' => $state, 'emailId' => $emailId];
         } catch (\Throwable $e) {
             $this->logger->debug(
                 'Souvera Mail: MailPushPoller could not resolve inbox state for user "' . $userId . '": '

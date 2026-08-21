@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.3] — 2026-08
+
+### Changed
+
+- Mail-Push enthaelt jetzt Deep-Link-Daten (emailId aus Stalwarts
+  documentId via base32, mailboxPath=INBOX) — die App oeffnet beim
+  Antippen der Notification direkt die betreffende Mail.
+- MailPushPoller reichert den Push zusaetzlich mit Betreff + Absender
+  der neuesten Inbox-Mail an (generischer Text bleibt als Fallback).
+
 ## [1.2.2] — 2026-08
 
 ### Added

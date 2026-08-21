@@ -332,7 +332,7 @@ class StalwartWebhookController extends Controller
             if ($userId === null) {
                 return 0;
             }
-            return $this->pushToUser($userId) ? 1 : 0;
+            return $this->pushToUser($userId, $event) ? 1 : 0;
         }
 
         if (\in_array($type, self::LEGACY_TRIGGER_EVENTS, true)) {
@@ -355,7 +355,7 @@ class StalwartWebhookController extends Controller
      *
      * @return bool true if at least one device token existed and a push was sent
      */
-    private function pushToUser(string $userId): bool
+    private function pushToUser(string $userId, array $event = []): bool
     {
         $fcmTokens = \array_map(
             static fn ($t) => $t->getFcmToken(),
@@ -364,7 +364,18 @@ class StalwartWebhookController extends Controller
         if ($fcmTokens === []) {
             return false;
         }
-        $this->fcm->send($fcmTokens, self::PUSH_TITLE, self::PUSH_BODY, ['type' => 'new_mail']);
+
+        // Deep-Link-Daten: data.documentId ist die numerische Stalwart-Doc-ID,
+        // deren base32-Form die JMAP-Email-ID ist - damit kann die App beim
+        // Antippen der Notification die Mail direkt oeffnen.
+        $data = ['type' => 'new_mail'];
+        $documentId = (int) ($event['data']['documentId'] ?? 0);
+        if ($documentId > 0) {
+            $data['emailId'] = StalwartAdminService::encodeJmapId($documentId);
+            $data['mailboxPath'] = 'INBOX';
+        }
+
+        $this->fcm->send($fcmTokens, self::PUSH_TITLE, self::PUSH_BODY, $data);
         return true;
     }
 
