@@ -103,6 +103,7 @@ class MailPushPoller extends TimedJob
                     'mailboxPath' => 'INBOX',
                     'subject' => $details['subject'],
                     'sender' => $details['from'],
+                    'preview' => $details['preview'],
                 ];
                 $body = $details['subject'] !== ''
                     ? $details['subject']
@@ -159,12 +160,12 @@ class MailPushPoller extends TimedJob
      * Fehler sind hier unkritisch (der Push geht trotzdem raus, nur mit
      * generischem Text).
      *
-     * @return array{subject: string, from: string}
+     * @return array{subject: string, from: string, preview: string}
      */
     private function fetchEmailDetails(string $userId, string $emailId): array
     {
         if ($emailId === '') {
-            return ['subject' => '', 'from' => ''];
+            return ['subject' => '', 'from' => '', 'preview' => ''];
         }
         try {
             $bearer = $this->userContext->resolveBearer($userId);
@@ -176,6 +177,7 @@ class MailPushPoller extends TimedJob
                         'accountId' => $accountId,
                         'ids' => [$emailId],
                         'properties' => ['subject', 'from'],
+                        'bodyProperties' => ['preview'],
                     ], 'g0'],
                 ],
                 ['urn:ietf:params:jmap:mail'],
@@ -189,7 +191,8 @@ class MailPushPoller extends TimedJob
             if (\is_array($fromArr) && isset($fromArr[0]) && \is_array($fromArr[0])) {
                 $from = (string) ($fromArr[0]['name'] ?? $fromArr[0]['email'] ?? '');
             }
-            return ['subject' => $subject, 'from' => $from];
+            $preview = (string) ($first['preview'] ?? '');
+            return ['subject' => $subject, 'from' => $from, 'preview' => $preview];
         } catch (\Throwable $e) {
             $this->logger->debug(
                 'Souvera Mail: MailPushPoller could not fetch email details for "'

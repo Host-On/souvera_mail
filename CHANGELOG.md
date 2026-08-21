@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.4] — 2026-08
+
+### Changed
+
+- Mail-Push enthaelt jetzt auch die Text-Vorschau (preview) — Webhook und
+  MailPushPoller reichern den Payload per JMAP mit Betreff, Absender und
+  Vorschau an (graceful Fallback, wenn OIDC/JMAP gerade nicht erreichbar).
+
 ## [1.2.3] — 2026-08
 
 ### Changed

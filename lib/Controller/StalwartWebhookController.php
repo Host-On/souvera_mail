@@ -7,6 +7,7 @@ namespace OCA\SouveraMail\Controller;
 use OCA\SouveraMail\Db\DeviceTokenMapper;
 use OCA\SouveraMail\Service\FcmClient;
 use OCA\SouveraMail\Service\StalwartAdminService;
+use OCA\SouveraMail\Service\StalwartUserContext;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\BruteForceProtection;
@@ -163,6 +164,7 @@ class StalwartWebhookController extends Controller
         private DeviceTokenMapper $tokens,
         private FcmClient $fcm,
         private StalwartAdminService $stalwartAdmin,
+        private StalwartUserContext $userContext,
         private IClientService $httpClientService,
         private LoggerInterface $logger,
     ) {
@@ -371,12 +373,62 @@ class StalwartWebhookController extends Controller
         $data = ['type' => 'new_mail'];
         $documentId = (int) ($event['data']['documentId'] ?? 0);
         if ($documentId > 0) {
-            $data['emailId'] = StalwartAdminService::encodeJmapId($documentId);
+            $emailId = StalwartAdminService::encodeJmapId($documentId);
+            $data['emailId'] = $emailId;
             $data['mailboxPath'] = 'INBOX';
+            $enrichment = $this->fetchEmailEnrichment($userId, $emailId);
+            $data['subject'] = $enrichment['subject'];
+            $data['sender'] = $enrichment['from'];
+            $data['preview'] = $enrichment['preview'];
         }
 
         $this->fcm->send($fcmTokens, self::PUSH_TITLE, self::PUSH_BODY, $data);
         return true;
+    }
+
+    /**
+     * Betreff, Absender und Text-Vorschau der neuen Mail per JMAP (als User).
+     * Fehler sind bewusst nicht fatal - der Push geht dann ohne Anreicherung
+     * raus (z. B. wenn OIDC auf der Instanz gerade nicht verfuegbar ist).
+     *
+     * @return array{subject: string, from: string, preview: string}
+     */
+    private function fetchEmailEnrichment(string $userId, string $emailId): array
+    {
+        $empty = ['subject' => '', 'from' => '', 'preview' => ''];
+        try {
+            $bearer = $this->userContext->resolveBearer($userId);
+            $accountId = $this->userContext->resolveAccountId($userId);
+            $response = $this->stalwartAdmin->jmapCall(
+                $bearer,
+                [
+                    ['Email/get', [
+                        'accountId' => $accountId,
+                        'ids' => [$emailId],
+                        'properties' => ['subject', 'from'],
+                        'bodyProperties' => ['preview'],
+                    ], 'g0'],
+                ],
+                ['urn:ietf:params:jmap:mail'],
+            );
+            $get = $this->stalwartAdmin->extractMethodResponse($response, 'Email/get');
+            $list = $get['list'] ?? [];
+            $first = \is_array($list) && isset($list[0]) && \is_array($list[0]) ? $list[0] : [];
+            $subject = (string) ($first['subject'] ?? '');
+            $from = '';
+            $fromArr = $first['from'] ?? null;
+            if (\is_array($fromArr) && isset($fromArr[0]) && \is_array($fromArr[0])) {
+                $from = (string) ($fromArr[0]['name'] ?? $fromArr[0]['email'] ?? '');
+            }
+            $preview = (string) ($first['preview'] ?? '');
+            return ['subject' => $subject, 'from' => $from, 'preview' => $preview];
+        } catch (\Throwable $e) {
+            $this->logger->debug(
+                'Souvera Mail: webhook enrichment failed for user "' . $userId . '": ' . $e->getMessage(),
+                ['app' => 'souvera_mail']
+            );
+            return $empty;
+        }
     }
 
     private function extractProvidedSecret(): string
