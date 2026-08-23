@@ -445,6 +445,32 @@ class AppPasswordService
      * Legacy (Stalwart-only, no mapping row) passwords are supported:
      * we skip the NC leg and destroy only the Stalwart side.
      */
+    /**
+     * Widerruft alle App-Passwörter des Nutzers mit einer bestimmten
+     * Beschreibung (z. B. "Souvera Android"). Verhindert, dass wiederholte
+     * Login-Flows (Re-Installationen, Neu-Anmeldungen) beliebig viele
+     * Alt-Einträge anhäufen: pro Beschreibung bleibt nur der neueste übrig.
+     */
+    public function revokeByDescription(string $userId, string $description): void
+    {
+        $description = \trim($description);
+        if ($description === '') {
+            return;
+        }
+        foreach ($this->listForUser($userId) as $item) {
+            if ((string) ($item['description'] ?? '') === $description) {
+                try {
+                    $this->revokeForUser($userId, (string) $item['id']);
+                } catch (\Throwable $e) {
+                    $this->logger->warning(
+                        'Souvera Mail: revokeByDescription failed for ' . $item['id'] . ': ' . $e->getMessage(),
+                        ['app' => 'souvera_mail']
+                    );
+                }
+            }
+        }
+    }
+
     public function revokeForUser(string $userId, string $appPasswordId): void
     {
         if ($appPasswordId === '') {

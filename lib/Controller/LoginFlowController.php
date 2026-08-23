@@ -165,6 +165,18 @@ class LoginFlowController extends Controller
         $description = $this->resolveDescription($description);
         $userId = $user->getUID();
 
+        // Alte Einträge derselben Geräteklasse zuerst widerrufen, damit
+        // wiederholte Anmeldungen nicht unbemerkt hunderte Passwörter
+        // anhäufen (pro Beschreibung bleibt genau ein Eintrag übrig).
+        try {
+            $this->appPasswords->revokeByDescription($userId, $description);
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail login-flow: revokeByDescription failed (continuing): ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'user' => $userId]
+            );
+        }
+
         try {
             $created = $this->appPasswords->createForUser($userId, $description);
         } catch (\InvalidArgumentException $e) {

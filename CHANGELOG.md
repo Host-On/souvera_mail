@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.22] — 2026-08
+
+### Fixed
+
+- App-Passwort-Anhäufung behoben: Der Login-Flow widerruft jetzt vor dem
+  Anlegen alle bestehenden Einträge mit derselben Beschreibung (z. B.
+  "Souvera Android") — pro Geräteklasse bleibt genau ein Eintrag übrig,
+  statt bei jeder Neu-Anmeldung weitere Passwörter zu sammeln.
+
 ## [1.2.21] — 2026-08
 
 ### Added
