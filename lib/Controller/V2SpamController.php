@@ -361,6 +361,41 @@ class V2SpamController extends Controller
         }
     }
 
+    /**
+     * POST /api/v2/spam/blacklist-sender  {entry: "absender@example.com"}
+     *
+     * Leitet die Absender-Blacklist an souvera_shield weiter (PMG-Blacklist
+     * aller Identitäten). Wird vom "Spam"-Button der Mail-UI aufgerufen,
+     * wenn eine Mail als Spam verschoben wird.
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function blacklistSender(): JSONResponse
+    {
+        $entry = \trim((string) ($this->request->getParam('entry') ?? ''));
+        if ($entry === '') {
+            return new JSONResponse(['error' => 'Missing "entry" (sender address)'], Http::STATUS_BAD_REQUEST);
+        }
+
+        try {
+            $client = $this->httpClientService->newClient();
+            $url = $this->urlGenerator->getAbsoluteURL('/apps/souvera_shield/api/internal/sender/blacklist');
+            $response = $client->post($url, [
+                'timeout' => 30,
+                'headers' => \array_merge(
+                    ['Content-Type' => 'application/json', 'Accept' => 'application/json'],
+                    $this->forwardSessionCookies(),
+                ),
+                'body' => \json_encode(['entry' => $entry]),
+            ]);
+            $result = \json_decode($response->getBody(), true) ?? [];
+            return new JSONResponse($result);
+        } catch (\Throwable $e) {
+            $this->logger->error('SpamController: blacklist sender failed', ['exception' => $e]);
+            return new JSONResponse(['error' => 'Failed to blacklist sender'], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+    }
+
     // -------------------------------------------------------------------
     // Action helpers
     // -------------------------------------------------------------------

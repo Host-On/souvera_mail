@@ -22,6 +22,10 @@
 						<span @click.stop="moveTo(mb.id)">{{ mailboxDisplayName(mb) }}</span>
 					</NcActionButton>
 				</NcActions>
+				<NcButton v-if="!readonly" variant="tertiary" :aria-label="t('souvera_mail', 'Spam')"
+					:title="t('souvera_mail', 'Move to spam and block sender')" @click="$emit('spam')">
+					<template #icon><AlertOctagon :size="20" /></template>
+				</NcButton>
 				<NcButton v-if="!readonly" variant="tertiary" :aria-label="t('souvera_mail', 'Delete')" @click="$emit('delete')">
 					<template #icon><TrashCan :size="20" /></template>
 				</NcButton>
@@ -180,6 +184,7 @@ import Reply from 'vue-material-design-icons/Reply.vue'
 import ReplyAll from 'vue-material-design-icons/ReplyAll.vue'
 import Forward from 'vue-material-design-icons/Forward.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
+import AlertOctagon from 'vue-material-design-icons/AlertOctagon.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import Download from 'vue-material-design-icons/Download.vue'
 import FolderMove from 'vue-material-design-icons/FolderMove.vue'
@@ -197,7 +202,7 @@ import { generateUrl } from '@nextcloud/router'
 
 export default {
 	name: 'EmailDetail',
-	components: { NcButton, NcActions, NcActionButton, NcDialog, NcTextField, NcEmptyContent, ArrowLeft, WeatherNight, WeatherSunny, Reply, ReplyAll, Forward, TrashCan, Download, Paperclip, FolderMove, Folder, FolderOpen, FolderPlus, FolderDownload, ContentSave, HtmlMailFrame, BimiLogo },
+	components: { NcButton, NcActions, NcActionButton, NcDialog, NcTextField, NcEmptyContent, ArrowLeft, WeatherNight, WeatherSunny, Reply, ReplyAll, Forward, TrashCan, AlertOctagon, Download, Paperclip, FolderMove, Folder, FolderOpen, FolderPlus, FolderDownload, ContentSave, HtmlMailFrame, BimiLogo },
 	props: {
 		email: { type: Object, default: null },
 		htmlBody: { type: String, default: '' },
@@ -208,7 +213,7 @@ export default {
 		// External IMAP messages: hide JMAP-only actions (move/delete).
 		readonly: { type: Boolean, default: false },
 	},
-	emits: ['close', 'reply', 'replyAll', 'forward', 'delete', 'move', 'mailto'],
+	emits: ['close', 'reply', 'replyAll', 'forward', 'delete', 'spam', 'move', 'mailto'],
 	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: this.remoteAlways, contentDark: false, frameReady: false } },
 	watch: {
 		// Reset the content theme toggle when switching to another email.

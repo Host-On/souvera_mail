@@ -568,6 +568,8 @@
         "From and until are required": "Von und Bis sind erforderlich",
         "Failed to delete": "Löschen fehlgeschlagen",
         "Saved": "Gespeichert",
-        "Deleted": "Gelöscht"
+        "Deleted": "Gelöscht",
+        "Move to spam and block sender": "In Spam verschieben und Absender blockieren",
+        "Moved to spam and sender blocked": "In Spam verschoben — Absender wurde blockiert"
     }
 }

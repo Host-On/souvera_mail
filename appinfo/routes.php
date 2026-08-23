@@ -391,6 +391,11 @@ return [
             'verb' => 'POST',
         ],
         [
+            'name' => 'v2_spam#blacklistSender',
+            'url' => '/api/v2/spam/blacklist-sender',
+            'verb' => 'POST',
+        ],
+        [
             'name' => 'v2_shield#quarantine',
             'url' => '/api/v2/shield/quarantine',
             'verb' => 'GET',

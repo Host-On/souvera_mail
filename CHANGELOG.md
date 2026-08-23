@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.7] — 2026-08
+
+### Added
+
+- Button "Spam": verschiebt Mails in den Spam-Ordner (JMAP Junk) und setzt
+  den Absender zugleich über souvera_shield auf die PMG-Blacklist aller
+  Identitäten — einzeln (Detailansicht) und für Mehrfachauswahl (Toolbar).
+
 ## [1.2.6] — 2026-08
 
 ### Fixed

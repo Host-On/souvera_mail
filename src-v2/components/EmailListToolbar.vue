@@ -42,6 +42,10 @@
 						<span @click.stop="$emit('moveTo', mb.id)">{{ mailboxDisplayName(mb) }}</span>
 					</NcActionButton>
 				</NcActions>
+				<NcButton variant="tertiary" :title="t('souvera_mail', 'Move to spam and block sender')"
+					@click="$emit('bulkSpam')">
+					<template #icon><AlertOctagon :size="20" /></template>
+				</NcButton>
 				<NcButton variant="tertiary" @click="$emit('bulkDelete')">
 					<template #icon><TrashCan :size="20" /></template>
 				</NcButton>
@@ -119,6 +123,7 @@ import Pencil from 'vue-material-design-icons/Pencil.vue'
 import EmailOpen from 'vue-material-design-icons/EmailOpen.vue'
 import EmailOutline from 'vue-material-design-icons/EmailOutline.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
+import AlertOctagon from 'vue-material-design-icons/AlertOctagon.vue'
 import FolderMove from 'vue-material-design-icons/FolderMove.vue'
 import Folder from 'vue-material-design-icons/Folder.vue'
 import Filter from 'vue-material-design-icons/Filter.vue'
@@ -132,7 +137,7 @@ import { mailboxDisplayName } from '../utils/mailboxNames.js'
 
 export default {
 	name: 'EmailListToolbar',
-	components: { NcButton, NcActions, NcActionButton, NcCheckboxRadioSwitch, NcTextField, NcLoadingIcon, Refresh, Pencil, EmailOpen, EmailOutline, TrashCan, FolderMove, Folder, Filter, Star, Paperclip, DotsHorizontal, CheckAll, Check, Magnify },
+	components: { NcButton, NcActions, NcActionButton, NcCheckboxRadioSwitch, NcTextField, NcLoadingIcon, Refresh, Pencil, EmailOpen, EmailOutline, TrashCan, AlertOctagon, FolderMove, Folder, Filter, Star, Paperclip, DotsHorizontal, CheckAll, Check, Magnify },
 	props: {
 		selectedCount: { type: Number, default: 0 },
 		selectAllState: { type: [Boolean, String], default: false },
@@ -145,7 +150,7 @@ export default {
 		refreshTotal: { type: Number, default: 60 },
 		loadingBulk: { type: Boolean, default: false },
 	},
-	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter', 'selectAll', 'markAllRead', 'markAllUnread', 'emptyTrash'],
+	emits: ['refresh', 'compose', 'markRead', 'markUnread', 'bulkDelete', 'bulkSpam', 'moveTo', 'toggleSelectAll', 'update:search', 'update:filter', 'selectAll', 'markAllRead', 'markAllUnread', 'emptyTrash'],
 	data() {
 		return { showSearch: false, localSearch: '' }
 	},

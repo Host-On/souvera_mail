@@ -17,6 +17,7 @@
 				@mark-read="bulkMarkRead"
 				@mark-unread="bulkMarkUnread"
 				@bulk-delete="bulkDelete"
+				@bulk-spam="bulkSpam"
 				@move-to="bulkMoveTo"
 				@toggle-select-all="toggleSelectAll"
 				@select-all="selectAll"
@@ -90,6 +91,7 @@
 							@forward="onForward"
 							@move="onMove"
 							@delete="deleteEmail"
+							@spam="markSpam"
 							@mailto="onMailto" />
 					</div>
 				</Transition>
@@ -535,6 +537,72 @@ export default {
 			showSuccess(this.t('souvera_mail', 'Messages moved'))
 			this.bulkProcessing = false
 		},
+		/**
+		 * Verschiebt markierte Mails in den Spam-Ordner und setzt die
+		 * Absender auf die Shield/PMG-Blacklist.
+		 */
+		async bulkSpam() {
+			this.bulkProcessing = true
+			const junk = this.junkMailbox()
+			const senders = new Set()
+			for (const id of this.checkedIds) {
+				const email = this.emails.find(e => e.id === id)
+				if (email?.from) {
+					const addr = this.extractAddress(email.from)
+					if (addr) senders.add(addr)
+				}
+				try {
+					await markEmailRead(id, true, this.currentAccountId)
+					if (junk) await moveEmail(id, junk, this.currentAccountId)
+				} catch (e) { console.error('Failed to move to spam', e) }
+			}
+			await this.blacklistSenders(senders)
+			this.checkedIds = []
+			await this.loadEmails()
+			this.notifyMailboxChange()
+			showSuccess(this.t('souvera_mail', 'Moved to spam and sender blocked'))
+			this.bulkProcessing = false
+		},
+		/** Einzelne geöffnete Mail als Spam markieren (verschieben + blockieren). */
+		async markSpam() {
+			if (!this.selectedEmail) return
+			const idx = this.emails.findIndex(e => e.id === this.selectedEmail.id)
+			const junk = this.junkMailbox()
+			try { await markEmailRead(this.selectedEmail.id, true, this.currentAccountId) } catch {}
+			if (junk) {
+				try { await moveEmail(this.selectedEmail.id, junk, this.currentAccountId) } catch (e) { console.error('Failed to move to spam', e) }
+			}
+			const addr = this.selectedEmail.from ? this.extractAddress(this.selectedEmail.from) : null
+			if (addr) await this.blacklistSenders(new Set([addr]))
+			await this.refreshEmails()
+			this.notifyMailboxChange()
+			showSuccess(this.t('souvera_mail', 'Moved to spam and sender blocked'))
+			if (this.emails.length > 0) {
+				const next = this.emails[Math.min(idx, this.emails.length - 1)]
+				if (next) this.onOpenEmail(next)
+			} else {
+				this.selectedEmail = null; this.emailBodyHtml = ''; this.emailBodyPlain = ''
+			}
+		},
+		/** Spam-Ordner (Junk) der aktuellen Ansicht — eigenes Konto bzw. Shared-Konto. */
+		junkMailbox() {
+			const aid = this.currentAccountId || ''
+			return (this.allMailboxes.find(m => m.role === 'junk' && (m._accountId || '') === aid) || {}).id
+		},
+		/** Zieht die Adresse aus "Name <mail@example.com>" bzw. "mail@example.com". */
+		extractAddress(from) {
+			const m = from.match(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+/)
+			return m ? m[0] : null
+		},
+		/** Setzt die Absender über souvera_shield auf die PMG-Blacklist. */
+		async blacklistSenders(senders) {
+			for (const entry of senders) {
+				try {
+					await axios.post(generateUrl('/apps/souvera_mail/api/v2/spam/blacklist-sender'), { entry })
+				} catch (e) { console.error('Failed to blacklist sender', e) }
+			}
+		},
+
 		async onOpenEmail(email) {
 			// A double-click fires click,click,dblclick — only the FIRST
 			// open for the same email does any work. A previously FAILED
