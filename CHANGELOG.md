@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.21] — 2026-08
+
+### Added
+
+- Rechtsklick-Menü respektiert die Mehrfachauswahl: Bei mehreren markierten
+  Mails wirken alle Aktionen (Gelesen/Ungelesen, Spam, Verschieben, Löschen)
+  auf die gesamte Auswahl; ein Zähler im Menü zeigt die Anzahl an. Rechtsklick
+  auf eine nicht markierte Zeile wirkt weiterhin nur auf diese eine Mail.
+
 ## [1.2.20] — 2026-08
 
 ### Fixed

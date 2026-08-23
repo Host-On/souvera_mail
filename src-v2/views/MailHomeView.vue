@@ -212,7 +212,7 @@ export default {
 			showSpamTargetDialog: false,
 			spamIdentities: [],
 			spamTarget: null,
-			moveDialog: { open: false, email: null },
+			moveDialog: { open: false, email: null, multi: false },
 			_refreshInterval: 60,
 			_soundPref: 'none',
 		}
@@ -842,6 +842,9 @@ export default {
 		openRowMenuDom(email, x, y) {
 			this.closeRowMenuDom()
 			const t = (k) => this.t('souvera_mail', k)
+			// Mehrfachauswahl: Rechtsklick auf eine markierte Zeile wirkt auf
+			// ALLE markierten Mails (nur wenn mehr als eine markiert ist).
+			const multi = this.checkedIds.length > 1 && this.checkedIds.includes(email.id)
 			const el = document.createElement('div')
 			el.className = 'row-context-menu'
 			el.style.left = Math.max(8, Math.min(x, window.innerWidth - 230)) + 'px'
@@ -871,15 +874,33 @@ export default {
 				el.appendChild(b)
 			}
 
-			item(email.isRead ? ICONS.mail : ICONS.eye, email.isRead ? t('Mark as unread') : t('Mark as read'), '', () => this.rowToggleRead(email))
-			item(ICONS.alert, t('Spam'), '', () => this.rowSpam(email))
-			item(ICONS.folder, t('Move to folder'), '', () => this.openMoveDialog(email))
+			if (multi) {
+				const head = document.createElement('div')
+				head.className = 'row-context-menu__count'
+				head.textContent = this.checkedIds.length + ' ' + t('selected')
+				el.appendChild(head)
+			}
+
+			item(email.isRead ? ICONS.mail : ICONS.eye, email.isRead ? t('Mark as unread') : t('Mark as read'), '', () => {
+				if (multi) {
+					if (email.isRead) this.bulkMarkUnread()
+					else this.bulkMarkRead()
+				} else {
+					this.rowToggleRead(email)
+				}
+			})
+			item(ICONS.alert, t('Spam'), '', () => {
+				if (multi) { this.bulkSpam() } else { this.rowSpam(email) }
+			})
+			item(ICONS.folder, t('Move to folder'), '', () => this.openMoveDialog(email, multi))
 
 			const divider = document.createElement('div')
 			divider.className = 'row-context-menu__divider'
 			el.appendChild(divider)
 
-			item(ICONS.trash, t('Delete'), 'row-context-menu__item--danger', () => this.rowDelete(email))
+			item(ICONS.trash, t('Delete'), 'row-context-menu__item--danger', () => {
+				if (multi) { this.bulkDelete() } else { this.rowDelete(email) }
+			})
 
 			document.body.appendChild(el)
 			this._rowMenuEl = el
@@ -893,17 +914,18 @@ export default {
 			document.addEventListener('scroll', this._rowMenuScroll, true)
 		},
 		/** Öffnet den Ordner-Auswahl-Dialog für die Verschieben-Aktion. */
-		openMoveDialog(email) {
-			this.moveDialog = { open: true, email }
+		openMoveDialog(email, multi = false) {
+			this.moveDialog = { open: true, email, multi }
 		},
 		closeMoveDialog() {
-			this.moveDialog = { open: false, email: null }
+			this.moveDialog = { open: false, email: null, multi: false }
 		},
-		/** Zielordner im Dialog gewählt. */
+		/** Zielordner im Dialog gewählt (Einzel- oder Mehrfachauswahl). */
 		chooseMoveTarget(mailboxId) {
-			const email = this.moveDialog.email
+			const { email, multi } = this.moveDialog
 			this.closeMoveDialog()
-			if (email) this.rowMoveTo(email, mailboxId)
+			if (multi) this.bulkMoveTo(mailboxId)
+			else if (email) this.rowMoveTo(email, mailboxId)
 		},
 		closeRowMenuDom() {
 			if (this._rowMenuEl) {
@@ -1332,6 +1354,14 @@ body.souvera-mobile-detail-open {
 }
 .row-context-menu__icon svg { width: 18px; height: 18px; }
 .row-context-menu__text { flex: 1; }
+.row-context-menu__count {
+	font-size: .78rem;
+	font-weight: 600;
+	color: var(--color-text-maxcontrast);
+	padding: 6px 10px 8px;
+	border-bottom: 1px solid var(--color-border);
+	margin-bottom: 4px;
+}
 .row-context-menu__divider {
 	height: 1px;
 	background: var(--color-border);
