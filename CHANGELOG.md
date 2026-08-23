@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.10] — 2026-08
+
+### Added
+
+- Rechtsklick-Kontextmenü in der Mail-Liste: gelesen/ungelesen markieren,
+  als Spam markieren (mit Absender-Blockierung), in Ordner verschieben und
+  löschen — direkt an der Zeile, mit Anpassung an den Bildschirmrand.
+
 ## [1.2.9] — 2026-08
 
 ### Added

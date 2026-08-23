@@ -44,7 +44,8 @@
 						@click="openEmailFromList(email)"
 						@dblclick="onOpenEmail(email)"
 						@check="toggleCheck(email.id)"
-						@flag="toggleFlag(email.id)" />
+						@flag="toggleFlag(email.id)"
+						@contextmenu.prevent="onRowContextMenu($event, email)" />
 				</div>
 				<div v-if="loadingMore" class="mail-load-more">
 					<span class="icon-loading" />
@@ -71,6 +72,23 @@
 			@mousedown.prevent="onResizeStart($event, 'vertical')">
 			<div class="mail-resize-handle__grip" />
 		</div>
+
+		<Teleport to="body">
+			<div v-if="rowMenu.open" class="row-context-menu" :style="rowMenuStyle"
+				@click.stop @contextmenu.stop.prevent>
+				<div class="row-context-menu__head">{{ rowMenu.email?.subject || '' }}</div>
+				<button class="row-context-menu__item" @click="rowToggleRead">
+					{{ rowMenu.email?.isRead ? t('souvera_mail', 'Mark as unread') : t('souvera_mail', 'Mark as read') }}
+				</button>
+				<button class="row-context-menu__item" @click="rowSpam">{{ t('souvera_mail', 'Spam') }}</button>
+				<div class="row-context-menu__label">{{ t('souvera_mail', 'Move to folder') }}</div>
+				<button v-for="mb in moveMailboxes" :key="'rcm-'+mb.id" class="row-context-menu__item row-context-menu__item--indent"
+					@click="rowMoveTo(mb.id)">{{ mailboxDisplayName(mb) }}</button>
+				<button class="row-context-menu__item row-context-menu__item--danger" @click="rowDelete">
+					{{ t('souvera_mail', 'Delete') }}
+				</button>
+			</div>
+		</Teleport>
 
 		<NcDialog v-if="showSpamTargetDialog"
 			:name="t('souvera_mail', 'Block sender in which mailbox?')"
@@ -150,6 +168,7 @@ import EmailListItem from '../components/EmailListItem.vue'
 import EmailListSkeleton from '../components/EmailListSkeleton.vue'
 import EmailDetail from '../components/EmailDetail.vue'
 import { useHotkeys } from '../composables/useHotkeys.js'
+import { mailboxDisplayName } from '../utils/mailboxNames.js'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { showSuccess, showError } from '@nextcloud/dialogs'
@@ -187,6 +206,7 @@ export default {
 			showSpamTargetDialog: false,
 			spamIdentities: [],
 			spamTarget: null,
+			rowMenu: { open: false, x: 0, y: 0, email: null },
 			_refreshInterval: 60,
 			_soundPref: 'none',
 		}
@@ -202,6 +222,15 @@ export default {
 			if (this.checkedIds.length === 0) return false
 			if (this.checkedIds.length === this.emails.length) return true
 			return 'indeterminate'
+		},
+		rowMenuStyle() {
+			const width = 260
+			const height = 320
+			let x = this.rowMenu.x
+			let y = this.rowMenu.y
+			if (x + width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - width - 8)
+			if (y + height > window.innerHeight - 8) y = Math.max(8, window.innerHeight - height - 8)
+			return { left: x + 'px', top: y + 'px' }
 		},
 		moveMailboxes() {
 			return this.allMailboxes.filter(m => m.role !== 'trash' && m.role !== 'junk')
@@ -306,6 +335,10 @@ export default {
 		window.addEventListener('souvera-mail:move-email', this._onMoveEmail)
 		this._onResize = () => { this.isMobile = window.innerWidth < 1024 }
 		window.addEventListener('resize', this._onResize)
+		this._onCloseRowMenu = () => this.closeRowMenu()
+		window.addEventListener('click', this._onCloseRowMenu)
+		window.addEventListener('keydown', this._onRowMenuKey)
+		window.addEventListener('scroll', this._onCloseRowMenu, true)
 	},
 	beforeUnmount() {
 		this._hotkeys?.destroy()
@@ -316,6 +349,9 @@ export default {
 		document.removeEventListener('keydown', this._onUserGesture)
 		window.removeEventListener('souvera-mail:move-email', this._onMoveEmail)
 		window.removeEventListener('resize', this._onResize)
+		window.removeEventListener('click', this._onCloseRowMenu)
+		window.removeEventListener('keydown', this._onRowMenuKey)
+		window.removeEventListener('scroll', this._onCloseRowMenu, true)
 		if (this._audioCtx) { this._audioCtx.close(); this._audioCtx = null }
 		if (this._originalTitle) document.title = this._originalTitle
 		if (this._mailboxChangeTimer) clearTimeout(this._mailboxChangeTimer)
@@ -744,6 +780,85 @@ export default {
 				this.selectedEmail = null; this.emailBodyHtml = ''; this.emailBodyPlain = ''
 			}
 		},
+		/** Rechtsklick-Kontextmenü für eine Zeile öffnen. */
+		onRowContextMenu(ev, email) {
+			this.rowMenu = { open: true, x: ev.clientX, y: ev.clientY, email }
+		},
+		closeRowMenu() {
+			if (this.rowMenu.open) this.rowMenu.open = false
+		},
+		_onRowMenuKey(ev) {
+			if (ev.key === 'Escape') this.closeRowMenu()
+		},
+		/** Gelesen/Ungelesen umschalten (Einzelzeile). */
+		async rowToggleRead() {
+			const email = this.rowMenu.email
+			this.closeRowMenu()
+			if (!email) return
+			const target = !email.isRead
+			try {
+				await markEmailRead(email.id, target, this.currentAccountId)
+				const item = this.emails.find(e => e.id === email.id)
+				if (item) item.isRead = target
+				if (this.selectedEmail?.id === email.id) this.selectedEmail.isRead = target
+				this.notifyMailboxChange()
+				showSuccess(this.t('souvera_mail', target ? 'Marked as read' : 'Marked as unread'))
+			} catch (e) { console.error('Failed to toggle read state', e) }
+		},
+		/** Einzelzeile in einen Ordner verschieben. */
+		async rowMoveTo(mailboxId) {
+			const email = this.rowMenu.email
+			this.closeRowMenu()
+			if (!email) return
+			try {
+				await moveEmail(email.id, mailboxId, this.currentAccountId)
+				await this.refreshEmails()
+				this.notifyMailboxChange()
+				if (this.selectedEmail?.id === email.id) this.selectedEmail = null
+				showSuccess(this.t('souvera_mail', 'Message moved'))
+			} catch (e) { console.error('Failed to move email', e) }
+		},
+		/** Einzelzeile löschen. */
+		async rowDelete() {
+			const email = this.rowMenu.email
+			this.closeRowMenu()
+			if (!email) return
+			try { await markEmailRead(email.id, true, this.currentAccountId) } catch {}
+			try { await deleteEmailApi(email.id, this.currentAccountId) } catch (e) { console.error('Failed to delete email', e) }
+			if (this.selectedEmail?.id === email.id) {
+				this.selectedEmail = null; this.emailBodyHtml = ''; this.emailBodyPlain = ''
+			}
+			await this.refreshEmails()
+			this.notifyMailboxChange()
+			showSuccess(this.t('souvera_mail', 'Message deleted'))
+		},
+		/** Einzelzeile als Spam markieren (verschieben + Absender blockieren). */
+		async rowSpam() {
+			const email = this.rowMenu.email
+			this.closeRowMenu()
+			if (!email) return
+			const junk = this.junkMailbox()
+			try { await markEmailRead(email.id, true, this.currentAccountId) } catch {}
+			if (junk) {
+				try { await moveEmail(email.id, junk, this.currentAccountId) } catch (e) { console.error('Failed to move to spam', e) }
+			}
+			const addr = email.from ? this.extractAddress(email.from) : null
+			if (addr) {
+				const target = await this.resolveBlacklistTarget()
+				if (target) {
+					await this.blacklistSenders(new Set([addr]), target)
+					showSuccess(this.t('souvera_mail', 'Moved to spam and sender blocked'))
+				} else {
+					showSuccess(this.t('souvera_mail', 'Moved to spam'))
+				}
+			}
+			if (this.selectedEmail?.id === email.id) {
+				this.selectedEmail = null; this.emailBodyHtml = ''; this.emailBodyPlain = ''
+			}
+			await this.refreshEmails()
+			this.notifyMailboxChange()
+		},
+
 		async toggleFlag(emailId) {
 			const email = this.emails.find(e => e.id === emailId)
 			if (!email) return
@@ -948,6 +1063,51 @@ export default {
 </script>
 
 <style scoped>
+.row-context-menu {
+	position: fixed;
+	z-index: 10000;
+	width: 260px;
+	max-height: 320px;
+	overflow-y: auto;
+	background: var(--color-main-background);
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large, 12px);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+	padding: 6px;
+}
+.row-context-menu__head {
+	font-size: .78rem;
+	color: var(--color-text-maxcontrast);
+	padding: 6px 10px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	border-bottom: 1px solid var(--color-border);
+	margin-bottom: 4px;
+}
+.row-context-menu__label {
+	font-size: .72rem;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: var(--color-text-maxcontrast);
+	padding: 8px 10px 4px;
+}
+.row-context-menu__item {
+	display: block;
+	width: 100%;
+	text-align: left;
+	background: none;
+	border: none;
+	border-radius: var(--border-radius, 8px);
+	padding: 8px 10px;
+	font-size: .9rem;
+	color: var(--color-main-text);
+	cursor: pointer;
+}
+.row-context-menu__item:hover { background: var(--color-background-hover); }
+.row-context-menu__item--indent { padding-left: 24px; }
+.row-context-menu__item--danger { color: var(--color-error); }
+.row-context-menu__item--danger:hover { background: var(--color-error-light, rgba(200, 60, 60, 0.08)); }
 .mail-home { display: flex; height: 100%; overflow: hidden; }
 .mail-home--vertical { flex-direction: column; }
 .mail-home--vertical .mail-list-panel { width: 100% !important; flex-shrink: 0; max-height: 45%; }
