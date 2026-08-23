@@ -325,14 +325,12 @@ export default {
 		// Event-Bindung) am Listen-Container und als Document-Fallback —
 		// so erreicht der Rechtsklick in jedem Fall den Handler.
 		this._nativeCtx = (ev) => this.onListContextMenu(ev)
-		this._docCtx = (ev) => {
-			const row = ev.target && ev.target.closest ? ev.target.closest('.email-row') : null
-			if (row) this.onListContextMenu(ev)
-		}
+		this._docCtx = (ev) => this.onListContextMenu(ev)
 		this.$nextTick(() => {
 			const list = this.$refs.emailItems
 			if (list) list.addEventListener('contextmenu', this._nativeCtx)
 			document.addEventListener('contextmenu', this._docCtx, true)
+			document.addEventListener('contextmenu', this._docCtx, false)
 		})
 	},
 	beforeUnmount() {
@@ -346,7 +344,10 @@ export default {
 		window.removeEventListener('resize', this._onResize)
 		const list = this.$refs.emailItems
 		if (list && this._nativeCtx) list.removeEventListener('contextmenu', this._nativeCtx)
-		if (this._docCtx) document.removeEventListener('contextmenu', this._docCtx, true)
+		if (this._docCtx) {
+			document.removeEventListener('contextmenu', this._docCtx, true)
+			document.removeEventListener('contextmenu', this._docCtx, false)
+		}
 		if (this._audioCtx) { this._audioCtx.close(); this._audioCtx = null }
 		if (this._originalTitle) document.title = this._originalTitle
 		if (this._mailboxChangeTimer) clearTimeout(this._mailboxChangeTimer)
@@ -778,25 +779,30 @@ export default {
 		/** Rechtsklick auf eine Zeile: Ziel per Event-Delegation ermitteln. */
 		onListContextMenu(ev) {
 			ev.preventDefault()
-			// Mehrfach-Trigger (Delegation + nativer Listener) deduplizieren.
+			// Mehrfach-Trigger (Delegation + native Listener) deduplizieren.
 			const now = Date.now()
 			if (this._lastCtxMenu && now - this._lastCtxMenu < 250) return
 			this._lastCtxMenu = now
 
 			const target = ev.target
+			const desc = target
+				? (typeof target.className === 'string' && target.className !== '' ? target.className : target.nodeName)
+				: 'none'
+			console.log('[souvera-mail] contextmenu target:', desc, target)
+
 			if (!target || typeof target.closest !== 'function') {
-				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' (no target)')
+				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' [a:' + desc + ']')
 				return
 			}
-			const row = target.closest('.email-row')
+			const row = target.closest('[data-email-id]')
 			if (!row) {
-				// Rechtsklick außerhalb der Zeilen (Toolbar etc.) — kein Menü.
+				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' [b:' + desc + ']')
 				return
 			}
-			const emailId = row.dataset && row.dataset.emailId
+			const emailId = row.dataset ? row.dataset.emailId : null
 			const email = emailId ? this.emails.find(e => e.id === emailId) : null
 			if (!email) {
-				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' (mail not found)')
+				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' [c:' + emailId + ']')
 				return
 			}
 			// Manche Eingabegeräte (Trackpads, ctrl+click auf macOS) feuern
@@ -807,14 +813,15 @@ export default {
 			const menu = this.$refs.rowMenu
 			if (!menu || typeof menu.show !== 'function') {
 				console.error('RowContextMenu ref nicht verfügbar', this.$refs)
-				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' (ref missing)')
+				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' [d:ref]')
 				return
 			}
 			try {
 				menu.show(ev.clientX, ev.clientY, email)
+				console.log('[souvera-mail] contextmenu geöffnet für', emailId)
 			} catch (e) {
 				console.error('RowContextMenu failed', e)
-				showError(this.t('souvera_mail', 'Context menu could not be opened') + ': ' + (e?.message || e))
+				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' [e:' + (e?.message || e) + ']')
 			}
 		},
 		/** Gelesen/Ungelesen umschalten (Einzelzeile). */

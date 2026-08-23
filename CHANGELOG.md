@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.16] — 2026-08
+
+### Fixed
+
+- Rechtsklick-Diagnose: Jeder Ausgang des Handlers zeigt jetzt eine
+  sichtbare, eindeutige Meldung ([a]-[e]); Zeilen werden über das
+  data-email-id-Attribut statt über eine CSS-Klasse gefunden, und der
+  Document-Fallback lauscht zusätzlich in der Bubble-Phase.
+
 ## [1.2.15] — 2026-08
 
 ### Fixed
