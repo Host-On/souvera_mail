@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.15] — 2026-08
+
+### Fixed
+
+- Rechtsklick-Menü: zusätzlich NATIVE Event-Listener (Container +
+  Document-Fallback mit Capture), unabhängig von Vues Template-Bindung;
+  jeder Fehlpfad zeigt jetzt eine sichtbare Diagnosemeldung.
+
 ## [1.2.14] — 2026-08
 
 ### Fixed
