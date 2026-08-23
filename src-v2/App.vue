@@ -249,12 +249,27 @@ export default {
 			c: () => { this.startCompose() },
 			'G': () => { this.$router.push({ name: 'inbox' }) },
 		})
+		// Beim Zurückkehren in den Tab sofort Counts/Titel aktualisieren —
+		// Hintergrund-Tabs drosseln Intervalle, daher den Fokus nutzen.
+		const debouncedRefresh = () => {
+			clearTimeout(this._focusRefreshTimer)
+			this._focusRefreshTimer = setTimeout(() => this.onRefreshMailboxes(), 400)
+		}
+		this._onWindowFocus = debouncedRefresh
+		this._onVisibility = () => {
+			if (!document.hidden) debouncedRefresh()
+		}
+		window.addEventListener('focus', this._onWindowFocus)
+		document.addEventListener('visibilitychange', this._onVisibility)
 	},
 	beforeUnmount() {
 		window.removeEventListener('souvera-mail:refresh-mailboxes', this.onRefreshMailboxes)
 		window.removeEventListener('souvera-mail:refresh-external', this.loadExternalAccounts)
 		window.removeEventListener('souvera-mail:layout-changed', this.onLayoutChanged)
 		window.removeEventListener('resize', this._onResize)
+		window.removeEventListener('focus', this._onWindowFocus)
+		document.removeEventListener('visibilitychange', this._onVisibility)
+		clearTimeout(this._focusRefreshTimer)
 		this._hotkeys?.destroy()
 	},
 	errorCaptured(err, instance, info) {
@@ -290,6 +305,11 @@ export default {
 				// Reload the shared accounts fully — settings may have
 				// changed the shared position or the account list.
 				await this.loadShared()
+				// Unread-Badges externer Konten mitaktualisieren (nur wenn
+				// überhaupt externe Konten eingerichtet sind).
+				if (this.externalAccounts.length > 0) {
+					await this.loadExternalAccounts()
+				}
 			} catch(e) { console.error(e) }
 		},
 		onMailboxSelect(id) {

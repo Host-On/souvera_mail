@@ -221,6 +221,8 @@ export default {
 			this._remoteAlways = data.remoteImages === 'always'
 		} catch {}
 		if (this.selectedMailbox) await this.loadEmails()
+		// Titel-Prefix "(n)" sofort anwenden — nicht erst nach einer Änderung.
+		this.$nextTick(() => this.notifyTitle())
 		this._hotkeys = useHotkeys({
 			k: () => this.navigateEmail(1),
 			j: () => this.navigateEmail(-1),
@@ -658,7 +660,9 @@ export default {
 			this.stopAutoRefresh()
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
-				const interval = (data.autoRefresh || 60)
+				const interval = Number(data.autoRefresh)
+				// 0 = "Off" in den Einstellungen — dann gar keinen Timer starten.
+				if (!interval || interval <= 0) return
 				this._refreshInterval = interval
 				this._soundPref = data.notificationSound || 'none'
 				this._remoteAlways = data.remoteImages === 'always'
@@ -668,10 +672,17 @@ export default {
 					if (this.refreshCountdown <= 0) {
 						this.refreshCountdown = interval
 						this._isAutoRefresh = true
-						this.loadEmails(false) // background reload, no skeleton
+						// Liste des aktuellen Postfachs neu laden UND die
+						// Sidebar-Counts (Badges + Titel) aktualisieren —
+						// unabhängig davon, in welchem Postfach sich etwas
+						// geändert hat (z. B. neue Mail in anderem Ordner
+						// oder als gelesen markierte Mail am Handy).
+						this.loadEmails(false)
+						this.notifyMailboxChange()
 					}
 				}, 1000)
 			} catch {
+				// Fallback, falls die Preferences nicht ladbar sind.
 				this._refreshInterval = 60
 				this.refreshCountdown = 60
 				this._countdownTimer = setInterval(() => {
@@ -680,6 +691,7 @@ export default {
 						this.refreshCountdown = 60
 						this._isAutoRefresh = true
 						this.loadEmails(false)
+						this.notifyMailboxChange()
 					}
 				}, 1000)
 			}

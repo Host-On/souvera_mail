@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.2.6] — 2026-08
+
+### Fixed
+
+- Postfach-Anzeige aktualisiert sich jetzt zuverlässig selbst: Der
+  Auto-Refresh lädt nicht mehr nur die Liste des aktuellen Ordners neu,
+  sondern refresht auch Sidebar-Badges und unread-Zähler — auch wenn sich
+  andere Postfächer ändern (neue Mail in anderem Ordner, am Handy gelesene
+  Mails).
+- Ungelesen-Zähler im Browser-Titel (`(n) Souvera Mail`) wird jetzt
+  kontinuierlich aktualisiert und beim Öffnen der App sofort gesetzt.
+- "Auto-Refresh: Off" in den Einstellungen wird wieder respektiert.
+- Beim Zurückkehren in den Tab werden Counts und Titel sofort aufgefrischt.
+
 ## [1.2.5] — 2026-08
 
 ### Fixed
