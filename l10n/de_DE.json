@@ -582,6 +582,7 @@
         "Block": "Blockieren",
         "Moved to spam": "In Spam verschoben",
         "Mark as unread": "Als ungelesen markieren",
-        "Context menu could not be opened": "Kontextmenü konnte nicht geöffnet werden"
+        "Context menu could not be opened": "Kontextmenü konnte nicht geöffnet werden",
+        "No folders available": "Keine Ordner verfügbar"
     }
 }

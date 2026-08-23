@@ -74,17 +74,26 @@
 			<div class="mail-resize-handle__grip" />
 		</div>
 
-		<NcDialog v-if="moveDialog.open"
-			:name="t('souvera_mail', 'Move to folder')"
-			:open="moveDialog.open"
-			@update:open="closeMoveDialog">
-			<div class="move-dialog-list">
-				<NcButton v-for="mb in moveMailboxes" :key="'mv-'+mb.id"
-					variant="tertiary" class="move-dialog-item" @click="chooseMoveTarget(mb.id)">
-					{{ mailboxDisplayName(mb) }}
-				</NcButton>
+		<Teleport to="body">
+			<div v-if="moveDialog.open" class="move-modal-backdrop" @click.self="closeMoveDialog">
+				<div class="move-modal">
+					<div class="move-modal__title">{{ t('souvera_mail', 'Move to folder') }}</div>
+					<div class="move-modal__list">
+						<button v-for="mb in moveMailboxes" :key="'mv-'+mb.id"
+							type="button" class="move-modal__item" @click="chooseMoveTarget(mb.id)">
+							<span class="move-modal__item-icon"><Folder :size="18" /></span>
+							<span class="move-modal__item-name">{{ mailboxDisplayName(mb) }}</span>
+						</button>
+						<div v-if="moveMailboxes.length === 0" class="move-modal__empty">
+							{{ t('souvera_mail', 'No folders available') }}
+						</div>
+					</div>
+					<div class="move-modal__actions">
+						<NcButton variant="secondary" @click="closeMoveDialog">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+					</div>
+				</div>
 			</div>
-		</NcDialog>
+		</Teleport>
 
 		<NcDialog v-if="showSpamTargetDialog"
 			:name="t('souvera_mail', 'Block sender in which mailbox?')"
@@ -156,6 +165,7 @@
 <script>
 import { NcEmptyContent, NcButton, NcDialog, NcCheckboxRadioSwitch } from '@nextcloud/vue'
 import EmailOutline from 'vue-material-design-icons/EmailOutline.vue'
+import Folder from 'vue-material-design-icons/Folder.vue'
 import ChevronLeft from 'vue-material-design-icons/ChevronLeft.vue'
 import ChevronRight from 'vue-material-design-icons/ChevronRight.vue'
 import { useJmapClient } from '../composables/useJmapClient.js'
@@ -173,7 +183,7 @@ const { fetchEmails, fetchEmailBody, deleteEmailApi, moveEmail, markEmailRead, t
 
 export default {
 	name: 'MailHomeView',
-	components: { EmailListToolbar, EmailListItem, EmailListSkeleton, EmailDetail, NcEmptyContent, NcButton, NcDialog, NcCheckboxRadioSwitch, EmailOutline, ChevronLeft, ChevronRight },
+	components: { EmailListToolbar, EmailListItem, EmailListSkeleton, EmailDetail, NcEmptyContent, NcButton, NcDialog, NcCheckboxRadioSwitch, EmailOutline, Folder, ChevronLeft, ChevronRight },
 	props: {
 		selectedMailbox: { type: String, default: '' },
 		allMailboxes: { type: Array, default: () => [] },
@@ -835,21 +845,41 @@ export default {
 			const el = document.createElement('div')
 			el.className = 'row-context-menu'
 			el.style.left = Math.max(8, Math.min(x, window.innerWidth - 230)) + 'px'
-			el.style.top = Math.max(8, Math.min(y, window.innerHeight - 260)) + 'px'
+			el.style.top = Math.max(8, Math.min(y, window.innerHeight - 280)) + 'px'
 
-			const item = (text, className, onClick) => {
+			const ICONS = {
+				eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
+				mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
+				alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 10v4"/><path d="M12 17h.01"/></svg>',
+				folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>',
+				trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="m6 7 1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M10 11v6M14 11v6"/></svg>',
+			}
+
+			const item = (icon, text, className, onClick) => {
 				const b = document.createElement('button')
 				b.type = 'button'
 				b.className = 'row-context-menu__item' + (className ? ' ' + className : '')
-				b.textContent = text
+				const ic = document.createElement('span')
+				ic.className = 'row-context-menu__icon'
+				ic.innerHTML = icon
+				const tx = document.createElement('span')
+				tx.className = 'row-context-menu__text'
+				tx.textContent = text
+				b.appendChild(ic)
+				b.appendChild(tx)
 				b.addEventListener('click', () => { this.closeRowMenuDom(); onClick() })
 				el.appendChild(b)
 			}
 
-			item(email.isRead ? t('Mark as unread') : t('Mark as read'), '', () => this.rowToggleRead(email))
-			item(t('Spam'), '', () => this.rowSpam(email))
-			item(t('Move to folder'), '', () => this.openMoveDialog(email))
-			item(t('Delete'), 'row-context-menu__item--danger', () => this.rowDelete(email))
+			item(email.isRead ? ICONS.mail : ICONS.eye, email.isRead ? t('Mark as unread') : t('Mark as read'), '', () => this.rowToggleRead(email))
+			item(ICONS.alert, t('Spam'), '', () => this.rowSpam(email))
+			item(ICONS.folder, t('Move to folder'), '', () => this.openMoveDialog(email))
+
+			const divider = document.createElement('div')
+			divider.className = 'row-context-menu__divider'
+			el.appendChild(divider)
+
+			item(ICONS.trash, t('Delete'), 'row-context-menu__item--danger', () => this.rowDelete(email))
 
 			document.body.appendChild(el)
 			this._rowMenuEl = el
@@ -1270,34 +1300,103 @@ body.souvera-mobile-detail-open {
 .row-context-menu {
 	position: fixed;
 	z-index: 10000;
-	width: 220px;
+	width: 224px;
 	background: var(--color-main-background);
 	border: 1px solid var(--color-border);
-	border-radius: var(--border-radius-large, 12px);
-	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+	border-radius: 12px;
+	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
 	padding: 6px;
 }
 .row-context-menu__item {
-	display: block;
+	display: flex;
+	align-items: center;
+	gap: 10px;
 	width: 100%;
 	text-align: left;
 	background: none;
 	border: none;
-	border-radius: var(--border-radius, 8px);
-	padding: 8px 12px;
-	font-size: .9rem;
+	border-radius: 8px;
+	padding: 9px 10px;
+	font-size: .92rem;
 	color: var(--color-main-text);
 	cursor: pointer;
+	transition: background-color .12s ease;
 }
 .row-context-menu__item:hover { background: var(--color-background-hover); }
+.row-context-menu__icon {
+	display: inline-flex;
+	width: 18px;
+	height: 18px;
+	flex-shrink: 0;
+	color: var(--color-text-maxcontrast);
+}
+.row-context-menu__icon svg { width: 18px; height: 18px; }
+.row-context-menu__text { flex: 1; }
+.row-context-menu__divider {
+	height: 1px;
+	background: var(--color-border);
+	margin: 4px 8px;
+}
 .row-context-menu__item--danger { color: var(--color-error); }
+.row-context-menu__item--danger .row-context-menu__icon { color: var(--color-error); }
 .row-context-menu__item--danger:hover { background: var(--color-error-light, rgba(200, 60, 60, 0.08)); }
-.move-dialog-list {
+.move-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 10001;
+	background: rgba(10, 15, 25, 0.45);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
+}
+.move-modal {
+	width: 340px;
+	max-width: 100%;
+	max-height: 80vh;
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
-	max-height: 50vh;
-	overflow-y: auto;
+	background: var(--color-main-background);
+	border-radius: 14px;
+	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+	overflow: hidden;
 }
-.move-dialog-item { justify-content: flex-start; width: 100%; }
+.move-modal__title {
+	font-size: 1.05rem;
+	font-weight: 600;
+	padding: 16px 18px 10px;
+}
+.move-modal__list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	overflow-y: auto;
+	padding: 0 10px 10px;
+}
+.move-modal__item {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	background: none;
+	border: none;
+	border-radius: 9px;
+	padding: 10px 10px;
+	font-size: .95rem;
+	color: var(--color-main-text);
+	cursor: pointer;
+	transition: background-color .12s ease;
+}
+.move-modal__item:hover { background: var(--color-background-hover); }
+.move-modal__item-icon {
+	display: inline-flex;
+	color: var(--color-text-maxcontrast);
+}
+.move-modal__empty { padding: 16px 10px; color: var(--color-text-maxcontrast); }
+.move-modal__actions {
+	display: flex;
+	justify-content: flex-end;
+	padding: 10px 14px;
+	border-top: 1px solid var(--color-border);
+}
 </style>

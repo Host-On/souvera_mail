@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.20] — 2026-08
+
+### Fixed
+
+- Ordner-Auswahl beim Verschieben als eigenes, zuverlässig gerendertes
+  Modal (statt NcDialog) mit Ordnerliste, Icon und Abbruch-Button; leere
+  Liste zeigt einen Hinweis statt eines leeren Dialogs.
+- Rechtsklick-Menü optisch überarbeitet: Linien-Icons je Eintrag, saubere
+  Abstände, Trennlinie vor "Löschen", weichere Schatten und Hover-Übergänge.
+
 ## [1.2.19] — 2026-08
 
 ### Changed
