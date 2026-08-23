@@ -396,6 +396,11 @@ return [
             'verb' => 'POST',
         ],
         [
+            'name' => 'v2_spam#identities',
+            'url' => '/api/v2/spam/identities',
+            'verb' => 'GET',
+        ],
+        [
             'name' => 'v2_shield#quarantine',
             'url' => '/api/v2/shield/quarantine',
             'verb' => 'GET',

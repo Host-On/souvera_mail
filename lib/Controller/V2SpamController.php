@@ -377,22 +377,70 @@ class V2SpamController extends Controller
             return new JSONResponse(['error' => 'Missing "entry" (sender address)'], Http::STATUS_BAD_REQUEST);
         }
 
+        $email = \trim((string) ($this->request->getParam('email') ?? ''));
+
         try {
             $client = $this->httpClientService->newClient();
             $url = $this->urlGenerator->getAbsoluteURL('/apps/souvera_shield/api/internal/sender/blacklist');
+            $payload = ['entry' => $entry];
+            if ($email !== '') {
+                // Nur das gewählte Postfach blockieren (sonst alle Identitäten).
+                $payload['email'] = $email;
+            }
             $response = $client->post($url, [
                 'timeout' => 30,
                 'headers' => \array_merge(
                     ['Content-Type' => 'application/json', 'Accept' => 'application/json'],
                     $this->forwardSessionCookies(),
                 ),
-                'body' => \json_encode(['entry' => $entry]),
+                'body' => \json_encode($payload),
             ]);
             $result = \json_decode($response->getBody(), true) ?? [];
             return new JSONResponse($result);
         } catch (\Throwable $e) {
             $this->logger->error('SpamController: blacklist sender failed', ['exception' => $e]);
             return new JSONResponse(['error' => 'Failed to blacklist sender'], Http::STATUS_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * GET /api/v2/spam/identities — Postfach-Identitäten (eigene + geteilte),
+     * für die eine Absender-Blacklist möglich ist. Grundlage des
+     * Auswahl-Dialogs beim Spam-Button.
+     */
+    #[NoAdminRequired]
+    #[NoCSRFRequired]
+    public function identities(): JSONResponse
+    {
+        try {
+            $client = $this->httpClientService->newClient();
+            $url = $this->urlGenerator->getAbsoluteURL('/apps/souvera_shield/api/internal/sender/identities');
+            $response = $client->get($url, [
+                'timeout' => 15,
+                'headers' => \array_merge(
+                    ['Accept' => 'application/json'],
+                    $this->forwardSessionCookies(),
+                ),
+            ]);
+            $data = \json_decode($response->getBody(), true) ?? [];
+
+            $own = \strtolower(\trim((string) ($this->userSession->getUser()?->getEMailAddress() ?? '')));
+            $identities = [];
+            foreach (($data['identities'] ?? []) as $email) {
+                $email = \trim((string) $email);
+                if ($email === '') {
+                    continue;
+                }
+                $identities[] = [
+                    'email' => $email,
+                    'isOwn' => $own !== '' && \strtolower($email) === $own,
+                ];
+            }
+
+            return new JSONResponse(['identities' => $identities]);
+        } catch (\Throwable $e) {
+            $this->logger->error('SpamController: identities failed', ['exception' => $e]);
+            return new JSONResponse(['identities' => []], Http::STATUS_INTERNAL_SERVER_ERROR);
         }
     }
 

@@ -179,7 +179,7 @@ export default {
 		currentRoute() { return this.$route.name || 'inbox' },		systemFolders() { return this.mailboxes.filter(m => SYSTEM_ROLES.includes(m.role)).sort((a,b) => (ROLE_ORDER[a.role]??99) - (ROLE_ORDER[b.role]??99)) },
 		routeProps() {
 			if (this.$route.name === 'inbox') {
-				return { selectedMailbox: this.selectedMailbox, allMailboxes: [...this.mailboxes, ...this.sharedMailboxes], verticalLayout: this._responsiveVertical || this.isVertical, listOnlyLayout: (this.listOnlyLayout || this.focusLayout) && !this._responsiveVertical, focusLayout: this.focusLayout && !this._responsiveVertical }
+				return { selectedMailbox: this.selectedMailbox, allMailboxes: [...this.mailboxes, ...this.sharedMailboxes], sharedAccounts: this.sharedFolders, verticalLayout: this._responsiveVertical || this.isVertical, listOnlyLayout: (this.listOnlyLayout || this.focusLayout) && !this._responsiveVertical, focusLayout: this.focusLayout && !this._responsiveVertical }
 			}
 			return {}
 		},

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.9] — 2026-08
+
+### Added
+
+- Spam-Aktion mit mehreren Postfächern: Ein Dialog fragt, in welchem
+  Postfach (eigene oder geteilte Identität) der Absender blockiert werden
+  soll; die Nachricht wird weiterhin in den Spam-Ordner des aktuellen
+  Postfachs verschoben. Bei nur einer Identität entfällt der Dialog.
+
 ## [1.2.8] — 2026-08
 
 ### Added

@@ -72,6 +72,30 @@
 			<div class="mail-resize-handle__grip" />
 		</div>
 
+		<NcDialog v-if="showSpamTargetDialog"
+			:name="t('souvera_mail', 'Block sender in which mailbox?')"
+			:open="showSpamTargetDialog"
+			@update:open="cancelSpamTarget">
+			<p class="spam-target-hint">{{ t('souvera_mail', 'The sender is only blocked for the selected mailbox. The message itself is moved to the spam folder of the current mailbox.') }}</p>
+			<div class="spam-target-list">
+				<NcCheckboxRadioSwitch v-for="idn in spamIdentities" :key="idn.email"
+					type="radio" :checked="spamTarget === idn.email"
+					:value="idn.email"
+					@update:checked="spamTarget = idn.email">
+					<span class="spam-target-label">
+						{{ idn.email }}
+						<em v-if="idn.isOwn">({{ t('souvera_mail', 'own mailbox') }})</em>
+					</span>
+				</NcCheckboxRadioSwitch>
+			</div>
+			<template #actions>
+				<NcButton @click="cancelSpamTarget">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+				<NcButton variant="primary" :disabled="!spamTarget" @click="confirmSpamTarget">
+					{{ t('souvera_mail', 'Block') }}
+				</NcButton>
+			</template>
+		</NcDialog>
+
 		<Teleport to="body" :disabled="!fullscreenDetail">
 			<div v-if="selectedEmail" class="mail-detail-panel" :class="{ 'mail-detail-panel--fullscreen': fullscreenDetail, 'mail-detail-panel--focus': focusLayout && !this.isMobile }">
 				<Transition :name="pageTransitionName" :mode="pageTransitionName !== 'none' ? 'out-in' : undefined"
@@ -116,7 +140,7 @@
 </template>
 
 <script>
-import { NcEmptyContent, NcButton } from '@nextcloud/vue'
+import { NcEmptyContent, NcButton, NcDialog, NcCheckboxRadioSwitch } from '@nextcloud/vue'
 import EmailOutline from 'vue-material-design-icons/EmailOutline.vue'
 import ChevronLeft from 'vue-material-design-icons/ChevronLeft.vue'
 import ChevronRight from 'vue-material-design-icons/ChevronRight.vue'
@@ -134,10 +158,11 @@ const { fetchEmails, fetchEmailBody, deleteEmailApi, moveEmail, markEmailRead, t
 
 export default {
 	name: 'MailHomeView',
-	components: { EmailListToolbar, EmailListItem, EmailListSkeleton, EmailDetail, NcEmptyContent, NcButton, EmailOutline, ChevronLeft, ChevronRight },
+	components: { EmailListToolbar, EmailListItem, EmailListSkeleton, EmailDetail, NcEmptyContent, NcButton, NcDialog, NcCheckboxRadioSwitch, EmailOutline, ChevronLeft, ChevronRight },
 	props: {
 		selectedMailbox: { type: String, default: '' },
 		allMailboxes: { type: Array, default: () => [] },
+		sharedAccounts: { type: Array, default: () => [] },
 		verticalLayout: { type: Boolean, default: false },
 		listOnlyLayout: { type: Boolean, default: false },
 		focusLayout: { type: Boolean, default: false },
@@ -159,6 +184,9 @@ export default {
 			searchQuery: '',
 			filterType: 'all',
 			refreshCountdown: 60,
+			showSpamTargetDialog: false,
+			spamIdentities: [],
+			spamTarget: null,
 			_refreshInterval: 60,
 			_soundPref: 'none',
 		}
@@ -556,11 +584,16 @@ export default {
 					if (junk) await moveEmail(id, junk, this.currentAccountId)
 				} catch (e) { console.error('Failed to move to spam', e) }
 			}
-			await this.blacklistSenders(senders)
+			const target = await this.resolveBlacklistTarget()
+			if (target) {
+				await this.blacklistSenders(senders, target)
+				showSuccess(this.t('souvera_mail', 'Moved to spam and sender blocked'))
+			} else {
+				showSuccess(this.t('souvera_mail', 'Moved to spam'))
+			}
 			this.checkedIds = []
 			await this.loadEmails()
 			this.notifyMailboxChange()
-			showSuccess(this.t('souvera_mail', 'Moved to spam and sender blocked'))
 			this.bulkProcessing = false
 		},
 		/** Einzelne geöffnete Mail als Spam markieren (verschieben + blockieren). */
@@ -573,10 +606,17 @@ export default {
 				try { await moveEmail(this.selectedEmail.id, junk, this.currentAccountId) } catch (e) { console.error('Failed to move to spam', e) }
 			}
 			const addr = this.selectedEmail.from ? this.extractAddress(this.selectedEmail.from) : null
-			if (addr) await this.blacklistSenders(new Set([addr]))
+			if (addr) {
+				const target = await this.resolveBlacklistTarget()
+				if (target) {
+					await this.blacklistSenders(new Set([addr]), target)
+					showSuccess(this.t('souvera_mail', 'Moved to spam and sender blocked'))
+				} else {
+					showSuccess(this.t('souvera_mail', 'Moved to spam'))
+				}
+			}
 			await this.refreshEmails()
 			this.notifyMailboxChange()
-			showSuccess(this.t('souvera_mail', 'Moved to spam and sender blocked'))
 			if (this.emails.length > 0) {
 				const next = this.emails[Math.min(idx, this.emails.length - 1)]
 				if (next) this.onOpenEmail(next)
@@ -595,12 +635,55 @@ export default {
 			return m ? m[0] : null
 		},
 		/** Setzt die Absender über souvera_shield auf die PMG-Blacklist. */
-		async blacklistSenders(senders) {
+		async blacklistSenders(senders, targetEmail = null) {
 			for (const entry of senders) {
 				try {
-					await axios.post(generateUrl('/apps/souvera_mail/api/v2/spam/blacklist-sender'), { entry })
+					const payload = { entry }
+					if (targetEmail) payload.email = targetEmail
+					await axios.post(generateUrl('/apps/souvera_mail/api/v2/spam/blacklist-sender'), payload)
 				} catch (e) { console.error('Failed to blacklist sender', e) }
 			}
+		},
+		/**
+		 * Ermittelt die Blacklist-Ziel-Identität: eine einzige Identität
+		 * wird direkt verwendet; bei mehreren (geteilte Postfächer) wird
+		 * der Auswahl-Dialog gezeigt. null = abgebrochen.
+		 */
+		async resolveBlacklistTarget() {
+			if (!this._spamIdentities) {
+				try {
+					const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/spam/identities'))
+					this._spamIdentities = data.identities || []
+				} catch (e) {
+					console.error('Failed to load identities', e)
+					this._spamIdentities = []
+				}
+			}
+			const identities = this._spamIdentities
+			if (identities.length === 0) return null
+			if (identities.length === 1) return identities[0].email || null
+			// Default: Identität des aktuell geöffneten Postfachs.
+			let def = identities.find(i => i.isOwn)?.email || identities[0]?.email || null
+			if (this.currentAccountId) {
+				const acc = this.sharedAccounts.find(a => String(a.id) === String(this.currentAccountId))
+				const hit = acc?.name ? identities.find(i => String(i.email).toLowerCase() === String(acc.name).toLowerCase()) : null
+				if (hit) def = hit.email
+			}
+			this.spamIdentities = identities
+			this.spamTarget = def
+			this.showSpamTargetDialog = true
+			return new Promise((resolve) => { this._spamTargetResolver = resolve })
+		},
+		confirmSpamTarget() {
+			this.showSpamTargetDialog = false
+			const target = this.spamTarget
+			this.spamTarget = null
+			if (this._spamTargetResolver) { this._spamTargetResolver(target); this._spamTargetResolver = null }
+		},
+		cancelSpamTarget() {
+			this.showSpamTargetDialog = false
+			this.spamTarget = null
+			if (this._spamTargetResolver) { this._spamTargetResolver(null); this._spamTargetResolver = null }
 		},
 
 		async onOpenEmail(email) {

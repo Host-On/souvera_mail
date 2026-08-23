@@ -575,6 +575,11 @@
         "Created:": "Erstellt:",
         "Last used:": "Zuletzt benutzt:",
         "Never": "Nie",
-        "Just now": "Gerade eben"
+        "Just now": "Gerade eben",
+        "Block sender in which mailbox?": "In welchem Postfach soll der Absender blockiert werden?",
+        "The sender is only blocked for the selected mailbox. The message itself is moved to the spam folder of the current mailbox.": "Der Absender wird nur für das gewählte Postfach blockiert. Die Nachricht selbst wird in den Spam-Ordner des aktuellen Postfachs verschoben.",
+        "own mailbox": "eigenes Postfach",
+        "Block": "Blockieren",
+        "Moved to spam": "In Spam verschoben"
     }
 }
