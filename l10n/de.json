@@ -580,6 +580,7 @@
         "own mailbox": "eigenes Postfach",
         "Block": "Blockieren",
         "Moved to spam": "In Spam verschoben",
-        "Mark as unread": "Als ungelesen markieren"
+        "Mark as unread": "Als ungelesen markieren",
+        "Context menu could not be opened": "Kontextmenü konnte nicht geöffnet werden"
     }
 }

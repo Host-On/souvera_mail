@@ -34,9 +34,10 @@
 				@update:filter="onFilter" />
 			<EmailListSkeleton v-if="loadingEmails" />
 			<template v-else-if="emails.length > 0">
-				<div ref="emailItems" class="email-items" @scroll="onListScroll">
+				<div ref="emailItems" class="email-items" @scroll="onListScroll"
+					@contextmenu.prevent="onListContextMenu">
 					<div v-for="email in emails" :key="email.id" class="email-row"
-						@contextmenu.prevent="onRowContextMenu($event, email)">
+						:data-email-id="email.id">
 						<EmailListItem
 							:email="email"
 							:active="selectedEmail?.id === email.id"
@@ -758,17 +759,28 @@ export default {
 				this.selectedEmail = null; this.emailBodyHtml = ''; this.emailBodyPlain = ''
 			}
 		},
-		/** Rechtsklick-Kontextmenü für eine Zeile öffnen. */
-		onRowContextMenu(ev, email) {
+		/** Rechtsklick auf eine Zeile: Ziel per Event-Delegation ermitteln. */
+		onListContextMenu(ev) {
+			const row = ev.target && ev.target.closest ? ev.target.closest('.email-row') : null
+			if (!row) return
+			const email = this.emails.find(e => e.id === row.dataset.emailId)
+			if (!email) return
 			// Manche Eingabegeräte (Trackpads, ctrl+click auf macOS) feuern
 			// direkt nach dem Rechtsklick zusätzlich einen Linksklick — der
 			// würde die Mail öffnen und auf schmalen Fenstern die Liste
 			// verdecken. Für eine halbe Sekunde unterdrücken.
 			this._suppressRowClickUntil = Date.now() + 600
+			const menu = this.$refs.rowMenu
+			if (!menu || typeof menu.show !== 'function') {
+				console.error('RowContextMenu ref nicht verfügbar', this.$refs)
+				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' (ref missing)')
+				return
+			}
 			try {
-				this.$refs.rowMenu.show(ev.clientX, ev.clientY, email)
+				menu.show(ev.clientX, ev.clientY, email)
 			} catch (e) {
 				console.error('RowContextMenu failed', e)
+				showError(this.t('souvera_mail', 'Context menu could not be opened') + ': ' + (e?.message || e))
 			}
 		},
 		/** Gelesen/Ungelesen umschalten (Einzelzeile). */

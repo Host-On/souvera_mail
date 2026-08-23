@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.14] — 2026-08
+
+### Fixed
+
+- Rechtsklick: Event-Delegation auf dem Listen-Container (statt Listener je
+  Zeile) — das Kontextmenü öffnet zuverlässig; bei Fehlern erscheint eine
+  sichtbare Meldung statt stillem Abbruch.
+
 ## [1.2.13] — 2026-08
 
 ### Fixed
