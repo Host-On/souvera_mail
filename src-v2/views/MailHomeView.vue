@@ -74,8 +74,6 @@
 			<div class="mail-resize-handle__grip" />
 		</div>
 
-		<RowContextMenu ref="rowMenu" :mailboxes="moveMailboxes" :handlers="rowMenuActions" />
-
 		<NcDialog v-if="showSpamTargetDialog"
 			:name="t('souvera_mail', 'Block sender in which mailbox?')"
 			:open="showSpamTargetDialog"
@@ -154,7 +152,7 @@ import EmailListItem from '../components/EmailListItem.vue'
 import EmailListSkeleton from '../components/EmailListSkeleton.vue'
 import EmailDetail from '../components/EmailDetail.vue'
 import { useHotkeys } from '../composables/useHotkeys.js'
-import RowContextMenu from '../components/RowContextMenu.vue'
+import { mailboxDisplayName } from '../utils/mailboxNames.js'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { showSuccess, showError } from '@nextcloud/dialogs'
@@ -163,7 +161,7 @@ const { fetchEmails, fetchEmailBody, deleteEmailApi, moveEmail, markEmailRead, t
 
 export default {
 	name: 'MailHomeView',
-	components: { EmailListToolbar, EmailListItem, EmailListSkeleton, EmailDetail, RowContextMenu, NcEmptyContent, NcButton, NcDialog, NcCheckboxRadioSwitch, EmailOutline, ChevronLeft, ChevronRight },
+	components: { EmailListToolbar, EmailListItem, EmailListSkeleton, EmailDetail, NcEmptyContent, NcButton, NcDialog, NcCheckboxRadioSwitch, EmailOutline, ChevronLeft, ChevronRight },
 	props: {
 		selectedMailbox: { type: String, default: '' },
 		allMailboxes: { type: Array, default: () => [] },
@@ -192,7 +190,6 @@ export default {
 			showSpamTargetDialog: false,
 			spamIdentities: [],
 			spamTarget: null,
-			rowMenuActions: { toggleRead: null, spam: null, move: null, remove: null },
 			_refreshInterval: 60,
 			_soundPref: 'none',
 		}
@@ -249,15 +246,6 @@ export default {
 		listOnlyLayout() { this.syncBodyScrollLock() },
 		focusLayout() { this.syncBodyScrollLock() },
 		selectedEmail() { this.syncBodyScrollLock() },
-	},
-	created() {
-		// Stabiles Objekt: Änderungen hier rendern die Liste nie neu.
-		this.rowMenuActions = {
-			toggleRead: (email) => this.rowToggleRead(email),
-			spam: (email) => this.rowSpam(email),
-			move: (email, mailboxId) => this.rowMoveTo(email, mailboxId),
-			remove: (email) => this.rowDelete(email),
-		}
 	},
 	async mounted() {
 		this._originalTitle = document.title.replace(/^\(\d+\)\s*/, '')
@@ -351,6 +339,7 @@ export default {
 		if (this._audioCtx) { this._audioCtx.close(); this._audioCtx = null }
 		if (this._originalTitle) document.title = this._originalTitle
 		if (this._mailboxChangeTimer) clearTimeout(this._mailboxChangeTimer)
+		this.closeRowMenuDom()
 	},
 	methods: {
 		syncBodyScrollLock() {
@@ -815,15 +804,79 @@ export default {
 			// verdecken. Für eine halbe Sekunde unterdrücken.
 			this._suppressRowClickUntil = now + 600
 			try {
-				window.dispatchEvent(new CustomEvent('souvera-row-menu-open', {
-					detail: { x: ev.clientX, y: ev.clientY, email },
-				}))
+				this.openRowMenuDom(email, ev.clientX, ev.clientY)
 				console.log('[souvera-mail] contextmenu geöffnet für', emailId)
 			} catch (e) {
 				console.error('RowContextMenu failed', e)
 				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' [e:' + (e?.message || e) + ']')
 			}
 		},
+		/**
+		 * Kontextmenü komplett imperativ als reines DOM — OHNE Vue-Kind,
+		 * Teleport, $refs oder Event-Bus. Funktioniert, solange dieser
+		 * Handler läuft (was per Diagnose-Toast bewiesen ist).
+		 */
+		openRowMenuDom(email, x, y) {
+			this.closeRowMenuDom()
+			const t = (k) => this.t('souvera_mail', k)
+			const el = document.createElement('div')
+			el.className = 'row-context-menu'
+			el.style.left = Math.max(8, Math.min(x, window.innerWidth - 268)) + 'px'
+			el.style.top = Math.max(8, Math.min(y, window.innerHeight - 320)) + 'px'
+
+			const item = (text, className, onClick) => {
+				const b = document.createElement('button')
+				b.type = 'button'
+				b.className = 'row-context-menu__item' + (className ? ' ' + className : '')
+				b.textContent = text
+				b.addEventListener('click', () => { this.closeRowMenuDom(); onClick() })
+				el.appendChild(b)
+			}
+
+			const head = document.createElement('div')
+			head.className = 'row-context-menu__head'
+			head.textContent = email.subject || ''
+			el.appendChild(head)
+
+			item(email.isRead ? t('Mark as unread') : t('Mark as read'), '', () => this.rowToggleRead(email))
+			item(t('Spam'), '', () => this.rowSpam(email))
+
+			const label = document.createElement('div')
+			label.className = 'row-context-menu__label'
+			label.textContent = t('Move to folder')
+			el.appendChild(label)
+
+			for (const mb of this.moveMailboxes) {
+				item(this.mailboxDisplayNameFor(mb), 'row-context-menu__item--indent', () => this.rowMoveTo(email, mb.id))
+			}
+
+			item(t('Delete'), 'row-context-menu__item--danger', () => this.rowDelete(email))
+
+			document.body.appendChild(el)
+			this._rowMenuEl = el
+			this._rowMenuClose = (ev) => {
+				if (!el.contains(ev.target)) this.closeRowMenuDom()
+			}
+			this._rowMenuKey = (ev) => { if (ev.key === 'Escape') this.closeRowMenuDom() }
+			this._rowMenuScroll = () => this.closeRowMenuDom()
+			document.addEventListener('click', this._rowMenuClose, true)
+			document.addEventListener('keydown', this._rowMenuKey, true)
+			document.addEventListener('scroll', this._rowMenuScroll, true)
+		},
+		/** Mailbox-Anzeigename fürs Menü (Helper, da t nicht in Hilfsfunktionen verfügbar ist). */
+		mailboxDisplayNameFor(mb) {
+			return mailboxDisplayName(mb)
+		},
+		closeRowMenuDom() {
+			if (this._rowMenuEl) {
+				this._rowMenuEl.remove()
+				this._rowMenuEl = null
+			}
+			if (this._rowMenuClose) { document.removeEventListener('click', this._rowMenuClose, true); this._rowMenuClose = null }
+			if (this._rowMenuKey) { document.removeEventListener('keydown', this._rowMenuKey, true); this._rowMenuKey = null }
+			if (this._rowMenuScroll) { document.removeEventListener('scroll', this._rowMenuScroll, true); this._rowMenuScroll = null }
+		},
+
 		/** Gelesen/Ungelesen umschalten (Einzelzeile). */
 		async rowToggleRead(email) {
 			if (!email) return
@@ -1204,4 +1257,51 @@ body.resize-active { user-select: none; cursor: col-resize; }
 body.souvera-mobile-detail-open {
 	overflow: hidden;
 }
+
+/* Unscoped: das Kontextmenü wird imperativ direkt an body gehängt. */
+.row-context-menu {
+	position: fixed;
+	z-index: 10000;
+	width: 260px;
+	max-height: 320px;
+	overflow-y: auto;
+	background: var(--color-main-background);
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-large, 12px);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+	padding: 6px;
+}
+.row-context-menu__head {
+	font-size: .78rem;
+	color: var(--color-text-maxcontrast);
+	padding: 6px 10px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	border-bottom: 1px solid var(--color-border);
+	margin-bottom: 4px;
+}
+.row-context-menu__label {
+	font-size: .72rem;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: var(--color-text-maxcontrast);
+	padding: 8px 10px 4px;
+}
+.row-context-menu__item {
+	display: block;
+	width: 100%;
+	text-align: left;
+	background: none;
+	border: none;
+	border-radius: var(--border-radius, 8px);
+	padding: 8px 10px;
+	font-size: .9rem;
+	color: var(--color-main-text);
+	cursor: pointer;
+}
+.row-context-menu__item:hover { background: var(--color-background-hover); }
+.row-context-menu__item--indent { padding-left: 24px; }
+.row-context-menu__item--danger { color: var(--color-error); }
+.row-context-menu__item--danger:hover { background: var(--color-error-light, rgba(200, 60, 60, 0.08)); }
 </style>

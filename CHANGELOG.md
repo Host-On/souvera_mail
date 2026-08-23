@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.18] — 2026-08
+
+### Fixed
+
+- Kontextmenü vollständig auf imperatives DOM umgestellt: Die Liste baut
+  das Menü direkt an `document.body` (keine Kind-Komponente, kein Teleport,
+  keine Refs, kein Event-Bus mehr) — damit entfällt die zuletzt beobachtete
+  still schweigende Kette (nicht gemountete Komponente verwarf das Öffnen).
+
 ## [1.2.17] — 2026-08
 
 ### Fixed
