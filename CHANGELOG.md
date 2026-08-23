@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.12] — 2026-08
+
+### Fixed
+
+- Rechtsklick-Kontextmenü vollständig entkoppelt: Das Menü lebt jetzt in
+  einer eigenen Komponente mit internem Zustand — das Öffnen rendert die
+  Mail-Liste nicht mehr neu und kann sie nicht mehr ausblenden. Zusätzlich
+  werden Folge-Klicks direkt nach dem Rechtsklick (Trackpad/ctrl+click)
+  kurz unterdrückt.
+
 ## [1.2.11] — 2026-08
 
 ### Fixed
