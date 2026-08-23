@@ -587,7 +587,11 @@
 						<div v-for="pw in passwords" :key="pw.id" class="password-row">
 							<div class="password-info">
 								<div class="password-name">{{ pw.description || pw.name }}</div>
-								<div class="settings-muted">{{ pw.createdAt ? fmtDate(pw.createdAt) : '' }}</div>
+								<div class="settings-muted">{{ t('souvera_mail', 'Created:') }} {{ pw.createdAt ? fmtDate(pw.createdAt) : '—' }}</div>
+								<div class="settings-muted password-last-used"
+									:title="pw.lastUsedAt ? fmtDate(pw.lastUsedAt) : ''">
+									{{ t('souvera_mail', 'Last used:') }} {{ fmtLastUsed(pw.lastUsedAt) }}
+								</div>
 							</div>
 							<NcButton variant="tertiary" size="small"
 								:aria-label="t('souvera_mail', 'Delete')" @click="remove(pw.id)">
@@ -1130,6 +1134,19 @@ export default {
 			return Math.round(s * 10) / 10 + ' ' + u[i]
 		},
 		fmtDate(ts) { return ts ? new Date(ts).toLocaleDateString() : '' },
+		/** Relatives "zuletzt benutzt" — fällt auf das Datum zurück. */
+		fmtLastUsed(ts) {
+			if (!ts) return this.t('souvera_mail', 'Never')
+			const d = new Date(ts)
+			if (Number.isNaN(d.getTime())) return this.t('souvera_mail', 'Never')
+			const diffMs = Date.now() - d.getTime()
+			if (diffMs < 60 * 1000) return this.t('souvera_mail', 'Just now')
+			const fmt = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+			if (diffMs < 60 * 60 * 1000) return fmt.format(-Math.round(diffMs / (60 * 1000)), 'minute')
+			if (diffMs < 24 * 60 * 60 * 1000) return fmt.format(-Math.round(diffMs / (60 * 60 * 1000)), 'hour')
+			if (diffMs < 30 * 24 * 60 * 60 * 1000) return fmt.format(-Math.round(diffMs / (24 * 60 * 60 * 1000)), 'day')
+			return new Date(ts).toLocaleDateString()
+		},
 		async create() {
 			try {
 				const r = await axios.post(generateUrl('/apps/souvera_mail/api/v2/settings/app-passwords'), { name: this.newName })

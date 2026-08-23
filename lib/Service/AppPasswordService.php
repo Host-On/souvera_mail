@@ -171,16 +171,27 @@ class AppPasswordService
         $accountId = $this->userContext->resolveAccountId($userId);
         $bearer = $this->userContext->resolveBearer($userId);
 
-        $response = $this->stalwart->jmapCall($bearer, [
-            [
-                'x:AppPassword/get',
+        // "lastUsedAt" ist optional — ältere Stalwart-Versionen lehnen die
+        // Property ab. Dann einfach ohne sie wiederholen.
+        $properties = ['id', 'description', 'createdAt', 'expiresAt', 'lastUsedAt'];
+        try {
+            $response = $this->stalwart->jmapCall($bearer, [
                 [
-                    'accountId' => $accountId,
-                    'properties' => ['id', 'description', 'createdAt', 'expiresAt'],
+                    'x:AppPassword/get',
+                    ['accountId' => $accountId, 'properties' => $properties],
+                    'c0',
                 ],
-                'c0',
-            ],
-        ]);
+            ]);
+        } catch (\Throwable $e) {
+            $properties = ['id', 'description', 'createdAt', 'expiresAt'];
+            $response = $this->stalwart->jmapCall($bearer, [
+                [
+                    'x:AppPassword/get',
+                    ['accountId' => $accountId, 'properties' => $properties],
+                    'c0',
+                ],
+            ]);
+        }
 
         $list = $this->stalwart->extractMethodResponse($response, 'x:AppPassword/get');
 
@@ -200,11 +211,27 @@ class AppPasswordService
             $stalwartId = (string) $entry['id'];
             $mapping = $mappingByStalwart[$stalwartId] ?? null;
 
+            // Letzte Nutzung: neuerer Zeitpunkt von Stalwart (IMAP/SMTP/Sieve)
+            // und — bei kombinierten Passwörtern — Nextcloud (DAV/CardDAV etc.).
+            $lastUsed = $this->isoToEpoch($entry['lastUsedAt'] ?? null);
+            if ($mapping !== null) {
+                try {
+                    $ncToken = $this->ncTokenProvider->getTokenById((int) $mapping->getNcTokenId());
+                    $ncActivity = $ncToken->getLastActivity();
+                    if ($ncActivity > 0) {
+                        $lastUsed = $lastUsed === null ? $ncActivity : \max($lastUsed, $ncActivity);
+                    }
+                } catch (\Throwable $e) {
+                    $this->logger->debug('AppPassword: nc token lookup failed: ' . $e->getMessage());
+                }
+            }
+
             $items[] = [
                 'id' => $stalwartId,
                 'description' => (string) ($entry['description'] ?? ''),
                 'createdAt' => isset($entry['createdAt']) ? (string) $entry['createdAt'] : null,
                 'expiresAt' => isset($entry['expiresAt']) ? (string) $entry['expiresAt'] : null,
+                'lastUsedAt' => $lastUsed !== null ? \gmdate('c', $lastUsed) : null,
                 // `combined` = Mail + Nextcloud/DAV; `legacy` = Mail only
                 // (created before v0.14.0 or via stalwart-cli directly).
                 'kind' => $mapping !== null ? 'combined' : 'legacy',
@@ -212,6 +239,20 @@ class AppPasswordService
             ];
         }
         return $items;
+    }
+
+    /**
+     * Wandelt einen ISO-8601-Zeitstempel in einen Unix-Epoch um (null bei
+     * leerem oder unlesbarem Wert).
+     */
+    private function isoToEpoch(mixed $iso): ?int
+    {
+        if (!\is_string($iso) || \trim($iso) === '') {
+            return null;
+        }
+        $t = \strtotime($iso);
+
+        return $t === false ? null : $t;
     }
 
     /**

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.8] — 2026-08
+
+### Added
+
+- App-Passwörter zeigen jetzt die letzte Nutzung an ("Zuletzt benutzt"):
+  neuester Zeitpunkt aus Stalwart (IMAP/SMTP/Sieve) und — bei kombinierten
+  Passwörtern — Nextcloud (DAV), relativ formatiert mit Datums-Fallback.
+
 ## [1.2.7] — 2026-08
 
 ### Added
