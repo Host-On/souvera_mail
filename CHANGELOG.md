@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.17] — 2026-08
+
+### Fixed
+
+- Kontextmenü öffnet jetzt über den Fenster-Event-Bus statt über eine
+  $refs-Verbindung (der Ref war zur Laufzeit nicht auflösbar). Die
+  Mail-Zuordnung vergleicht IDs als Strings und zeigt bei Fehlschlag die
+  tatsächlichen Listen-IDs zur Diagnose an.
+
 ## [1.2.16] — 2026-08
 
 ### Fixed

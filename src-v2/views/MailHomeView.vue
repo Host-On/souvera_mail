@@ -800,9 +800,13 @@ export default {
 				return
 			}
 			const emailId = row.dataset ? row.dataset.emailId : null
-			const email = emailId ? this.emails.find(e => e.id === emailId) : null
+			const email = emailId
+				? this.emails.find(e => String(e.id) === String(emailId))
+					|| this.emails.find(e => e.rowId !== undefined && String(e.rowId) === String(emailId))
+				: null
 			if (!email) {
-				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' [c:' + emailId + ']')
+				const sample = this.emails.slice(0, 3).map(e => String(e.id)).join(',')
+				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' [c:' + emailId + ' vs ' + sample + ']')
 				return
 			}
 			// Manche Eingabegeräte (Trackpads, ctrl+click auf macOS) feuern
@@ -810,14 +814,10 @@ export default {
 			// würde die Mail öffnen und auf schmalen Fenstern die Liste
 			// verdecken. Für eine halbe Sekunde unterdrücken.
 			this._suppressRowClickUntil = now + 600
-			const menu = this.$refs.rowMenu
-			if (!menu || typeof menu.show !== 'function') {
-				console.error('RowContextMenu ref nicht verfügbar', this.$refs)
-				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' [d:ref]')
-				return
-			}
 			try {
-				menu.show(ev.clientX, ev.clientY, email)
+				window.dispatchEvent(new CustomEvent('souvera-row-menu-open', {
+					detail: { x: ev.clientX, y: ev.clientY, email },
+				}))
 				console.log('[souvera-mail] contextmenu geöffnet für', emailId)
 			} catch (e) {
 				console.error('RowContextMenu failed', e)

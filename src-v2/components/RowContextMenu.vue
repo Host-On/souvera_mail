@@ -59,15 +59,23 @@ export default {
 		this._onClick = () => this.close()
 		this._onKey = (ev) => { if (ev.key === 'Escape') this.close() }
 		this._onScroll = () => this.close()
+		// Öffnen über den Fenster-Event-Bus — bewusst OHNE $refs zwischen
+		// Eltern- und Kind-Komponente (unabhängig von Instanz-Exposition).
+		this._onOpenEvent = (ev) => {
+			const d = ev && ev.detail
+			if (d && d.email) this.show(d.x, d.y, d.email)
+		}
 		window.addEventListener('click', this._onClick)
 		window.addEventListener('keydown', this._onKey)
 		window.addEventListener('scroll', this._onScroll, true)
+		window.addEventListener('souvera-row-menu-open', this._onOpenEvent)
 	},
 
 	beforeUnmount() {
 		window.removeEventListener('click', this._onClick)
 		window.removeEventListener('keydown', this._onKey)
 		window.removeEventListener('scroll', this._onScroll, true)
+		window.removeEventListener('souvera-row-menu-open', this._onOpenEvent)
 	},
 
 	methods: {
