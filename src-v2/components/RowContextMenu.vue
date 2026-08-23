@@ -72,7 +72,7 @@ export default {
 
 	methods: {
 		/** Öffnet das Menü an der Mausposition für die übergebene Mail. */
-		open(x, y, email) {
+		show(x, y, email) {
 			this.x = x
 			this.y = y
 			this.email = email

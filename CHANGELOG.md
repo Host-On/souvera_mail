@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.13] — 2026-08
+
+### Fixed
+
+- Rechtsklick-Menü: Namenskollision zwischen Daten-Eigenschaft `open` und
+  Methode `open()` in der Menü-Komponente behoben (Methode heißt jetzt
+  `show`) — der Rechtsklick öffnet das Kontextmenü nun zuverlässig.
+
 ## [1.2.12] — 2026-08
 
 ### Fixed

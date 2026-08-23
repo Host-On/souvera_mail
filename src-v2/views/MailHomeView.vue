@@ -765,7 +765,11 @@ export default {
 			// würde die Mail öffnen und auf schmalen Fenstern die Liste
 			// verdecken. Für eine halbe Sekunde unterdrücken.
 			this._suppressRowClickUntil = Date.now() + 600
-			this.$refs.rowMenu.open(ev.clientX, ev.clientY, email)
+			try {
+				this.$refs.rowMenu.show(ev.clientX, ev.clientY, email)
+			} catch (e) {
+				console.error('RowContextMenu failed', e)
+			}
 		},
 		/** Gelesen/Ungelesen umschalten (Einzelzeile). */
 		async rowToggleRead(email) {
