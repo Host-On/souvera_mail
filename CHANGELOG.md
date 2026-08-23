@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.11] — 2026-08
+
+### Fixed
+
+- Rechtsklick-Kontextmenü: Der `contextmenu`-Listener sitzt jetzt auf einem
+  eigenen Wrapper-Element pro Zeile statt als Fallthrough auf der
+  Listen-Komponente — das Menü öffnet zuverlässig und beeinflusst die
+  Listen-Darstellung nicht mehr.
+
 ## [1.2.10] — 2026-08
 
 ### Added

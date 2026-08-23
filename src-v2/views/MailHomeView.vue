@@ -35,17 +35,17 @@
 			<EmailListSkeleton v-if="loadingEmails" />
 			<template v-else-if="emails.length > 0">
 				<div ref="emailItems" class="email-items" @scroll="onListScroll">
-					<EmailListItem
-						v-for="email in emails"
-						:key="email.id"
-						:email="email"
-						:active="selectedEmail?.id === email.id"
-						:checked="checkedIds.includes(email.id)"
-						@click="openEmailFromList(email)"
-						@dblclick="onOpenEmail(email)"
-						@check="toggleCheck(email.id)"
-						@flag="toggleFlag(email.id)"
-						@contextmenu.prevent="onRowContextMenu($event, email)" />
+					<div v-for="email in emails" :key="email.id" class="email-row"
+						@contextmenu.prevent="onRowContextMenu($event, email)">
+						<EmailListItem
+							:email="email"
+							:active="selectedEmail?.id === email.id"
+							:checked="checkedIds.includes(email.id)"
+							@click="openEmailFromList(email)"
+							@dblclick="onOpenEmail(email)"
+							@check="toggleCheck(email.id)"
+							@flag="toggleFlag(email.id)" />
+					</div>
 				</div>
 				<div v-if="loadingMore" class="mail-load-more">
 					<span class="icon-loading" />
@@ -1063,6 +1063,8 @@ export default {
 </script>
 
 <style scoped>
+.email-row { display: contents; }
+.email-row > .email-list-item { display: flex; }
 .row-context-menu {
 	position: fixed;
 	z-index: 10000;
