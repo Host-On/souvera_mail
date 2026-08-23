@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.19] — 2026-08
+
+### Changed
+
+- Rechtsklick-Menü aufgeräumt: schlichtere Optik ohne Betreff-Kopf und
+  ohne Scrollbar — vier kompakte Einträge (Gelesen/Ungelesen, Spam,
+  Verschieben, Löschen). "Verschieben" öffnet einen Ordner-Auswahl-Dialog
+  statt einer langen Inline-Liste.
+
 ## [1.2.18] — 2026-08
 
 ### Fixed

@@ -74,6 +74,18 @@
 			<div class="mail-resize-handle__grip" />
 		</div>
 
+		<NcDialog v-if="moveDialog.open"
+			:name="t('souvera_mail', 'Move to folder')"
+			:open="moveDialog.open"
+			@update:open="closeMoveDialog">
+			<div class="move-dialog-list">
+				<NcButton v-for="mb in moveMailboxes" :key="'mv-'+mb.id"
+					variant="tertiary" class="move-dialog-item" @click="chooseMoveTarget(mb.id)">
+					{{ mailboxDisplayName(mb) }}
+				</NcButton>
+			</div>
+		</NcDialog>
+
 		<NcDialog v-if="showSpamTargetDialog"
 			:name="t('souvera_mail', 'Block sender in which mailbox?')"
 			:open="showSpamTargetDialog"
@@ -190,6 +202,7 @@ export default {
 			showSpamTargetDialog: false,
 			spamIdentities: [],
 			spamTarget: null,
+			moveDialog: { open: false, email: null },
 			_refreshInterval: 60,
 			_soundPref: 'none',
 		}
@@ -821,8 +834,8 @@ export default {
 			const t = (k) => this.t('souvera_mail', k)
 			const el = document.createElement('div')
 			el.className = 'row-context-menu'
-			el.style.left = Math.max(8, Math.min(x, window.innerWidth - 268)) + 'px'
-			el.style.top = Math.max(8, Math.min(y, window.innerHeight - 320)) + 'px'
+			el.style.left = Math.max(8, Math.min(x, window.innerWidth - 230)) + 'px'
+			el.style.top = Math.max(8, Math.min(y, window.innerHeight - 260)) + 'px'
 
 			const item = (text, className, onClick) => {
 				const b = document.createElement('button')
@@ -833,23 +846,9 @@ export default {
 				el.appendChild(b)
 			}
 
-			const head = document.createElement('div')
-			head.className = 'row-context-menu__head'
-			head.textContent = email.subject || ''
-			el.appendChild(head)
-
 			item(email.isRead ? t('Mark as unread') : t('Mark as read'), '', () => this.rowToggleRead(email))
 			item(t('Spam'), '', () => this.rowSpam(email))
-
-			const label = document.createElement('div')
-			label.className = 'row-context-menu__label'
-			label.textContent = t('Move to folder')
-			el.appendChild(label)
-
-			for (const mb of this.moveMailboxes) {
-				item(this.mailboxDisplayNameFor(mb), 'row-context-menu__item--indent', () => this.rowMoveTo(email, mb.id))
-			}
-
+			item(t('Move to folder'), '', () => this.openMoveDialog(email))
 			item(t('Delete'), 'row-context-menu__item--danger', () => this.rowDelete(email))
 
 			document.body.appendChild(el)
@@ -863,9 +862,18 @@ export default {
 			document.addEventListener('keydown', this._rowMenuKey, true)
 			document.addEventListener('scroll', this._rowMenuScroll, true)
 		},
-		/** Mailbox-Anzeigename fürs Menü (Helper, da t nicht in Hilfsfunktionen verfügbar ist). */
-		mailboxDisplayNameFor(mb) {
-			return mailboxDisplayName(mb)
+		/** Öffnet den Ordner-Auswahl-Dialog für die Verschieben-Aktion. */
+		openMoveDialog(email) {
+			this.moveDialog = { open: true, email }
+		},
+		closeMoveDialog() {
+			this.moveDialog = { open: false, email: null }
+		},
+		/** Zielordner im Dialog gewählt. */
+		chooseMoveTarget(mailboxId) {
+			const email = this.moveDialog.email
+			this.closeMoveDialog()
+			if (email) this.rowMoveTo(email, mailboxId)
 		},
 		closeRowMenuDom() {
 			if (this._rowMenuEl) {
@@ -1262,31 +1270,12 @@ body.souvera-mobile-detail-open {
 .row-context-menu {
 	position: fixed;
 	z-index: 10000;
-	width: 260px;
-	max-height: 320px;
-	overflow-y: auto;
+	width: 220px;
 	background: var(--color-main-background);
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-large, 12px);
 	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 	padding: 6px;
-}
-.row-context-menu__head {
-	font-size: .78rem;
-	color: var(--color-text-maxcontrast);
-	padding: 6px 10px;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	border-bottom: 1px solid var(--color-border);
-	margin-bottom: 4px;
-}
-.row-context-menu__label {
-	font-size: .72rem;
-	text-transform: uppercase;
-	letter-spacing: .04em;
-	color: var(--color-text-maxcontrast);
-	padding: 8px 10px 4px;
 }
 .row-context-menu__item {
 	display: block;
@@ -1295,13 +1284,20 @@ body.souvera-mobile-detail-open {
 	background: none;
 	border: none;
 	border-radius: var(--border-radius, 8px);
-	padding: 8px 10px;
+	padding: 8px 12px;
 	font-size: .9rem;
 	color: var(--color-main-text);
 	cursor: pointer;
 }
 .row-context-menu__item:hover { background: var(--color-background-hover); }
-.row-context-menu__item--indent { padding-left: 24px; }
 .row-context-menu__item--danger { color: var(--color-error); }
 .row-context-menu__item--danger:hover { background: var(--color-error-light, rgba(200, 60, 60, 0.08)); }
+.move-dialog-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	max-height: 50vh;
+	overflow-y: auto;
+}
+.move-dialog-item { justify-content: flex-start; width: 100%; }
 </style>
