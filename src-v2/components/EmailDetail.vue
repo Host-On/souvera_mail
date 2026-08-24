@@ -236,7 +236,15 @@ export default {
 			}
 			return ''
 		},
-		displayPlain() { return !this.htmlBody ? this.plainBody : '' },
+		displayPlain() {
+			if (!this.htmlBody) return this.plainBody
+			// Plaintext-Mails mit auto-generiertem HTML (kein <br>/Block-Tag)
+			// würden als HTML die Zeilenumbrüche verlieren — dann lieber den
+			// Plaintext anzeigen.
+			const hasBreakElement = /<(br|p|div|li|h[1-6]|pre|blockquote|table|ul|ol|tr)[\s>/]/i.test(this.htmlBody)
+			if (!hasBreakElement && this.plainBody && this.plainBody.trim() !== '') return this.plainBody
+			return ''
+		},
 		filePath() {
 			const p = this.folderPath.replace(/^\//, '')
 			return p

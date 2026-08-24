@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.23] — 2026-08
+
+### Fixed
+
+- Zeilenumbrüche bei Plaintext-Nachrichten: Mails, deren HTML-Teil keine
+  Umbrüche enthält (kein <br>/Block-Tag), werden wieder als Plaintext mit
+  erhaltenen Absätzen angezeigt.
+
 ## [1.2.22] — 2026-08
 
 ### Fixed

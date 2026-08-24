@@ -40,7 +40,7 @@ All write commands accept `--json` and `--dry-run`.
 - [H2CK/oidc](https://github.com/H2CK/oidc) 1.17+ (Nextcloud OIDC Provider — install via `occ app:install oidc`)
 - Mail server with OAUTHBEARER / XOAUTH2 (Stalwart 0.16+ or Dovecot 2.4+ + Postfix 3.7+)
 	]]></description>
-	<version>1.2.22</version>
+	<version>1.2.23</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author homepage="https://github.com/Host-On/souvera_mail">Souvera</author>
 	<namespace>SouveraMail</namespace>
