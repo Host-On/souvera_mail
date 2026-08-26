@@ -31,6 +31,7 @@ use OCP\AppFramework\Db\Entity;
 class DeviceToken extends Entity
 {
     public const PLATFORM_ANDROID = 'android';
+    public const PLATFORM_IOS = 'ios';
 
     /** @var string */
     protected $userId = '';

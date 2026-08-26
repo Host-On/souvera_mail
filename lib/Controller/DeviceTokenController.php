@@ -68,7 +68,8 @@ class DeviceTokenController extends Controller
         }
 
         $body = \json_decode(\file_get_contents('php://input'), true);
-        $fcmToken = \trim((string) ($body['fcmToken'] ?? ''));
+        // iOS sendet sein APNs-Token als "apnsToken"; beide Feldnamen werden akzeptiert.
+        $fcmToken = \trim((string) ($body['fcmToken'] ?? $body['apnsToken'] ?? ''));
         $platform = \trim((string) ($body['platform'] ?? 'android'));
 
         try {

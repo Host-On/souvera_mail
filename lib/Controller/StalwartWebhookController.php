@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\SouveraMail\Controller;
 
 use OCA\SouveraMail\Db\DeviceTokenMapper;
+use OCA\SouveraMail\Service\ApnsClient;
 use OCA\SouveraMail\Service\FcmClient;
 use OCA\SouveraMail\Service\StalwartAdminService;
 use OCA\SouveraMail\Service\StalwartUserContext;
@@ -163,6 +164,7 @@ class StalwartWebhookController extends Controller
         private IUserManager $userManager,
         private DeviceTokenMapper $tokens,
         private FcmClient $fcm,
+        private \OCA\SouveraMail\Service\ApnsClient $apns,
         private StalwartAdminService $stalwartAdmin,
         private StalwartUserContext $userContext,
         private IClientService $httpClientService,
@@ -359,11 +361,16 @@ class StalwartWebhookController extends Controller
      */
     private function pushToUser(string $userId, array $event = []): bool
     {
-        $fcmTokens = \array_map(
-            static fn ($t) => $t->getFcmToken(),
-            $this->tokens->findAllForUser($userId),
-        );
-        if ($fcmTokens === []) {
+        $androidTokens = [];
+        $iosTokens = [];
+        foreach ($this->tokens->findAllForUser($userId) as $device) {
+            if ($device->getPlatform() === \OCA\SouveraMail\Db\DeviceToken::PLATFORM_IOS) {
+                $iosTokens[] = $device->getFcmToken();
+            } else {
+                $androidTokens[] = $device->getFcmToken();
+            }
+        }
+        if ($androidTokens === [] && $iosTokens === []) {
             return false;
         }
 
@@ -382,7 +389,12 @@ class StalwartWebhookController extends Controller
             $data['preview'] = $enrichment['preview'];
         }
 
-        $this->fcm->send($fcmTokens, self::PUSH_TITLE, self::PUSH_BODY, $data);
+        if ($androidTokens !== []) {
+            $this->fcm->send($androidTokens, self::PUSH_TITLE, self::PUSH_BODY, $data);
+        }
+        if ($iosTokens !== [] && $this->apns->isConfigured()) {
+            $this->apns->send($iosTokens, self::PUSH_TITLE, self::PUSH_BODY, $data);
+        }
         return true;
     }
 

@@ -6,6 +6,7 @@ namespace OCA\SouveraMail\Cron;
 
 use OCA\SouveraMail\Db\DeviceToken;
 use OCA\SouveraMail\Db\DeviceTokenMapper;
+use OCA\SouveraMail\Service\ApnsClient;
 use OCA\SouveraMail\Service\FcmClient;
 use OCA\SouveraMail\Service\StalwartAdminService;
 use OCA\SouveraMail\Service\StalwartUserContext;
@@ -49,6 +50,7 @@ class MailPushPoller extends TimedJob
         private StalwartUserContext $userContext,
         private StalwartAdminService $stalwartAdmin,
         private FcmClient $fcm,
+        private ApnsClient $apns,
         private LoggerInterface $logger,
     ) {
         parent::__construct($time);
@@ -59,8 +61,8 @@ class MailPushPoller extends TimedJob
 
     protected function run($argument): void
     {
-        if (!$this->userContext->isAvailable() || !$this->fcm->isConfigured()) {
-            return; // Nothing useful to do without OIDC or FCM configured.
+        if (!$this->userContext->isAvailable() || (!$this->fcm->isConfigured() && !$this->apns->isConfigured())) {
+            return; // Nothing useful to do without OIDC and a configured push backend.
         }
 
         $byUser = $this->sweepTokensByUser();
@@ -108,12 +110,17 @@ class MailPushPoller extends TimedJob
                 $body = $details['subject'] !== ''
                     ? $details['subject']
                     : 'Du hast eine neue Nachricht erhalten.';
-                $this->fcm->send(
-                    [$token->getFcmToken()],
-                    'Neue E-Mail',
-                    $body,
-                    $data,
-                );
+                // Plattform-Routing: Android -> FCM, iOS -> APNs.
+                if ($token->getPlatform() === DeviceToken::PLATFORM_IOS && $this->apns->isConfigured()) {
+                    $this->apns->send([$token->getFcmToken()], 'Neue E-Mail', $body, $data);
+                } else {
+                    $this->fcm->send(
+                        [$token->getFcmToken()],
+                        'Neue E-Mail',
+                        $body,
+                        $data,
+                    );
+                }
             }
         }
     }

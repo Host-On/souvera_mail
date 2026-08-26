@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.24] — 2026-08
+
+### Added
+
+- Push für iOS: Neuer APNs-Sender (ApnsClient, HTTP/2 via curl, JWT-ES256)
+  mit Konfiguration über `souvera_mail.apns_config_json`. Webhook und
+  Mail-Poller routen Geräte jetzt nach Plattform: Android -> FCM, iOS -> APNs.
+- Device-Endpoint akzeptiert zusätzlich das Feld `apnsToken` für iOS-Clients.
+
 ## [1.2.23] — 2026-08
 
 ### Fixed
