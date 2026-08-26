@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.26] — 2026-08
+
+### Added
+
+- Neuer Push-Modus `nc`: Mail-Eingangsmeldungen laufen über die
+  Nextcloud-Notifications-API (notify_push-Proxy, end-to-end-verschluesselt)
+  statt direkt über FCM/APNs. Umschaltung per System-Config
+  `souvera_mail.push_mode` (`direct` = bisheriges Verhalten, Default;
+  `nc` = Benachrichtigungspfad). Deep-Link ueber object_id = JMAP-Email-ID.
+
 ## [1.2.25] — 2026-08
 
 ### Added

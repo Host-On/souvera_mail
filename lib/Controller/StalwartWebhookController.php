@@ -7,6 +7,7 @@ namespace OCA\SouveraMail\Controller;
 use OCA\SouveraMail\Db\DeviceTokenMapper;
 use OCA\SouveraMail\Service\ApnsClient;
 use OCA\SouveraMail\Service\FcmClient;
+use OCA\SouveraMail\Service\MailPushNotifier;
 use OCA\SouveraMail\Service\StalwartAdminService;
 use OCA\SouveraMail\Service\StalwartUserContext;
 use OCP\AppFramework\Controller;
@@ -165,6 +166,7 @@ class StalwartWebhookController extends Controller
         private DeviceTokenMapper $tokens,
         private FcmClient $fcm,
         private \OCA\SouveraMail\Service\ApnsClient $apns,
+        private \OCA\SouveraMail\Service\MailPushNotifier $notifier,
         private StalwartAdminService $stalwartAdmin,
         private StalwartUserContext $userContext,
         private IClientService $httpClientService,
@@ -372,6 +374,19 @@ class StalwartWebhookController extends Controller
         }
         if ($androidTokens === [] && $iosTokens === []) {
             return false;
+        }
+
+        // NC-Modus: Benachrichtigungspfad statt Direktversand (verschluesselt).
+        if ((string) $this->config->getSystemValue(MailPushNotifier::PUSH_MODE_CONFIG, MailPushNotifier::PUSH_MODE_DIRECT)
+            === MailPushNotifier::PUSH_MODE_NC) {
+            $this->notifier->notify(
+                $userId,
+                (string) ($data['emailId'] ?? ''),
+                (string) ($data['subject'] ?? ''),
+                (string) ($data['sender'] ?? ''),
+                (string) ($data['preview'] ?? ''),
+            );
+            return true;
         }
 
         // Deep-Link-Daten: data.documentId ist die numerische Stalwart-Doc-ID,

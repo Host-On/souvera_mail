@@ -8,6 +8,7 @@ use OCA\SouveraMail\Db\DeviceToken;
 use OCA\SouveraMail\Db\DeviceTokenMapper;
 use OCA\SouveraMail\Service\ApnsClient;
 use OCA\SouveraMail\Service\FcmClient;
+use OCA\SouveraMail\Service\MailPushNotifier;
 use OCA\SouveraMail\Service\StalwartAdminService;
 use OCA\SouveraMail\Service\StalwartUserContext;
 use OCP\AppFramework\Utility\ITimeFactory;
@@ -51,6 +52,8 @@ class MailPushPoller extends TimedJob
         private StalwartAdminService $stalwartAdmin,
         private FcmClient $fcm,
         private ApnsClient $apns,
+        private \OCA\SouveraMail\Service\MailPushNotifier $notifier,
+        private \OCP\IConfig $config,
         private LoggerInterface $logger,
     ) {
         parent::__construct($time);
@@ -70,6 +73,11 @@ class MailPushPoller extends TimedJob
             return;
         }
 
+        $ncMode = (string) $this->config->getSystemValue(
+            MailPushNotifier::PUSH_MODE_CONFIG,
+            MailPushNotifier::PUSH_MODE_DIRECT
+        ) === MailPushNotifier::PUSH_MODE_NC;
+
         foreach ($byUser as $userId => $userTokens) {
             $snapshot = $this->resolveInboxSnapshot($userId);
             if ($snapshot === null) {
@@ -77,6 +85,36 @@ class MailPushPoller extends TimedJob
             }
             $state = $snapshot['state'];
             $details = null; // lazy: erst holen, wenn wirklich ein Push rausgeht
+
+            if ($ncMode) {
+                // NC-Modus: keine Direktversende — einmal pro neuem
+                // Zustand eine NC-Benachrichtigung erzeugen.
+                $token = $userTokens[0];
+                if ($token->getLastPushState() === $state) {
+                    continue;
+                }
+                $isBaseline = $token->getLastPushState() === null;
+                $token->setLastPushState($state);
+                try {
+                    $this->tokens->update($token);
+                } catch (\Throwable $e) {
+                    $this->logger->warning('Souvera Mail: failed to persist last_push_state: ' . $e->getMessage(), ['app' => 'souvera_mail', 'exception' => $e]);
+                    continue;
+                }
+                if ($isBaseline) {
+                    continue;
+                }
+                $details = $this->fetchEmailDetails($userId, $snapshot['emailId']);
+                $this->notifier->notify(
+                    $userId,
+                    $snapshot['emailId'],
+                    $details['subject'],
+                    $details['from'],
+                    $details['preview'],
+                );
+                continue;
+            }
+
             foreach ($userTokens as $token) {
                 if ($token->getLastPushState() === $state) {
                     continue;
