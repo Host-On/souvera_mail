@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.25] — 2026-08
+
+### Added
+
+- `souvera_mail:push:test` routet jetzt nach Plattform (FCM/APNs) und meldet
+  die Anzahl je Backend — damit lässt sich die iOS-Zustellung direkt testen.
+
 ## [1.2.24] — 2026-08
 
 ### Added

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace OCA\SouveraMail\Command\Push;
 
+use OCA\SouveraMail\Db\DeviceToken;
 use OCA\SouveraMail\Db\DeviceTokenMapper;
+use OCA\SouveraMail\Service\ApnsClient;
 use OCA\SouveraMail\Service\FcmClient;
 use OCP\IUserManager;
 use Symfony\Component\Console\Command\Command;
@@ -24,6 +26,7 @@ class Test extends Command
     public function __construct(
         private DeviceTokenMapper $tokens,
         private FcmClient $fcm,
+        private ApnsClient $apns,
         private IUserManager $userManager,
     ) {
         parent::__construct();
@@ -49,10 +52,11 @@ class Test extends Command
             return Command::FAILURE;
         }
 
-        if (!$this->fcm->isConfigured()) {
+        if (!$this->fcm->isConfigured() && !$this->apns->isConfigured()) {
             $output->writeln(
-                '<error>FCM is not configured on this instance — set '
-                . FcmClient::SYSTEM_CONFIG_SERVICE_ACCOUNT . ' in config.php.</error>'
+                '<error>Neither FCM nor APNs is configured on this instance — set '
+                . FcmClient::SYSTEM_CONFIG_SERVICE_ACCOUNT . ' and/or '
+                . ApnsClient::SYSTEM_CONFIG_CREDENTIALS . ' in config.php.</error>'
             );
             return Command::FAILURE;
         }
@@ -63,15 +67,32 @@ class Test extends Command
             return Command::FAILURE;
         }
 
-        $fcmTokens = \array_map(static fn ($t) => $t->getFcmToken(), $entities);
-        $this->fcm->send(
-            $fcmTokens,
-            (string) $input->getOption('title'),
-            (string) $input->getOption('body'),
-            ['type' => 'test'],
-        );
+        // Plattform-Routing wie im Produktivpfad: Android -> FCM, iOS -> APNs.
+        $androidTokens = [];
+        $iosTokens = [];
+        foreach ($entities as $entity) {
+            if ($entity->getPlatform() === DeviceToken::PLATFORM_IOS) {
+                $iosTokens[] = $entity->getFcmToken();
+            } else {
+                $androidTokens[] = $entity->getFcmToken();
+            }
+        }
 
-        $output->writeln('<info>Sent test push to ' . \count($fcmTokens) . ' device(s) for user "' . $uid . '".</info>');
+        $title = (string) $input->getOption('title');
+        $body = (string) $input->getOption('body');
+
+        if ($androidTokens !== [] && $this->fcm->isConfigured()) {
+            $this->fcm->send($androidTokens, $title, $body, ['type' => 'test']);
+            $output->writeln('<info>FCM: Sent test push to ' . \count($androidTokens) . ' device(s).</info>');
+        }
+        if ($iosTokens !== [] && $this->apns->isConfigured()) {
+            $this->apns->send($iosTokens, $title, $body, ['type' => 'test']);
+            $output->writeln('<info>APNs: Sent test push to ' . \count($iosTokens) . ' device(s).</info>');
+        }
+        if ($iosTokens !== [] && !$this->apns->isConfigured()) {
+            $output->writeln('<error>APNs: ' . \count($iosTokens) . ' iOS device(s) registered, but APNs is not configured.</error>');
+        }
+
         return Command::SUCCESS;
     }
 }
