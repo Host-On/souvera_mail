@@ -396,6 +396,16 @@ return [
             'verb' => 'POST',
         ],
         [
+            'name' => 'v2_calendar_invite#parse',
+            'url' => '/api/v2/calendar-invite/parse',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'v2_calendar_invite#respond',
+            'url' => '/api/v2/calendar-invite/respond',
+            'verb' => 'POST',
+        ],
+        [
             'name' => 'v2_spam#identities',
             'url' => '/api/v2/spam/identities',
             'verb' => 'GET',

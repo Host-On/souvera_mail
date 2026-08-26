@@ -582,6 +582,15 @@
         "Moved to spam": "In Spam verschoben",
         "Mark as unread": "Als ungelesen markieren",
         "Context menu could not be opened": "Kontextmenü konnte nicht geöffnet werden",
-        "No folders available": "Keine Ordner verfügbar"
+        "No folders available": "Keine Ordner verfügbar",
+        "Reading calendar invitation…": "Termineinladung wird gelesen…",
+        "Calendar invitation": "Termineinladung",
+        "Organizer:": "Organisator:",
+        "Accept": "Zusagen",
+        "Maybe": "Vielleicht",
+        "Decline": "Ablehnen",
+        "Accepted — added to your calendar": "Zugesagt — in den Kalender übernommen",
+        "Marked as maybe": "Als „vielleicht\" markiert",
+        "Declined": "Abgelehnt"
     }
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.27] — 2026-08
+
+### Added
+
+- Termineinladungen: Kalender-Anhänge werden erkannt; neue API
+  `GET /api/v2/calendar-invite/parse` und `POST /api/v2/calendar-invite/respond`
+  (zusage/vielleicht/ablehnen). Die Antwort legt das Ereignis per UID im
+  CalDAV-Kalender des Nutzers an und sendet eine iTIP-Antwort (METHOD:REPLY)
+  an den Organisator. Web-Oberfläche zeigt ein Einladungs-Banner mit
+  Annehmen/Vielleicht/Ablehnen.
+
 ## [1.2.26] — 2026-08
 
 ### Added

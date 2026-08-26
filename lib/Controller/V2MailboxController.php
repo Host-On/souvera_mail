@@ -271,14 +271,16 @@ class V2MailboxController extends Controller
 
         $attachments = [];
         foreach ($email['attachments'] ?? [] as $att) {
+            $type = (string) ($att['type'] ?? 'application/octet-stream');
             $attachments[] = [
                 'blobId' => $att['blobId'] ?? '',
                 'name' => $att['name'] ?? 'attachment',
-                'type' => $att['type'] ?? 'application/octet-stream',
+                'type' => $type,
                 'size' => $att['size'] ?? 0,
                 'partId' => $att['partId'] ?? '',
                 'cid' => $att['cid'] ?? null,
                 'disposition' => $att['disposition'] ?? 'attachment',
+                'isCalendarInvite' => \str_starts_with(\strtolower($type), 'text/calendar'),
             ];
         }
 

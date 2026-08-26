@@ -148,6 +148,35 @@
 			</div>
 		</NcDialog>
 
+		<div v-if="inviteAttachment" class="email-detail__invite">
+			<div v-if="inviteLoading" class="email-detail__invite-loading">
+				<NcLoadingIcon :size="20" />
+				{{ t('souvera_mail', 'Reading calendar invitation…') }}
+			</div>
+			<div v-else-if="invite" class="email-detail__invite-card">
+				<div class="email-detail__invite-icon">📅</div>
+				<div class="email-detail__invite-info">
+					<div class="email-detail__invite-title">{{ invite.summary || t('souvera_mail', 'Calendar invitation') }}</div>
+					<div class="email-detail__invite-meta">
+						<span v-if="invite.dtstart">{{ formatInviteDate(invite) }}</span>
+						<span v-if="invite.location">{{ invite.location }}</span>
+						<span v-if="invite.organizer">{{ t('souvera_mail', 'Organizer:') }} {{ invite.organizer }}</span>
+					</div>
+				</div>
+				<div v-if="inviteStatus" class="email-detail__invite-status">
+					{{ inviteStatus }}
+				</div>
+				<div v-else class="email-detail__invite-actions">
+					<NcButton type="primary" size="small" :disabled="inviteBusy"
+						@click="respondToInvite('accepted')">{{ t('souvera_mail', 'Accept') }}</NcButton>
+					<NcButton type="tertiary" size="small" :disabled="inviteBusy"
+						@click="respondToInvite('tentative')">{{ t('souvera_mail', 'Maybe') }}</NcButton>
+					<NcButton type="error" size="small" :disabled="inviteBusy"
+						@click="respondToInvite('declined')">{{ t('souvera_mail', 'Decline') }}</NcButton>
+				</div>
+			</div>
+		</div>
+
 		<div class="email-detail__body">
 			<div v-if="loading && !displayHtml" class="email-detail__loading">
 				<NcLoadingIcon :size="52" />
@@ -214,8 +243,31 @@ export default {
 		readonly: { type: Boolean, default: false },
 	},
 	emits: ['close', 'reply', 'replyAll', 'forward', 'delete', 'spam', 'move', 'mailto'],
+
+	data() {
+		return {
+			invite: null,
+			inviteLoading: false,
+			inviteBusy: false,
+			inviteStatus: '',
+		}
+	},
 	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: this.remoteAlways, contentDark: false, frameReady: false } },
+	computed: {
+		inviteAttachment() {
+			return (this.email.attachments || []).find(a => a.isCalendarInvite) || null
+		},
+	},
+
 	watch: {
+		inviteAttachment: {
+			immediate: true,
+			handler(att) {
+				if (att && this.email?.id) {
+					this.loadInvite(att)
+				}
+			},
+		},
 		// Reset the content theme toggle when switching to another email.
 		'email.id'() { this.contentDark = false; this.remoteAllowed = this.remoteAlways; this.frameReady = false },
 		htmlBody() { this.frameReady = false },
@@ -265,6 +317,53 @@ export default {
 		},
 	},
 	methods: {
+		async loadInvite(att) {
+			this.inviteLoading = true
+			this.invite = null
+			this.inviteStatus = ''
+			try {
+				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/calendar-invite/parse'), {
+					params: { emailId: this.email.id, partId: att.partId || att.blobId || '' },
+				})
+				this.invite = data.invite || null
+			} catch (e) {
+				console.error('Calendar invite parse failed', e)
+				this.invite = null
+			} finally {
+				this.inviteLoading = false
+			}
+		},
+		async respondToInvite(response) {
+			const att = this.inviteAttachment
+			if (!att || !this.email?.id) return
+			this.inviteBusy = true
+			try {
+				await axios.post(generateUrl('/apps/souvera_mail/api/v2/calendar-invite/respond'), {
+					emailId: this.email.id,
+					partId: att.partId || att.blobId || '',
+					response,
+				})
+				this.inviteStatus = {
+					accepted: this.t('souvera_mail', 'Accepted — added to your calendar'),
+					tentative: this.t('souvera_mail', 'Marked as maybe'),
+					declined: this.t('souvera_mail', 'Declined'),
+				}[response]
+			} catch (e) {
+				console.error('Calendar invite respond failed', e)
+			} finally {
+				this.inviteBusy = false
+			}
+		},
+		formatInviteDate(invite) {
+			const fmt = new Intl.DateTimeFormat(undefined, {
+				weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric',
+				hour: '2-digit', minute: '2-digit',
+			})
+			const start = invite.dtstart?.iso ? fmt.format(new Date(invite.dtstart.iso)) : ''
+			const end = invite.dtend?.iso ? fmt.format(new Date(invite.dtend.iso)) : ''
+			return start && end && start !== end ? `${start} – ${end}` : start
+		},
+
 		buildBlobUrl,
 		formatDateTime(iso) { try { return new Date(iso).toLocaleString() } catch { return iso } },
 		formatSize(bytes) {
@@ -417,6 +516,22 @@ export default {
 .email-detail__empty { color: var(--color-text-maxcontrast); text-align: center; padding: 48px; }
 .email-detail__blocked { margin-top: 10px; }
 .email-detail__plaintext { white-space: pre-wrap; font-family: monospace; font-size: 13px; line-height: 1.5; padding: 16px; }
+.email-detail__invite { margin: 0 16px 12px; }
+.email-detail__invite-loading { display: flex; align-items: center; gap: 8px; color: var(--color-text-maxcontrast); font-size: 13px; }
+.email-detail__invite-card {
+	display: flex; align-items: center; gap: 12px;
+	border: 1px solid var(--color-border);
+	border-left: 4px solid var(--color-primary);
+	border-radius: var(--border-radius-large, 12px);
+	padding: 12px 14px;
+	background: var(--color-main-background);
+}
+.email-detail__invite-icon { font-size: 22px; }
+.email-detail__invite-info { flex: 1; min-width: 0; }
+.email-detail__invite-title { font-weight: 600; font-size: .95rem; }
+.email-detail__invite-meta { display: flex; flex-direction: column; gap: 2px; color: var(--color-text-maxcontrast); font-size: .8rem; margin-top: 2px; }
+.email-detail__invite-actions { display: flex; gap: 8px; }
+.email-detail__invite-status { color: var(--color-primary); font-weight: 600; font-size: .85rem; }
 .folder-picker { display: flex; flex-direction: column; min-height: 300px; max-height: 55vh; }
 .folder-picker__breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-bottom: 8px; }
 .folder-picker__sep { color: var(--color-text-maxcontrast); padding: 0 2px; }
