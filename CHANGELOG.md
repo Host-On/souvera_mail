@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.28] — 2026-08
+
+### Fixed
+
+- Anhänge funktionieren wieder: Der Blob-Upload im Web-Composer (Cloud-
+  Dateien und Geräte-Dateien) lief über einen JMAP-Blob/upload-Methodenaufruf,
+  den Stalwart nicht akzeptiert. Jetzt läuft der Upload über die bewährte
+  path-style Upload-URL (RFC 8620 §6.1) — dieselbe Strecke wie Android und
+  die Sieve-Verwaltung. Auch die Kalendereinladungs-Antwort nutzt diesen Weg.
+
 ## [1.2.27] — 2026-08
 
 ### Added

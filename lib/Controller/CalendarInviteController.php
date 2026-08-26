@@ -416,11 +416,7 @@ class CalendarInviteController extends Controller
 
     private function uploadBlob(string $accountId, string $data): string
     {
-        $result = $this->jmap->singleCall('Blob/upload', [
-            'accountId' => $accountId,
-            'data' => [['type' => 'application/octet-stream', 'data:asBase64' => \base64_encode($data)]],
-        ]);
-        $blobId = $result['data']['list'][0]['blobId'] ?? ($result['data']['list'][0]['id'] ?? '');
-        return (string) $blobId;
+        $uploaded = $this->jmap->uploadBlob($accountId, $data, 'application/octet-stream');
+        return (string) ($uploaded['blobId'] ?? '');
     }
 }

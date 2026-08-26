@@ -121,27 +121,16 @@ class FilesController extends Controller
             $type = $node->getMimetype();
             $size = $node->getSize();
 
-            $base64 = \base64_encode($data);
-            $result = $this->jmap->singleCall('Blob/upload', [
-                'accountId' => $accountId,
-                'create' => ['b1' => [
-                    'data:asBase64' => $base64,
-                    'type' => $type,
-                ]],
-            ]);
-
-            if (isset($result['error'])) {
-                return new JSONResponse(['error' => 'Blob upload failed'], 500);
-            }
-
-            $uploaded = $result['data']['created']['b1'] ?? null;
+            // Path-style Upload-URL statt Blob/upload-Methodenaufruf — siehe
+            // V2JmapProxy::uploadBlob (Stalwart akzeptiert nur diese Form).
+            $uploaded = $this->jmap->uploadBlob((string) $accountId, $data, $type);
             if ($uploaded === null) {
                 return new JSONResponse(['error' => 'Blob upload failed'], 500);
             }
 
             return new JSONResponse([
                 'success' => true,
-                'blobId' => $uploaded['blobId'] ?? '',
+                'blobId' => $uploaded['blobId'],
                 'name' => $name,
                 'type' => $type,
                 'size' => $size,

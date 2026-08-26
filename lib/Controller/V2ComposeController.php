@@ -771,25 +771,18 @@ class V2ComposeController extends Controller
 
     private function uploadBlob(string $accountId, string $data, string $type, string $name): ?array
     {
-        $base64 = \base64_encode($data);
-        $result = $this->jmap->singleCall('Blob/upload', [
-            'accountId' => $accountId,
-            'create' => ['b1' => [
-                'data:asBase64' => $base64,
-                'type' => $type,
-            ]],
-        ]);
-
-        if (isset($result['error'])) return null;
-
-        $uploaded = $result['data']['created']['b1'] ?? null;
-        if ($uploaded === null) return null;
+        // Path-style Upload-URL statt Blob/upload-Methodenaufruf — siehe
+        // V2JmapProxy::uploadBlob (Stalwart akzeptiert nur diese Form).
+        $uploaded = $this->jmap->uploadBlob($accountId, $data, $type);
+        if ($uploaded === null) {
+            return null;
+        }
 
         return [
-            'blobId' => $uploaded['blobId'] ?? '',
+            'blobId' => $uploaded['blobId'],
             'type' => $type,
             'name' => $name,
-            'size' => $uploaded['size'] ?? \strlen($data),
+            'size' => $uploaded['size'],
         ];
     }
 }
