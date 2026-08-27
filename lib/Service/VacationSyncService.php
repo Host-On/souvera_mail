@@ -326,7 +326,71 @@ class VacationSyncService
             $state['vacation'] = ['enabled' => false, 'subject' => '', 'message' => '', 'from' => '', 'to' => ''];
         }
 
+        $state['debug'] = $this->collectDebug($uid);
+
         return $state;
+    }
+
+    /**
+     * Diagnosedaten für die Einstellungs-UI — zeigt exakt, was der Server
+     * an Abwesenheitsdaten sieht (NC-Version, APIs, Tabellen, Rohdaten).
+     *
+     * @return array<string, mixed>
+     */
+    private function collectDebug(string $uid): array
+    {
+        $debug = [
+            'ncVersion' => \implode('.', \OCP\Util::getVersion()),
+            'absenceManager' => \interface_exists(\OCP\User\IAbsenceManager::class),
+            'availabilityCoordinator' => \interface_exists(IAvailabilityCoordinator::class),
+        ];
+
+        $current = $this->getCurrentAbsence($uid);
+        $debug['currentAbsence'] = $current !== null
+            ? ['firstDay' => $current['firstDay'], 'lastDay' => $current['lastDay'], 'status' => $current['status']]
+            : null;
+
+        try {
+            $debug['tableAbsence'] = $this->db->tableExists('dav_absence');
+        } catch (\Throwable $e) {
+            $debug['tableAbsence'] = 'error: ' . $e->getMessage();
+        }
+        try {
+            $debug['tableAvailability'] = $this->db->tableExists('dav_availability');
+        } catch (\Throwable $e) {
+            $debug['tableAvailability'] = 'error: ' . $e->getMessage();
+        }
+
+        try {
+            $rows = $this->db->executeQuery(
+                'SELECT * FROM `*PREFIX*dav_absence` WHERE `user_id` = ?',
+                [$uid]
+            )->fetchAll();
+            $debug['absenceRows'] = \count($rows);
+            $debug['absenceData'] = [];
+            foreach ($rows as $row) {
+                $debug['absenceData'][] = [
+                    'firstDay' => $row['first_day'] ?? null,
+                    'lastDay' => $row['last_day'] ?? null,
+                    'status' => $row['status'] ?? null,
+                ];
+            }
+        } catch (\Throwable $e) {
+            $debug['absenceRows'] = 'error: ' . $e->getMessage();
+        }
+
+        try {
+            $rows = $this->db->executeQuery(
+                'SELECT `availability_level`, `start_time`, `end_time` FROM `*PREFIX*dav_availability` WHERE `user_id` = ?',
+                [$uid]
+            )->fetchAll();
+            $debug['availabilityRows'] = \count($rows);
+            $debug['availabilityData'] = $rows;
+        } catch (\Throwable $e) {
+            $debug['availabilityRows'] = 'error: ' . $e->getMessage();
+        }
+
+        return $debug;
     }
 
     /**

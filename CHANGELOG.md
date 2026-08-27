@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.36] — 2026-08
+
+### Added
+
+- Diagnose für die Abwesenheitsnotiz: Die Einstellungs-Karte zeigt aufklappbar,
+  was der Server tatsächlich an Abwesenheitsdaten sieht (NC-Version, APIs,
+  Tabellen, Rohdaten) und meldet Fehler beim Status-Laden sichtbar.
+
 ## [1.2.35] — 2026-08
 
 ### Fixed

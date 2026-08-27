@@ -593,6 +593,8 @@
         "Declined": "Abgelehnt",
         "Disabled on this instance. Admin: occ config:app:set --value=no dav hide_absence_settings": "Auf dieser Instanz deaktiviert. Admin: occ config:app:set --value=no dav hide_absence_settings",
         "Auto-reply active (Sieve)": "Auto-Antwort aktiv (Sieve)",
-        "No absence found (neither out-of-office nor an \"Absent\" period in personal availability)": "Keine Abwesenheit gefunden (weder Out-of-Office noch ein „Abwesend\"-Zeitraum in der persönlichen Verfügbarkeit)"
+        "No absence found (neither out-of-office nor an \"Absent\" period in personal availability)": "Keine Abwesenheit gefunden (weder Out-of-Office noch ein „Abwesend\"-Zeitraum in der persönlichen Verfügbarkeit)",
+        "Diagnosis": "Diagnose",
+        "Failed to load vacation state": "Abwesenheits-Status konnte nicht geladen werden"
     }
 }

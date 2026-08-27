@@ -235,6 +235,10 @@
 					<div v-if="vacationState.vacation && vacationState.vacation.enabled" class="vacation-status vacation-status--active">
 						{{ t('souvera_mail', 'Auto-reply active (Sieve)') }}
 					</div>
+					<details v-if="vacationState.debug" class="vacation-debug">
+						<summary>{{ t('souvera_mail', 'Diagnosis') }}</summary>
+						<pre class="vacation-debug__body">{{ JSON.stringify(vacationState.debug, null, 2) }}</pre>
+					</details>
 
 					<div class="setting-row setting-row--column" v-if="showVacationEditor">
 						<div class="vacation-editor">
@@ -1179,8 +1183,13 @@ export default {
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/vacation/state'))
 				this.vacationState = data.state || this.vacationState
-
-			} catch {}
+				if (data.status === 'error') {
+					showError(data.message || this.t('souvera_mail', 'Failed to load vacation state'))
+				}
+			} catch (e) {
+				console.error('Vacation state load failed', e)
+				showError(this.t('souvera_mail', 'Failed to load vacation state'))
+			}
 		},
 		async onVacationSyncToggle(val) {
 			this.vacationSync = !!val
@@ -1613,6 +1622,9 @@ export default {
 }
 
 
+.vacation-debug { margin-top: 8px; }
+.vacation-debug summary { font-size: .8rem; color: var(--color-text-maxcontrast); cursor: pointer; }
+.vacation-debug__body { font-size: .72rem; background: var(--color-background-dark); padding: 8px; border-radius: 8px; overflow-x: auto; max-height: 260px; }
 .vacation-divider { border-top: 1px solid var(--color-border); margin: 14px 0; }
 .vacation-status { font-size: 13px; color: var(--color-text-maxcontrast); }
 .vacation-status--active { color: var(--color-success); font-weight: 600; }
