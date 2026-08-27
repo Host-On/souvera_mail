@@ -214,18 +214,20 @@ return [
             'verb' => 'POST',
         ],
         [
-            // Out-of-office — standalone user-friendly form (no webmail needed).
-        [
+            // Out-of-office — combined state for the settings UI
+            // (NC absence + Sieve responder + diagnostics).
             'name' => 'vacation#state',
             'url' => '/vacation/state',
-            'verb' => 'GET'
+            'verb' => 'GET',
         ],
         [
+            // Out-of-office — pull NC absence data into the responder now.
             'name' => 'vacation#sync',
             'url' => '/vacation/sync',
-            'verb' => 'POST'
+            'verb' => 'POST',
         ],
-            // GET /apps/souvera_mail/vacation/form → HTML page
+        [
+            // Out-of-office — standalone user-friendly form (no webmail needed).
             'name' => 'vacation#form',
             'url' => '/vacation/form',
             'verb' => 'GET',

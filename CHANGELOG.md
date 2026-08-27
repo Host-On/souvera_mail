@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.40] — 2026-08
+
+### Fixed
+
+- URLAUBS-ROOT-CAUSE: Die Routen `vacation/state`, `vacation/sync` und
+  `vacation/form` waren in `appinfo/routes.php` verschachtelt deklariert
+  (Kommentar direkt vor einem inneren `[`) und wurden deshalb von Nextcloud
+  nie registriert — der Status-Abruf lief die ganze Zeit in einen 404.
+  Routen-Definition repariert; die Einstellungs-Karte funktioniert damit
+  vollständig (Status, Sync, Diagnose).
+
 ## [1.2.38] — 2026-08
 
 ### Fixed
