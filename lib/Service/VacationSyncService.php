@@ -485,7 +485,7 @@ class VacationSyncService
                 : 'Ich bin derzeit abwesend und werde Ihre Nachricht nach meiner Rückkehr beantworten.';
             $from = '';
             $to = \date('Y-m-d', $absentSlot['end']);
-            $hash = \sha1(\json_encode(['availability', $subject, $message, $from, $to], JSON_UNESCAPED_SLASHES));
+            $hash = \sha1(\json_encode(['sv2', 'availability', $subject, $message, $from, $to], JSON_UNESCAPED_SLASHES));
             if ($this->config->getUserValue($uid, 'souvera_mail', self::PREF_HASH, '') === $hash) {
                 return ['ok' => true, 'changed' => false, 'active' => true];
             }
@@ -509,6 +509,7 @@ class VacationSyncService
         }
 
         $hash = \sha1(\json_encode([
+            'sv2',
             $subject, $message,
             $data['firstDay'], $data['lastDay'],
         ], JSON_UNESCAPED_SLASHES));

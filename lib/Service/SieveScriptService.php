@@ -212,12 +212,37 @@ class SieveScriptService
      */
     public function rebuildActiveScript(string $userId): array
     {
+        return $this->rebuildInternal($userId, null, null);
+    }
+
+    /**
+     * Rebuild the combined main script with an EXPLICIT vacation block
+     * (VacationService::set) and activate it — the single source of truth.
+     * Pass ''/'  for both to remove the responder while keeping filters.
+     *
+     * @return array{success: bool, filters: int, active: bool}
+     */
+    public function setVacationAndRebuild(string $userId, string $vacationRequire, string $vacationBody): array
+    {
+        return $this->rebuildInternal($userId, $vacationRequire, $vacationBody);
+    }
+
+    /**
+     * @param ?string $vacationOverrideRequire null = carry over from
+     *     existing scripts, otherwise explicit value (may be '' to remove)
+     * @param ?string $vacationOverrideBody    null = carry over, otherwise
+     *     explicit value (may be '' to remove)
+     * @return array{success: bool, filters: int, active: bool}
+     */
+    private function rebuildInternal(string $userId, ?string $vacationOverrideRequire, ?string $vacationOverrideBody): array
+    {
         $scripts = $this->listScriptsWithBodies($userId)['scripts'];
         $disabled = $this->getDisabledFilters($userId);
 
         $blocks = [];
         $capabilities = [];
         $count = 0;
+        $skipped = [];
         $vacationRequire = '';
         $vacationBody = '';
         // Vacation lives in the MAIN script — the fallback to other
@@ -243,6 +268,15 @@ class SieveScriptService
                 $vacationBody = \OCA\SouveraMail\Service\VacationService::extractManagedBody((string) ($s['body'] ?? ''));
                 if ($vacationRequire !== '' || $vacationBody !== '') break;
             }
+        }
+
+        // Expliziter Override durch VacationService::set — ersetzt den
+        // Carry-Over-Wert (auch mit Leerstring zum Entfernen).
+        if ($vacationOverrideRequire !== null) {
+            $vacationRequire = $vacationOverrideRequire;
+        }
+        if ($vacationOverrideBody !== null) {
+            $vacationBody = $vacationOverrideBody;
         }
 
         foreach ($scripts as $s) {

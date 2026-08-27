@@ -166,14 +166,10 @@ class VacationService
             }
         }
 
-        $active = $this->activeScript($userId);
-        $scriptName = $active['name'] !== '' ? $active['name'] : self::SCRIPT_NAME_FALLBACK;
-
-        $base = $this->stripManaged($active['body']);
-
         if ($enabled) {
             $meta = [
                 'enabled' => true,
+                'v' => 2,
                 'subject' => $subject,
                 'message' => $message,
                 'from' => $from,
@@ -187,26 +183,20 @@ class VacationService
             }
             $requireLine = 'require ["' . \implode('", "', $caps) . '"]; ' . self::REQUIRE_MARKER;
             $block = $this->buildBlock($meta, $subject, $message, $from, $to);
-            // Vacation-Block VOR den Nutzerregeln: Regeln mit fileinto/stop
-            // würden den am Ende stehenden Responder sonst überspringen.
-            [$userRequires, $userRest] = $this->splitRequires($base);
-            $newBody = $requireLine . "\n"
-                . $userRequires
-                . $block . "\n"
-                . ($userRest !== '' ? $userRest . "\n" : '');
+            // ALLES in das kombinierte Haupt-Skript schreiben: Stalwart führt
+            // pro Konto nur das AKTIVE Skript aus — das Haupt-Skript
+            // (souvera_filters) enthält Vacation + sämtliche Filterregeln
+            // und wird aktiviert. Verhindert Script-Fragmentierung wie
+            // „Bloonix aktiv, Haupt-Skript inaktiv".
+            $this->sieveScripts->setVacationAndRebuild($userId, $requireLine, $block);
         } else {
-            // Disabled: managed parts already stripped — persist the bare
-            // user script so the responder stops firing.
-            $newBody = $base !== '' ? $base . "\n" : '';
+            // Disabled: Vacation-Block entfernen, Filterregeln behalten.
+            $this->sieveScripts->setVacationAndRebuild($userId, '', '');
         }
-
-        $this->sieveScripts->saveScript($userId, $scriptName, $newBody);
-        // Keep this script the active one (saveScript does not activate).
-        $this->sieveScripts->activateScript($userId, $scriptName);
 
         $this->logger->info(
             'Souvera Mail: vacation responder ' . ($enabled ? 'enabled' : 'disabled')
-                . ' for user in script "' . $scriptName . '"',
+                . ' for user in main script "' . SieveScriptService::MAIN_SCRIPT_NAME . '"',
             ['app' => 'souvera_mail']
         );
     }
