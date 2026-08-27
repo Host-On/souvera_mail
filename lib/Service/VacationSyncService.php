@@ -39,6 +39,7 @@ class VacationSyncService
         private VacationService $vacationService,
         private IUserManager $userManager,
         private IConfig $config,
+        private \OCP\IDBConnection $db,
         private LoggerInterface $logger,
     ) {
     }
@@ -58,12 +59,18 @@ class VacationSyncService
      */
     public function isSupported(): bool
     {
-        if (!\interface_exists(IAvailabilityCoordinator::class)) {
-            return false;
+        if (\interface_exists(\OCP\User\IAbsenceManager::class)) {
+            return true;
+        }
+        if (\interface_exists(IAvailabilityCoordinator::class)) {
+            try {
+                return \OCP\Server::get(IAvailabilityCoordinator::class)->isEnabled();
+            } catch (\Throwable $e) {
+                // Fall through to DB check.
+            }
         }
         try {
-            $coordinator = \OCP\Server::get(IAvailabilityCoordinator::class);
-            return $coordinator->isEnabled();
+            return $this->db->tableExists('dav_absence');
         } catch (\Throwable $e) {
             return false;
         }
@@ -115,7 +122,7 @@ class VacationSyncService
     /** @return IOutOfOfficeData|null */
     public function getCurrentOutOfOffice(string $uid): ?IOutOfOfficeData
     {
-        if (!$this->isSupported()) {
+        if (!\interface_exists(IAvailabilityCoordinator::class)) {
             return null;
         }
         $user = $this->userManager->get($uid);
@@ -127,6 +134,88 @@ class VacationSyncService
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    /**
+     * Einheitliche Abwesenheits-Abfrage über ALLE Nextcloud-Versionen:
+     *   NC 31+ : IAbsenceManager::getCurrentAbsenceData (Out-of-Office)
+     *   NC 28-30: IAvailabilityCoordinator::getCurrentOutOfOfficeData
+     *   Fallback: direkter DB-Zugriff auf oc_dav_absence (versionsunabhängig)
+     *
+     * @return array{firstDay: int, lastDay: int, status: string, message: string, replacement: string}|null
+     */
+    public function getCurrentAbsence(string $uid): ?array
+    {
+        $user = $this->userManager->get($uid);
+        if ($user === null) {
+            return null;
+        }
+
+        // NC 31+: neues Absence-Management (das "Out-of-Office" der neueren
+        // Versionen — auf NC 33+ existiert IAvailabilityCoordinator nicht mehr).
+        if (\interface_exists(\OCP\User\IAbsenceManager::class)) {
+            try {
+                $manager = \OCP\Server::get(\OCP\User\IAbsenceManager::class);
+                $data = $manager->getCurrentAbsenceData($user);
+                if ($data !== null && \method_exists($data, 'getFirstDay')) {
+                    return [
+                        'firstDay' => (int) $data->getFirstDay(),
+                        'lastDay' => (int) $data->getLastDay(),
+                        'status' => \method_exists($data, 'getStatus') ? (string) $data->getStatus() : '',
+                        'message' => \method_exists($data, 'getMessage') ? (string) $data->getMessage() : '',
+                        'replacement' => \method_exists($data, 'getReplacementUserDisplayName')
+                            ? (string) $data->getReplacementUserDisplayName()
+                            : '',
+                    ];
+                }
+            } catch (\Throwable $e) {
+                $this->logger->debug('Absence via IAbsenceManager failed: ' . $e->getMessage());
+            }
+        }
+
+        // NC 28-30: Out-of-Office über den Availability-Koordinator.
+        if (\interface_exists(IAvailabilityCoordinator::class)) {
+            try {
+                $data = \OCP\Server::get(IAvailabilityCoordinator::class)->getCurrentOutOfOfficeData($user);
+                if ($data !== null) {
+                    return [
+                        'firstDay' => $data->getStartDate(),
+                        'lastDay' => $data->getEndDate(),
+                        'status' => $data->getShortMessage(),
+                        'message' => $data->getMessage(),
+                        'replacement' => $data->getReplacementUserDisplayName() ?? '',
+                    ];
+                }
+            } catch (\Throwable $e) {
+                $this->logger->debug('Absence via IAvailabilityCoordinator failed: ' . $e->getMessage());
+            }
+        }
+
+        // Letzter Fallback: direkte DB-Abfrage (funktioniert auf jeder Version).
+        try {
+            $rows = $this->db->executeQuery(
+                'SELECT * FROM `*PREFIX*dav_absence` WHERE `user_id` = ?',
+                [$uid]
+            )->fetchAll();
+            $now = \time();
+            foreach ($rows as $row) {
+                $first = (int) ($row['first_day'] ?? 0);
+                $last = (int) ($row['last_day'] ?? 0);
+                if ($first !== 0 && $first <= $now && $now <= $last) {
+                    return [
+                        'firstDay' => $first,
+                        'lastDay' => $last,
+                        'status' => (string) ($row['status'] ?? ''),
+                        'message' => (string) ($row['message'] ?? ''),
+                        'replacement' => (string) ($row['replacement_user_display_name'] ?? ''),
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->logger->debug('Absence via DB failed: ' . $e->getMessage());
+        }
+
+        return null;
     }
 
     /**
@@ -148,20 +237,15 @@ class VacationSyncService
             'replacement' => '',
         ];
 
-        $data = $this->getCurrentOutOfOffice($uid);
+        $data = $this->getCurrentAbsence($uid);
         if ($data !== null) {
             $state['ncActive'] = true;
-            try {
-                $state['inEffect'] = \OCP\Server::get(IAvailabilityCoordinator::class)->isInEffect($data);
-            } catch (\Throwable $e) {
-                $state['inEffect'] = true;
-            }
-            $state['start'] = \date('Y-m-d', $data->getStartDate());
-            $state['end'] = \date('Y-m-d', $data->getEndDate());
-            $state['short'] = $data->getShortMessage();
-            $state['long'] = $data->getMessage();
-            $replacement = $data->getReplacementUserDisplayName();
-            $state['replacement'] = $replacement ?? '';
+            $state['inEffect'] = true;
+            $state['start'] = \date('Y-m-d', $data['firstDay']);
+            $state['end'] = \date('Y-m-d', $data['lastDay']);
+            $state['short'] = $data['status'];
+            $state['long'] = $data['message'];
+            $state['replacement'] = $data['replacement'];
         }
 
         if (!$state['ncActive']) {
@@ -211,7 +295,7 @@ class VacationSyncService
             }
         }
 
-        $data = $this->getCurrentOutOfOffice($uid);
+        $data = $this->getCurrentAbsence($uid);
 
         // Fallback: Klassische "persönliche Verfügbarkeit" (Abwesend-Zeiträume)
         // — viele Nutzer pflegen genau DORT ihre Abwesenheit statt im neuen
@@ -250,25 +334,9 @@ class VacationSyncService
             }
         }
 
-        $inEffect = true;
-        try {
-            $inEffect = \OCP\Server::get(IAvailabilityCoordinator::class)->isInEffect($data);
-        } catch (\Throwable $e) {
-            // Treat as active — the date window is authoritative anyway.
-        }
-
-        if (!$inEffect) {
-            try {
-                $this->vacationService->set($uid, false, '', '');
-                return ['ok' => true, 'changed' => true, 'active' => false];
-            } catch (\Throwable $e) {
-                return ['ok' => false, 'error' => $e->getMessage()];
-            }
-        }
-
-        $short = \trim($data->getShortMessage());
-        $long = \trim($data->getMessage());
-        $replacement = \trim((string) $data->getReplacementUserDisplayName());
+        $short = \trim($data['status']);
+        $long = \trim($data['message']);
+        $replacement = \trim($data['replacement']);
 
         $subject = $short !== '' ? 'Abwesenheit: ' . $short : 'Abwesenheitsnotiz';
         $message = $long;
@@ -278,7 +346,7 @@ class VacationSyncService
 
         $hash = \sha1(\json_encode([
             $subject, $message,
-            $data->getStartDate(), $data->getEndDate(),
+            $data['firstDay'], $data['lastDay'],
         ], JSON_UNESCAPED_SLASHES));
         if ($this->config->getUserValue($uid, 'souvera_mail', self::PREF_HASH, '') === $hash) {
             return ['ok' => true, 'changed' => false, 'active' => true];
@@ -290,8 +358,8 @@ class VacationSyncService
                 true,
                 $subject,
                 $message,
-                \date('Y-m-d', $data->getStartDate()),
-                \date('Y-m-d', $data->getEndDate()),
+                \date('Y-m-d', $data['firstDay']),
+                \date('Y-m-d', $data['lastDay']),
             );
             $this->config->setUserValue($uid, 'souvera_mail', self::PREF_HASH, $hash);
             return ['ok' => true, 'changed' => true, 'active' => true];

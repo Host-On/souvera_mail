@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.34] — 2026-08
+
+### Fixed
+
+- Abwesenheitsnotiz liest die NC-Abwesenheit jetzt über ALLE Versionen:
+  NC 31+ (IAbsenceManager), NC 28-30 (Availability-Koordinator) und als
+  versionsunabhängiger Fallback direkt aus der Datenbank (oc_dav_absence).
+  Auf NC 33+ existiert die alte API nicht mehr — deshalb wurde die gepflegte
+  Abwesenheit zuvor nie erkannt.
+
 ## [1.2.33] — 2026-08
 
 ### Fixed
