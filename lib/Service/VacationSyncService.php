@@ -34,7 +34,6 @@ class VacationSyncService
 {
     private const PREF_SYNC = 'pref_vacation_sync';
     private const PREF_HASH = 'pref_vacation_hash';
-    private const PREF_WRITER = 'pref_vacation_writer';
 
     public function __construct(
         private VacationService $vacationService,
@@ -52,17 +51,6 @@ class VacationSyncService
     public function setSyncEnabled(string $uid, bool $enabled): void
     {
         $this->config->setUserValue($uid, 'souvera_mail', self::PREF_SYNC, $enabled ? '1' : '0');
-    }
-
-    /** Merkt, woher der Responder zuletzt gesetzt wurde: 'mail' | 'nc' | 'none'. */
-    public function setLastWriter(string $uid, string $writer): void
-    {
-        $this->config->setUserValue($uid, 'souvera_mail', self::PREF_WRITER, $writer);
-    }
-
-    public function lastWriter(string $uid): string
-    {
-        return (string) $this->config->getUserValue($uid, 'souvera_mail', self::PREF_WRITER, 'none');
     }
 
     /**
@@ -155,35 +143,25 @@ class VacationSyncService
             return ['ok' => true, 'changed' => false, 'active' => false];
         }
         if (!$this->isSyncEnabled($uid)) {
-            // Sync aus: Nur abschalten, wenn NC den Responder zuletzt gesetzt
-            // hat — mail-eigene Abwesenheitsnotizen bleiben unangetastet.
-            if ($this->lastWriter($uid) === 'nc') {
-                try {
-                    $this->vacationService->set($uid, false, '', '');
-                    $this->setLastWriter($uid, 'none');
-                    return ['ok' => true, 'changed' => true, 'active' => false];
-                } catch (\Throwable $e) {
-                    return ['ok' => false, 'error' => $e->getMessage()];
-                }
+            // Sync deaktiviert — Responder abschalten.
+            try {
+                $this->vacationService->set($uid, false, '', '');
+                return ['ok' => true, 'changed' => true, 'active' => false];
+            } catch (\Throwable $e) {
+                return ['ok' => false, 'error' => $e->getMessage()];
             }
-            return ['ok' => true, 'changed' => false, 'active' => false];
         }
 
         $data = $this->getCurrentOutOfOffice($uid);
         if ($data === null) {
-            // Keine NC-Abwesenheit: Nur abschalten, wenn NC der letzte
-            // Schreiber war. Mail-eigene Notizen bleiben bestehen.
-            if ($this->lastWriter($uid) === 'nc') {
-                try {
-                    $this->vacationService->set($uid, false, '', '');
-                    $this->setLastWriter($uid, 'none');
-                    $this->config->setUserValue($uid, 'souvera_mail', self::PREF_HASH, 'none');
-                    return ['ok' => true, 'changed' => true, 'active' => false];
-                } catch (\Throwable $e) {
-                    return ['ok' => false, 'error' => $e->getMessage()];
-                }
+            // Keine NC-Abwesenheit → Responder aus.
+            try {
+                $this->vacationService->set($uid, false, '', '');
+                $this->config->setUserValue($uid, 'souvera_mail', self::PREF_HASH, 'none');
+                return ['ok' => true, 'changed' => true, 'active' => false];
+            } catch (\Throwable $e) {
+                return ['ok' => false, 'error' => $e->getMessage()];
             }
-            return ['ok' => true, 'changed' => false, 'active' => false];
         }
 
         $inEffect = true;
@@ -229,7 +207,6 @@ class VacationSyncService
                 \date('Y-m-d', $data->getStartDate()),
                 \date('Y-m-d', $data->getEndDate()),
             );
-            $this->setLastWriter($uid, 'nc');
             $this->config->setUserValue($uid, 'souvera_mail', self::PREF_HASH, $hash);
             return ['ok' => true, 'changed' => true, 'active' => true];
         } catch (\Throwable $e) {

@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.31] — 2026-08
+
+### Changed
+
+- Abwesenheitsnotiz auf EIN Konzept zurückgeführt: "Aus Nextcloud übernehmen"
+  ist die einzige Oberfläche (der zusätzliche Mail-Editor aus 1.2.30 wurde
+  entfernt). Bei deaktiviertem Feature zeigt die Oberfläche den konkreten
+  Admin-Hinweis (`occ config:app:set --value=no dav hide_absence_settings`)
+  und der Status zeigt an, ob die Sieve-Auto-Antwort wirklich aktiv ist.
+- Server: Schreiber-Tracking entfernt — NC ist die alleinige Quelle für den
+  Responder (keine NC-Abwesenheit -> Antwort aus).
+
 ## [1.2.30] — 2026-08
 
 ### Fixed

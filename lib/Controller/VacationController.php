@@ -89,9 +89,6 @@ class VacationController extends Controller
 
         try {
             $this->service->set($this->userId, $enabled, $subject, $message, $from, $to);
-            // Mail-eigenes Formular war der letzte Schreiber — der NC-Sync-Job
-            // darf diese Notiz nicht stillschweigend abschalten.
-            $this->syncService->setLastWriter($this->userId, 'mail');
         } catch (\InvalidArgumentException $e) {
             return new DataResponse(
                 ['status' => 'error', 'message' => $e->getMessage()],
