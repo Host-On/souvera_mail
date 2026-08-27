@@ -69,6 +69,49 @@ class VacationSyncService
         }
     }
 
+    /**
+     * Liefert den aktuell laufenden "Abwesend"-Zeitraum der klassischen
+     * persönlichen Verfügbarkeit, oder null wenn der Nutzer nicht abwesend ist.
+     *
+     * @return array{end: int, message: string}|null
+     */
+    public function currentAbsentSlot(string $uid): ?array
+    {
+        if (!\interface_exists(IAvailabilityCoordinator::class)) {
+            return null;
+        }
+        try {
+            $coordinator = \OCP\Server::get(IAvailabilityCoordinator::class);
+            if (!\method_exists($coordinator, 'getAvailability')) {
+                return null;
+            }
+            $user = $this->userManager->get($uid);
+            if ($user === null) {
+                return null;
+            }
+            $now = \time();
+            $slots = $coordinator->getAvailability($user);
+            \usort($slots, static fn ($a, $b) => $a->getBeginTime() <=> $b->getBeginTime());
+            foreach ($slots as $slot) {
+                if (!\method_exists($slot, 'getAvailability') || !\method_exists($slot, 'getBeginTime')) {
+                    continue;
+                }
+                if ((string) $slot->getAvailability() !== 'ABSENT') {
+                    continue;
+                }
+                $begin = (int) $slot->getBeginTime();
+                $end = \method_exists($slot, 'getEndTime') ? (int) $slot->getEndTime() : $begin;
+                if ($begin <= $now && $now <= $end) {
+                    $message = \method_exists($slot, 'getMessage') ? (string) $slot->getMessage() : '';
+                    return ['end' => $end, 'message' => \trim($message)];
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->logger->debug('VacationSyncService: availability fallback failed: ' . $e->getMessage());
+        }
+        return null;
+    }
+
     /** @return IOutOfOfficeData|null */
     public function getCurrentOutOfOffice(string $uid): ?IOutOfOfficeData
     {
@@ -121,6 +164,22 @@ class VacationSyncService
             $state['replacement'] = $replacement ?? '';
         }
 
+        if (!$state['ncActive']) {
+            // Fallback: klassische "persönliche Verfügbarkeit" (Abwesend-Slots).
+            $slot = $this->currentAbsentSlot($uid);
+            if ($slot !== null) {
+                $state['ncActive'] = true;
+                $state['inEffect'] = true;
+                $state['start'] = '';
+                $state['end'] = \date('Y-m-d', $slot['end']);
+                $state['short'] = 'Abwesenheitsnotiz';
+                $state['long'] = $slot['message'] !== ''
+                    ? $slot['message']
+                    : 'Ich bin derzeit abwesend und werde Ihre Nachricht nach meiner Rückkehr beantworten.';
+                $state['replacement'] = '';
+            }
+        }
+
         try {
             $state['vacation'] = $this->vacationService->get($uid);
         } catch (\Throwable $e) {
@@ -153,12 +212,39 @@ class VacationSyncService
         }
 
         $data = $this->getCurrentOutOfOffice($uid);
-        if ($data === null) {
-            // Keine NC-Abwesenheit → Responder aus.
+
+        // Fallback: Klassische "persönliche Verfügbarkeit" (Abwesend-Zeiträume)
+        // — viele Nutzer pflegen genau DORT ihre Abwesenheit statt im neuen
+        // Out-of-Office-Dialog. Liegt ein aktiver Abwesend-Zeitraum vor,
+        // wird er als Auto-Antwort übernommen.
+        $absentSlot = $data === null ? $this->currentAbsentSlot($uid) : null;
+
+        if ($data === null && $absentSlot === null) {
+            // Weder NC-Abwesenheit noch Abwesend-Zeitraum → Responder aus.
             try {
                 $this->vacationService->set($uid, false, '', '');
                 $this->config->setUserValue($uid, 'souvera_mail', self::PREF_HASH, 'none');
                 return ['ok' => true, 'changed' => true, 'active' => false];
+            } catch (\Throwable $e) {
+                return ['ok' => false, 'error' => $e->getMessage()];
+            }
+        }
+
+        if ($data === null && $absentSlot !== null) {
+            $subject = 'Abwesenheitsnotiz';
+            $message = $absentSlot['message'] !== ''
+                ? $absentSlot['message']
+                : 'Ich bin derzeit abwesend und werde Ihre Nachricht nach meiner Rückkehr beantworten.';
+            $from = '';
+            $to = \date('Y-m-d', $absentSlot['end']);
+            $hash = \sha1(\json_encode(['availability', $subject, $message, $from, $to], JSON_UNESCAPED_SLASHES));
+            if ($this->config->getUserValue($uid, 'souvera_mail', self::PREF_HASH, '') === $hash) {
+                return ['ok' => true, 'changed' => false, 'active' => true];
+            }
+            try {
+                $this->vacationService->set($uid, true, $subject, $message, $from, $to);
+                $this->config->setUserValue($uid, 'souvera_mail', self::PREF_HASH, $hash);
+                return ['ok' => true, 'changed' => true, 'active' => true];
             } catch (\Throwable $e) {
                 return ['ok' => false, 'error' => $e->getMessage()];
             }

@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.32] — 2026-08
+
+### Fixed
+
+- Abwesenheitsnotiz erkennt jetzt auch die klassische "persönliche
+  Verfügbarkeit": Liegt ein aktiver "Abwesend"-Zeitraum im Zeitplan vor,
+  wird er als Auto-Antwort übernommen (mit dem hinterlegten Text bzw. einer
+  Standardformulierung) — nicht nur das neue Out-of-Office-Feature. Status
+  in den Einstellungen zeigt den Verfügbarkeits-Fallback ebenfalls an.
+
 ## [1.2.31] — 2026-08
 
 ### Changed
