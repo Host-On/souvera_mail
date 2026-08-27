@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.35] — 2026-08
+
+### Fixed
+
+- Abwesenheitsnotiz erkennt jetzt auch den NÄCHSTEN geplanten
+  Abwesenheitszeitraum ("Richte deinen nächsten Abwesenheitszeitraum ein"):
+  Der Responder wird mit dem passenden Datumsfenster hinterlegt und
+  antwortet automatisch, sobald der Zeitraum beginnt. Zuvor wurde nur der
+  aktuell laufende Zeitraum berücksichtigt — geplante Abwesenheiten galten
+  als "keine Abwesenheit".
+
 ## [1.2.34] — 2026-08
 
 ### Fixed

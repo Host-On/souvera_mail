@@ -77,6 +77,62 @@ class VacationSyncService
     }
 
     /**
+     * Liefert den AKTUELLEN oder — falls keiner läuft — den NÄCHSTEN
+     * geplanten Abwesenheitszeitraum. Der Nutzer stellt im NC-Dialog
+     * ausdrücklich den "nächsten Abwesenheitszeitraum" ein — der darf nicht
+     * als "keine Abwesenheit" gewertet werden.
+     *
+     * @return array{firstDay: int, lastDay: int, status: string, message: string, replacement: string, planned: bool}|null
+     */
+    public function getRelevantAbsence(string $uid): ?array
+    {
+        $current = $this->getCurrentAbsence($uid);
+        if ($current !== null) {
+            return $current + ['planned' => false];
+        }
+
+        try {
+            $rows = $this->db->executeQuery(
+                'SELECT * FROM `*PREFIX*dav_absence` WHERE `user_id` = ?',
+                [$uid]
+            )->fetchAll();
+            $now = \time();
+            $future = null;
+            foreach ($rows as $row) {
+                $first = (int) ($row['first_day'] ?? 0);
+                $last = (int) ($row['last_day'] ?? 0);
+                if ($first === 0 || $last === 0) {
+                    continue;
+                }
+                if ($first <= $now && $now <= $last) {
+                    return [
+                        'firstDay' => $first,
+                        'lastDay' => $last,
+                        'status' => (string) ($row['status'] ?? ''),
+                        'message' => (string) ($row['message'] ?? ''),
+                        'replacement' => (string) ($row['replacement_user_display_name'] ?? ''),
+                        'planned' => false,
+                    ];
+                }
+                if ($first > $now && ($future === null || $first < $future['firstDay'])) {
+                    $future = [
+                        'firstDay' => $first,
+                        'lastDay' => $last,
+                        'status' => (string) ($row['status'] ?? ''),
+                        'message' => (string) ($row['message'] ?? ''),
+                        'replacement' => (string) ($row['replacement_user_display_name'] ?? ''),
+                        'planned' => true,
+                    ];
+                }
+            }
+            return $future;
+        } catch (\Throwable $e) {
+            $this->logger->debug('Absence via DB (future) failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Liefert den aktuell laufenden "Abwesend"-Zeitraum der klassischen
      * persönlichen Verfügbarkeit, oder null wenn der Nutzer nicht abwesend ist.
      *
@@ -237,10 +293,10 @@ class VacationSyncService
             'replacement' => '',
         ];
 
-        $data = $this->getCurrentAbsence($uid);
+        $data = $this->getRelevantAbsence($uid);
         if ($data !== null) {
             $state['ncActive'] = true;
-            $state['inEffect'] = true;
+            $state['inEffect'] = !$data['planned'];
             $state['start'] = \date('Y-m-d', $data['firstDay']);
             $state['end'] = \date('Y-m-d', $data['lastDay']);
             $state['short'] = $data['status'];
@@ -295,12 +351,11 @@ class VacationSyncService
             }
         }
 
-        $data = $this->getCurrentAbsence($uid);
+        // AKTUELLER oder NÄCHSTER geplanter Zeitraum — das Sieve-Datumsfenster
+        // (from/to) entscheidet, wann die Antwort wirklich verschickt wird.
+        $data = $this->getRelevantAbsence($uid);
 
-        // Fallback: Klassische "persönliche Verfügbarkeit" (Abwesend-Zeiträume)
-        // — viele Nutzer pflegen genau DORT ihre Abwesenheit statt im neuen
-        // Out-of-Office-Dialog. Liegt ein aktiver Abwesend-Zeitraum vor,
-        // wird er als Auto-Antwort übernommen.
+        // Fallback: Klassische "persönliche Verfügbarkeit" (Abwesend-Zeiträume).
         $absentSlot = $data === null ? $this->currentAbsentSlot($uid) : null;
 
         if ($data === null && $absentSlot === null) {
