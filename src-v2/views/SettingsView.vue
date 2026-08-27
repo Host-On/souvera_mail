@@ -235,6 +235,9 @@
 					<div v-if="vacationState.vacation && vacationState.vacation.enabled" class="vacation-status vacation-status--active">
 						{{ t('souvera_mail', 'Auto-reply active (Sieve)') }}
 					</div>
+					<p v-if="vacationState.debug && vacationState.debug.appVersion" class="settings-muted">
+						{{ t('souvera_mail', 'App version:') }} {{ vacationState.debug.appVersion }}
+					</p>
 					<details v-if="vacationState.debug" class="vacation-debug">
 						<summary>{{ t('souvera_mail', 'Diagnosis') }}</summary>
 						<pre class="vacation-debug__body">{{ JSON.stringify(vacationState.debug, null, 2) }}</pre>

@@ -594,6 +594,7 @@
         "Auto-reply active (Sieve)": "Auto-Antwort aktiv (Sieve)",
         "No absence found (neither out-of-office nor an \"Absent\" period in personal availability)": "Keine Abwesenheit gefunden (weder Out-of-Office noch ein „Abwesend\"-Zeitraum in der persönlichen Verfügbarkeit)",
         "Diagnosis": "Diagnose",
-        "Failed to load vacation state": "Abwesenheits-Status konnte nicht geladen werden"
+        "Failed to load vacation state": "Abwesenheits-Status konnte nicht geladen werden",
+        "App version:": "App-Version:"
     }
 }

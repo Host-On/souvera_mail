@@ -376,6 +376,7 @@ class VacationSyncService
     private function collectDebug(string $uid): array
     {
         $debug = [
+            'appVersion' => \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion('souvera_mail'),
             'ncVersion' => \implode('.', \OCP\Util::getVersion()),
             'absenceManager' => \interface_exists(\OCP\User\IAbsenceManager::class),
             'availabilityCoordinator' => \interface_exists(IAvailabilityCoordinator::class),
