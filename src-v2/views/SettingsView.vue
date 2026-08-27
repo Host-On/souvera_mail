@@ -210,6 +210,33 @@
 					{{ t('souvera_mail', 'Out-of-office (vacation)') }}
 				</h2>
 				<div class="settings-card__body">
+					<NcCheckboxRadioSwitch :model-value="mailVacation.enabled"
+						@update:modelValue="onMailVacationToggle">
+						{{ t('souvera_mail', 'Enable out-of-office reply') }}
+					</NcCheckboxRadioSwitch>
+					<p class="settings-muted">{{ t('souvera_mail', 'The automatic reply is sent once per sender and day. Works on every instance — no Nextcloud settings required.') }}</p>
+
+					<div class="setting-row setting-row--column" v-if="mailVacation.enabled || showMailVacationEditor">
+						<div class="vacation-editor">
+							<div class="vacation-editor__row">
+								<NcDateTimePicker v-model="mailVacationForm.from" type="date"
+									:label="t('souvera_mail', 'From')" />
+								<NcDateTimePicker v-model="mailVacationForm.to" type="date"
+									:label="t('souvera_mail', 'Until')" />
+							</div>
+							<NcTextField v-model="mailVacationForm.subject"
+								:label="t('souvera_mail', 'Subject')" />
+							<NcTextArea v-model="mailVacationForm.message"
+								:label="t('souvera_mail', 'Auto-reply text')" />
+							<div class="vacation-editor__actions">
+								<NcButton variant="primary" :disabled="mailVacationSaving" @click="saveMailVacation">{{ t('souvera_mail', 'Save') }}</NcButton>
+								<NcButton variant="tertiary" @click="showMailVacationEditor = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+							</div>
+						</div>
+					</div>
+
+					<div class="vacation-divider" />
+
 					<NcCheckboxRadioSwitch :model-value="vacationSync"
 						@update:modelValue="onVacationSyncToggle">
 						{{ t('souvera_mail', 'Adopt from Nextcloud') }}
@@ -217,7 +244,7 @@
 					<p class="settings-muted">{{ t('souvera_mail', 'The absence configured in Nextcloud (personal availability) is used as the automatic reply.') }}</p>
 
 					<div v-if="vacationState.supported === false" class="vacation-status vacation-status--warn">
-						{{ t('souvera_mail', 'Not available on this Nextcloud version (NC 28+ required)') }}
+						{{ t('souvera_mail', 'Not enabled on this instance (server configuration). The direct form above works anyway.') }}
 					</div>
 					<div v-else-if="!vacationSync" class="vacation-status">
 						{{ t('souvera_mail', 'Sync is disabled — no out-of-office reply is sent') }}
@@ -727,6 +754,10 @@ export default {
 			identitySignatures: {},
 			vacationSync: true,
 			vacationState: { supported: true, ncActive: false, inEffect: false, start: '', end: '', short: '', long: '', replacement: '' },
+			mailVacation: { enabled: false, subject: '', message: '', from: '', to: '' },
+			mailVacationForm: { from: null, to: null, subject: '', message: '' },
+			mailVacationSaving: false,
+			showMailVacationEditor: false,
 			showVacationEditor: false,
 			vacationSaving: false,
 			vacationForm: { from: null, to: null, short: '', long: '' },
@@ -1176,6 +1207,7 @@ export default {
 			try {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/vacation/state'))
 				this.vacationState = data.state || this.vacationState
+				this.loadMailVacation()
 			} catch {}
 		},
 		async onVacationSyncToggle(val) {
@@ -1209,6 +1241,56 @@ export default {
 			}
 			this.showVacationEditor = true
 		},
+		async loadMailVacation() {
+			try {
+				const { data } = await axios.get(generateUrl('/apps/souvera_mail/vacation'))
+				if (data?.status === 'ok' && data.vacation) {
+					this.mailVacation = data.vacation
+					this.mailVacationForm = {
+						from: data.vacation.from ? Math.floor(new Date(data.vacation.from + 'T00:00:00').getTime() / 1000) : null,
+						to: data.vacation.to ? Math.floor(new Date(data.vacation.to + 'T00:00:00').getTime() / 1000) : null,
+						subject: data.vacation.subject || '',
+						message: data.vacation.message || '',
+					}
+				}
+			} catch (e) { console.error('Load vacation failed', e) }
+		},
+		onMailVacationToggle(enabled) {
+			if (enabled) {
+				this.showMailVacationEditor = true
+			} else {
+				this.saveMailVacation(false)
+			}
+		},
+		async saveMailVacation(enabled = true) {
+			this.mailVacationSaving = true
+			const fmt = (ts) => {
+				if (!ts) return ''
+				const d = new Date(ts * 1000)
+				return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+			}
+			const payload = {
+				enabled,
+				subject: this.mailVacationForm.subject || '',
+				message: this.mailVacationForm.message || '',
+				from: fmt(this.mailVacationForm.from),
+				to: fmt(this.mailVacationForm.to),
+			}
+			try {
+				await axios.post(generateUrl('/apps/souvera_mail/vacation'), payload, {
+					headers: { requesttoken: (window.OC && window.OC.requestToken) || '' },
+				})
+				this.mailVacation = { enabled, subject: payload.subject, message: payload.message, from: payload.from, to: payload.to }
+				this.showMailVacationEditor = false
+				showSuccess(this.t('souvera_mail', 'Saved'))
+			} catch (e) {
+				console.error('Vacation save failed', e)
+				showError(e?.response?.data?.message || this.t('souvera_mail', 'Failed to save'))
+			} finally {
+				this.mailVacationSaving = false
+			}
+		},
+
 		async saveVacationToNextcloud() {
 			if (!this.accountUid) { showError(this.t('souvera_mail', 'Cannot resolve user id')); return }
 			const fmt = (ts) => {
@@ -1609,6 +1691,7 @@ export default {
 }
 
 
+.vacation-divider { border-top: 1px solid var(--color-border); margin: 14px 0; }
 .vacation-status { font-size: 13px; color: var(--color-text-maxcontrast); }
 .vacation-status--active { color: var(--color-success); font-weight: 600; }
 .vacation-status--warn { color: var(--color-warning); }

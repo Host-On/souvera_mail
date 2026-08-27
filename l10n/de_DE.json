@@ -592,6 +592,10 @@
         "Decline": "Ablehnen",
         "Accepted — added to your calendar": "Zugesagt — in den Kalender übernommen",
         "Marked as maybe": "Als „vielleicht\" markiert",
-        "Declined": "Abgelehnt"
+        "Declined": "Abgelehnt",
+        "Enable out-of-office reply": "Abwesenheitsnotiz aktivieren",
+        "The automatic reply is sent once per sender and day. Works on every instance — no Nextcloud settings required.": "Die automatische Antwort wird einmal pro Absender und Tag verschickt. Funktioniert auf jeder Instanz — ohne Nextcloud-Einstellungen.",
+        "Auto-reply text": "Text der automatischen Antwort",
+        "Not enabled on this instance (server configuration). The direct form above works anyway.": "Auf dieser Instanz nicht aktiviert (Server-Konfiguration). Das Formular oben funktioniert trotzdem."
     }
 }

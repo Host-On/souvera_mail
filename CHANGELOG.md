@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.30] — 2026-08
+
+### Fixed
+
+- Abwesenheitsnotiz grundlegend repariert: Eigener, immer verfügbarer Editor
+  in den Einstellungen (aktiv, Betreff, Text, von/bis) schreibt direkt das
+  Sieve-Skript — unabhängig von der Nextcloud-Verfügbarkeitsfunktion, die auf
+  Instanzen standardmäßig deaktiviert ist und zuvor alle Antworten
+  stummschaltete. Der Stunden-Job schaltet mail-eigene Notizen nicht mehr ab
+  (Schreiber-Tracking mail/nc), der NC-Sync bleibt als Option erhalten.
+
+### Ops
+
+- Stalwart: Vacation-Antworten enden nach dem Standard-Limit
+  (`SieveUserInterpreter.maxOutMessages`, Default 3). Für unbegrenzte
+  Antworten den Wert auf 0 setzen, z. B.:
+  `stalwart-cli -u https://<host> set sieve.interpreter.user.maxOutMessages 0`
+  (falls die Instanz 0 ablehnt: einen hohen Wert wie 10000 verwenden).
+
 ## [1.2.29] — 2026-08
 
 ### Fixed
