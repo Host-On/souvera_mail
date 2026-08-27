@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.29] — 2026-08
+
+### Fixed
+
+- Abwesenheitsnotizen feuern jetzt zuverlässig: Der Vacation-Block steht im
+  Sieve-Skript vor den Nutzerregeln (fileinto/stop-Regeln übersprangen den
+  am Ende stehenden Responder zuvor) und Zeilenumbrüche in Betreff/Text
+  werden kollabiert — mehrzeilige Texte machten das Skript zuvor ungültig.
+
 ## [1.2.28] — 2026-08
 
 ### Fixed

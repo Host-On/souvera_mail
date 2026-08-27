@@ -147,6 +147,10 @@ class VacationService
     ): void {
         $subject = \trim($subject);
         $message = \trim($message);
+        // Sieve-Quoted-Strings dürfen keine rohen Zeilenumbrüche enthalten —
+        // sonst ist das gesamte Skript ungültig und der Responder feuert nie.
+        $subject = (string) \preg_replace('/\s+/u', ' ', $subject);
+        $message = (string) \preg_replace('/\s+/u', ' ', $message);
         $from = $this->normaliseDate($from);
         $to = $this->normaliseDate($to);
 
@@ -183,9 +187,13 @@ class VacationService
             }
             $requireLine = 'require ["' . \implode('", "', $caps) . '"]; ' . self::REQUIRE_MARKER;
             $block = $this->buildBlock($meta, $subject, $message, $from, $to);
+            // Vacation-Block VOR den Nutzerregeln: Regeln mit fileinto/stop
+            // würden den am Ende stehenden Responder sonst überspringen.
+            [$userRequires, $userRest] = $this->splitRequires($base);
             $newBody = $requireLine . "\n"
-                . ($base !== '' ? $base . "\n" : '')
-                . $block . "\n";
+                . $userRequires
+                . $block . "\n"
+                . ($userRest !== '' ? $userRest . "\n" : '');
         } else {
             // Disabled: managed parts already stripped — persist the bare
             // user script so the responder stops firing.
@@ -276,6 +284,29 @@ class VacationService
             return \is_array($decoded) ? $decoded : null;
         }
         return null;
+    }
+
+    /**
+     * Trennt die führenden `require`-Zeilen eines Skripts vom Rest ab —
+     * RFC 5228 verlangt alle requires vor jedem anderen Kommando.
+     *
+     * @return array{string, string} [requires, rest]
+     */
+    private function splitRequires(string $body): array
+    {
+        $lines = \preg_split('/\r\n|\n|\r/', $body);
+        $requires = '';
+        $rest = [];
+        $inRequire = true;
+        foreach ($lines as $line) {
+            if ($inRequire && \preg_match('/^\s*require\s+\[[^\]]*\];/', $line) === 1) {
+                $requires .= $line . "\n";
+                continue;
+            }
+            $inRequire = false;
+            $rest[] = $line;
+        }
+        return [$requires, \ltrim(\implode("\n", $rest))];
     }
 
     /**

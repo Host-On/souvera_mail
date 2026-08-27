@@ -293,12 +293,14 @@ class SieveScriptService
         if ($merged !== '') {
             $merged .= "\n";
         }
+        // Vacation-Block VOR den Filterblöcken: Nutzerregeln mit
+        // fileinto/stop dürfen den Auto-Responder nicht überspringen.
+        if ($vacationBody !== '') {
+            $merged .= "\n" . \rtrim($vacationBody) . "\n\n";
+        }
         $merged .= $blocks !== []
             ? \implode("\n\n", $blocks)
             : '# Souvera Mail — no active filters';
-        if ($vacationBody !== '') {
-            $merged .= "\n\n" . \rtrim($vacationBody);
-        }
 
         $this->saveScript($userId, self::MAIN_SCRIPT_NAME, $merged);
         $this->activateScript($userId, self::MAIN_SCRIPT_NAME);
