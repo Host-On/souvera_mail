@@ -104,6 +104,13 @@ class VacationController extends Controller
             );
         }
 
+        // Fallback path for instances without the newer /vacation/sync route:
+        // the settings UI posts { action: 'sync' } to the legacy /vacation route.
+        if ($this->request->getParam('action') === 'sync') {
+            $result = $this->syncService->syncNow($this->userId);
+            return new DataResponse(['status' => $result['ok'] ? 'ok' : 'error'] + $result);
+        }
+
         $enabled = (bool) $this->request->getParam('enabled', false);
         $subject = (string) $this->request->getParam('subject', '');
         $message = (string) $this->request->getParam('message', '');

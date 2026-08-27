@@ -1224,7 +1224,15 @@ export default {
 		async syncVacationNow() {
 			try {
 				await axios.post(generateUrl('/apps/souvera_mail/vacation/sync'))
-			} catch {}
+			} catch (e) {
+				// Fallback: Sync über die seit jeher vorhandene /vacation-Route,
+				// falls die Instanz /vacation/sync nicht registriert hat.
+				if (e?.response?.status === 404) {
+					try {
+						await axios.post(generateUrl('/apps/souvera_mail/vacation'), { action: 'sync' })
+					} catch {}
+				}
+			}
 			await this.loadVacationState()
 			showSuccess(this.t('souvera_mail', 'Synchronized'))
 		},
