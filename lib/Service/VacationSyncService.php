@@ -281,6 +281,32 @@ class VacationSyncService
      */
     public function getState(string $uid): array
     {
+        try {
+            return $this->getStateInternal($uid);
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail: vacation getState failed: ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
+            return [
+                'supported' => true,
+                'syncEnabled' => $this->isSyncEnabled($uid),
+                'ncActive' => false,
+                'inEffect' => false,
+                'start' => '',
+                'end' => '',
+                'short' => '',
+                'long' => '',
+                'replacement' => '',
+                'vacation' => ['enabled' => false, 'subject' => '', 'message' => '', 'from' => '', 'to' => ''],
+                'debug' => ['stateError' => $e->getMessage()],
+            ];
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function getStateInternal(string $uid): array
+    {
         $state = [
             'supported' => $this->isSupported(),
             'syncEnabled' => $this->isSyncEnabled($uid),

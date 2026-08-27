@@ -1185,6 +1185,8 @@ export default {
 				this.vacationState = data.state || this.vacationState
 				if (data.status === 'error') {
 					showError(data.message || this.t('souvera_mail', 'Failed to load vacation state'))
+					// Diagnose trotzdem anzeigen, damit der Fehlertext sichtbar ist.
+					this.vacationState = { ...this.vacationState, debug: (data.state && data.state.debug) || { stateError: data.message || 'unbekannt' } }
 				}
 			} catch (e) {
 				console.error('Vacation state load failed', e)

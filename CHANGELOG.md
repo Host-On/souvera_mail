@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.37] — 2026-08
+
+### Fixed
+
+- Abwesenheits-Status ist jetzt ausfallsicher: Der Status-Endpoint kann nicht
+  mehr scheitern — Fehler werden geloggt und erscheinen als sichtbarer
+  Diagnose-Block ("stateError") in der Einstellungs-Karte, statt still in den
+  "Keine Abwesenheit"-Standard zu fallen.
+
 ## [1.2.36] — 2026-08
 
 ### Added

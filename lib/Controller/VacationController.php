@@ -140,8 +140,16 @@ class VacationController extends Controller
                 'state' => $this->syncService->getState($this->userId),
             ]);
         } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail: vacation state failed: ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
             return new DataResponse(
-                ['status' => 'error', 'message' => $e->getMessage()],
+                [
+                    'status' => 'error',
+                    'message' => $e->getMessage(),
+                    'state' => ['debug' => ['stateError' => $e->getMessage()]],
+                ],
                 Http::STATUS_INTERNAL_SERVER_ERROR
             );
         }
