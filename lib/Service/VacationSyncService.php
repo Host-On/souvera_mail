@@ -39,9 +39,19 @@ class VacationSyncService
         private VacationService $vacationService,
         private IUserManager $userManager,
         private IConfig $config,
-        private \OCP\IDBConnection $db,
         private LoggerInterface $logger,
     ) {
+    }
+
+    /** DB-Zugriff wird bedarfsweise geladen (kein Konstruktor-Zwang). */
+    private function db(): ?\OCP\IDBConnection
+    {
+        try {
+            return \OCP\Server::get(\OCP\IDBConnection::class);
+        } catch (\Throwable $e) {
+            $this->logger->warning('Souvera Mail: IDBConnection not available: ' . $e->getMessage());
+            return null;
+        }
     }
 
     public function isSyncEnabled(string $uid): bool
@@ -70,7 +80,7 @@ class VacationSyncService
             }
         }
         try {
-            return $this->db->tableExists('dav_absence');
+            return $this->db()?->tableExists('dav_absence');
         } catch (\Throwable $e) {
             return false;
         }
@@ -92,7 +102,7 @@ class VacationSyncService
         }
 
         try {
-            $rows = $this->db->executeQuery(
+            $rows = $this->db()?->executeQuery(
                 'SELECT * FROM `*PREFIX*dav_absence` WHERE `user_id` = ?',
                 [$uid]
             )->fetchAll();
@@ -249,7 +259,7 @@ class VacationSyncService
 
         // Letzter Fallback: direkte DB-Abfrage (funktioniert auf jeder Version).
         try {
-            $rows = $this->db->executeQuery(
+            $rows = $this->db()?->executeQuery(
                 'SELECT * FROM `*PREFIX*dav_absence` WHERE `user_id` = ?',
                 [$uid]
             )->fetchAll();
@@ -377,18 +387,18 @@ class VacationSyncService
             : null;
 
         try {
-            $debug['tableAbsence'] = $this->db->tableExists('dav_absence');
+            $debug['tableAbsence'] = $this->db()?->tableExists('dav_absence');
         } catch (\Throwable $e) {
             $debug['tableAbsence'] = 'error: ' . $e->getMessage();
         }
         try {
-            $debug['tableAvailability'] = $this->db->tableExists('dav_availability');
+            $debug['tableAvailability'] = $this->db()?->tableExists('dav_availability');
         } catch (\Throwable $e) {
             $debug['tableAvailability'] = 'error: ' . $e->getMessage();
         }
 
         try {
-            $rows = $this->db->executeQuery(
+            $rows = $this->db()?->executeQuery(
                 'SELECT * FROM `*PREFIX*dav_absence` WHERE `user_id` = ?',
                 [$uid]
             )->fetchAll();
@@ -406,7 +416,7 @@ class VacationSyncService
         }
 
         try {
-            $rows = $this->db->executeQuery(
+            $rows = $this->db()?->executeQuery(
                 'SELECT `availability_level`, `start_time`, `end_time` FROM `*PREFIX*dav_availability` WHERE `user_id` = ?',
                 [$uid]
             )->fetchAll();

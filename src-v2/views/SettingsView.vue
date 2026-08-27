@@ -1190,7 +1190,9 @@ export default {
 				}
 			} catch (e) {
 				console.error('Vacation state load failed', e)
-				showError(this.t('souvera_mail', 'Failed to load vacation state'))
+				const status = e?.response?.status || 'netz'
+				const detail = (typeof e?.response?.data === 'string' ? e.response.data : (e?.message || ''))
+				showError('Abwesenheit: ' + status + ' — ' + String(detail).slice(0, 300))
 			}
 		},
 		async onVacationSyncToggle(val) {

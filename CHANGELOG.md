@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.38] — 2026-08
+
+### Fixed
+
+- Abwesenheits-Status: IDBConnection wird nicht mehr über den Konstruktor
+  aufgelöst (verhindert Instanziierungs-Fehler des Service) und die
+  Fehlermeldung in der Oberfläche enthält jetzt HTTP-Status + Antworttext.
+
 ## [1.2.37] — 2026-08
 
 ### Fixed
