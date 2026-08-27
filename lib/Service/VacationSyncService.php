@@ -427,6 +427,14 @@ class VacationSyncService
             $debug['availabilityRows'] = 'error: ' . $e->getMessage();
         }
 
+        try {
+            $svc = \OCP\Server::get(\OCA\SouveraMail\Service\SieveScriptService::class);
+            $res = $svc->listScriptsWithBodies($uid);
+            $debug['scripts'] = $res['scripts'] ?? [];
+        } catch (\Throwable $e) {
+            $debug['scripts'] = 'error: ' . $e->getMessage();
+        }
+
         return $debug;
     }
 
