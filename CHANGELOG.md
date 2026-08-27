@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.41] — 2026-08
+
+### Fixed
+
+- ROBUSTER ABWESENHEITS-ABRUF: Der kombinierte Status wird jetzt zusätzlich
+  über die seit jeher vorhandene Route `GET /vacation` ausgeliefert
+  (`state`-Feld). Die Einstellungs-Karte fällt bei einem 404 auf
+  `/vacation/state` automatisch auf diese Route zurück — der Status
+  funktioniert damit auch auf Instanzen, deren Routen-Cache die neueren
+  Vacation-Routen noch nicht registriert hat.
+
 ## [1.2.40] — 2026-08
 
 ### Fixed

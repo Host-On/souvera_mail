@@ -64,7 +64,30 @@ class VacationController extends Controller
                 Http::STATUS_BAD_GATEWAY
             );
         }
-        return new DataResponse(['status' => 'ok', 'available' => true, 'vacation' => $vacation]);
+        return new DataResponse([
+            'status' => 'ok',
+            'available' => true,
+            'vacation' => $vacation,
+            'state' => $this->safeState(),
+        ]);
+    }
+
+    /**
+     * Builds the combined state without ever throwing — the settings UI uses
+     * this via the long-established /vacation route as a fallback for
+     * instances where the newer /vacation/state route is not registered.
+     */
+    private function safeState(): array
+    {
+        try {
+            return $this->syncService->getState($this->userId);
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail: vacation state (fallback) failed: ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
+            return ['debug' => ['stateError' => $e->getMessage()]];
+        }
     }
 
     #[NoAdminRequired]

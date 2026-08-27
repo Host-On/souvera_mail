@@ -1188,11 +1188,27 @@ export default {
 				this.vacationState = data.state || this.vacationState
 				if (data.status === 'error') {
 					showError(data.message || this.t('souvera_mail', 'Failed to load vacation state'))
-					// Diagnose trotzdem anzeigen, damit der Fehlertext sichtbar ist.
 					this.vacationState = { ...this.vacationState, debug: (data.state && data.state.debug) || { stateError: data.message || 'unbekannt' } }
 				}
 			} catch (e) {
 				console.error('Vacation state load failed', e)
+				// Fallback: die ältere, seit jeher vorhandene /vacation-Route
+				// liefert denselben Zustand (state-Feld), falls die Instanz die
+				// /vacation/state-Route nicht registriert hat (404).
+				if (e?.response?.status === 404) {
+					try {
+						const { data } = await axios.get(generateUrl('/apps/souvera_mail/vacation'))
+						if (data.state) {
+							this.vacationState = data.state
+							if (data.state.debug && data.state.debug.stateError) {
+								showError('Abwesenheit (Fallback): ' + data.state.debug.stateError)
+							}
+							return
+						}
+					} catch (e2) {
+						console.error('Vacation fallback failed', e2)
+					}
+				}
 				const status = e?.response?.status || 'netz'
 				const detail = (typeof e?.response?.data === 'string' ? e.response.data : (e?.message || ''))
 				showError('Abwesenheit: ' + status + ' — ' + String(detail).slice(0, 300))
