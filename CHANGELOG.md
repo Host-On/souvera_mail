@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.46] — 2026-08
+
+### Added
+
+- Abwesenheits-Auto-Antwort mit **echten Zeilenumbrüchen**: Der
+  Nachrichtentext wird jetzt als RFC 5228 §8.1 `text:`-String ins
+  Sieve-Skript geschrieben (dot-stuffed, CRLF) statt als
+  Whitespace-kollabierter Einzeiler.
+- **Dynamischer Betreff**: Die Antwort nutzt `RE: <Betreff des Absenders>`
+  (RFC 5229 `variables`, `header :matches "subject"`), mit Fallback auf
+  den festen Abwesenheits-Betreff, wenn die Mail keinen Subject-Header hat.
+
 ## [1.2.41] — 2026-08
 
 ### Fixed

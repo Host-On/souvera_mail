@@ -150,7 +150,11 @@ class VacationService
         // Sieve-Quoted-Strings dürfen keine rohen Zeilenumbrüche enthalten —
         // sonst ist das gesamte Skript ungültig und der Responder feuert nie.
         $subject = (string) \preg_replace('/\s+/u', ' ', $subject);
-        $message = (string) \preg_replace('/\s+/u', ' ', $message);
+        // Nachricht: Zeilenumbrüche ERHALTEN (text:-String), nur
+        // Zeilenenden normalisieren und NUL entfernen.
+        $message = (string) \str_replace("\0", '', $message);
+        $message = \str_replace(["\r\n", "\r"], "\n", $message);
+        $message = \rtrim($message, "\n");
         $from = $this->normaliseDate($from);
         $to = $this->normaliseDate($to);
 
@@ -175,7 +179,7 @@ class VacationService
                 'from' => $from,
                 'to' => $to,
             ];
-            $caps = ['vacation'];
+            $caps = ['vacation', 'variables'];
             if ($from !== '' || $to !== '') {
                 // currentdate :value "ge"/"le" needs the date + relational extensions.
                 $caps[] = 'date';
@@ -306,8 +310,21 @@ class VacationService
     {
         $encodedMeta = \base64_encode((string) \json_encode($meta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
-        $vacationCmd = 'vacation :days 1 :subject "' . $this->escape($subject) . '" "'
-            . $this->escape($message) . '";';
+        // Betreff dynamisch: "RE: <Original-Betreff des Absenders>", mit
+        // Fallback auf den festen Abwesenheits-Betreff, falls die Mail
+        // keinen Subject-Header hat (RFC 5229 variables).
+        $subjectSetup = 'set "souv_subj" "' . $this->escape($subject) . "\";\n"
+            . 'if header :matches "subject" "*" {' . "\n"
+            . '    set "souv_subj" "RE: ${1}";' . "\n"
+            . '}';
+
+        // Mehrzeiliger Nachrichtentext als RFC 5228 §8.1 text:-String —
+        // erhält die Zeilenumbrüche aus der NC-Abwesenheitsnachricht.
+        $vacationCmd = $subjectSetup . "\n"
+            . 'vacation :days 1 :subject "${souv_subj}"' . "\n"
+            . 'text:' . "\n"
+            . $this->toTextString($message)
+            . "\n.\n;";
 
         $conditions = [];
         if ($from !== '') {
@@ -318,10 +335,10 @@ class VacationService
         }
 
         if (\count($conditions) === 1) {
-            $inner = 'if ' . $conditions[0] . " {\n    " . $vacationCmd . "\n}";
+            $inner = 'if ' . $conditions[0] . " {\n" . $vacationCmd . "\n}";
         } elseif (\count($conditions) === 2) {
             $inner = "if allof(\n    " . $conditions[0] . ",\n    " . $conditions[1]
-                . ") {\n    " . $vacationCmd . "\n}";
+                . ") {\n" . $vacationCmd . "\n}";
         } else {
             $inner = $vacationCmd;
         }
@@ -330,6 +347,26 @@ class VacationService
             . self::META_PREFIX . $encodedMeta . "\n"
             . $inner . "\n"
             . self::BLOCK_END;
+    }
+
+    /**
+     * Convert a multi-line message into the body of an RFC 5228 §8.1
+     * `text:` string (CRLF line endings, dot-stuffed, no NUL bytes).
+     */
+    private function toTextString(string $message): string
+    {
+        $message = \str_replace("\0", '', $message);
+        $message = \str_replace(["\r\n", "\r"], "\n", $message);
+        $message = \rtrim($message, "\n");
+        $lines = \explode("\n", $message);
+        $out = [];
+        foreach ($lines as $line) {
+            if (\strncmp($line, '.', 1) === 0) {
+                $line = '.' . $line;
+            }
+            $out[] = $line;
+        }
+        return \implode("\r\n", $out);
     }
 
     /**
