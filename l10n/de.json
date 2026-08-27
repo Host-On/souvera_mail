@@ -554,7 +554,6 @@
         "Active until {date}": "Aktiv bis {date}",
         "Replacement: {name}": "Vertretung: {name}",
         "Planned from {date}": "Geplant ab {date}",
-        "No absence configured in Nextcloud": "Keine Abwesenheit in Nextcloud hinterlegt",
         "Until": "Bis",
         "Short text": "Kurzer Text",
         "Long text (auto-reply body)": "Langer Text (Inhalt der automatischen Antwort)",
@@ -592,6 +591,7 @@
         "Marked as maybe": "Als „vielleicht\" markiert",
         "Declined": "Abgelehnt",
         "Disabled on this instance. Admin: occ config:app:set --value=no dav hide_absence_settings": "Auf dieser Instanz deaktiviert. Admin: occ config:app:set --value=no dav hide_absence_settings",
-        "Auto-reply active (Sieve)": "Auto-Antwort aktiv (Sieve)"
+        "Auto-reply active (Sieve)": "Auto-Antwort aktiv (Sieve)",
+        "No absence found (neither out-of-office nor an \"Absent\" period in personal availability)": "Keine Abwesenheit gefunden (weder Out-of-Office noch ein „Abwesend\"-Zeitraum in der persönlichen Verfügbarkeit)"
     }
 }

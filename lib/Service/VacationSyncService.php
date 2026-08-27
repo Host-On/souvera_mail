@@ -96,7 +96,7 @@ class VacationSyncService
                 if (!\method_exists($slot, 'getAvailability') || !\method_exists($slot, 'getBeginTime')) {
                     continue;
                 }
-                if ((string) $slot->getAvailability() !== 'ABSENT') {
+                if (\strtolower((string) $slot->getAvailability()) !== 'absent') {
                     continue;
                 }
                 $begin = (int) $slot->getBeginTime();

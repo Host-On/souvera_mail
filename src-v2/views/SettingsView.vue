@@ -230,7 +230,7 @@
 						{{ t('souvera_mail', 'Planned from {date}', { date: vacationState.start }) }}
 					</div>
 					<div v-else class="vacation-status">
-						{{ t('souvera_mail', 'No absence configured in Nextcloud') }}
+						{{ t('souvera_mail', 'No absence found (neither out-of-office nor an "Absent" period in personal availability)') }}
 					</div>
 					<div v-if="vacationState.vacation && vacationState.vacation.enabled" class="vacation-status vacation-status--active">
 						{{ t('souvera_mail', 'Auto-reply active (Sieve)') }}

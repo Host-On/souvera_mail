@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.33] — 2026-08
+
+### Fixed
+
+- Abwesenheitserkennung korrigiert: Nextcloud liefert die Verfügbarkeitsstufe
+  in Kleinbuchstaben ("absent") — der Vergleich auf "ABSENT" schlug daher
+  immer fehl und die persönliche Verfügbarkeit wurde nie erkannt. Jetzt
+  case-insensitive; Statusmeldung präzisiert.
+
 ## [1.2.32] — 2026-08
 
 ### Fixed
