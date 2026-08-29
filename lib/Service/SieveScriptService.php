@@ -54,6 +54,16 @@ class SieveScriptService
     public const CAPABILITY_SIEVE = 'urn:ietf:params:jmap:sieve';
     private const HTTP_TIMEOUT_SECONDS = 10;
 
+    /**
+     * Sieve capabilities that Stalwart v0.16 does NOT implement. When the
+     * user's (engine-generated) filter scripts require one of these, we drop
+     * it from the combined `require` union and strip the corresponding
+     * flag-marking commands — otherwise Stalwart rejects the whole active
+     * script with "Undeclared capability …". Flag marking is not critical
+     * for filtering/vacation (fileinto/keep/redirect keep working).
+     */
+    private const UNSUPPORTED_CAPABILITIES = ['imap4flags'];
+
     /** Reserved script name for the combined active script (one active
      *  script per account is a Stalwart hard limit — see rebuildActiveScript). */
     public const MAIN_SCRIPT_NAME = 'souvera_filters';
@@ -299,17 +309,29 @@ class SieveScriptService
             // A single `require` must head the combined script — collect
             // every capability and strip the per-script require lines
             // (a second require after executable rules is invalid Sieve).
-            if (\preg_match_all('/^\s*require\s*\[([^\]]*)\]\s*;.*$/m', $body, $m) > 0) {
-                foreach ($m[1] as $caps) {
+            // Both require forms are handled: `require "cap";` and
+            // `require ["cap1", "cap2"];`.
+            if (\preg_match_all('/^\s*require\s+(?:"([^"]*)"|\[([^\]]*)\])\s*;.*$/m', $body, $m, PREG_SET_ORDER) > 0) {
+                foreach ($m as $req) {
+                    $caps = ($req[2] ?? '') !== '' ? $req[2] : $req[1];
                     foreach (\preg_split('/,\s*/', \trim($caps)) as $cap) {
                         $cap = \trim($cap, " \t\"'");
-                        if ($cap !== '') $capabilities[$cap] = true;
+                        if ($cap === '') continue;
+                        if (\in_array($cap, self::UNSUPPORTED_CAPABILITIES, true)) continue;
+                        $capabilities[$cap] = true;
                     }
                 }
-                $body = \preg_replace('/^\s*require\s*\[[^\]]*\]\s*;.*\n?/m', '', $body);
+                $body = \preg_replace('/^\s*require\s+(?:"[^"]*"|\[[^\]]*\])\s*;.*\n?/m', '', $body);
                 $body = \trim($body);
                 if ($body === '') continue;
             }
+            // Drop flag-marking commands that depend on unsupported
+            // capabilities (imap4flags) — they would invalidate the script.
+            // Position-independent: also catches `addflag …;` inside a
+            // single-line `if … { … }` block.
+            $body = \preg_replace('/\b(?:addflag|setflag|removeflag)\b[^;]*;/', '', $body);
+            $body = \trim($body);
+            if ($body === '') continue;
             $blocks[] = '# --- ' . $s['name'] . " ---\n" . $body;
             $count++;
         }

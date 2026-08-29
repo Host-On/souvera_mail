@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.47] — 2026-08
+
+### Fixed
+
+- Abwesenheits-/Filter-Skript wurde von Stalwart v0.16 abgelehnt
+  (`Undeclared capability 'imap4flags'`). Beim Zusammenführen des aktiven
+  Skripts wird die nicht unterstützte Capability `imap4flags` jetzt aus dem
+  `require`-Union entfernt und davon abhängige Flag-Befehle
+  (`addflag`/`setflag`/`removeflag`) aus den Filterblöcken gestrippt —
+  `fileinto`/`keep`/`redirect`/`vacation` funktionieren unverändert.
+
 ## [1.2.46] — 2026-08
 
 ### Added
