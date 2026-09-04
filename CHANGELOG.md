@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.50] — 2026-09
+
+### Changed
+
+- App-Icon erneut ersetzt (`img/app.svg`, neues Design).
+
 ## [1.2.49] — 2026-08
 
 ### Changed
