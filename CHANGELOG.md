@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.49] — 2026-08
+
+### Changed
+
+- App-Icon überarbeitet.
+
 ## [1.2.48] — 2026-08
 
 ### Changed
