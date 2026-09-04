@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.48] — 2026-08
+
+### Changed
+
+- Neues App-Icon (app.svg aus dem Souvera-Design).
+
 ## [1.2.47] — 2026-08
 
 ### Fixed
