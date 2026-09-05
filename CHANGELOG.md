@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.51]
+
+### Fixed
+
+- Fehlende `js/nc-header-menu-quota.js` erganzt (level-3-Fehler im
+  NC-Log, brach das Rendering): Quota-Eintrag im globalen User-Menue,
+  MutationObserver fuer das lazy Popover, idempotenter ENTRY_ID,
+  Non-Clickable-Info-Eintrag mit deutscher Uebersetzung (Mail-Speicher).
+
 ## [1.2.50] — 2026-09
 
 ### Changed
