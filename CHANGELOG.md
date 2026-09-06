@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.53]
+
+### Changed
+
+- **GitLab-Migration**: Self-Update und alle Repo-URLs auf
+  git.host-on.dev/souvera/souvera_mail umgestellt (GitHub bleibt nur uebergangsweise
+  gespiegelt).
+
 ## [1.2.52]
 
 ### Changed

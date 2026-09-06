@@ -20,31 +20,25 @@ trait SelfUpdateTrait
 {
     abstract protected function getAppId(): string;
 
-    public function checkAndUpdate(): array
+    /**
+     * @param bool $manual true = expliziterocc-Aufruf: Wartungsfenster und
+     *                     24h-Drossel werden ignoriert (der Cron-Pfad nutzt
+     *                     den Default false).
+     */
+    public function checkAndUpdate(bool $manual = false): array
     {
         $appId = $this->getAppId();
         $config = \OCP\Server::get(\OCP\IConfig::class);
-        // EIN zentraler Suite-Channel (dev|stable) für alle Souvera-Apps;
-        // Abwärtskompatibilität: alter App-Channel, falls System-Config leer.
-        $suite = trim((string) $config->getSystemValue('souvera.update.channel', ''));
-        $channel = in_array($suite, ['dev', 'stable'], true)
-            ? $suite
-            : trim((string) $config->getAppValue($appId, 'devops.channel', 'stable'));
-
-        $installed = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId);
-        if ($installed === '0') {
-            return ['error' => 'No version'];
+        // EIN Suite-Channel für alle Apps (dev = main-HEAD, stable = Release);
+        // System-Config souvera.update.channel, Abwärtskompatibilität über den
+        // App-Channel von souvera_central.
+        $suiteChannel = trim((string) $config->getSystemValue('souvera.update.channel', ''));
+        if ($suiteChannel !== 'dev' && $suiteChannel !== 'stable') {
+            $suiteChannel = trim((string) $config->getAppValue('souvera_central', 'devops.channel', 'stable'));
         }
+        $channel = ($suiteChannel === 'dev') ? 'dev' : 'stable';
 
-        // Reset detection: some deployments restore an OLD app version
-        // externally. We remember what we installed (devops.last_version);
-        // when the installed version no longer matches, the updater must
-        // run immediately (no 24h rate limit, no maintenance window) to
-        // heal the app back to the current version.
-        $lastVersion = trim((string) $config->getAppValue($appId, 'devops.last_version', ''));
-        $resetDetected = $lastVersion !== '' && $installed !== $lastVersion;
-
-        if ($channel === 'stable' && !$resetDetected) {
+        if ($channel === 'stable' && !$manual) {
             // Release channel: check/install at most once per 24h and only
             // inside the maintenance window (config.php:
             // 'maintenance_window_start' => hour 0-23, window length 1h).
@@ -55,6 +49,11 @@ trait SelfUpdateTrait
             if ($last > time() - 24 * 3600) {
                 return ['skipped' => true, 'reason' => 'Rate-limited (24h)'];
             }
+        }
+
+        $installed = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId);
+        if ($installed === '0') {
+            return ['error' => 'No version'];
         }
 
         $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath($appId);
@@ -77,7 +76,7 @@ trait SelfUpdateTrait
             $branch = trim((string) $config->getAppValue($appId, 'devops.branch', 'main'));
 
             if ($channel === 'dev') {
-                $result = $this->downloadBranch($appId, $appPath, $branch, $installed);
+                $result = $this->downloadBranch($appId, $appPath, $branch);
             } else {
                 $latest = $this->latestReleaseTag();
                 if ($latest === null) {
@@ -85,15 +84,9 @@ trait SelfUpdateTrait
                 }
                 if (version_compare($latest, $installed, '<=')) {
                     $config->setAppValue($appId, 'devops.last_check', (string) time());
-                    // Baseline for reset detection: what we accept as installed.
-                    $config->setAppValue($appId, 'devops.last_version', $installed);
                     return ['up_to_date' => true, 'installed' => $installed, 'latest' => $latest];
                 }
-                $result = $this->downloadTag($appId, $appPath, $latest, $installed);
-            }
-            if (empty($result['error']) && !isset($result['up_to_date'])) {
-                $config->setAppValue($appId, 'devops.last_version',
-                    \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId));
+                $result = $this->downloadTag($appId, $appPath, $latest);
             }
 
             // Only write the timestamp after a successful check (or real update).
@@ -126,58 +119,87 @@ trait SelfUpdateTrait
         if ($repo === '') {
             return null;
         }
-        $data = $this->apiGet("https://api.github.com/repos/$repo/releases/latest");
-        if ($data === null || !isset($data['tag_name'])) {
-            return null;
+
+        $project = str_replace('/', '%2F', $repo);
+
+        // 1) Neuester GitLab-Release
+        $releases = $this->gitlabApiGet($this->gitlabBase() . '/api/v4/projects/'
+            . $project . '/releases?per_page=1');
+        if (is_array($releases) && isset($releases[0]['tag_name'])) {
+            return ltrim((string) $releases[0]['tag_name'], 'v');
         }
-        // Keep the raw tag (e.g. "v1.2.3") for downloading; version_compare
-        // handles the optional "v" prefix itself since PHP 7.1.
-        return ltrim((string) $data['tag_name'], 'v');
+
+        // 2) Fallback: neuester Tag (semantisch absteigend sortiert)
+        $tags = $this->gitlabApiGet($this->gitlabBase() . '/api/v4/projects/'
+            . $project . '/repository/tags?per_page=100');
+        if (is_array($tags) && $tags !== []) {
+            usort($tags, static function ($a, $b) {
+                return version_compare($b['name'], $a['name']);
+            });
+            return ltrim((string) $tags[0]['name'], 'v');
+        }
+
+        return null;
     }
 
-    private function downloadBranch(string $appId, string $appPath, string $branch, string $installedVersion): array
+    private function downloadBranch(string $appId, string $appPath, string $branch): array
     {
         $repo = $this->getRepo();
         if ($repo === '') {
             return ['error' => 'Unknown app'];
         }
 
-        // Dev channel: download when the branch HEAD changed OR the
-        // installed app no longer matches what we last installed. The
-        // second check heals external resets (e.g. a deployment tool
-        // restoring an OLD app version while devops.last_sha still points
-        // at the current branch — without it the updater would wrongly
-        // report "up_to_date" although the installed code is ancient).
-        $config = \OCP\Server::get(\OCP\IConfig::class);
+        // Dev channel: only download if the branch HEAD changed.
         $latestSha = $this->fetchBranchSha($repo, $branch);
         if ($latestSha === null) {
             return ['error' => 'Cannot fetch branch HEAD'];
         }
-        $lastSha = trim((string) $config->getAppValue($appId, 'devops.last_sha', ''));
-        $lastVersion = trim((string) $config->getAppValue($appId, 'devops.last_version', ''));
-        if ($latestSha === $lastSha && $lastVersion !== '' && $installedVersion === $lastVersion) {
-            return ['up_to_date' => true, 'sha' => $latestSha, 'version' => $installedVersion];
+        $lastSha = trim((string) \OCP\Server::get(\OCP\IConfig::class)
+            ->getAppValue($appId, 'devops.last_sha', ''));
+        if ($latestSha === $lastSha) {
+            return ['up_to_date' => true, 'sha' => $latestSha];
         }
 
-        $url = "https://api.github.com/repos/$repo/zipball/$branch";
-        $result = $this->downloadAndApply($appId, $appPath, $url, $installedVersion);
+        if ($this->isGitlabApp()) {
+            $url = $this->gitlabBase() . '/api/v4/projects/'
+                . $this->gitlabProjectEncoded() . '/repository/archive.zip?sha='
+                . rawurlencode($branch);
+        } else {
+            $url = "https://api.github.com/repos/$repo/zipball/$branch";
+        }
+        $result = $this->downloadAndApply($appId, $appPath, $url);
+        if (!isset($result['error'])) {
+            $this->runAppMigrations($appId);
+        }
         if (empty($result['error'])) {
             \OCP\Server::get(\OCP\IConfig::class)
                 ->setAppValue($appId, 'devops.last_sha', $latestSha);
-            // Remember which version we installed — a later reset to an
-            // OLD version must be detected and healed on the next run.
-            $newVersion = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId);
-            \OCP\Server::get(\OCP\IConfig::class)
-                ->setAppValue($appId, 'devops.last_version', $newVersion);
         }
         return $result;
     }
 
-    private function downloadTag(string $appId, string $appPath, string $tag, string $installedVersion): array
+    private function downloadTag(string $appId, string $appPath, string $tag): array
     {
         $repo = $this->getRepo();
         if ($repo === '') {
             return ['error' => 'Unknown app'];
+        }
+        if ($this->isGitlabApp()) {
+            $data = $this->gitlabApiGet($this->gitlabBase() . '/api/v4/projects/'
+                . $this->gitlabProjectEncoded() . '/releases');
+            $rawTag = (is_array($data) && isset($data[0]['tag_name']))
+                ? (string) $data[0]['tag_name'] : '';
+            if ($rawTag === '') {
+                return ['error' => 'No GitLab release found'];
+            }
+            $url = $this->gitlabBase() . '/api/v4/projects/'
+                . $this->gitlabProjectEncoded() . '/repository/archive.zip?sha='
+                . rawurlencode($rawTag);
+            $applied = $this->downloadAndApply($appId, $appPath, $url);
+        if (!isset($applied['error'])) {
+            $this->runAppMigrations($appId);
+        }
+        return $applied;
         }
         // GitHub zipball expects the tag exactly as stored (with or without "v").
         $data = $this->apiGet("https://api.github.com/repos/$repo/releases/latest");
@@ -186,7 +208,11 @@ trait SelfUpdateTrait
             $rawTag = (string) $data['tag_name'];
         }
         $url = "https://api.github.com/repos/$repo/zipball/" . ($rawTag !== '' ? $rawTag : "v$tag");
-        return $this->downloadAndApply($appId, $appPath, $url, $installedVersion);
+        $applied = $this->downloadAndApply($appId, $appPath, $url);
+        if (!isset($applied['error'])) {
+            $this->runAppMigrations($appId);
+        }
+        return $applied;
     }
 
     /**
@@ -194,6 +220,15 @@ trait SelfUpdateTrait
      */
     private function fetchBranchSha(string $repo, string $branch): ?string
     {
+        if ($this->isGitlabApp()) {
+            $data = $this->gitlabApiGet($this->gitlabBase() . '/api/v4/projects/'
+                . $this->gitlabProjectEncoded() . '/repository/branches/'
+                . rawurlencode($branch));
+            if ($data === null || !isset($data['commit']['id'])) {
+                return null;
+            }
+            return (string) $data['commit']['id'];
+        }
         $data = $this->apiGet("https://api.github.com/repos/$repo/commits/$branch");
         if ($data === null || !isset($data['sha'])) {
             return null;
@@ -201,7 +236,27 @@ trait SelfUpdateTrait
         return (string) $data['sha'];
     }
 
-    private function downloadAndApply(string $appId, string $appPath, string $url, ?string $installedVersion = null): array
+    /**
+     * Run app migrations in-process after a self-update. A raw zipball swap
+     * does NOT execute migrations — without this, new tables from newer
+     * versions are missing and the app crashes on first use.
+     * (Same mechanism as `occ migrations:migrate <app>`.)
+     */
+    private function runAppMigrations(string $appId): void
+    {
+        try {
+            $connection = \OCP\Server::get(\OCP\IDBConnection::class);
+            $ms = new \OC\DB\MigrationService($appId, $connection);
+            $ms->migrate();
+            \OCP\Server::get(\Psr\Log\LoggerInterface::class)
+                ->info('Souvera SelfUpdate: migrations executed', ['app' => $appId]);
+        } catch (\Throwable $e) {
+            \OCP\Server::get(\Psr\Log\LoggerInterface::class)
+                ->error('Souvera SelfUpdate: migrations failed for ' . $appId . ': ' . $e->getMessage());
+        }
+    }
+
+    private function downloadAndApply(string $appId, string $appPath, string $url): array
     {
         $token = $this->readToken();
         if ($token === '') {
@@ -209,13 +264,19 @@ trait SelfUpdateTrait
         }
 
         $client = \OCP\Server::get(\OCP\Http\Client\IClientService::class)->newClient();
+        if ($this->isGitlabApp()) {
+            $token = $this->readGitlabToken();
+        }
         try {
-            $response = $client->get($url, [
-                'headers' => [
+            $headers = $this->isGitlabApp()
+                ? ['PRIVATE-TOKEN' => $token, 'User-Agent' => 'Souvera-DevOps']
+                : [
                     'Authorization' => 'Bearer ' . $token,
                     'User-Agent' => 'Souvera-DevOps',
                     'Accept' => 'application/vnd.github+json',
-                ],
+                ];
+            $response = $client->get($url, [
+                'headers' => $headers,
                 'timeout' => 60,
                 'connect_timeout' => 15,
                 'http_errors' => false,
@@ -264,93 +325,32 @@ trait SelfUpdateTrait
         }
         $sourceDir = $dirs[0];
 
-        // Downgrade guard: verify the version of the EXTRACTED code BEFORE
-        // touching the installed app. If the archive does not actually
-        // contain a newer version (stale cache, wrong tag, mix-up) — or its
-        // version cannot be verified at all — abort (fail closed).
-        $extractedVersion = $this->readAppVersion($sourceDir);
-        if ($installedVersion !== null) {
-            if ($extractedVersion === null) {
-                $this->rmdirRecursive($extractDir);
-                return [
-                    'error' => 'Cannot verify extracted app version — update aborted',
-                    'installed_version' => $installedVersion,
-                ];
-            }
-            $needsReapply = false;
-            if ($extractedVersion === $installedVersion) {
-                // Identical version — normally up to date. BUT: a previous
-                // update may have left the installed app in a broken,
-                // half-copied state (missing files) with the same version
-                // number. Heal it instead of reporting up_to_date forever.
-                if ($this->appHasCoreFiles($appPath)) {
-                    $this->rmdirRecursive($extractDir);
-                    return [
-                        'up_to_date' => true,
-                        'extracted_version' => $extractedVersion,
-                        'installed_version' => $installedVersion,
-                    ];
-                }
-                \OCP\Server::get(\Psr\Log\LoggerInterface::class)->warning(
-                    'SelfUpdate: installed app ' . $appId . ' reports version '
-                    . $installedVersion . ' but core files are missing — re-applying.',
-                    ['app' => $appId]
-                );
-                $needsReapply = true;
-            }
-            if (!$needsReapply && version_compare($extractedVersion, $installedVersion, '<=')) {
-                $this->rmdirRecursive($extractDir);
-                return [
-                    'error' => "Downgrade blocked: extracted app version {$extractedVersion} "
-                        . "is not newer than installed version {$installedVersion}",
-                    'extracted_version' => $extractedVersion,
-                    'installed_version' => $installedVersion,
-                ];
-            }
-        }
-
-        // Atomic swap: stage the new tree NEXT TO the live app first (the
-        // slow file-by-file copy then never affects running requests),
-        // then swap two sibling renames on the same filesystem.
+        // Atomic swap: backup current → extract new → enable → keep or rollback.
         $backupDir = $appPath . '.bak';
         if (is_dir($backupDir)) {
             $this->rmdirRecursive($backupDir);
         }
-        $stagingDir = $appPath . '.new';
-        if (is_dir($stagingDir)) {
-            $this->rmdirRecursive($stagingDir);
-        }
-        // EXDEV-safe: the extract dir lives on the local filesystem
-        // (/tmp), the app dir possibly on NFS — rename() across mounts
-        // fails with "Invalid cross-device link". Copy file-by-file into
-        // the staging dir (same filesystem as the final app dir).
+        // Use copy+delete instead of rename — rename() fails on NFS,
+        // containers with open file handles, or cross-device mounts.
         try {
-            $this->copyRecursive($sourceDir, $stagingDir);
+            $this->copyRecursive($appPath, $backupDir);
+            $this->rmdirRecursive($appPath);
         } catch (\Throwable $e) {
-            $this->rmdirRecursive($stagingDir);
             $this->rmdirRecursive($extractDir);
-            return ['error' => 'Cannot copy extracted app into staging: ' . $e->getMessage()];
+            return ['error' => 'Cannot move current app to backup: ' . $e->getMessage()];
         }
-        if (!$this->appHasCoreFiles($stagingDir)) {
-            $this->rmdirRecursive($stagingDir);
+        // EXDEV-safe install: the extract dir lives on the local filesystem
+        // (/tmp), the app dir on NFS — rename() across mounts fails with
+        // "Invalid cross-device link". Copy file-by-file instead.
+        try {
+            $this->copyRecursive($sourceDir, $appPath);
+        } catch (\Throwable $e) {
+            // Restore backup.
+            $this->rmdirRecursive($appPath);
+            $this->copyRecursive($backupDir, $appPath);
+            $this->rmdirRecursive($backupDir);
             $this->rmdirRecursive($extractDir);
-            return ['error' => 'Staged app is incomplete — update aborted'];
-        }
-        if (!rename($appPath, $backupDir)) {
-            $this->rmdirRecursive($stagingDir);
-            $this->rmdirRecursive($extractDir);
-            return ['error' => 'Cannot move current app to backup'];
-        }
-        if (!rename($stagingDir, $appPath)) {
-            // Restore backup, clean up staging.
-            if (!rename($backupDir, $appPath)) {
-                $this->rmdirRecursive($stagingDir);
-                $this->rmdirRecursive($extractDir);
-                return ['error' => 'FATAL: cannot move app to backup AND cannot restore it — app dir missing'];
-            }
-            $this->rmdirRecursive($stagingDir);
-            $this->rmdirRecursive($extractDir);
-            return ['error' => 'Cannot move staged app into place'];
+            return ['error' => 'Cannot copy extracted app into place: ' . $e->getMessage()];
         }
         $this->rmdirRecursive($sourceDir);
 
@@ -358,10 +358,8 @@ trait SelfUpdateTrait
         if (!empty($enableResult['error'])) {
             // Rollback: restore backup, remove broken new version.
             $this->rmdirRecursive($appPath);
-            if (!rename($backupDir, $appPath)) {
-                $this->rmdirRecursive($extractDir);
-                return ['error' => 'FATAL: enable failed AND backup restore failed — app dir missing'];
-            }
+            $this->copyRecursive($backupDir, $appPath);
+            $this->rmdirRecursive($backupDir);
             $this->rmdirRecursive($extractDir);
             return $enableResult;
         }
@@ -370,53 +368,6 @@ trait SelfUpdateTrait
         $this->rmdirRecursive($backupDir);
         $this->rmdirRecursive($extractDir);
         return $enableResult;
-    }
-
-    /**
-     * Sanity check that an app directory contains the files the app needs
-     * to boot (autoload bootstrap + main entry points). Used to detect a
-     * half-copied install and to validate the staging directory before
-     * the atomic swap.
-     */
-    private function appHasCoreFiles(string $appDir): bool
-    {
-        $required = [
-            'appinfo/info.xml',
-            'composer/autoload.php',
-            'lib/Controller/PageController.php',
-            'lib/Service/L10nService.php',
-            // Frequently hit classes — a missing file here manifests as
-            // HTML 500 pages ("Invalid response from server" in the
-            // migration wizard), so they must trigger a heal re-apply too.
-            'lib/AppInfo/Application.php',
-            'lib/Controller/MigrationController.php',
-            'lib/Service/MigrationService.php',
-            'lib/Service/ProviderToolsClient.php',
-            'lib/Db/MigrationJobMapper.php',
-        ];
-        foreach ($required as $rel) {
-            if (!\is_file($appDir . '/' . $rel)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private function readAppVersion(string $appDir): ?string
-    {
-        $infoPath = $appDir . '/appinfo/info.xml';
-        if (!\is_file($infoPath)) {
-            return null;
-        }
-        $raw = @\file_get_contents($infoPath);
-        if ($raw === false) {
-            return null;
-        }
-        if (\preg_match('/<version>([^<]+)<\/version>/', $raw, $m) === 1) {
-            $v = \trim((string) ($m[1] ?? ''));
-            return $v !== '' ? $v : null;
-        }
-        return null;
     }
 
     private function enableApp(string $appId): array
@@ -429,11 +380,34 @@ trait SelfUpdateTrait
         $occPath = \OC::$SERVERROOT . '/occ';
         // PHP_BINARY instead of "php": cron often runs with a minimal PATH
         // where the interpreter is not resolvable, failing every update.
+        // Gruppen-Freigabe erhalten (05.09.-Fix): der 'enabled'-AppConfig-
+        // Wert (JSON mit Gruppenliste) liegt in der DB und überlebt den
+        // Code-Tausch — aber ein platte app:enable würde ihn bei einer
+        // zwischenzeitlichen Deaktivierung auf 'yes' zurücksetzen. Gruppen
+        // daher explizit mit --groups mitgeben.
+        $groupArgs = '';
+        $enabledRaw = '';
+        try {
+            $enabledRaw = trim((string) \OCP\Server::get(\OCP\IConfig::class)
+                ->getAppValue($appId, 'enabled', 'yes'));
+        } catch (\Throwable) {
+        }
+        $decoded = json_decode($enabledRaw, true);
+        if (is_array($decoded)) {
+            $groups = isset($decoded['groups']) && is_array($decoded['groups'])
+                ? $decoded['groups'] : $decoded;
+            foreach ($groups as $g) {
+                if (is_string($g) && $g !== '') {
+                    $groupArgs .= ' --groups ' . escapeshellarg($g);
+                }
+            }
+        }
         exec(sprintf(
-            '%s %s app:enable %s 2>&1',
+            '%s %s app:enable %s%s 2>&1',
             escapeshellarg(\PHP_BINARY),
             escapeshellarg($occPath),
-            escapeshellarg($appId)
+            escapeshellarg($appId),
+            $groupArgs
         ), $occOut, $occExit);
 
         $log = implode("\n", $occOut);
@@ -477,12 +451,80 @@ trait SelfUpdateTrait
         }
     }
 
+    /** GitLab-native Apps (eigenes GitLab) — Update-Quelle nicht GitHub. */
+    private function isGitlabApp(): bool
+    {
+        // Seit der GitLab-Migration liegen ALLE Souvera-Apps auf
+        // git.host-on.dev — der GitHub-Pfad ist toter Übergangscode.
+        return true;
+    }
+
+    private function gitlabBase(): string
+    {
+        try {
+            $u = \OCP\Server::get(\OCP\IConfig::class)
+                ->getSystemValue('souvera.gitlab_url', 'https://git.host-on.dev');
+        } catch (\Throwable) {
+            $u = 'https://git.host-on.dev';
+        }
+        return rtrim(trim((string) $u), '/');
+    }
+
+    private function gitlabProjectEncoded(): string
+    {
+        return str_replace('/', '%2F', $this->getRepo());
+    }
+
+    private function readGitlabToken(): string
+    {
+        try {
+            $t = \OCP\Server::get(\OCP\IConfig::class)
+                ->getSystemValue('souvera.gitlab_devops_token', '');
+            return trim((string) $t);
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
+    private function gitlabApiGet(string $url): ?array
+    {
+        $token = $this->readGitlabToken();
+        if ($token === '') {
+            return null;
+        }
+        $client = \OCP\Server::get(\OCP\Http\Client\IClientService::class)->newClient();
+        try {
+            $response = $client->get($url, [
+                'headers' => [
+                    'PRIVATE-TOKEN' => $token,
+                    'User-Agent' => 'Souvera-DevOps',
+                ],
+                'timeout' => 15,
+                'connect_timeout' => 10,
+                'http_errors' => false,
+            ]);
+        } catch (\Throwable) {
+            return null;
+        }
+        if ($response->getStatusCode() >= 400) {
+            return null;
+        }
+        try {
+            return json_decode((string) $response->getBody(), true);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     private function getRepo(): string
     {
+        // ALLE Apps liegen auf GitLab: https://git.host-on.dev/souvera/<app>
         return match ($this->getAppId()) {
-            'souvera_mail' => 'Host-On/souvera_mail',
-            'souvera_central' => 'Host-On/souvera_central',
-            'souvera_shield' => 'Host-On/souvera_shield',
+            'souvera_mail' => 'souvera/souvera_mail',
+            'souvera_central' => 'souvera/souvera_central',
+            'souvera_shield' => 'souvera/souvera_shield',
+            'souvera_mailarchiv' => 'souvera/souvera_mailarchiv',
+            'souvera_documents' => 'souvera/souvera_documents',
             default => '',
         };
     }
@@ -494,13 +536,19 @@ trait SelfUpdateTrait
             return null;
         }
         $client = \OCP\Server::get(\OCP\Http\Client\IClientService::class)->newClient();
+        if ($this->isGitlabApp()) {
+            $token = $this->readGitlabToken();
+        }
         try {
-            $response = $client->get($url, [
-                'headers' => [
+            $headers = $this->isGitlabApp()
+                ? ['PRIVATE-TOKEN' => $token, 'User-Agent' => 'Souvera-DevOps']
+                : [
                     'Authorization' => 'Bearer ' . $token,
                     'User-Agent' => 'Souvera-DevOps',
                     'Accept' => 'application/vnd.github+json',
-                ],
+                ];
+            $response = $client->get($url, [
+                'headers' => $headers,
                 'timeout' => 15,
                 'connect_timeout' => 10,
                 'http_errors' => false,
