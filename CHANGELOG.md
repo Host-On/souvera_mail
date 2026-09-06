@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.52]
+
+### Changed
+
+- Update-Channel zentral: dieser Self-Update folgt dem Suite-Channel
+  (souvera.update.channel) statt des App-eigenen Kanals.
+
 ## [1.2.51]
 
 ### Fixed
