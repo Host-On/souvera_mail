@@ -330,6 +330,21 @@ return [
         [
             'name' => 'v2_mailbox#emptyMailbox',
             'url' => '/api/v2/mailboxes/{id}/empty',
+        ],
+        [
+            'name' => 'pmg#report',
+            'url' => '/api/v2/pmg/report/{class}',
+            'verb' => 'POST',
+        ],
+        [
+            'name' => 'pmg#forget',
+            'url' => '/api/v2/pmg/report/forget',
+            'verb' => 'POST',
+        ],
+        [
+            'name' => 'pmg#status',
+            'url' => '/api/v2/pmg/status',
+            'verb' => 'GET',
             'verb' => 'POST',
         ],
         [

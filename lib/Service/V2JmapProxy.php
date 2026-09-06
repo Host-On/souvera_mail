@@ -107,6 +107,98 @@ class V2JmapProxy
     }
 
     /**
+     * Lädt die ORIGINAL-RFC822-Rohbytes einer Email (exakt wie vom Server
+     * empfangen, inkl. aller Header) — Voraussetzung für das PMG-Bayes-
+     * Training, das die unveränderte Original-Nachricht braucht.
+     *
+     * Weg: Email/get → blobId, dann JMAP-Download-Endpoint aus der Session
+     * (RFC 8620 §2 `downloadUrl`-Template) mit dem User-Bearer-Token.
+     *
+     * @return array{bytes: string, messageId: ?string, subject: ?string}|null
+     */
+    public function fetchRawMailBytes(string $accountId, string $emailId): ?array
+    {
+        $user = $this->userSession->getUser();
+        if ($user === null) {
+            return null;
+        }
+
+        $result = $this->singleCall('Email/get', [
+            'accountId' => $accountId,
+            'ids' => [$emailId],
+            'properties' => ['blobId', 'messageId', 'subject', 'receivedAt'],
+        ]);
+        if (isset($result['error'])) {
+            $this->logger->error('V2JmapProxy: Email/get failed: ' . $result['error']);
+            return null;
+        }
+
+        $callId = 'c' . ($this->callCounter - 1);
+        $resp = $result['responses'][$callId] ?? null;
+        $list = $resp['args']['list'] ?? [];
+        $email = $list[0] ?? null;
+        if ($email === null || empty($email['blobId'])) {
+            $this->logger->error('V2JmapProxy: Email/get returned no blob for ' . $emailId);
+            return null;
+        }
+
+        try {
+            $bearer = $this->userContext->resolveBearer($user->getUID());
+            $session = $this->stalwartAdmin->fetchSessionAsUser($bearer);
+        } catch (\Throwable $e) {
+            $this->logger->error('V2JmapProxy: session fetch failed: ' . $e->getMessage());
+            return null;
+        }
+
+        $downloadTemplate = (string) ($session['body']['downloadUrl'] ?? '');
+        if ($downloadTemplate === '') {
+            $downloadTemplate = '{server}/jmap/download/{accountId}/{blobId}/{name}';
+        }
+
+        $url = str_replace(
+            ['{server}', '{accountId}', '{blobId}', '{name}', '{type}'],
+            [$this->stalwartAdmin->getApiUrl() ?? '', $accountId, (string) $email['blobId'], 'mail.eml', 'message/rfc822'],
+            $downloadTemplate
+        );
+
+        try {
+            $client = $this->clientService->newClient();
+            $response = $client->get($url, [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $bearer,
+                    'Accept' => 'message/rfc822',
+                ],
+                'timeout' => 30,
+                'connect_timeout' => 10,
+                'http_errors' => false,
+                'nextcloud' => ['allow_local_address' => true],
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('V2JmapProxy: blob download failed: ' . $e->getMessage());
+            return null;
+        }
+
+        if ($response->getStatusCode() !== 200) {
+            $this->logger->error('V2JmapProxy: blob download HTTP ' . $response->getStatusCode());
+            return null;
+        }
+
+        $bytes = (string) $response->getBody();
+        if ($bytes === '') {
+            return null;
+        }
+
+        $messageIds = $email['messageId'] ?? [];
+        $messageId = is_array($messageIds) && $messageIds !== [] ? (string) $messageIds[0] : null;
+
+        return [
+            'bytes' => $bytes,
+            'messageId' => $messageId,
+            'subject' => (string) ($email['subject'] ?? ''),
+        ];
+    }
+
+    /**
      * Lädt rohe Bytes als JMAP-Blob hoch — über die path-style Upload-URL
      * (RFC 8620 §6.1, `POST {api}/jmap/upload/{accountId}/`), dieselbe
      * Strecke, die der Android-Client (uploadUrl) und die Sieve-Verwaltung

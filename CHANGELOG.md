@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.54]
+
+### Added
+
+- **PMG Spam/Ham-Learning** (PROXMOX_SPAM.md): OCS-API `report/spam`,
+  `report/ham` (Ruecknahme vs. False-Positive ueber Vermerk), `report/forget`,
+  `status` — trainiert den Bayes-Filter auf allen 5 PMG-Nodes mit der
+  Original-RFC822-Mail (JMAP-Blob-Download, keine Neu-Serialisierung).
+  Token via `occ config:app:set souvera_mail pmg.api_token`. API-Vertrag
+  fuer die Webmail-UI: docs/pmg-learning-api.md.
+- Vermerk-Tabelle `souvera_mail_pmg_reports` (Migration).
+
 ## [1.2.53]
 
 ### Changed
