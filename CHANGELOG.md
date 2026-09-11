@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.56]
+
+### Fixed
+
+- **PMG-Reports wirkungslos in 1.2.54/1.2.55**: das ausgelieferte
+  Webmail-Bundle (`js/souvera_mail-v2.js`) enthielt das PMG-Frontend-
+  Wiring nicht — Meldungen wurden nie gesendet. Bundle wird jetzt
+  mit dem Release ausgeliefert (neu gebaut, enthaelt
+  `pmg/report/{spam,ham,ham-shield}`).
+
 ## [1.2.55]
 
 ### Added
