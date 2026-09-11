@@ -6,6 +6,7 @@ namespace OCA\SouveraMail\Service;
 
 use OCA\SouveraMail\Service\StalwartAdminService;
 use OCA\SouveraMail\Service\StalwartUserContext;
+use OCP\BackgroundJob\IJobList;
 use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
 
@@ -38,6 +39,7 @@ class V2JmapProxy
         private StalwartAdminService $stalwartAdmin,
         private \OCP\Http\Client\IClientService $clientService,
         private LoggerInterface $logger,
+        private IJobList $jobList,
     ) {
     }
 
@@ -82,6 +84,19 @@ class V2JmapProxy
             $expectedIds[] = $callId;
         }
 
+        // PMG: Junk-Move-Kandidaten aus den Tripeln einsammeln — die callIds
+        // aus den Tripeln sind verbindlich. Nur Email/set-Batches mit
+        // mailboxIds-Patch sind relevant, alle anderen Calls laufen ohne
+        // Zusatzaufwand durch.
+        $candidates = $this->collectMailboxMoveCandidates($triples);
+
+        // ALT-Zustand (junk/inbox-Rolle + bisherige mailboxIds) VOR dem Move
+        // erfassen — nach der Ausführung wäre er nicht mehr rekonstruierbar.
+        // Die Kontext-Aufrufe über singleCall() verschieben den callCounter,
+        // deshalb DARF die Kandidaten-Collectierung erst nach dem Tripel-Bau
+        // mit echten callIds erfolgen.
+        $context = $candidates !== [] ? $this->resolveMailboxContext($candidates) : [];
+
         try {
             $bearer = $this->userContext->resolveBearer($user->getUID());
             $response = $this->stalwartAdmin->jmapCall($bearer, $triples, self::CAPS);
@@ -97,6 +112,12 @@ class V2JmapProxy
                 $args = $triple[1] ?? [];
                 $callId = $triple[2] ?? '';
                 $byCallId[$callId] = ['name' => $name, 'args' => $args];
+            }
+
+            // PMG: nach erfolgreichem Batch Junk-Moves klassifizieren und als
+            // Hintergrund-Job einreihen (nie blockieren).
+            if ($candidates !== []) {
+                $this->detectAndQueuePmgReports($candidates, $context, $byCallId, $user->getUID());
             }
 
             return ['responses' => $byCallId, 'sessionState' => $response['sessionState'] ?? null];
@@ -284,5 +305,178 @@ class V2JmapProxy
             return ['error' => ($resp['args']['description'] ?? $resp['args']['type'] ?? 'unknown')];
         }
         return ['data' => $resp['args']];
+    }
+
+    /**
+     * Sammelt Junk-Move-Kandidaten aus einem Email/set-Batch: alle
+     * Update-Patches, die mailboxIds ändern. Die callIds stammen direkt aus
+     * den gebauten Tripeln — die Kontext-Aufrufe (singleCall) verschieben
+     * den callCounter, eine Vorhersage wäre hier falsch.
+     *
+     * @param list<array{string, array, string}> $triples gebaute Tripel [method, args, callId]
+     * @return list<array{callId: string, accountId: string, emailId: string, newMailboxIds: list<string>}>
+     */
+    private function collectMailboxMoveCandidates(array $triples): array
+    {
+        $candidates = [];
+        foreach ($triples as $triple) {
+            if (($triple[0] ?? '') !== 'Email/set') {
+                continue;
+            }
+            $args = $triple[1] ?? [];
+            $callId = (string) ($triple[2] ?? '');
+            $update = $args['update'] ?? [];
+            if (!\is_array($update) || $update === []) {
+                continue;
+            }
+            foreach ($update as $emailId => $patch) {
+                if (!\is_array($patch) || !isset($patch['mailboxIds']) || !\is_array($patch['mailboxIds'])) {
+                    continue;
+                }
+                $candidates[] = [
+                    'callId' => $callId,
+                    'accountId' => (string) ($args['accountId'] ?? ''),
+                    'emailId' => (string) $emailId,
+                    'newMailboxIds' => \array_map('strval', \array_keys(\array_filter($patch['mailboxIds']))),
+                ];
+            }
+        }
+        return $candidates;
+    }
+
+    /**
+     * Ermittelt pro beteiligtem Konto die junk/inbox-Rollen-IDs und die
+     * ALTEN mailboxIds der betroffenen Emails (Mailbox/get + Email/get via
+     * singleCall — kein Hook-Rekursionsrisiko). Fehler werden nur
+     * debug-geloggt und lassen die Detection für das Konto entfallen — der
+     * Move selbst wird davon nie beeinträchtigt.
+     *
+     * @param list<array{callId: string, accountId: string, emailId: string, newMailboxIds: list<string>}> $candidates
+     * @return array<string, array{junkId: ?string, inboxId: ?string, oldMailboxIds: array<string, list<string>>}>
+     */
+    private function resolveMailboxContext(array $candidates): array
+    {
+        $context = [];
+        $accountIds = [];
+        foreach ($candidates as $c) {
+            if ($c['accountId'] !== '' && !isset($accountIds[$c['accountId']])) {
+                $accountIds[$c['accountId']] = true;
+            }
+        }
+
+        foreach (\array_keys($accountIds) as $accountId) {
+            $entry = ['junkId' => null, 'inboxId' => null, 'oldMailboxIds' => []];
+            try {
+                $mailboxes = $this->singleCall('Mailbox/get', ['accountId' => $accountId]);
+                $junkId = null;
+                $inboxId = null;
+                if (!isset($mailboxes['error'])) {
+                    foreach (($mailboxes['data']['list'] ?? []) as $mb) {
+                        $role = $mb['role'] ?? null;
+                        if ($role === 'junk') {
+                            $junkId = (string) $mb['id'];
+                        } elseif ($role === 'inbox') {
+                            $inboxId = (string) $mb['id'];
+                        }
+                    }
+                }
+                if ($junkId === null) {
+                    $this->logger->debug('V2JmapProxy: PMG detection skipped — no junk mailbox for account ' . $accountId);
+                    $context[$accountId] = $entry;
+                    continue;
+                }
+                $entry['junkId'] = $junkId;
+                $entry['inboxId'] = $inboxId;
+
+                $ids = [];
+                foreach ($candidates as $c) {
+                    if ($c['accountId'] === $accountId) {
+                        $ids[] = $c['emailId'];
+                    }
+                }
+                $ids = \array_values(\array_unique($ids));
+
+                $emails = $this->singleCall('Email/get', [
+                    'accountId' => $accountId,
+                    'ids' => $ids,
+                    'properties' => ['mailboxIds'],
+                ]);
+                if (!isset($emails['error'])) {
+                    foreach (($emails['data']['list'] ?? []) as $em) {
+                        $eid = (string) ($em['id'] ?? '');
+                        $old = $em['mailboxIds'] ?? [];
+                        if (\is_array($old)) {
+                            $entry['oldMailboxIds'][$eid] = \array_map('strval', \array_keys(\array_filter($old)));
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                $this->logger->debug('V2JmapProxy: PMG detection skipped for account ' . $accountId . ': ' . $e->getMessage());
+            }
+            $context[$accountId] = $entry;
+        }
+        return $context;
+    }
+
+    /**
+     * Klassifiziert die Junk-Moves nach der Ausführung und reiht die
+     * PMG-Reports als Background-Jobs ein (nie blockieren):
+     *   - in Junk (vorher nicht Junk)  → spam
+     *   - aus Junk in die Inbox        → ham (Rücknahme/False-Positive)
+     *   - sonst (z.B. junk→trash)      → kein Report
+     * Fehlgeschlagene Moves (notUpdated) werden übersprungen.
+     *
+     * @param list<array{callId: string, accountId: string, emailId: string, newMailboxIds: list<string>}> $candidates
+     * @param array<string, array{junkId: ?string, inboxId: ?string, oldMailboxIds: array<string, list<string>>}> $context
+     * @param array<string, array{name: string, args: array}> $responses
+     */
+    private function detectAndQueuePmgReports(array $candidates, array $context, array $responses, string $userId): void
+    {
+        foreach ($candidates as $c) {
+            $accountId = $c['accountId'];
+            $entry = $context[$accountId] ?? null;
+            if ($entry === null || $entry['junkId'] === null) {
+                continue;
+            }
+            $junkId = $entry['junkId'];
+            $inboxId = $entry['inboxId'];
+
+            // Fehlgeschlagene Moves (notUpdated) überspringen.
+            $resp = $responses[$c['callId']] ?? null;
+            if (\is_array($resp) && isset($resp['args']['notUpdated'][$c['emailId']])) {
+                continue;
+            }
+
+            $old = $entry['oldMailboxIds'][$c['emailId']] ?? [];
+            $new = $c['newMailboxIds'];
+
+            $wasJunk = \in_array($junkId, $old, true);
+            $isJunk = \in_array($junkId, $new, true);
+            $isInbox = $inboxId !== null && \in_array($inboxId, $new, true);
+
+            $class = null;
+            if (!$wasJunk && $isJunk) {
+                $class = 'spam';
+            } elseif ($wasJunk && !$isJunk && $isInbox) {
+                $class = 'ham';
+            } else {
+                // z.B. junk→trash: kein Report.
+                continue;
+            }
+
+            try {
+                $this->jobList->add(
+                    \OCA\SouveraMail\BackgroundJob\PmgReportJob::class,
+                    \json_encode([
+                        'userId' => $userId,
+                        'accountId' => $accountId,
+                        'emailId' => $c['emailId'],
+                        'class' => $class,
+                    ])
+                );
+            } catch (\Throwable $e) {
+                $this->logger->warning('V2JmapProxy: PMG report job queue failed: ' . $e->getMessage());
+            }
+        }
     }
 }

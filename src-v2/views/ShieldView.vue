@@ -33,9 +33,6 @@ import { NcButton, NcEmptyContent } from '@nextcloud/vue'
 import ShieldCheck from 'vue-material-design-icons/ShieldCheck.vue'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
-import { usePmgClient } from '../composables/usePmgClient.js'
-
-const { reportSpam, reportHam } = usePmgClient()
 
 export default {
 	name: 'ShieldView',
@@ -51,9 +48,6 @@ export default {
 		async report(emailId, action) {
 			try {
 				await axios.post(generateUrl('/apps/souvera_mail/api/v2/shield/report'), { emailId, action })
-				// PMG-Lernen nachmelden (fire-and-forget, nicht awaiten).
-				if (action === 'spam') reportSpam('', emailId)
-				else if (action === 'notspam') reportHam('', emailId)
 				await this.loadJunk()
 			}
 			catch (e) { console.error('Failed to report spam', e) }

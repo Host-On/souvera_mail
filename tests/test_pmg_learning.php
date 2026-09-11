@@ -29,10 +29,6 @@ $ctl = (string) file_get_contents(__DIR__ . '/../lib/Controller/PmgController.ph
 $mig = (string) file_get_contents(__DIR__ . '/../lib/Migration/Version001910Date20260905120000.php');
 $routes = (string) file_get_contents(__DIR__ . '/../appinfo/routes.php');
 $proxy = (string) file_get_contents(__DIR__ . '/../lib/Service/V2JmapProxy.php');
-$pmgClient = (string) @file_get_contents(__DIR__ . '/../src-v2/composables/usePmgClient.js');
-$mailHome = (string) @file_get_contents(__DIR__ . '/../src-v2/views/MailHomeView.vue');
-$spamList = (string) @file_get_contents(__DIR__ . '/../src-v2/views/SpamListView.vue');
-$shieldView = (string) @file_get_contents(__DIR__ . '/../src-v2/views/ShieldView.vue');
 $info = (string) file_get_contents(__DIR__ . '/../appinfo/info.xml');
 // ---- PmgLearningService (transport) ----
 ok(str_contains($svc, chr(39) . '/v1/' . chr(39)), 'learn URL pattern /v1/{mode}/{class}', $passes, $failures);
@@ -60,7 +56,7 @@ ok(str_contains($routes, "'pmg#forget'"), 'routes register pmg#forget', $passes,
 ok(str_contains($routes, "'pmg#status'"), 'routes register pmg#status', $passes, $failures);
 ok(str_contains($ctl, 'requireUserId'), 'controller requires authenticated user', $passes, $failures);
 
-// ---- v1.2.55 — Shield-Quarantäne-HAM + Frontend-Wiring ----
+// ---- v1.2.55 — Shield-Quarantäne-HAM ----
 ok(str_contains($routes, "'pmg#reportShieldHam'"), 'routes register pmg#reportShieldHam', $passes, $failures);
 ok(str_contains($routes, '/api/v2/pmg/report/ham-shield'), 'routes register /api/v2/pmg/report/ham-shield', $passes, $failures);
 ok(str_contains($ctl, 'reportShieldHam'), 'controller exposes reportShieldHam', $passes, $failures);
@@ -74,15 +70,12 @@ ok(str_contains($ctl, 'requesttoken'), 'controller forwards request token', $pas
 ok(str_contains($rpt, 'getCurrentAccountId'), 'report service resolves accountId from JMAP context', $passes, $failures);
 ok(str_contains($rpt, 'reportRestoredFromJunk') && str_contains($rpt, 'reverted'), 'reportRestoredFromJunk delegates and flags reverted', $passes, $failures);
 ok(str_contains($rpt, "findLatestByHash") && str_contains($rpt, "'forget'"), 'ham report distinguishes revert (findLatestByHash + forget)', $passes, $failures);
-ok($pmgClient !== false && $pmgClient !== '', 'src-v2/usePmgClient.js exists', $passes, $failures);
-ok(str_contains($pmgClient, '/api/v2/pmg/report/spam'), 'usePmgClient reports spam endpoint', $passes, $failures);
-ok(str_contains($pmgClient, '/api/v2/pmg/report/ham'), 'usePmgClient reports ham endpoint', $passes, $failures);
-ok(str_contains($pmgClient, '/api/v2/pmg/report/ham-shield'), 'usePmgClient reports shield-ham endpoint', $passes, $failures);
-ok(str_contains($pmgClient, 'console.error'), 'usePmgClient is fire-and-forget (logs only)', $passes, $failures);
-ok(str_contains($mailHome, 'usePmgClient') && str_contains($mailHome, 'reportSpam'), 'MailHomeView wires PMG reports', $passes, $failures);
-ok(str_contains($mailHome, 'pmgReportForMove'), 'MailHomeView reports on move (junk in/out)', $passes, $failures);
-ok(str_contains($spamList, 'reportShieldHam') && str_contains($spamList, 'reportHam'), 'SpamListView wires release→ham reports', $passes, $failures);
-ok(str_contains($shieldView, 'reportSpam') && str_contains($shieldView, 'reportHam'), 'ShieldView wires report actions', $passes, $failures);
+
+// ---- v1.2.59 — PMG-Meldung serverseitig (Single Path) ----
+ok(str_contains($proxy, 'Email/set') && str_contains($proxy, 'PmgReportJob'), 'JMAP proxy queues PMG reports on mailbox moves', $passes, $failures);
+$job = (string) file_get_contents(__DIR__ . '/../lib/BackgroundJob/PmgReportJob.php');
+ok(str_contains($job, 'QueuedJob') && str_contains($job, 'report('), 'PmgReportJob performs PMG reports in background', $passes, $failures);
+
 preg_match('/<version>([0-9.]+)<\/version>/', $info, $m);
 ok(isset($m[1]) && version_compare($m[1], '1.2.56', '>='), 'info.xml at least 1.2.56 (bundle shipped with PMG wiring) — found ' . ($m[1] ?? '?'), $passes, $failures);
 echo "\n{$passes} passed, {$failures} failed\n";

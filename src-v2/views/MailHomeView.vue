@@ -174,14 +174,12 @@ import EmailListItem from '../components/EmailListItem.vue'
 import EmailListSkeleton from '../components/EmailListSkeleton.vue'
 import EmailDetail from '../components/EmailDetail.vue'
 import { useHotkeys } from '../composables/useHotkeys.js'
-import { usePmgClient } from '../composables/usePmgClient.js'
 import { mailboxDisplayName } from '../utils/mailboxNames.js'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { showSuccess, showError } from '@nextcloud/dialogs'
 
 const { fetchEmails, fetchEmailBody, deleteEmailApi, moveEmail, markEmailRead, toggleEmailFlag } = useJmapClient()
-const { reportSpam, reportHam } = usePmgClient()
 
 export default {
 	name: 'MailHomeView',
@@ -322,7 +320,6 @@ export default {
 					} catch (e) { /* try next account */ }
 				}
 				if (moved) {
-					this.pmgReportForMove(emailId, mailboxId)
 					await this.loadEmails(false)
 					this.notifyMailboxChange()
 					showSuccess(this.t('souvera_mail', 'Message moved'))
@@ -604,7 +601,7 @@ export default {
 		async bulkMoveTo(mailboxId) {
 			this.bulkProcessing = true
 			for (const id of this.checkedIds) {
-				try { await moveEmail(id, mailboxId, this.currentAccountId); this.pmgReportForMove(id, mailboxId) } catch (e) { console.error('Failed to move', e) }
+				try { await moveEmail(id, mailboxId, this.currentAccountId) } catch (e) { console.error('Failed to move', e) }
 			}
 			this.checkedIds = []
 			await this.loadEmails()
@@ -630,7 +627,6 @@ export default {
 					await markEmailRead(id, true, this.currentAccountId)
 					if (junk) {
 						await moveEmail(id, junk, this.currentAccountId)
-						reportSpam(this.currentAccountId, id)
 					}
 				} catch (e) { console.error('Failed to move to spam', e) }
 			}
@@ -653,7 +649,7 @@ export default {
 			const junk = this.junkMailbox()
 			try { await markEmailRead(this.selectedEmail.id, true, this.currentAccountId) } catch {}
 			if (junk) {
-				try { await moveEmail(this.selectedEmail.id, junk, this.currentAccountId); reportSpam(this.currentAccountId, this.selectedEmail.id) } catch (e) { console.error('Failed to move to spam', e) }
+				try { await moveEmail(this.selectedEmail.id, junk, this.currentAccountId) } catch (e) { console.error('Failed to move to spam', e) }
 			}
 			const addr = this.selectedEmail.from ? this.extractAddress(this.selectedEmail.from) : null
 			if (addr) {
@@ -678,23 +674,6 @@ export default {
 		junkMailbox() {
 			const aid = this.currentAccountId || ''
 			return (this.allMailboxes.find(m => m.role === 'junk' && (m._accountId || '') === aid) || {}).id
-		},
-		/**
-		 * PMG-Lern-Meldung nach einer Verschiebung (fire-and-forget, nie
-		 * awaiten): in Junk → reportSpam, aus Junk → reportHam.
-		 */
-		pmgReportForMove(emailId, toMailboxId) {
-			const aid = this.currentAccountId || ''
-			const tmb = this.allMailboxes.find(m => m.id === toMailboxId && (m._accountId || '') === aid)
-				|| this.allMailboxes.find(m => m.id === toMailboxId)
-			const toRole = tmb ? (tmb.role || '') : ''
-			const cmb = this.allMailboxes.find(m => m.id === this.selectedMailbox || (m._accountId + '|' + m.id) === this.selectedMailbox)
-			const fromRole = cmb ? (cmb.role || '') : ''
-			if (toRole === 'junk') {
-				reportSpam(this.currentAccountId, emailId)
-			} else if (fromRole === 'junk' && toRole !== '' && toRole !== 'junk') {
-				reportHam(this.currentAccountId, emailId)
-			}
 		},
 		/** Zieht die Adresse aus "Name <mail@example.com>" bzw. "mail@example.com". */
 		extractAddress(from) {
@@ -803,7 +782,7 @@ export default {
 		async onMove(mailboxId) {
 			if (!this.selectedEmail) return
 			const idx = this.emails.findIndex(e => e.id === this.selectedEmail.id)
-			try { await moveEmail(this.selectedEmail.id, mailboxId, this.currentAccountId); this.pmgReportForMove(this.selectedEmail.id, mailboxId); await this.refreshEmails(); this.notifyMailboxChange() } catch (e) { console.error('Failed to move email', e) }
+			try { await moveEmail(this.selectedEmail.id, mailboxId, this.currentAccountId); await this.refreshEmails(); this.notifyMailboxChange() } catch (e) { console.error('Failed to move email', e) }
 			if (this.emails.length > 0) {
 				const next = this.emails[Math.min(idx, this.emails.length - 1)]
 				if (next) this.onOpenEmail(next)
@@ -978,7 +957,6 @@ export default {
 			if (!email) return
 			try {
 				await moveEmail(email.id, mailboxId, this.currentAccountId)
-				this.pmgReportForMove(email.id, mailboxId)
 				await this.refreshEmails()
 				this.notifyMailboxChange()
 				if (this.selectedEmail?.id === email.id) this.selectedEmail = null
@@ -1003,7 +981,7 @@ export default {
 			const junk = this.junkMailbox()
 			try { await markEmailRead(email.id, true, this.currentAccountId) } catch {}
 			if (junk) {
-				try { await moveEmail(email.id, junk, this.currentAccountId); reportSpam(this.currentAccountId, email.id) } catch (e) { console.error('Failed to move to spam', e) }
+				try { await moveEmail(email.id, junk, this.currentAccountId) } catch (e) { console.error('Failed to move to spam', e) }
 			}
 			const addr = email.from ? this.extractAddress(email.from) : null
 			if (addr) {

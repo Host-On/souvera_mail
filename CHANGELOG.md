@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.59]
+
+### Changed
+
+- **PMG-Meldung serverseitig (Single Path)**: Der JMAP-Proxy-Hook in
+  `V2JmapProxy::call()` erkennt Junk-Moves (Email/set mit `mailboxIds`-Patch)
+  und reiht die Meldung als neuer `PmgReportJob` in den Background-Job ein.
+  Die fire-and-forget-Calls aus der Webmail-UI sind entfernt (MailHomeView,
+  SpamListView, ShieldView, `usePmgClient.js` geloescht) — es gibt nur noch
+  einen Meldeweg. Mobile-Integration in `docs/pmg-learning-api.md`
+  dokumentiert (Phase-3-Auftrag fuer die App-Teams).
+
 ## [1.2.58]
 
 ### Fixed
