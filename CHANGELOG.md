@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.2.58]
+
+### Fixed
+
+- **PMG-Reports kamen nie an (Root Cause)**: `PmgController` war ein
+  OCSController, seine Routen aber als normale `/apps/...`-Routen
+  registriert — Nextcloud liefert OCS-Controller nur unter
+  `/ocs/v2.php` aus. Jeder Report-Aufruf aus der Webmail-UI lief
+  daher ins 404 und der PMG-Learn-Call (:9911) wurde nie ausgeloest.
+  Controller ist jetzt ein plain JSON-Controller im v2-Stil der App;
+  Routen und Frontend-URLs passen exakt zusammen.
+- Stalwart-Webhook: stille Drop-Punkte (nicht aufloesbare accountId,
+  fehlende Device-Tokens) werden jetzt auf info-Level geloggt — die
+  Push-Zustellkette ist damit beobachtbar.
+
 ## [1.2.57]
 
 ### Fixed

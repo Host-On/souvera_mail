@@ -336,6 +336,7 @@ class StalwartWebhookController extends Controller
             }
             $userId = $this->resolveNcUserForStalwartAccountId($accountId);
             if ($userId === null) {
+                $this->logger->info('Souvera Mail: Stalwart webhook ham event: accountId ' . $accountId . ' not resolvable to an NC user — push skipped', ['app' => 'souvera_mail']);
                 return 0;
             }
             return $this->pushToUser($userId, $event) ? 1 : 0;
@@ -393,6 +394,7 @@ class StalwartWebhookController extends Controller
             }
         }
         if ($androidTokens === [] && $iosTokens === []) {
+            $this->logger->info('Souvera Mail: webhook push skipped — no registered device tokens for user "' . $userId . '"', ['app' => 'souvera_mail']);
             return false;
         }
 
