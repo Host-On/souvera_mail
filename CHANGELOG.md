@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.2.55]
+
+### Added
+
+- **PMG-Learning live geschaltet**: Frontend-Wiring fuer Spam-Melden,
+  Restore und Shield-Quarantäne-Release. Neue OCS-Route
+  `POST /api/v2/pmg/report/ham-shield` holt die Original-EML aus Shield
+  (`souvera_shield/api/internal/spam/raw`) und trainiert sie als ham.
+  Shield-Quarantäne-Releases lernen jetzt ham.
+- `src-v2/composables/usePmgClient.js` (fire-and-forget) — MailHomeView,
+  SpamListView und ShieldView melden PMG-Spam/Ham-Aktionen nach.
+
+### Changed
+
+- **Ham-Semantik** in `PmgReportService::report('ham')` gemaess
+  docs/pmg-learning-api.md: eigener Spam-Vermerk wird zurueckgenommen
+  (forget/spam), sonst learn/ham (False-Positive). `reportRestoredFromJunk`
+  delegiert nun an `report()` und ergaenzt `reverted`. `accountId` ist
+  optional (Aufloesung ueber JMAP-Kontext, sonst Fehler).
+
 ## [1.2.54]
 
 ### Added

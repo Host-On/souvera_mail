@@ -29,6 +29,11 @@ $ctl = (string) file_get_contents(__DIR__ . '/../lib/Controller/PmgController.ph
 $mig = (string) file_get_contents(__DIR__ . '/../lib/Migration/Version001910Date20260905120000.php');
 $routes = (string) file_get_contents(__DIR__ . '/../appinfo/routes.php');
 $proxy = (string) file_get_contents(__DIR__ . '/../lib/Service/V2JmapProxy.php');
+$pmgClient = (string) @file_get_contents(__DIR__ . '/../src-v2/composables/usePmgClient.js');
+$mailHome = (string) @file_get_contents(__DIR__ . '/../src-v2/views/MailHomeView.vue');
+$spamList = (string) @file_get_contents(__DIR__ . '/../src-v2/views/SpamListView.vue');
+$shieldView = (string) @file_get_contents(__DIR__ . '/../src-v2/views/ShieldView.vue');
+$info = (string) file_get_contents(__DIR__ . '/../appinfo/info.xml');
 // ---- PmgLearningService (transport) ----
 ok(str_contains($svc, chr(39) . '/v1/' . chr(39)), 'learn URL pattern /v1/{mode}/{class}', $passes, $failures);
 ok(str_contains($svc, "'X-API-Token'"), 'sends X-API-Token header', $passes, $failures);
@@ -54,5 +59,30 @@ ok(str_contains($routes, "'pmg#report'"), 'routes register pmg#report', $passes,
 ok(str_contains($routes, "'pmg#forget'"), 'routes register pmg#forget', $passes, $failures);
 ok(str_contains($routes, "'pmg#status'"), 'routes register pmg#status', $passes, $failures);
 ok(str_contains($ctl, 'requireUserId'), 'controller requires authenticated user', $passes, $failures);
+
+// ---- v1.2.55 — Shield-Quarantäne-HAM + Frontend-Wiring ----
+ok(str_contains($routes, "'pmg#reportShieldHam'"), 'routes register pmg#reportShieldHam', $passes, $failures);
+ok(str_contains($routes, '/api/v2/pmg/report/ham-shield'), 'routes register /api/v2/pmg/report/ham-shield', $passes, $failures);
+ok(str_contains($ctl, 'reportShieldHam'), 'controller exposes reportShieldHam', $passes, $failures);
+ok(str_contains($ctl, 'httpClientService'), 'controller injects IClientService', $passes, $failures);
+ok(str_contains($ctl, 'urlGenerator'), 'controller injects IURLGenerator', $passes, $failures);
+ok(str_contains($ctl, 'forwardSessionCookies'), 'controller forwards session cookies to Shield', $passes, $failures);
+ok(str_contains($ctl, 'getAbsoluteURL'), 'controller builds absolute Shield URL', $passes, $failures);
+ok(str_contains($ctl, 'spam/raw'), 'controller fetches Shield internal spam/raw', $passes, $failures);
+ok(str_contains($ctl, 'base64_decode'), 'controller decodes base64 Shield EML', $passes, $failures);
+ok(str_contains($ctl, 'requesttoken'), 'controller forwards request token', $passes, $failures);
+ok(str_contains($rpt, 'getCurrentAccountId'), 'report service resolves accountId from JMAP context', $passes, $failures);
+ok(str_contains($rpt, 'reportRestoredFromJunk') && str_contains($rpt, 'reverted'), 'reportRestoredFromJunk delegates and flags reverted', $passes, $failures);
+ok(str_contains($rpt, "findLatestByHash") && str_contains($rpt, "'forget'"), 'ham report distinguishes revert (findLatestByHash + forget)', $passes, $failures);
+ok($pmgClient !== false && $pmgClient !== '', 'src-v2/usePmgClient.js exists', $passes, $failures);
+ok(str_contains($pmgClient, '/api/v2/pmg/report/spam'), 'usePmgClient reports spam endpoint', $passes, $failures);
+ok(str_contains($pmgClient, '/api/v2/pmg/report/ham'), 'usePmgClient reports ham endpoint', $passes, $failures);
+ok(str_contains($pmgClient, '/api/v2/pmg/report/ham-shield'), 'usePmgClient reports shield-ham endpoint', $passes, $failures);
+ok(str_contains($pmgClient, 'console.error'), 'usePmgClient is fire-and-forget (logs only)', $passes, $failures);
+ok(str_contains($mailHome, 'usePmgClient') && str_contains($mailHome, 'reportSpam'), 'MailHomeView wires PMG reports', $passes, $failures);
+ok(str_contains($mailHome, 'pmgReportForMove'), 'MailHomeView reports on move (junk in/out)', $passes, $failures);
+ok(str_contains($spamList, 'reportShieldHam') && str_contains($spamList, 'reportHam'), 'SpamListView wires release→ham reports', $passes, $failures);
+ok(str_contains($shieldView, 'reportSpam') && str_contains($shieldView, 'reportHam'), 'ShieldView wires report actions', $passes, $failures);
+ok(str_contains($info, '<version>1.2.55</version>'), 'info.xml bumped to 1.2.55', $passes, $failures);
 echo "\n{$passes} passed, {$failures} failed\n";
 exit($failures === 0 ? 0 : 1);

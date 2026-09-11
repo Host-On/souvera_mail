@@ -87,9 +87,11 @@ import TrashCan from 'vue-material-design-icons/TrashCan.vue'
 import CheckAll from 'vue-material-design-icons/CheckAll.vue'
 import AlertCircle from 'vue-material-design-icons/AlertCircle.vue'
 import { useSpamClient } from '../composables/useSpamClient.js'
+import { usePmgClient } from '../composables/usePmgClient.js'
 import SpamDetail from '../components/SpamDetail.vue'
 
 const { fetchSpamItems, viewSpamItem, releaseSpamItems, deleteSpamItems } = useSpamClient()
+const { reportHam, reportShieldHam } = usePmgClient()
 
 export default {
 	name: 'SpamListView',
@@ -160,6 +162,9 @@ export default {
 				const shieldIds = checked.filter(c => c.source === 'shield').map(c => c.id)
 				if (jmapIds.length > 0) await releaseSpamItems(jmapIds, 'jmap')
 				if (shieldIds.length > 0) await releaseSpamItems(shieldIds, 'shield')
+				// PMG-Lernen: Junk-Restore lernt ham (fire-and-forget).
+				jmapIds.forEach((id) => reportHam('', id))
+				shieldIds.forEach((id) => reportShieldHam(id))
 				showSuccess(this.t('souvera_mail', 'Released {n} items', { n: checked.length }))
 				this.offset = 0
 				await this.loadItems()

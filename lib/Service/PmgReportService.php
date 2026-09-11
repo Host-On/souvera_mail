@@ -45,6 +45,15 @@ class PmgReportService
             return ['operation' => 'learn', 'class' => $class, 'success' => false, 'partial' => false, 'nodes_ok' => '', 'error' => 'Invalid class'];
         }
 
+        // Account may be omitted by callers without a JMAP context (e.g.
+        // Shield releases) — resolve it from the current session then.
+        if ($accountId === '') {
+            $accountId = $this->jmap->getCurrentAccountId() ?? '';
+        }
+        if ($accountId === '') {
+            return ['operation' => 'learn', 'class' => $class, 'success' => false, 'partial' => false, 'nodes_ok' => '', 'error' => 'Original mail could not be fetched (JMAP context missing)'];
+        }
+
         $raw = $this->jmap->fetchRawMailBytes($accountId, $emailId);
         if ($raw === null) {
             return ['operation' => 'learn', 'class' => $class, 'success' => false, 'partial' => false, 'nodes_ok' => '', 'error' => 'Original mail could not be fetched (JMAP blob download failed)'];
@@ -52,7 +61,36 @@ class PmgReportService
 
         $messageIdHash = $this->hashFor($accountId, (string) ($raw['messageId'] ?? $emailId));
 
-        $pmg = $this->learning->learn($class, 'learn', $raw['bytes']);
+        // ham: distinguish "take back my own spam report" (forget/spam) from
+        // "the system sorted it wrong" (learn/ham false positive).
+        if ($class === 'ham') {
+            $own = $this->reportMapper->findLatestByHash($userId, $messageIdHash);
+            if ($own !== null && $own->getClass() === 'spam') {
+                $pmg = $this->learning->learn('spam', 'forget', $raw['bytes']);
+                $this->reportMapper->deleteByUserAndHash($userId, $messageIdHash);
+
+                $this->logger->info('PMG report: revert own spam report by ' . $userId, [
+                    'app' => 'souvera_mail',
+                    'nodes_ok' => $pmg['nodes_ok'] ?? '',
+                    'partial' => $pmg['partial'] ?? false,
+                ]);
+
+                return [
+                    'operation' => 'forget',
+                    'class' => 'spam',
+                    'success' => (bool) ($pmg['success'] ?? false),
+                    'partial' => (bool) ($pmg['partial'] ?? false),
+                    'nodes_ok' => (string) ($pmg['nodes_ok'] ?? ''),
+                ] + (isset($pmg['error']) ? ['error' => $pmg['error']] : []);
+            }
+        }
+
+        if ($class === 'ham') {
+            // sonst: kein eigener Spam-Vermerk → False Positive trainieren.
+            $pmg = $this->learning->learn('ham', 'learn', $raw['bytes']);
+        } else {
+            $pmg = $this->learning->learn('spam', 'learn', $raw['bytes']);
+        }
 
         $report = new PmgReport();
         $report->setUserId($userId);
@@ -87,50 +125,9 @@ class PmgReportService
      */
     public function reportRestoredFromJunk(string $userId, string $accountId, string $emailId): array
     {
-        $raw = $this->jmap->fetchRawMailBytes($accountId, $emailId);
-        if ($raw === null) {
-            return ['operation' => 'learn', 'class' => 'ham', 'success' => false, 'partial' => false, 'nodes_ok' => '', 'reverted' => false, 'error' => 'Original mail could not be fetched (JMAP blob download failed)'];
-        }
-
-        $messageIdHash = $this->hashFor($accountId, (string) ($raw['messageId'] ?? $emailId));
-        $own = $this->reportMapper->findLatestByHash($userId, $messageIdHash);
-
-        // User reported this mail themselves → take the report back.
-        if ($own !== null && $own->getClass() === 'spam') {
-            $pmg = $this->learning->learn('spam', 'forget', $raw['bytes']);
-            $this->reportMapper->deleteByUserAndHash($userId, $messageIdHash);
-
-            return [
-                'operation' => 'forget',
-                'class' => 'spam',
-                'success' => (bool) ($pmg['success'] ?? false),
-                'partial' => (bool) ($pmg['partial'] ?? false),
-                'nodes_ok' => (string) ($pmg['nodes_ok'] ?? ''),
-                'reverted' => true,
-            ] + (isset($pmg['error']) ? ['error' => $pmg['error']] : []);
-        }
-
-        // The system (filter) had sorted it → train it as ham (false positive).
-        $pmg = $this->learning->learn('ham', 'learn', $raw['bytes']);
-
-        $report = new PmgReport();
-        $report->setUserId($userId);
-        $report->setAccountId($accountId);
-        $report->setEmailId($emailId);
-        $report->setMessageId((string) ($raw['messageId'] ?? ''));
-        $report->setMessageIdHash($messageIdHash);
-        $report->setClass('ham');
-        $report->setReportedAt(date('Y-m-d H:i:s'));
-        $this->reportMapper->upsert($report);
-
-        return [
-            'operation' => 'learn',
-            'class' => 'ham',
-            'success' => (bool) ($pmg['success'] ?? false),
-            'partial' => (bool) ($pmg['partial'] ?? false),
-            'nodes_ok' => (string) ($pmg['nodes_ok'] ?? ''),
-            'reverted' => false,
-        ] + (isset($pmg['error']) ? ['error' => $pmg['error']] : []);
+        $result = $this->report($userId, $accountId, 'ham', $emailId);
+        $result['reverted'] = ($result['operation'] ?? '') === 'forget';
+        return $result;
     }
 
     /**
@@ -140,6 +137,15 @@ class PmgReportService
      */
     public function forgetLast(string $userId, string $accountId, string $emailId): array
     {
+        // Account may be omitted by callers without a JMAP context — resolve
+        // it from the current session then, matching report().
+        if ($accountId === '') {
+            $accountId = $this->jmap->getCurrentAccountId() ?? '';
+        }
+        if ($accountId === '') {
+            return ['operation' => 'forget', 'class' => '', 'success' => false, 'partial' => false, 'nodes_ok' => '', 'error' => 'Original mail could not be fetched (JMAP context missing)'];
+        }
+
         $raw = $this->jmap->fetchRawMailBytes($accountId, $emailId);
         if ($raw === null) {
             return ['operation' => 'forget', 'class' => '', 'success' => false, 'partial' => false, 'nodes_ok' => '', 'error' => 'Original mail could not be fetched'];

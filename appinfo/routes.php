@@ -332,6 +332,11 @@ return [
             'url' => '/api/v2/mailboxes/{id}/empty',
         ],
         [
+            'name' => 'pmg#reportShieldHam',
+            'url' => '/api/v2/pmg/report/ham-shield',
+            'verb' => 'POST',
+        ],
+        [
             'name' => 'pmg#report',
             'url' => '/api/v2/pmg/report/{class}',
             'verb' => 'POST',
