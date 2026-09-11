@@ -83,6 +83,7 @@ ok(str_contains($mailHome, 'usePmgClient') && str_contains($mailHome, 'reportSpa
 ok(str_contains($mailHome, 'pmgReportForMove'), 'MailHomeView reports on move (junk in/out)', $passes, $failures);
 ok(str_contains($spamList, 'reportShieldHam') && str_contains($spamList, 'reportHam'), 'SpamListView wires release→ham reports', $passes, $failures);
 ok(str_contains($shieldView, 'reportSpam') && str_contains($shieldView, 'reportHam'), 'ShieldView wires report actions', $passes, $failures);
-ok(str_contains($info, '<version>1.2.55</version>'), 'info.xml bumped to 1.2.55', $passes, $failures);
+preg_match('/<version>([0-9.]+)<\/version>/', $info, $m);
+ok(isset($m[1]) && version_compare($m[1], '1.2.56', '>='), 'info.xml at least 1.2.56 (bundle shipped with PMG wiring) — found ' . ($m[1] ?? '?'), $passes, $failures);
 echo "\n{$passes} passed, {$failures} failed\n";
 exit($failures === 0 ? 0 : 1);

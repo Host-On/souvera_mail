@@ -363,6 +363,26 @@ class StalwartWebhookController extends Controller
      */
     private function pushToUser(string $userId, array $event = []): bool
     {
+        // NC-Modus zuerst: der Benachrichtigungspfad braucht weder registrierte
+        // Device-Tokens noch FCM/APNs — die Zustellung übernimmt die
+        // Notifications-App (Web-Bell, notify_push, Push-Proxy der NC-Apps).
+        if ((string) $this->config->getSystemValue(MailPushNotifier::PUSH_MODE_CONFIG, MailPushNotifier::PUSH_MODE_DIRECT)
+            === MailPushNotifier::PUSH_MODE_NC) {
+            $documentId = (int) ($event['data']['documentId'] ?? 0);
+            $emailId = $documentId > 0 ? StalwartAdminService::encodeJmapId($documentId) : '';
+            $enrichment = $emailId !== ''
+                ? $this->fetchEmailEnrichment($userId, $emailId)
+                : ['subject' => '', 'from' => '', 'preview' => ''];
+            $this->notifier->notify(
+                $userId,
+                $emailId,
+                $enrichment['subject'],
+                $enrichment['from'],
+                $enrichment['preview'],
+            );
+            return true;
+        }
+
         $androidTokens = [];
         $iosTokens = [];
         foreach ($this->tokens->findAllForUser($userId) as $device) {
@@ -374,19 +394,6 @@ class StalwartWebhookController extends Controller
         }
         if ($androidTokens === [] && $iosTokens === []) {
             return false;
-        }
-
-        // NC-Modus: Benachrichtigungspfad statt Direktversand (verschluesselt).
-        if ((string) $this->config->getSystemValue(MailPushNotifier::PUSH_MODE_CONFIG, MailPushNotifier::PUSH_MODE_DIRECT)
-            === MailPushNotifier::PUSH_MODE_NC) {
-            $this->notifier->notify(
-                $userId,
-                (string) ($data['emailId'] ?? ''),
-                (string) ($data['subject'] ?? ''),
-                (string) ($data['sender'] ?? ''),
-                (string) ($data['preview'] ?? ''),
-            );
-            return true;
         }
 
         // Deep-Link-Daten: data.documentId ist die numerische Stalwart-Doc-ID,

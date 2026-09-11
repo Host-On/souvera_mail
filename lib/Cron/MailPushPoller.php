@@ -33,6 +33,12 @@ use Psr\Log\LoggerInterface;
  *
  * Reuses the EXISTING JMAP machinery ({@see StalwartAdminService},
  * {@see StalwartUserContext}) — no Stalwart-side change required.
+ *
+ * Im NC-Modus (System-Config `souvera_mail.push_mode` = "nc") läuft der
+ * Poller auch ohne konfiguriertes FCM/APNs — die Zustellung übernimmt die
+ * NC-Notifications-App. Er braucht weiterhin mindestens ein registriertes
+ * Device-Token pro Nutzer (die User-Ermittlung läuft über die Token-Tabelle),
+ * während der Webhook-Pfad token-frei arbeitet.
  */
 class MailPushPoller extends TimedJob
 {
@@ -64,19 +70,19 @@ class MailPushPoller extends TimedJob
 
     protected function run($argument): void
     {
-        if (!$this->userContext->isAvailable() || (!$this->fcm->isConfigured() && !$this->apns->isConfigured())) {
-            return; // Nothing useful to do without OIDC and a configured push backend.
+        $ncMode = (string) $this->config->getSystemValue(
+            MailPushNotifier::PUSH_MODE_CONFIG,
+            MailPushNotifier::PUSH_MODE_DIRECT
+        ) === MailPushNotifier::PUSH_MODE_NC;
+
+        if (!$this->userContext->isAvailable() || (!$ncMode && !$this->fcm->isConfigured() && !$this->apns->isConfigured())) {
+            return; // Ohne OIDC (bzw. im Direct-Modus ohne konfiguriertes Push-Backend) nichts zu tun.
         }
 
         $byUser = $this->sweepTokensByUser();
         if ($byUser === []) {
             return;
         }
-
-        $ncMode = (string) $this->config->getSystemValue(
-            MailPushNotifier::PUSH_MODE_CONFIG,
-            MailPushNotifier::PUSH_MODE_DIRECT
-        ) === MailPushNotifier::PUSH_MODE_NC;
 
         foreach ($byUser as $userId => $userTokens) {
             $snapshot = $this->resolveInboxSnapshot($userId);

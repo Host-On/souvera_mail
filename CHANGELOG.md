@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.57]
+
+### Fixed
+
+- **NC-Notification-Push war unbenutzbar**: der `push_mode=nc`-Pfad im
+  Stalwart-Webhook stand hinter dem Device-Token-Gate (ohne FCM-Tokens
+  nie eine Benachrichtigung) und las undefinierte Variablen (leere
+  Betreff/Absender). NC-Modus arbeitet jetzt token-frei mit voller
+  Anreicherung (Betreff, Absender, Vorschau, Deep-Link).
+- MailPushPoller läuft im NC-Modus auch ohne konfiguriertes FCM/APNs.
+
 ## [1.2.56]
 
 ### Fixed
