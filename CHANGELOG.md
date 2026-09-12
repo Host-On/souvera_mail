@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.62]
+
+### Refactoring
+
+- `MailEnricherService`: die 1:1-Duplikate der Push-Anreicherung
+  (Betreff/Absender/Vorschau) in `MailPushPoller` und
+  `StalwartWebhookController` sind zusammengeführt.
+- `docs/improvement-backlog.md`: dokumentierte Zurückstellungen des
+  Gemini-Gesamtreviews mit Begründung (Loopback→DI, externe Konten in
+  DB-Tabelle, ext-imap-Ersatz, PHPUnit-Infrastruktur, Poller-Batching,
+  MigrationCleanup-Entscheidung, bewusste Types.php-Shims).
+
 ## [1.2.61]
 
 ### Fixed

@@ -62,6 +62,7 @@ class MailPushPoller extends TimedJob
         private DeviceTokenMapper $tokens,
         private StalwartUserContext $userContext,
         private StalwartAdminService $stalwartAdmin,
+        private \OCA\SouveraMail\Service\MailEnricherService $enricher,
         private FcmClient $fcm,
         private ApnsClient $apns,
         private \OCA\SouveraMail\Service\MailPushNotifier $notifier,
@@ -149,7 +150,7 @@ class MailPushPoller extends TimedJob
                 if ($isBaseline) {
                     continue;
                 }
-                $details = $this->fetchEmailDetails($userId, $snapshot['emailId']);
+                $details = $this->enricher->fetchDetails($userId, $snapshot['emailId']);
                 $this->notifier->notify(
                     $userId,
                     $snapshot['emailId'],
@@ -180,7 +181,7 @@ class MailPushPoller extends TimedJob
                     continue;
                 }
                 if ($details === null) {
-                    $details = $this->fetchEmailDetails($userId, $snapshot['emailId']);
+                    $details = $this->enricher->fetchDetails($userId, $snapshot['emailId']);
                 }
                 $data = [
                     'type' => 'new_mail',
@@ -245,81 +246,6 @@ class MailPushPoller extends TimedJob
      * be read back into PHP and spliced into a literal `filter` object
      * on the second call.
      */
-    /**
-     * Extrahiert eine Text-Vorschau aus den bodyValues einer Email/get-Antwort.
-     * Stalwart liefert bodyValues nur, wenn "bodyValues" in properties steht.
-     *
-     * @param array<string, mixed> $email Email-Objekt aus Email/get
-     */
-    private function extractPreview(array $email): string
-    {
-        $bodyValues = $email['bodyValues'] ?? null;
-        if (!\is_array($bodyValues)) {
-            return '';
-        }
-        $parts = [];
-        foreach ($bodyValues as $part) {
-            if (\is_array($part) && isset($part['value']) && \is_string($part['value'])) {
-                $parts[] = $part['value'];
-            }
-        }
-        $text = \trim(\preg_replace('/\s+/u', ' ', \implode(' ', $parts)) ?? '');
-        return \mb_substr($text, 0, 300);
-    }
-
-    /**
-     * Holt Betreff + Absender der neuesten Inbox-Mail für die Push-Ansicht.
-     * Fehler sind hier unkritisch (der Push geht trotzdem raus, nur mit
-     * generischem Text).
-     *
-     * @return array{subject: string, from: string, preview: string}
-     */
-    private function fetchEmailDetails(string $userId, string $emailId): array
-    {
-        if ($emailId === '') {
-            return ['subject' => '', 'from' => '', 'preview' => ''];
-        }
-        try {
-            $bearer = $this->userContext->resolveBearer($userId);
-            $accountId = $this->userContext->resolveAccountId($userId);
-            $response = $this->stalwartAdmin->jmapCall(
-                $bearer,
-                [
-                    ['Email/get', [
-                        'accountId' => $accountId,
-                        'ids' => [$emailId],
-                        'properties' => ['subject', 'from', 'bodyValues'],
-                        'bodyProperties' => ['preview'],
-                        'fetchTextBodyValues' => true,
-                        'maxBodyValueBytes' => 512,
-                    ], 'g0'],
-                ],
-                ['urn:ietf:params:jmap:mail'],
-            );
-            $get = $this->stalwartAdmin->extractMethodResponse($response, 'Email/get');
-            $list = $get['list'] ?? [];
-            $first = \is_array($list) && isset($list[0]) && \is_array($list[0]) ? $list[0] : [];
-            $subject = (string) ($first['subject'] ?? '');
-            $from = '';
-            $fromArr = $first['from'] ?? null;
-            if (\is_array($fromArr) && isset($fromArr[0]) && \is_array($fromArr[0])) {
-                $from = (string) ($fromArr[0]['name'] ?? $fromArr[0]['email'] ?? '');
-            }
-            $preview = (string) ($first['preview'] ?? '');
-            if ($preview === '') {
-                $preview = $this->extractPreview($first);
-            }
-            return ['subject' => $subject, 'from' => $from, 'preview' => $preview];
-        } catch (\Throwable $e) {
-            $this->logger->debug(
-                'Souvera Mail: MailPushPoller could not fetch email details for "'
-                . $userId . '": ' . $e->getMessage(),
-                ['app' => 'souvera_mail']
-            );
-            return ['subject' => '', 'from' => ''];
-        }
-    }
-
     /**
      * Ermittelt Inbox-queryState UND die JMAP-Id der neuesten Inbox-Mail
      * in EINEM Durchlauf (das Email/query mit limit=1 liefert beides).
