@@ -135,8 +135,12 @@ class PageController extends Controller
         ];
         if ($this->userId !== null) {
             $config = \OCP\Server::get(\OCP\IConfig::class);
+            $uid = $this->userId;
+            // static fn bindet $this NICHT — die UID wird deshalb vorab
+            // in $uid gecaptured ("Using $this when not in object
+            // context", v1.2.64 Hotfix).
             $pref = static fn (string $key, string $default): string =>
-                $config->getUserValue($this->userId, 'souvera_mail', $key, $default);
+                $config->getUserValue($uid, 'souvera_mail', $key, $default);
             $prefs['verticalLayout'] = $pref('pref_vertical_layout', '0') === '1';
             $prefs['listOnlyLayout'] = $pref('pref_list_only', '0') === '1';
             $prefs['focusLayout'] = $pref('pref_focus_layout', '0') === '1';

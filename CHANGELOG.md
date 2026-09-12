@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.2.65]
+
+### Fixed
+
+- **Hotfix "Using $this when not in object context"**: die `static fn`
+  im Preference-Injection-Pfad (v1.2.64) band `$this` nicht — die UID
+  wird jetzt vorab gecaptured.
+
+## [1.2.64]
+
+### Fixed
+
+- **Layout-Präferenzen serverseitig injiziert** (`window.
+  _souvera_mail_prefs`): der erste Paint rendert im korrekten Layout —
+  kein Umspringen nach dem preferences-Fetch mehr.
+
 ## [1.2.63]
 
 ### Fixed
