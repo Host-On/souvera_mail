@@ -98,13 +98,16 @@ final class MessageFacts
      * @param string|null $envelopeFrom
      * @param string[]    $envelopeTo
      * @param int         $size
+     * @param string|null $body Plain-Text-Inhalt der Mail — nur belegt, wenn
+     *                          das Skript body-Tests enthält (Datenvolumen!)
      */
     public function __construct(
         public readonly string $emailId,
         public readonly array $headers,
         public readonly ?string $envelopeFrom,
         public readonly array $envelopeTo,
-        public readonly int $size
+        public readonly int $size,
+        public readonly ?string $body = null
     ) {}
 
     /**

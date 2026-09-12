@@ -226,7 +226,9 @@ class SieveApplyService
 
         // ---- 4. Fetch facts for those messages ----
         try {
-            $facts = $this->fetchMessageFacts($accountId, $bearer, $ids);
+            // Body-Werte nur laden, wenn das Skript body-Tests enthält.
+            $needsBody = MiniInterpreter::rulesUseBody($engine->getRules());
+            $facts = $this->fetchMessageFacts($accountId, $bearer, $ids, $needsBody);
         } catch (\Throwable $e) {
             return ['status' => 'error', 'message' => 'Nachrichten-Details nicht abrufbar: ' . $e->getMessage()];
         }
@@ -306,7 +308,9 @@ class SieveApplyService
             $bearer,
             [[
                 'Mailbox/get',
-                ['accountId' => $accountId, 'properties' => ['id', 'name', 'role']],
+                // parentId für die hierarchische Pfad-Auflösung tiefer
+                // Unterordner (findMailboxByName).
+                ['accountId' => $accountId, 'properties' => ['id', 'name', 'role', 'parentId']],
                 'c0',
             ]],
             [self::CAP_MAIL]
@@ -319,6 +323,7 @@ class SieveApplyService
                 'id' => (string) $mb['id'],
                 'name' => (string) ($mb['name'] ?? ''),
                 'role' => isset($mb['role']) ? (string) $mb['role'] : null,
+                'parentId' => isset($mb['parentId']) && $mb['parentId'] !== null ? (string) $mb['parentId'] : null,
             ];
         }
         return $out;
@@ -358,19 +363,40 @@ class SieveApplyService
     }
 
     /**
-     * Best-effort case-insensitive lookup — also strips a leading `INBOX/`
-     * for shared/namespaced folders where Snappymail's sieve.js emits e.g.
-     * `fileinto "INBOX/Newsletters";`.
-     * @param array<int, array{id:string,name:string,role:?string}> $mailboxes
+     * Best-effort case-insensitive lookup — auch mit vollständiger
+     * Hierarchie: JMAP-Mailbox-`name` enthält nur den BLATTNAMEN ("Acme"),
+     * die Hierarchie steckt in parentId. Ein Sieve-`fileinto
+     * "INBOX/Clients/Acme"` vergleicht daher pro Mailbox den rekonstruierten
+     * Vollpfad (parentId-Kette), nicht nur den Blattnamen — vorher scheiterte
+     * jede Unterordner-Tiefe ≥ 2 beim Nachträglichen-Anwenden.
+     * @param array<int, array{id:string,name:string,role:?string,parentId:?string}> $mailboxes
      */
     private function findMailboxByName(array $mailboxes, string $name): ?string
     {
-        $candidates = [$name, \ltrim(\preg_replace('#^INBOX/#i', '', $name) ?? $name, '/')];
-        foreach ($candidates as $cand) {
-            if ($cand === '') { continue; }
-            foreach ($mailboxes as $mb) {
-                if (\strcasecmp($mb['name'], $cand) === 0) { return $mb['id']; }
+        $byId = [];
+        foreach ($mailboxes as $mb) { $byId[$mb['id']] = $mb; }
+
+        $buildFullPath = static function (array $mb) use ($byId): string {
+            $parts = [$mb['name']];
+            $cur = $mb;
+            $guard = 0;
+            while (isset($cur['parentId'], $byId[$cur['parentId']]) && $guard++ < 64) {
+                $cur = $byId[$cur['parentId']];
+                \array_unshift($parts, $cur['name']);
             }
+            return \implode('/', $parts);
+        };
+
+        $target = \ltrim(\preg_replace('#^INBOX/#i', '', $name) ?? $name, '/');
+        if ($target === '') { return null; }
+
+        foreach ($mailboxes as $mb) {
+            $fullPath = \ltrim(\preg_replace('#^INBOX/#i', '', $buildFullPath($mb)) ?? $buildFullPath($mb), '/');
+            if (\strcasecmp($fullPath, $target) === 0) { return $mb['id']; }
+        }
+        // Fallback: alter Blattnamen-Vergleich (Tiefe 1, alte Skripte).
+        foreach ($mailboxes as $mb) {
+            if (\strcasecmp($mb['name'], $target) === 0) { return $mb['id']; }
         }
         return null;
     }
@@ -447,7 +473,7 @@ class SieveApplyService
      * @param string[] $ids
      * @return MessageFacts[]
      */
-    private function fetchMessageFacts(string $accountId, string $bearer, array $ids): array
+    private function fetchMessageFacts(string $accountId, string $bearer, array $ids, bool $withBody = false): array
     {
         // Stalwart 0.16 applies the same 500-item cap to Email/get.ids
         // as to Email/query.limit. Use JMAP_PAGE_LIMIT (250) to stay
@@ -455,32 +481,36 @@ class SieveApplyService
         $chunks = \array_chunk($ids, self::JMAP_PAGE_LIMIT);
         $facts = [];
         foreach ($chunks as $chunk) {
+            $args = [
+                'accountId' => $accountId,
+                'ids' => $chunk,
+                // `headers:all:asRaw` returns every header as a
+                // {name, value} tuple — we normalise it below.
+                'properties' => ['id', 'mailboxIds', 'size', 'headers', 'from', 'to', 'cc', 'subject'],
+            ];
+            // Body-Werte sind teuer — nur mitladen, wenn das Skript
+            // tatsächlich body-Tests enthält (rulesUseBody()).
+            if ($withBody) {
+                $args['properties'][] = 'bodyValues';
+                $args['fetchTextBodyValues'] = true;
+                $args['maxBodyValueBytes'] = 65536;
+            }
             $response = $this->stalwart->jmapCall(
                 $bearer,
-                [[
-                    'Email/get',
-                    [
-                        'accountId' => $accountId,
-                        'ids' => $chunk,
-                        // `headers:all:asRaw` returns every header as a
-                        // {name, value} tuple — we normalise it below.
-                        'properties' => ['id', 'mailboxIds', 'size', 'headers', 'from', 'to', 'cc', 'subject'],
-                    ],
-                    'c0',
-                ]],
+                [['Email/get', $args, 'c0']],
                 [self::CAP_MAIL]
             );
             $list = (array) ($this->stalwart->extractMethodResponse($response, 'Email/get')['list'] ?? []);
             foreach ($list as $entry) {
                 if (!\is_array($entry) || !isset($entry['id'])) { continue; }
-                $facts[] = $this->buildFacts($entry);
+                $facts[] = $this->buildFacts($entry, $withBody);
             }
         }
         return $facts;
     }
 
     /** @param array<string,mixed> $entry Email/get list entry */
-    private function buildFacts(array $entry): MessageFacts
+    private function buildFacts(array $entry, bool $withBody = false): MessageFacts
     {
         $headers = [];
         foreach ((array) ($entry['headers'] ?? []) as $h) {
@@ -508,12 +538,24 @@ class SieveApplyService
         foreach ((array) ($entry['to'] ?? []) as $t) {
             if (\is_array($t) && isset($t['email'])) { $envelopeTo[] = (string) $t['email']; }
         }
+        // Plain-Text-Body aus den bodyValues (nur mitgeladen, wenn $withBody).
+        $body = null;
+        if ($withBody) {
+            $parts = [];
+            foreach ((array) ($entry['bodyValues'] ?? []) as $bv) {
+                if (\is_array($bv) && isset($bv['value']) && \is_string($bv['value'])) {
+                    $parts[] = $bv['value'];
+                }
+            }
+            $body = \mb_substr(\trim(\implode("\n", $parts)), 0, 262144);
+        }
         return new MessageFacts(
             (string) $entry['id'],
             $headers,
             $envelopeFrom !== null ? (string) $envelopeFrom : null,
             $envelopeTo,
-            (int) ($entry['size'] ?? 0)
+            (int) ($entry['size'] ?? 0),
+            $body
         );
     }
 

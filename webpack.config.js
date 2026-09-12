@@ -1,6 +1,7 @@
 const path = require('path')
 const webpack = require('webpack')
 const { VueLoaderPlugin } = require('vue-loader')
+const MiniCssExtractPlugin = require('mini-css-extract-plugin')
 
 module.exports = {
 	entry: {
@@ -48,16 +49,23 @@ module.exports = {
 			},
 			{
 				test: /\.css$/,
-				use: ['style-loader', 'css-loader'],
+				// CSS als eigene Datei extrahieren (style-loader injizierte
+				// das CSS erst zur Laufzeit aus dem JS-Bundle → FOUC).
+				use: [MiniCssExtractPlugin.loader, 'css-loader'],
 			},
 			{
 				test: /\.scss$/,
-				use: ['style-loader', 'css-loader', 'sass-loader'],
+				use: [MiniCssExtractPlugin.loader, 'css-loader', 'sass-loader'],
 			},
 		],
 	},
 	plugins: [
 		new VueLoaderPlugin(),
+		// CSS-Datei landet via ../ in css/ — der Server bindet sie server-
+		// seitig per \OCP\Util::addStyle() im <head> ein (kein FOUC).
+		// ignoreOrder: LimitChunkCountPlugin merged alle Chunks je Entry —
+		// die Conflicting-Order-Warnungen sind damit obsolet.
+		new MiniCssExtractPlugin({ filename: '../css/souvera_mail-[name].css', ignoreOrder: true }),
 		// Merge ALL async chunks into the entry bundles — the deployment
 		// (self-update zipball) has repeatedly failed to deliver chunk
 		// files (404 → "Loading chunk N failed"), breaking the app.

@@ -411,6 +411,19 @@ final class MiniInterpreter
             elseif (\preg_match('/:regex\b/', $modifiers)) { $match = 'regex'; }
             return new TestNode($kind, ['headers' => $headers, 'needles' => $needles, 'match' => $match]);
         }
+        // body :contains "x" / body :is ["a","b"] — Body-Tests haben KEINEN
+        // Header-Namen als erstes Argument (nur Modifier + Needle). Ohne
+        // diesen Zweig fiel jeder Body-Test lautlos auf `false` zurück
+        // (Gemini-Review 2026-09: "Body-Filter sind wirkungslos").
+        if (\preg_match('/^body\b\s*((?::\w+\s*(?:"[^"]*"\s*)?)*)(' . $strOrList . ')\s*$/is', $expr, $m)) {
+            $modifiers = $m[1];
+            $needles = $this->parseStringOrList($m[2]);
+            $match = 'contains';
+            if (\preg_match('/:is\b/', $modifiers)) { $match = 'is'; }
+            elseif (\preg_match('/:matches\b/', $modifiers)) { $match = 'matches'; }
+            elseif (\preg_match('/:regex\b/', $modifiers)) { $match = 'regex'; }
+            return new TestNode('body', ['needles' => $needles, 'match' => $match]);
+        }
         // size :over N / size :under N (N may have K/M/G suffix)
         if (\preg_match('/^size\b\s*:(over|under)\s+(\d+)\s*([KMG]?)/is', $expr, $m)) {
             $direction = \strtolower($m[1]);
@@ -546,6 +559,8 @@ final class MiniInterpreter
                 return false;
             case 'header':
                 return $this->matchHeader($test->args, $msg);
+            case 'body':
+                return $this->matchBody($test->args, $msg);
             case 'address':
                 return $this->matchAddress($test->args, $msg);
             case 'envelope':
@@ -563,6 +578,19 @@ final class MiniInterpreter
                     }
                 }
                 return false;
+        }
+        return false;
+    }
+
+    /** @param array<string,mixed> $args */
+    private function matchBody(array $args, MessageFacts $msg): bool
+    {
+        $needles = $args['needles'] ?? [];
+        $match = $args['match'] ?? 'contains';
+        $body = $msg->body ?? '';
+        if ($body === '') { return false; }
+        foreach ($needles as $n) {
+            if ($this->cmp($body, $n, $match)) { return true; }
         }
         return false;
     }
@@ -639,8 +667,9 @@ final class MiniInterpreter
     private function extractAddresses(string $headerValue): array
     {
         $out = [];
-        // Very simple RFC 5322 subset — good enough for sieve address tests.
-        if (\preg_match_all('/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/', $headerValue, $m)) {
+        // RFC 5322 subset mit Unicode (EAI/IDN: Umlaute in Local-Part und
+        // Domain) — das reine ASCII-`\\w` schluckte z.B. "test@österreich.at".
+        if (\preg_match_all('/[\p{L}\p{N}._%+\-]+@[\p{L}\p{N}.\-]+\.\p{L}{2,}/u', $headerValue, $m)) {
             $out = $m[0];
         }
         return $out;
@@ -648,22 +677,44 @@ final class MiniInterpreter
 
     private function cmp(string $value, string $needle, string $match): bool
     {
+        // mb_* + /u-Flag: strcasecmp/stripos sind ASCII-only — Umlaute
+        // ("Österreich" vs "österreich", Ordner "Müll") matchten sonst nie.
         switch ($match) {
             case 'is':
-                return \strcasecmp($value, $needle) === 0;
+                return \mb_strtolower($value, 'UTF-8') === \mb_strtolower($needle, 'UTF-8');
             case 'contains':
-                return \stripos($value, $needle) !== false;
+                return \mb_stripos($value, $needle, 0, 'UTF-8') !== false;
             case 'matches':
                 // Sieve glob: `*` = any-run, `?` = single char.
                 $regex = '/^' . \str_replace(
                     ['\*', '\?'],
                     ['.*', '.'],
                     \preg_quote($needle, '/')
-                ) . '$/i';
+                ) . '$/iu';
                 return (bool) \preg_match($regex, $value);
             case 'regex':
-                $pattern = '/' . \str_replace('/', '\/', $needle) . '/i';
+                $pattern = '/' . \str_replace('/', '\/', $needle) . '/iu';
                 return @\preg_match($pattern, $value) === 1;
+        }
+        return false;
+    }
+
+    /**
+     * Ob irgendeine Regel einen body-Test enthält — steuert, ob das
+     * Nachträgliche-Anwenden die (teuren) Body-Werte mitladen muss.
+     * @param Rule[] $rules
+     */
+    public static function rulesUseBody(array $rules): bool
+    {
+        $walk = static function (TestNode $t) use (&$walk): bool {
+            if ($t->kind === 'body') { return true; }
+            foreach ($t->args as $arg) {
+                if ($arg instanceof TestNode && $walk($arg)) { return true; }
+            }
+            return false;
+        };
+        foreach ($rules as $rule) {
+            if ($walk($rule->test)) { return true; }
         }
         return false;
     }

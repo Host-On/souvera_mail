@@ -97,6 +97,14 @@ class PageController extends Controller
         // The language comes from the user's PERSONAL setting, not the
         // cached IL10N instance (which may resolve to the instance default).
         $translations = $this->l10nService->getCatalog($this->l10nService->resolveLanguage());
+        // Extrahiertes CSS (mini-css-extract-plugin) serverseitig im <head>
+        // laden — vor dem JS-Bundle, damit kein ungestylter Flash (FOUC)
+        // mehr entsteht. Die Datei erzeugt der Webpack-Build parallel zum
+        // JS-Entry unter css/souvera_mail-v2.css.
+        \OCP\Util::addStyle('souvera_mail', 'souvera_mail-v2');
+        // Der Migration-Wizard ist ein eigener Webpack-Entry — sein CSS
+        // liegt in einer eigenen Extraktions-Datei.
+        \OCP\Util::addStyle('souvera_mail', 'souvera_mail-migration-wizard');
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-v2');
         // The mail-migration assistant (provider.tools IMAP import, built for
         // SnappyMail) also runs on the v2 client. Its mount stays hidden

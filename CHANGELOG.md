@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.2.61]
+
+### Fixed
+
+- **Sieve: Body-Filter waren wirkungslos** — `body`-Tests werden jetzt
+  geparst und ausgewertet; Body-Werte werden beim „Nachträglich
+  anwenden" nur geladen, wenn das Skript sie braucht (64 KB/Part).
+- **Sieve: Unterordner ab Tiefe 2 scheiterten** beim Nachträglich-
+  Anwenden — Zielpfade werden über die parentId-Kette aufgelöst.
+- **Sieve: UTF-8/EAI** — Vergleiche jetzt mbstring-basiert, Adress-
+  Regex akzeptiert Umlaut-Domains (vorbestehender, falscher Testfall
+  im Interpreter-Test korrigiert).
+- **FOUC an der Wurzel behoben**: CSS wird per mini-css-extract-plugin
+  als eigene Datei (`css/souvera_mail-v2.css`) ausgeliefert und im
+  `<head>` geladen — vorher steckte das komplette CSS im JS-Bundle und
+  wurde erst zur Laufzeit injiziert (ungestylter Flash).
+
+### Added
+
+- `docs/sieve-limitations.md` — dokumentierte Stalwart-Limitierung
+  (imap4flags nicht unterstützt, envelope-Emulation, Body-Grenzen).
+
 ## [1.2.60]
 
 ### Security

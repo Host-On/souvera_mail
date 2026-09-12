@@ -128,7 +128,10 @@ $check($r4->shouldDiscard(), 'Spam rule → discard');
 // -------------------------------------------------------------------
 $m5 = new MessageFacts(
     'M5',
-    ['From' => 'friend@example.com', 'Subject' => 'Coffee?'],
+    // bewusst NICHT example.com — sonst matcht die Newsletter-Regel und
+    // der Testfall wäre kein "no rule matches" mehr (vorbestehender
+    // Testdatenfehler, Gemini-Review 2026-09).
+    ['From' => 'friend@other.example', 'Subject' => 'Coffee?'],
     null, [], 700
 );
 $r5 = $engine->evaluate($m5);
@@ -231,6 +234,66 @@ $check((new MiniInterpreter())->parse('')->getRules() === [],
     'empty script parses to zero rules without error');
 $check((new MiniInterpreter())->parse("   \n\n  \n")->getRules() === [],
     'whitespace-only script parses to zero rules without error');
+
+// -------------------------------------------------------------------
+// Body-Tests (Gemini-Review-Blocker 2026-09: body fiel stumm auf false)
+// -------------------------------------------------------------------
+$bodyEngine = (new MiniInterpreter())->parse(
+    'require ["body", "fileinto"];'
+    . 'if body :contains "Rechnung" { fileinto "Buchhaltung"; }'
+    . 'if body :is ["exakt"] { fileinto "Exakt"; }'
+);
+$bodyRules = $bodyEngine->getRules();
+$check(\count($bodyRules) === 2, 'body script parses to 2 rules');
+$check(MiniInterpreter::rulesUseBody($bodyRules), 'rulesUseBody detects body tests');
+$check(!MiniInterpreter::rulesUseBody((new MiniInterpreter())->parse('if header :contains "From" "x" { fileinto "Y"; }')->getRules()),
+    'rulesUseBody false without body tests');
+
+$mBody = new MessageFacts(
+    'MB1',
+    ['From' => 'shop@example.com', 'Subject' => 'Ihre Bestellung'],
+    'shop@example.com',
+    ['user@example.com'],
+    8192,
+    "Sehr geehrte Kundin,\n Ihre RECHNUNG Nr. 4711 ist beigefügt.\nViele Grüße"
+);
+$rBody = $bodyEngine->evaluate($mBody);
+$check($rBody->fileintoTarget() === 'Buchhaltung',
+    'body :contains matches case-insensitively inside body text');
+$mBodyNeg = new MessageFacts('MB2', ['From' => 'shop@example.com'], 'shop@example.com', ['user@example.com'], 100, 'Kein Treffer hier');
+$check($bodyEngine->evaluate($mBodyNeg)->fileintoTarget() === null,
+    'body test without matching needle does not fire');
+$mBodyEmpty = new MessageFacts('MB3', ['From' => 'shop@example.com'], 'shop@example.com', ['user@example.com'], 100);
+$check($bodyEngine->evaluate($mBodyEmpty)->fileintoTarget() === null,
+    'body test with null body (not fetched) does not fire and does not crash');
+
+// -------------------------------------------------------------------
+// UTF-8-Matching (Umlaute in Betreff/Body — strcasecmp war ASCII-only)
+// -------------------------------------------------------------------
+$umlautEngine = (new MiniInterpreter())->parse(
+    'if header :contains "Subject" "österreich" { fileinto "At"; }'
+    . 'if header :is "Subject" "Müll-Abfuhr" { fileinto "Muell"; }'
+);
+$mUmlaut = new MessageFacts(
+    'MU1',
+    ['From' => 'info@österreich.at', 'Subject' => 'Willkommen in ÖSTERREICH'],
+    'info@österreich.at',
+    ['user@example.com'],
+    512
+);
+$check($umlautEngine->evaluate($mUmlaut)->fileintoTarget() === 'At',
+    'UTF-8 case-insensitive contains ("ÖSTERREICH" vs "österreich")');
+$mUmlautIs = new MessageFacts(
+    'MU2',
+    ['From' => 'x@example.com', 'Subject' => 'MÜLL-ABFUHR'],
+    'x@example.com',
+    ['user@example.com'],
+    512
+);
+$check($umlautEngine->evaluate($mUmlautIs)->fileintoTarget() === 'Muell',
+    'UTF-8 case-insensitive :is ("MÜLL-ABFUHR" vs "Müll-Abfuhr")');
+$check(\preg_match_all('/[\p{L}\p{N}._%+\-]+@[\p{L}\p{N}.\-]+\.\p{L}{2,}/u', 'X <test@österreich.at>, y@b.de', $mm) === 2,
+    'address regex extracts IDN/EAI addresses with umlauts');
 
 // -------------------------------------------------------------------
 // `php -l` clean
