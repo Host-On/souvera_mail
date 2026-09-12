@@ -8,7 +8,6 @@ use OCA\SouveraMail\Service\DeviceTokenService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\IRequest;
 use Psr\Log\LoggerInterface;
@@ -60,7 +59,6 @@ class DeviceTokenController extends Controller
     }
 
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function register(): DataResponse
     {
         if ($this->userId === null) {
@@ -87,7 +85,6 @@ class DeviceTokenController extends Controller
     }
 
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function unregister(int $id = 0): DataResponse
     {
         if ($this->userId === null) {

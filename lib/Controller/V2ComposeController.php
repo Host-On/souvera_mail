@@ -11,7 +11,6 @@ use OCA\SouveraMail\Service\StalwartUserContext;
 use OCA\SouveraMail\Service\V2JmapProxy;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IConfig;
 use OCP\IRequest;
@@ -39,7 +38,6 @@ class V2ComposeController extends Controller
      * GET /apps/souvera_mail/api/v2/identities
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function identities(): JSONResponse
     {
         $accountId = $this->jmap->getCurrentAccountId();
@@ -269,7 +267,6 @@ class V2ComposeController extends Controller
      * POST /apps/souvera_mail/api/v2/send
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function send(): JSONResponse
     {
         $accountId = $this->jmap->getCurrentAccountId();
@@ -483,7 +480,6 @@ class V2ComposeController extends Controller
      * POST /apps/souvera_mail/api/v2/drafts
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function createDraft(): JSONResponse
     {
         $accountId = $this->jmap->getCurrentAccountId();
@@ -531,7 +527,6 @@ class V2ComposeController extends Controller
      * PUT /apps/souvera_mail/api/v2/drafts/{id}
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function updateDraft(string $id): JSONResponse
     {
         $accountId = $this->jmap->getCurrentAccountId();

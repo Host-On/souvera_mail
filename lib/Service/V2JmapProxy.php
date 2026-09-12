@@ -7,6 +7,7 @@ namespace OCA\SouveraMail\Service;
 use OCA\SouveraMail\Service\StalwartAdminService;
 use OCA\SouveraMail\Service\StalwartUserContext;
 use OCP\BackgroundJob\IJobList;
+use OCP\ICacheFactory;
 use OCP\IUserSession;
 use Psr\Log\LoggerInterface;
 
@@ -33,6 +34,10 @@ class V2JmapProxy
 
     private int $callCounter = 0;
 
+    /** Local cache namespace for per-account mailbox-role resolution. */
+    private const MAILBOX_ROLES_CACHE = 'souvera_mail_mailbox_roles';
+    private const MAILBOX_ROLES_TTL = 300;
+
     public function __construct(
         private IUserSession $userSession,
         private StalwartUserContext $userContext,
@@ -40,6 +45,7 @@ class V2JmapProxy
         private \OCP\Http\Client\IClientService $clientService,
         private LoggerInterface $logger,
         private IJobList $jobList,
+        private ICacheFactory $cacheFactory,
     ) {
     }
 
@@ -367,18 +373,25 @@ class V2JmapProxy
         foreach (\array_keys($accountIds) as $accountId) {
             $entry = ['junkId' => null, 'inboxId' => null, 'oldMailboxIds' => []];
             try {
-                $mailboxes = $this->singleCall('Mailbox/get', ['accountId' => $accountId]);
-                $junkId = null;
-                $inboxId = null;
-                if (!isset($mailboxes['error'])) {
-                    foreach (($mailboxes['data']['list'] ?? []) as $mb) {
-                        $role = $mb['role'] ?? null;
-                        if ($role === 'junk') {
-                            $junkId = (string) $mb['id'];
-                        } elseif ($role === 'inbox') {
-                            $inboxId = (string) $mb['id'];
+                $cached = $this->loadMailboxRoles($accountId);
+                if ($cached !== null) {
+                    $junkId = $cached['junkId'];
+                    $inboxId = $cached['inboxId'];
+                } else {
+                    $junkId = null;
+                    $inboxId = null;
+                    $mailboxes = $this->singleCall('Mailbox/get', ['accountId' => $accountId]);
+                    if (!isset($mailboxes['error'])) {
+                        foreach (($mailboxes['data']['list'] ?? []) as $mb) {
+                            $role = $mb['role'] ?? null;
+                            if ($role === 'junk') {
+                                $junkId = (string) $mb['id'];
+                            } elseif ($role === 'inbox') {
+                                $inboxId = (string) $mb['id'];
+                            }
                         }
                     }
+                    $this->saveMailboxRoles($accountId, $junkId, $inboxId);
                 }
                 if ($junkId === null) {
                     $this->logger->debug('V2JmapProxy: PMG detection skipped — no junk mailbox for account ' . $accountId);
@@ -416,6 +429,52 @@ class V2JmapProxy
             $context[$accountId] = $entry;
         }
         return $context;
+    }
+
+    /**
+     * Liest die gecachten junk/inbox-Rollen für ein Konto. Null bei Miss
+     * oder Cache-Fehler (dann wird live aufgelöst).
+     *
+     * @return array{junkId: ?string, inboxId: ?string}|null
+     */
+    private function loadMailboxRoles(string $accountId): ?array
+    {
+        try {
+            $cache = $this->cacheFactory->createLocal(self::MAILBOX_ROLES_CACHE);
+            $raw = $cache->get($accountId);
+            if (!\is_string($raw) || $raw === '') {
+                return null;
+            }
+            $decoded = \json_decode($raw, true);
+            if (!\is_array($decoded) || !\array_key_exists('junkId', $decoded)) {
+                return null;
+            }
+            return [
+                'junkId' => $decoded['junkId'] ?? null,
+                'inboxId' => $decoded['inboxId'] ?? null,
+            ];
+        } catch (\Throwable $e) {
+            $this->logger->debug('V2JmapProxy: mailbox roles cache read failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Persistiert die junk/inbox-Rollen eines Kontos (kurzes TTL, damit
+     * neu angelegte Standard-Mailboxen schnell erkannt werden).
+     */
+    private function saveMailboxRoles(string $accountId, ?string $junkId, ?string $inboxId): void
+    {
+        try {
+            $cache = $this->cacheFactory->createLocal(self::MAILBOX_ROLES_CACHE);
+            $cache->set(
+                $accountId,
+                \json_encode(['junkId' => $junkId, 'inboxId' => $inboxId], JSON_UNESCAPED_SLASHES),
+                self::MAILBOX_ROLES_TTL
+            );
+        } catch (\Throwable $e) {
+            $this->logger->debug('V2JmapProxy: mailbox roles cache write failed: ' . $e->getMessage());
+        }
     }
 
     /**

@@ -7,7 +7,6 @@ namespace OCA\SouveraMail\Controller;
 use OCA\SouveraMail\Service\V2JmapProxy;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 
@@ -25,7 +24,6 @@ class V2SearchController extends Controller
      * GET /apps/souvera_mail/api/v2/search?q=term&limit=50
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function search(): JSONResponse
     {
         $accountId = $this->jmap->getCurrentAccountId();

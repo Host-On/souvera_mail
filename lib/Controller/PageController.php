@@ -6,7 +6,6 @@ use OCA\SouveraMail\Service\DomainConfigService;
 use OCA\SouveraMail\Service\L10nService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IGroupManager;
 use OCP\INavigationManager;
@@ -30,7 +29,6 @@ class PageController extends Controller
 
     /** @return TemplateResponse|void */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function index(string $target = '')
     {
         return $this->renderV2();
@@ -52,7 +50,6 @@ class PageController extends Controller
      * @return TemplateResponse|void
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function embed()
     {
         return $this->renderV2();
@@ -67,7 +64,6 @@ class PageController extends Controller
      * endpoint is the only path that works everywhere.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function sound(string $name): \OCP\AppFramework\Http\Response
     {
         $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath('souvera_mail');

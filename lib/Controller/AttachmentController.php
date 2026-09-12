@@ -7,7 +7,6 @@ namespace OCA\SouveraMail\Controller;
 use OCA\SouveraMail\Service\V2JmapProxy;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\Files\IRootFolder;
 use OCP\IRequest;
@@ -30,7 +29,6 @@ class AttachmentController extends Controller
      * { name, accountId? }
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function saveToFiles(string $blobId): JSONResponse
     {
         $user = $this->userSession->getUser();
@@ -98,7 +96,6 @@ class AttachmentController extends Controller
      * { blobIds: [{blobId, name}], accountId? }
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function saveAll(): JSONResponse
     {
         $user = $this->userSession->getUser();

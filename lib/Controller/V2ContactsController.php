@@ -6,7 +6,6 @@ namespace OCA\SouveraMail\Controller;
 
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\Contacts\IManager;
 use OCP\IRequest;
@@ -25,7 +24,6 @@ class V2ContactsController extends Controller
      * GET /apps/souvera_mail/api/v2/contacts/list?limit=50&offset=0
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function listAll(): JSONResponse
     {
         $limit = \min(200, \max(1, (int) ($this->request->getParam('limit') ?? 100)));
@@ -65,7 +63,6 @@ class V2ContactsController extends Controller
         return new JSONResponse(['contacts' => $contacts, 'total' => \count($contacts)]);
     }
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function search(): JSONResponse
     {
         $query = \trim((string) ($this->request->getParam('q') ?? ''));

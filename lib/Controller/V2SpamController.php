@@ -8,7 +8,6 @@ use OCA\SouveraMail\Service\V2JmapProxy;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\Http\Client\IClientService;
 use OCP\IRequest;
@@ -42,7 +41,6 @@ class V2SpamController extends Controller
      * merged and sorted by date descending.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function list(): JSONResponse
     {
         $accountId = $this->getAccountIdSafe();
@@ -75,7 +73,6 @@ class V2SpamController extends Controller
      * GET /apps/souvera_mail/api/v2/spam/view?id=<shieldId>&source=shield
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function view(): JSONResponse
     {
         $id = \trim((string) ($this->request->getParam('id') ?? ''));
@@ -369,7 +366,6 @@ class V2SpamController extends Controller
      * wenn eine Mail als Spam verschoben wird.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function blacklistSender(): JSONResponse
     {
         $entry = \trim((string) ($this->request->getParam('entry') ?? ''));
@@ -409,7 +405,6 @@ class V2SpamController extends Controller
      * Auswahl-Dialogs beim Spam-Button.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function identities(): JSONResponse
     {
         try {

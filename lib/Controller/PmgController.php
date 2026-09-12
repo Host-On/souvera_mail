@@ -9,7 +9,6 @@ use OCA\SouveraMail\Service\PmgReportService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\Http\Client\IClientService;
 use OCP\IRequest;
@@ -132,7 +131,6 @@ class PmgController extends Controller
      * GET /api/v2/pmg/status — user's own reports + PMG health.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function status(): JSONResponse
     {
         $userId = $this->requireUserId();

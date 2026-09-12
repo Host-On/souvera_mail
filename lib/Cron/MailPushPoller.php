@@ -13,6 +13,7 @@ use OCA\SouveraMail\Service\StalwartAdminService;
 use OCA\SouveraMail\Service\StalwartUserContext;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
+use OCP\ICacheFactory;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -51,6 +52,11 @@ class MailPushPoller extends TimedJob
     /** Hard cap on tokens touched per tick — bounds wall time. */
     private const MAX_TOKENS_PER_TICK = 2000;
 
+    /** Local cache namespace shared by the Souvera Mail cron jobs. */
+    private const CACHE_NAME = 'souvera_mail_jobs';
+    private const LOCK_KEY = 'push_poller_lock';
+    private const LOCK_TTL = 600;
+
     public function __construct(
         ITimeFactory $time,
         private DeviceTokenMapper $tokens,
@@ -60,6 +66,7 @@ class MailPushPoller extends TimedJob
         private ApnsClient $apns,
         private \OCA\SouveraMail\Service\MailPushNotifier $notifier,
         private \OCP\IConfig $config,
+        private ICacheFactory $cacheFactory,
         private LoggerInterface $logger,
     ) {
         parent::__construct($time);
@@ -69,6 +76,38 @@ class MailPushPoller extends TimedJob
     }
 
     protected function run($argument): void
+    {
+        // Job-Lock: parallele Cron-Läufe verhindern. Läuft bereits ein
+        // Poller (get() liefert einen Wert), kehren wir sofort zurück. Ist
+        // der Cache nicht verfügbar, läuft der Job ohne Lock weiter.
+        $cache = null;
+        try {
+            $cache = $this->cacheFactory->createLocal(self::CACHE_NAME);
+            if ($cache->get(self::LOCK_KEY) !== null) {
+                return;
+            }
+            $cache->set(self::LOCK_KEY, '1', self::LOCK_TTL);
+        } catch (\Throwable $e) {
+            $this->logger->debug(
+                'Souvera Mail: MailPushPoller lock unavailable — running without lock: ' . $e->getMessage(),
+                ['app' => 'souvera_mail']
+            );
+            $cache = null;
+        }
+        try {
+            $this->runLocked();
+        } finally {
+            if ($cache !== null) {
+                try {
+                    $cache->remove(self::LOCK_KEY);
+                } catch (\Throwable $e) {
+                    // Lock läuft ohnehin über die TTL ab.
+                }
+            }
+        }
+    }
+
+    private function runLocked(): void
     {
         $ncMode = (string) $this->config->getSystemValue(
             MailPushNotifier::PUSH_MODE_CONFIG,

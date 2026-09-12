@@ -8,7 +8,6 @@ use OCA\SouveraMail\Service\SieveScriptService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use OCP\IUserSession;
@@ -39,7 +38,6 @@ class V2SieveController extends Controller
      * List all Sieve scripts for the current user with metadata and body.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function list(): JSONResponse
     {
         $userId = $this->getUserId();
@@ -220,7 +218,6 @@ class V2SieveController extends Controller
      * filters the user switched OFF before rebuilding.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function rebuild(): JSONResponse
     {
         $userId = $this->getUserId();

@@ -10,7 +10,6 @@ use OCA\SouveraMail\Service\SignatureStoreService;
 use OCA\SouveraMail\Service\VacationSyncService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IConfig;
 use OCP\IRequest;
@@ -34,7 +33,6 @@ class V2SettingsController extends Controller
     }
 
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function quota(): JSONResponse
     {
         try {
@@ -57,7 +55,6 @@ class V2SettingsController extends Controller
     }
 
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function appPasswords(): JSONResponse
     {
         $user = $this->userSession->getUser();
@@ -108,7 +105,6 @@ class V2SettingsController extends Controller
     }
 
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function preferences(): JSONResponse
     {
         $user = $this->userSession->getUser();
@@ -158,7 +154,6 @@ class V2SettingsController extends Controller
     }
 
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function updatePreferences(): JSONResponse
     {
         $user = $this->userSession->getUser();

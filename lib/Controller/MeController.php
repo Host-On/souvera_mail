@@ -8,7 +8,6 @@ use OCA\SouveraMail\Service\StalwartUserContext;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\IConfig;
 use OCP\IRequest;
@@ -130,7 +129,6 @@ class MeController extends Controller
     }
 
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function show(): DataResponse
     {
         $user = $this->userSession->getUser();

@@ -7,7 +7,6 @@ namespace OCA\SouveraMail\Controller;
 use OCA\SouveraMail\Service\L10nService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 
@@ -31,7 +30,6 @@ class V2L10nController extends Controller
     }
 
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function index(): JSONResponse
     {
         // Personal user language is authoritative (see L10nService::resolveLanguage).

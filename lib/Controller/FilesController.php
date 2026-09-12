@@ -7,7 +7,6 @@ namespace OCA\SouveraMail\Controller;
 use OCA\SouveraMail\Service\V2JmapProxy;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\Files\File;
 use OCP\Files\IRootFolder;
@@ -31,7 +30,6 @@ class FilesController extends Controller
      * Returns a flat list of files + folders in the given directory.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function list(string $path = ''): JSONResponse
     {
         $user = $this->userSession->getUser();
@@ -86,7 +84,6 @@ class FilesController extends Controller
      * { filePath, accountId? } → { blobId, name, type, size }
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function attach(): JSONResponse
     {
         $user = $this->userSession->getUser();

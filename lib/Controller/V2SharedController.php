@@ -9,7 +9,6 @@ use OCA\SouveraMail\Service\StalwartUserContext;
 use OCA\SouveraMail\Service\V2JmapProxy;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IConfig;
 use OCP\IRequest;
@@ -35,7 +34,6 @@ class V2SharedController extends Controller
      * The user's own account is excluded from the result.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function list(): JSONResponse
     {
         $user = $this->userSession->getUser();

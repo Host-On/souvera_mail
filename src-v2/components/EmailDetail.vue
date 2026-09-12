@@ -253,6 +253,11 @@ export default {
 		}
 	},
 	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: this.remoteAlways, contentDark: false, frameReady: false } },
+	mounted() {
+		// Dark-Mode ohne Weißblitz: den iframe-Inhalt direkt im NC-Theme
+		// starten statt immer hell und dann umschalten zu lassen.
+		this.contentDark = this.detectDarkContent()
+	},
 	computed: {
 		inviteAttachment() {
 			return (this.email.attachments || []).find(a => a.isCalendarInvite) || null
@@ -268,8 +273,9 @@ export default {
 				}
 			},
 		},
-		// Reset the content theme toggle when switching to another email.
-		'email.id'() { this.contentDark = false; this.remoteAllowed = this.remoteAlways; this.frameReady = false },
+		// Reset the content theme toggle when switching to another email —
+		// zurück auf die vom Theme abgeleitete Voreinstellung, nicht auf hell.
+		'email.id'() { this.contentDark = this.detectDarkContent(); this.remoteAllowed = this.remoteAlways; this.frameReady = false },
 		htmlBody() { this.frameReady = false },
 		plainBody() { this.frameReady = false },
 		// The "Always load remote images" preference may arrive AFTER the
@@ -317,6 +323,9 @@ export default {
 		},
 	},
 	methods: {
+		detectDarkContent() {
+			return !!document.querySelector('body.theme--dark, html.theme--dark')
+		},
 		async loadInvite(att) {
 			this.inviteLoading = true
 			this.invite = null

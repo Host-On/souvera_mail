@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.2.60]
+
+### Security
+
+- **CSRF-Hardening der v2-API**: `NoCSRFRequired` von allen Session-
+  authentifizierten Endpunkten entfernt (inkl. Mail-Senden) — das
+  Frontend sendet das requesttoken automatisch mit.
+
+### Fixed
+
+- VacationSync: stündliche Sieve-Rebuilds für nicht-abwesende Nutzer
+  gestoppt (Status-Hash-Guard statt bedingungslosem Deaktivieren).
+- Cron-Jobs (MailPushPoller, VacationSyncJob) gegen Parallelläufe
+  abgesichert (Cache-Lock).
+- JMAP-Proxy: Mailbox-Rollen gecacht (300s) — Mail-Moves brauchen
+  statt drei nur noch einen JMAP-Roundtrip.
+- FOUC-Quick-Wins: Shared-Mailboxen parallel geladen, Gravatar/BIMI
+  flackerfrei (Preload), Dark-Mode-Iframe ohne Weißblitz, Skeleton
+  metrisch an echte List-Items angeglichen.
+
 ## [1.2.59]
 
 ### Changed

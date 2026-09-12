@@ -469,6 +469,13 @@ class VacationSyncService
 
         if ($data === null && $absentSlot === null) {
             // Weder NC-Abwesenheit noch Abwesend-Zeitraum → Responder aus.
+            // Hash-Guard: steht er bereits auf 'none', ist der Responder schon
+            // deaktiviert — dann KEIN Sieve-Rebuild und KEIN DB-Write (der
+            // Cron läuft stündlich pro Nutzer; ohne Guard würde jeder Lauf
+            // einen vollständigen Sieve-Rebuild auslösen).
+            if ($this->config->getUserValue($uid, 'souvera_mail', self::PREF_HASH, '') === 'none') {
+                return ['ok' => true, 'changed' => false, 'active' => false];
+            }
             try {
                 $this->vacationService->set($uid, false, '', '');
                 $this->config->setUserValue($uid, 'souvera_mail', self::PREF_HASH, 'none');

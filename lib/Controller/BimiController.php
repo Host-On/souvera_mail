@@ -7,7 +7,6 @@ namespace OCA\SouveraMail\Controller;
 use OCA\SouveraMail\Service\BimiService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\IRequest;
 use Psr\Log\LoggerInterface;
@@ -30,7 +29,6 @@ class BimiController extends Controller
      * Response is cached client-side for 7 days.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function resolve(): DataResponse
     {
         $emailOrDomain = \trim((string) ($this->request->getParam('email') ?? $this->request->getParam('domain') ?? ''));

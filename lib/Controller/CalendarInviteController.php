@@ -7,7 +7,6 @@ namespace OCA\SouveraMail\Controller;
 use OCA\SouveraMail\Service\V2JmapProxy;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use OCP\IUserSession;
@@ -35,7 +34,6 @@ class CalendarInviteController extends Controller
     }
 
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function parse(): JSONResponse
     {
         $emailId = \trim((string) $this->request->getParam('emailId'));
@@ -61,7 +59,6 @@ class CalendarInviteController extends Controller
     }
 
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function respond(): JSONResponse
     {
         $emailId = \trim((string) ($this->request->getParam('emailId') ?? ''));

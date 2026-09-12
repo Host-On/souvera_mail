@@ -6,7 +6,6 @@ namespace OCA\SouveraMail\Controller;
 
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\RedirectResponse;
 use OCP\IRequest;
 use OCP\IURLGenerator;
@@ -36,7 +35,6 @@ class SettingsController extends Controller
 	}
 
 	#[NoAdminRequired]
-	#[NoCSRFRequired]
 	public function index(): RedirectResponse
 	{
 		// Build the engine URL + Snappymail hash route. The engine is mounted

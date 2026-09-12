@@ -7,7 +7,6 @@ namespace OCA\SouveraMail\Controller;
 use OCA\SouveraMail\Service\V2JmapProxy;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 
@@ -46,7 +45,6 @@ class V2MailboxController extends Controller
      * Optional query parameter: ?accountId=<sharedAccountId> for shared folders.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function list(): JSONResponse
     {
         $accountId = $this->request->getParam('accountId');
@@ -119,7 +117,6 @@ class V2MailboxController extends Controller
      * GET /apps/souvera_mail/api/v2/emails?mailbox=INBOX&limit=20&offset=0
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function emails(): JSONResponse
     {
         $accountId = $this->request->getParam('accountId');
@@ -211,7 +208,6 @@ class V2MailboxController extends Controller
      * GET /apps/souvera_mail/api/v2/emails/{id}?accountId=...
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function detail(string $id): JSONResponse
     {
         $accountId = $this->resolveAccountId();
@@ -310,7 +306,6 @@ class V2MailboxController extends Controller
      * POST /apps/souvera_mail/api/v2/emails/{id}/read
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function markRead(string $id): JSONResponse
     {
         $accountId = $this->resolveAccountId();
@@ -344,7 +339,6 @@ class V2MailboxController extends Controller
      * Permanently delete ALL emails in the given mailbox.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function emptyMailbox(string $id): JSONResponse
     {
         $accountId = $this->request->getParam('accountId');
@@ -419,7 +413,6 @@ class V2MailboxController extends Controller
      * batch — no checkbox animation, no per-page limitation.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function markAllRead(string $id): JSONResponse
     {
         $accountId = $this->request->getParam('accountId');
@@ -467,7 +460,6 @@ class V2MailboxController extends Controller
      * POST /apps/souvera_mail/api/v2/emails/{id}/flag
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function flagEmail(string $id): JSONResponse
     {
         $accountId = $this->resolveAccountId();
@@ -500,7 +492,6 @@ class V2MailboxController extends Controller
      * Moves to Trash mailbox (soft-delete).
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function delete(string $id): JSONResponse
     {
         $accountId = $this->resolveAccountId();
@@ -555,7 +546,6 @@ class V2MailboxController extends Controller
     }
 
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function downloadBlob(string $id, string $name): \OCP\AppFramework\Http\Response
     {
         $accountId = $this->resolveAccountId();

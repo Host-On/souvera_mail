@@ -10,7 +10,6 @@ use OCA\SouveraMail\Service\ExternalSmtpService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 use OCP\IUserSession;
@@ -42,7 +41,6 @@ class V2ExternalAccountsController extends Controller
      * List all external accounts for the current user.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function list(): JSONResponse
     {
         $uid = $this->getUserId();
@@ -65,7 +63,6 @@ class V2ExternalAccountsController extends Controller
      *        smtp_ssl, username, password, provider}
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function create(): JSONResponse
     {
         $uid = $this->getUserId();
@@ -85,7 +82,6 @@ class V2ExternalAccountsController extends Controller
      * DELETE /apps/souvera_mail/api/v2/external/accounts/{id}
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function delete(string $id): JSONResponse
     {
         $uid = $this->getUserId();
@@ -106,7 +102,6 @@ class V2ExternalAccountsController extends Controller
      * Test IMAP connection for an account.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function test(string $id): JSONResponse
     {
         $uid = $this->getUserId();
@@ -129,7 +124,6 @@ class V2ExternalAccountsController extends Controller
      * The add flow requires a successful test before it saves.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function testConnection(): JSONResponse
     {
         $uid = $this->getUserId();
@@ -170,7 +164,6 @@ class V2ExternalAccountsController extends Controller
      * GET /apps/souvera_mail/api/v2/external/accounts/{id}/folders
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function folders(string $id): JSONResponse
     {
         $uid = $this->getUserId();
@@ -193,7 +186,6 @@ class V2ExternalAccountsController extends Controller
      * Query: folder, offset, limit
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function messages(string $id, string $folder = 'INBOX', int $offset = 0, int $limit = 50): JSONResponse
     {
         $uid = $this->getUserId();
@@ -214,7 +206,6 @@ class V2ExternalAccountsController extends Controller
      * Query: folder
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function message(string $id, int $messageUid, string $folder = 'INBOX'): JSONResponse
     {
         $uid = $this->getUserId();
@@ -237,7 +228,6 @@ class V2ExternalAccountsController extends Controller
      * verbatim (no alias checks apply — the account itself is the sender).
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function send(string $id): JSONResponse
     {
         $uid = $this->getUserId();

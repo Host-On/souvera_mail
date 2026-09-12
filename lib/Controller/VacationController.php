@@ -8,7 +8,6 @@ use OCA\SouveraMail\Service\VacationSyncService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
-use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\DataResponse;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
@@ -91,7 +90,6 @@ class VacationController extends Controller
     }
 
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function save(): DataResponse
     {
         if ($this->userId === null) {
@@ -193,7 +191,6 @@ class VacationController extends Controller
      * via the dav OCS API, or when the user toggles the sync preference.
      */
     #[NoAdminRequired]
-    #[NoCSRFRequired]
     public function sync(): DataResponse
     {
         if ($this->userId === null) {

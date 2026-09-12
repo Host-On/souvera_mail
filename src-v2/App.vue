@@ -363,16 +363,16 @@ export default {
 				const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/shared'))
 				this.sharedFolders = data.shared || []
 				this.sharedAbove = data.position === 'above'
-				// Fetch mailboxes for each shared account
+				// Fetch mailboxes for each shared account — parallel statt
+				// sequenziell (jede geteilte Mailbox addierte sonst Latenz).
 				if (this.sharedFolders.length > 0) {
-					const allSharedMboxes = []
-					for (const sh of this.sharedFolders) {
-						try {
-							const mboxes = await fetchMailboxes(sh.id)
-							allSharedMboxes.push(...mboxes)
-						} catch (e) { console.error('Failed to load shared mailboxes for', sh.id, e) }
-					}
-					this.sharedMailboxes = allSharedMboxes
+					const results = await Promise.all(
+						this.sharedFolders.map((sh) => fetchMailboxes(sh.id).catch((e) => {
+							console.error('Failed to load shared mailboxes for', sh.id, e)
+							return []
+						}))
+					)
+					this.sharedMailboxes = results.flat()
 				}
 			} catch (e) { console.error('Failed to load shared', e) }
 		},
