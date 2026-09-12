@@ -25,7 +25,10 @@ use Psr\Log\LoggerInterface;
  */
 class PmgLearningService
 {
-    public const DEFAULT_BASE_URL = 'https://mx10.mail-gw.org:9911';
+    // NEU (Endpoint-Änderung, 2026-09): nginx-Proxy auf Standard-HTTPS (443)
+    // mit /learn-api-Prefix — der direkte Port 9911 wird hinter dem
+    // VPN-Gateway blockiert. Pfade identisch, nur der Prefix ändert sich.
+    public const DEFAULT_BASE_URL = 'https://mx10.mail-gw.org/learn-api';
     public const APP_CONFIG_URL = 'pmg.api_url';
     public const APP_CONFIG_TOKEN = 'pmg.api_token';
 

@@ -43,7 +43,7 @@ Duplikate sind harmlos, ein erneuter Aufruf ist sicher).
 
 ```
 occ config:app:set souvera_mail pmg.api_token --value <PMG-TOKEN>
-occ config:app:set souvera_mail pmg.api_url --value https://mx10.mail-gw.org:9911
+occ config:app:set souvera_mail pmg.api_url --value https://mx10.mail-gw.org/learn-api
 ```
 Status prüfen: `GET /status` → `configured: true`.
 Firewall: Der NC-Server muss in den PMG-Allowlist-Netzen stehen (sonst 403).

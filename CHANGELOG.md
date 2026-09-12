@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.66]
+
+### Fixed
+
+- **PMG-Learning-Endpoint umgestellt**: `https://mx10.mail-gw.org/learn-api`
+  (nginx-Proxy, Standard-HTTPS 443) statt direktem Port 9911 — der wird
+  hinter dem VPN-Gateway blockiert. Pfade/Verhalten unverändert.
+  **Achtung Instanz-Betreiber:** falls `pmg.api_url` via occ gesetzt ist,
+  auf den neuen Wert aktualisieren.
+
 ## [1.2.65]
 
 ### Fixed
