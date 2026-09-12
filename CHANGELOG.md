@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.2.63]
+
+### Fixed
+
+- **Hotfix "Zugriff verboten — CSRF check failed"**: v1.2.60 entfernte
+  `NoCSRFRequired` auch auf den Seiten-Routen (index/embed/sound) —
+  Nextcloud erzwingt den CSRF-Check dort aber auch fuer GET-Navigation,
+  die kein requesttoken mitsendet. Attribute wiederhergestellt; alle
+  zustandsaendernden API-POSTs bleiben CSRF-geschuetzt.
+
 ## [1.2.62]
 
 ### Refactoring

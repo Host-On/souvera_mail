@@ -6,6 +6,7 @@ use OCA\SouveraMail\Service\DomainConfigService;
 use OCA\SouveraMail\Service\L10nService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IGroupManager;
 use OCP\INavigationManager;
@@ -28,6 +29,11 @@ class PageController extends Controller
     }
 
     /** @return TemplateResponse|void */
+    // NoCSRFRequired: Browser-NAVIGATION (Klick in der NC-Navigation) sendet
+    // kein requesttoken — NC erzwingt den CSRF-Check hier auch für GET
+    // (v1.2.60 Regression "Zugriff verboten — CSRF check failed"). Die
+    // zustandsändernden API-POSTs bleiben CSRF-geschützt.
+    #[NoCSRFRequired]
     #[NoAdminRequired]
     public function index(string $target = '')
     {
@@ -49,6 +55,9 @@ class PageController extends Controller
      *
      * @return TemplateResponse|void
      */
+    // Browser-Subresource/-Navigation: WebView-iframe bzw. Audio-src laden
+    // ohne requesttoken — CSRF muss hier ausgenommen bleiben (siehe index).
+    #[NoCSRFRequired]
     #[NoAdminRequired]
     public function embed()
     {
@@ -63,6 +72,8 @@ class PageController extends Controller
      * guaranteed to be served by every webserver config — a PHP
      * endpoint is the only path that works everywhere.
      */
+    // Audio-src lädt ohne requesttoken (Browser-Subresource).
+    #[NoCSRFRequired]
     #[NoAdminRequired]
     public function sound(string $name): \OCP\AppFramework\Http\Response
     {
