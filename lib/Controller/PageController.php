@@ -122,12 +122,38 @@ class PageController extends Controller
         // unless the welcome-state allows it or the open-migration event
         // forces it open (settings entry).
         \OCP\Util::addScript('souvera_mail', 'souvera_mail-migration-wizard');
+        // Layout-Präferenzen SERVERSEITIG injizieren: ohne sie rendert die
+        // App im Default-Layout und springt erst nach dem asynchronen
+        // preferences-Fetch um (Layout-Flash nach jedem Öffnen).
+        $prefs = [
+            'verticalLayout' => false,
+            'listOnlyLayout' => false,
+            'focusLayout' => false,
+            'mailArchiveEnabled' => false,
+            'navCollapsedGroups' => [],
+            'navCollapsedMailboxes' => [],
+        ];
+        if ($this->userId !== null) {
+            $config = \OCP\Server::get(\OCP\IConfig::class);
+            $pref = static fn (string $key, string $default): string =>
+                $config->getUserValue($this->userId, 'souvera_mail', $key, $default);
+            $prefs['verticalLayout'] = $pref('pref_vertical_layout', '0') === '1';
+            $prefs['listOnlyLayout'] = $pref('pref_list_only', '0') === '1';
+            $prefs['focusLayout'] = $pref('pref_focus_layout', '0') === '1';
+            $prefs['mailArchiveEnabled'] = \OCP\Server::get(\OCP\App\IAppManager::class)
+                ->isEnabledForUser('souvera_mailarchiv');
+            foreach (['navCollapsedGroups' => 'pref_nav_collapsed_groups', 'navCollapsedMailboxes' => 'pref_nav_collapsed_mailboxes'] as $outKey => $prefKey) {
+                $decoded = \json_decode($pref($prefKey, '[]'), true);
+                $prefs[$outKey] = \is_array($decoded) ? $decoded : [];
+            }
+        }
         // The inline <script> in templates/v2.php uses the NC-provided
         // $cspNonce template variable (part of the default CSP header),
         // so no app-side ContentSecurityPolicy instance is needed here —
         // the engine-bound LocalCSP class must not be used on this route.
         return new TemplateResponse('souvera_mail', 'v2', [
             'translations' => $translations,
+            'initialPrefs' => $prefs,
         ]);
     }
 }

@@ -173,7 +173,12 @@ export default {
 	name: 'MailV2App',
 	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, LanConnect, MailboxItem, QuotaDonut, ContactPicker },
 	data() {
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], extFolders: {}, extFoldersLoading: {}, extExpanded: {}, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: false, listOnlyLayout: false, focusLayout: false, _responsiveVertical: false, mailArchiveEnabled: false, showContactPicker: false, navCollapsedGroups: [], navCollapsedMailboxes: [] }
+		// Layout-Präferenzen kommen SERVERSEITIG injiziert (window.
+		// _souvera_mail_prefs, aus templates/v2.php) — damit rendert der
+		// erste Paint bereits im korrekten Layout, statt nach dem
+		// preferences-Fetch sichtbar umzuspringen (FOUC).
+		const prefs = (typeof window !== 'undefined' && window._souvera_mail_prefs) || {}
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], extFolders: {}, extFoldersLoading: {}, extExpanded: {}, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: !!prefs.verticalLayout, listOnlyLayout: !!prefs.listOnlyLayout, focusLayout: !!prefs.focusLayout, _responsiveVertical: false, mailArchiveEnabled: !!prefs.mailArchiveEnabled, showContactPicker: false, navCollapsedGroups: prefs.navCollapsedGroups || [], navCollapsedMailboxes: prefs.navCollapsedMailboxes || [] }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },		systemFolders() { return this.mailboxes.filter(m => SYSTEM_ROLES.includes(m.role)).sort((a,b) => (ROLE_ORDER[a.role]??99) - (ROLE_ORDER[b.role]??99)) },

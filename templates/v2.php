@@ -4,13 +4,17 @@
  *
  * Mountpunkt für die Vue-3-App (souvera_mail-v2.js).
  *
- * Die Übersetzungen werden INLINE mit CSP-Nonce injiziert (kein
- * Laufzeit-Datei-Write, kein Asset-Caching) — sie stehen damit garantiert
- * vor dem Vue-Boot bereit (main.js liest window._souvera_mail_translations).
+ * Die Übersetzungen und die Layout-Präferenzen werden INLINE mit CSP-Nonce
+ * injiziert (kein Laufzeit-Datei-Write, kein Asset-Caching) — sie stehen
+ * damit garantiert vor dem Vue-Boot bereit (main.js liest
+ * window._souvera_mail_translations / window._souvera_mail_prefs). Ohne
+ * die injizierten Präferenzen rendert die App im Default-Layout und
+ * springt erst nach dem preferences-Fetch um (Layout-Flash).
  */
 ?>
 <script nonce="<?php p($cspNonce); ?>">
 	window._souvera_mail_translations = <?php echo json_encode($translations ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
+	window._souvera_mail_prefs = <?php echo json_encode($initialPrefs ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE); ?>;
 </script>
 <div id="souvera-mail-v2-app" style="width:100%;height:100%;background:var(--color-main-background)">
 	<div style="display:flex;align-items:center;justify-content:center;width:100%;height:100%">
