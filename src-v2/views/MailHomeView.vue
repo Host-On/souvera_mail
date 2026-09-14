@@ -35,7 +35,7 @@
 			<EmailListSkeleton v-if="loadingEmails" />
 			<template v-else-if="emails.length > 0">
 				<div ref="emailItems" class="email-items" @scroll="onListScroll"
-					@contextmenu.prevent="onListContextMenu">
+					@contextmenu="onListContextMenu">
 					<div v-for="email in emails" :key="email.id" class="email-row"
 						:data-email-id="email.id">
 						<EmailListItem
@@ -175,6 +175,8 @@ import EmailListSkeleton from '../components/EmailListSkeleton.vue'
 import EmailDetail from '../components/EmailDetail.vue'
 import { useHotkeys } from '../composables/useHotkeys.js'
 import { mailboxDisplayName } from '../utils/mailboxNames.js'
+import { openContextMenu, closeContextMenu } from '../utils/contextMenu.js'
+import { CTX_ICONS } from '../utils/contextMenuIcons.js'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { showSuccess, showError } from '@nextcloud/dialogs'
@@ -332,17 +334,10 @@ export default {
 		window.addEventListener('souvera-mail:move-email', this._onMoveEmail)
 		this._onResize = () => { this.isMobile = window.innerWidth < 1024 }
 		window.addEventListener('resize', this._onResize)
-		// Rechtsklick: zusätzlich NATIVE Listener (unabhängig von Vues
-		// Event-Bindung) am Listen-Container und als Document-Fallback —
-		// so erreicht der Rechtsklick in jedem Fall den Handler.
-		this._nativeCtx = (ev) => this.onListContextMenu(ev)
-		this._docCtx = (ev) => this.onListContextMenu(ev)
-		this.$nextTick(() => {
-			const list = this.$refs.emailItems
-			if (list) list.addEventListener('contextmenu', this._nativeCtx)
-			document.addEventListener('contextmenu', this._docCtx, true)
-			document.addEventListener('contextmenu', this._docCtx, false)
-		})
+		// Rechtsklick kommt ausschließlich über die Template-Bindung am
+		// Listen-Container (@contextmenu). KEIN Document-Fallback mehr — der
+		// fing jeden Rechtsklick auf der ganzen Seite und warf für Ziele
+		// außerhalb von Mail-Zeilen die Fehler-Toasts [a:]/[b:] aus.
 	},
 	beforeUnmount() {
 		this._hotkeys?.destroy()
@@ -353,16 +348,10 @@ export default {
 		document.removeEventListener('keydown', this._onUserGesture)
 		window.removeEventListener('souvera-mail:move-email', this._onMoveEmail)
 		window.removeEventListener('resize', this._onResize)
-		const list = this.$refs.emailItems
-		if (list && this._nativeCtx) list.removeEventListener('contextmenu', this._nativeCtx)
-		if (this._docCtx) {
-			document.removeEventListener('contextmenu', this._docCtx, true)
-			document.removeEventListener('contextmenu', this._docCtx, false)
-		}
+		closeContextMenu()
 		if (this._audioCtx) { this._audioCtx.close(); this._audioCtx = null }
 		if (this._originalTitle) document.title = this._originalTitle
 		if (this._mailboxChangeTimer) clearTimeout(this._mailboxChangeTimer)
-		this.closeRowMenuDom()
 	},
 	methods: {
 		syncBodyScrollLock() {
@@ -790,130 +779,78 @@ export default {
 				this.selectedEmail = null; this.emailBodyHtml = ''; this.emailBodyPlain = ''
 			}
 		},
-		/** Rechtsklick auf eine Zeile: Ziel per Event-Delegation ermitteln. */
+		/**
+		 * Rechtsklick auf eine Zeile: Ziel per Event-Delegation ermitteln.
+		 * Außerhalb von Mail-Zeilen: natives Browsermenü (kein preventDefault,
+		 * keine Fehler-Toasts mehr — [a:]/[b:]/[c:]/[e:] sind entfernt).
+		 */
 		onListContextMenu(ev) {
-			ev.preventDefault()
-			// Mehrfach-Trigger (Delegation + native Listener) deduplizieren.
+			// Mehrfach-Trigger deduplizieren.
 			const now = Date.now()
 			if (this._lastCtxMenu && now - this._lastCtxMenu < 250) return
 			this._lastCtxMenu = now
 
 			const target = ev.target
-			const desc = target
-				? (typeof target.className === 'string' && target.className !== '' ? target.className : target.nodeName)
-				: 'none'
-			console.log('[souvera-mail] contextmenu target:', desc, target)
-
-			if (!target || typeof target.closest !== 'function') {
-				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' [a:' + desc + ']')
-				return
-			}
+			if (!target || typeof target.closest !== 'function') return
 			const row = target.closest('[data-email-id]')
-			if (!row) {
-				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' [b:' + desc + ']')
-				return
-			}
+			if (!row) return // Leerbereich / Toolbar / UI drumherum → natives Menü
+
 			const emailId = row.dataset ? row.dataset.emailId : null
 			const email = emailId
 				? this.emails.find(e => String(e.id) === String(emailId))
 					|| this.emails.find(e => e.rowId !== undefined && String(e.rowId) === String(emailId))
 				: null
-			if (!email) {
-				const sample = this.emails.slice(0, 3).map(e => String(e.id)).join(',')
-				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' [c:' + emailId + ' vs ' + sample + ']')
-				return
-			}
+			if (!email) return
+
+			ev.preventDefault()
 			// Manche Eingabegeräte (Trackpads, ctrl+click auf macOS) feuern
 			// direkt nach dem Rechtsklick zusätzlich einen Linksklick — der
 			// würde die Mail öffnen und auf schmalen Fenstern die Liste
 			// verdecken. Für eine halbe Sekunde unterdrücken.
 			this._suppressRowClickUntil = now + 600
-			try {
-				this.openRowMenuDom(email, ev.clientX, ev.clientY)
-				console.log('[souvera-mail] contextmenu geöffnet für', emailId)
-			} catch (e) {
-				console.error('RowContextMenu failed', e)
-				showError(this.t('souvera_mail', 'Context menu could not be opened') + ' [e:' + (e?.message || e) + ']')
-			}
+			this.openRowMenu(email, ev.clientX, ev.clientY, target)
 		},
 		/**
-		 * Kontextmenü komplett imperativ als reines DOM — OHNE Vue-Kind,
-		 * Teleport, $refs oder Event-Bus. Funktioniert, solange dieser
-		 * Handler läuft (was per Diagnose-Toast bewiesen ist).
+		 * Kontextmenü einer Mail-Zeile über das zentrale Modul
+		 * (utils/contextMenu.js) — Aktionen identisch zur Toolbar.
 		 */
-		openRowMenuDom(email, x, y) {
-			this.closeRowMenuDom()
+		openRowMenu(email, x, y, opener) {
 			const t = (k) => this.t('souvera_mail', k)
 			// Mehrfachauswahl: Rechtsklick auf eine markierte Zeile wirkt auf
 			// ALLE markierten Mails (nur wenn mehr als eine markiert ist).
 			const multi = this.checkedIds.length > 1 && this.checkedIds.includes(email.id)
-			const el = document.createElement('div')
-			el.className = 'row-context-menu'
-			el.style.left = Math.max(8, Math.min(x, window.innerWidth - 230)) + 'px'
-			el.style.top = Math.max(8, Math.min(y, window.innerHeight - 280)) + 'px'
+			const n = this.checkedIds.length
 
-			const ICONS = {
-				eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>',
-				mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
-				alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 10v4"/><path d="M12 17h.01"/></svg>',
-				folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>',
-				trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="m6 7 1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"/><path d="M10 11v6M14 11v6"/></svg>',
-			}
+			const items = [
+				{ icon: email.isRead ? CTX_ICONS.mail : CTX_ICONS.eye,
+					label: email.isRead ? t('Mark as unread') : t('Mark as read'),
+					onClick: () => { if (multi) { if (email.isRead) this.bulkMarkUnread(); else this.bulkMarkRead() } else this.rowToggleRead(email) } },
+				{ icon: CTX_ICONS.star,
+					label: email.isFlagged ? t('Remove flag') : t('Add flag'),
+					disabled: multi,
+					onClick: () => this.toggleFlag(email.id) },
+				{ icon: CTX_ICONS.alert, label: t('Spam'),
+					onClick: () => { if (multi) { this.bulkSpam() } else { this.rowSpam(email) } } },
+				{ icon: CTX_ICONS.folder, label: t('Move to folder'),
+					onClick: () => this.openMoveDialog(email, multi) },
+				{ type: 'divider' },
+				{ icon: CTX_ICONS.reply, label: t('Reply'), disabled: multi,
+					onClick: () => { this.selectedEmail = email; this.onReply() } },
+				{ icon: CTX_ICONS.replyAll, label: t('Reply all'), disabled: multi,
+					onClick: () => { this.selectedEmail = email; this.onReplyAll() } },
+				{ icon: CTX_ICONS.forward, label: t('Forward'), disabled: multi,
+					onClick: () => { this.selectedEmail = email; this.onForward() } },
+				{ type: 'divider' },
+				{ icon: CTX_ICONS.trash, label: t('Delete'), danger: true,
+					onClick: () => { if (multi) { this.bulkDelete() } else { this.rowDelete(email) } } },
+			]
 
-			const item = (icon, text, className, onClick) => {
-				const b = document.createElement('button')
-				b.type = 'button'
-				b.className = 'row-context-menu__item' + (className ? ' ' + className : '')
-				const ic = document.createElement('span')
-				ic.className = 'row-context-menu__icon'
-				ic.innerHTML = icon
-				const tx = document.createElement('span')
-				tx.className = 'row-context-menu__text'
-				tx.textContent = text
-				b.appendChild(ic)
-				b.appendChild(tx)
-				b.addEventListener('click', () => { this.closeRowMenuDom(); onClick() })
-				el.appendChild(b)
-			}
-
-			if (multi) {
-				const head = document.createElement('div')
-				head.className = 'row-context-menu__count'
-				head.textContent = this.checkedIds.length + ' ' + t('selected')
-				el.appendChild(head)
-			}
-
-			item(email.isRead ? ICONS.mail : ICONS.eye, email.isRead ? t('Mark as unread') : t('Mark as read'), '', () => {
-				if (multi) {
-					if (email.isRead) this.bulkMarkUnread()
-					else this.bulkMarkRead()
-				} else {
-					this.rowToggleRead(email)
-				}
+			openContextMenu({
+				x, y,
+				opener,
+				header: multi ? `${n} ${t('selected')}` : undefined,
+				items,
 			})
-			item(ICONS.alert, t('Spam'), '', () => {
-				if (multi) { this.bulkSpam() } else { this.rowSpam(email) }
-			})
-			item(ICONS.folder, t('Move to folder'), '', () => this.openMoveDialog(email, multi))
-
-			const divider = document.createElement('div')
-			divider.className = 'row-context-menu__divider'
-			el.appendChild(divider)
-
-			item(ICONS.trash, t('Delete'), 'row-context-menu__item--danger', () => {
-				if (multi) { this.bulkDelete() } else { this.rowDelete(email) }
-			})
-
-			document.body.appendChild(el)
-			this._rowMenuEl = el
-			this._rowMenuClose = (ev) => {
-				if (!el.contains(ev.target)) this.closeRowMenuDom()
-			}
-			this._rowMenuKey = (ev) => { if (ev.key === 'Escape') this.closeRowMenuDom() }
-			this._rowMenuScroll = () => this.closeRowMenuDom()
-			document.addEventListener('click', this._rowMenuClose, true)
-			document.addEventListener('keydown', this._rowMenuKey, true)
-			document.addEventListener('scroll', this._rowMenuScroll, true)
 		},
 		/** Öffnet den Ordner-Auswahl-Dialog für die Verschieben-Aktion. */
 		openMoveDialog(email, multi = false) {
@@ -930,13 +867,9 @@ export default {
 			else if (email) this.rowMoveTo(email, mailboxId)
 		},
 		closeRowMenuDom() {
-			if (this._rowMenuEl) {
-				this._rowMenuEl.remove()
-				this._rowMenuEl = null
-			}
-			if (this._rowMenuClose) { document.removeEventListener('click', this._rowMenuClose, true); this._rowMenuClose = null }
-			if (this._rowMenuKey) { document.removeEventListener('keydown', this._rowMenuKey, true); this._rowMenuKey = null }
-			if (this._rowMenuScroll) { document.removeEventListener('scroll', this._rowMenuScroll, true); this._rowMenuScroll = null }
+			// Deprecated wrapper — ersetzt durch closeContextMenu() aus dem
+			// zentralen Modul. Bleibt für etwaige Restaufrufe als No-Op-Hook.
+			closeContextMenu()
 		},
 
 		/** Gelesen/Ungelesen umschalten (Einzelzeile). */
@@ -1320,58 +1253,8 @@ body.souvera-mobile-detail-open {
 	overflow: hidden;
 }
 
-/* Unscoped: das Kontextmenü wird imperativ direkt an body gehängt. */
-.row-context-menu {
-	position: fixed;
-	z-index: 10000;
-	width: 224px;
-	background: var(--color-main-background);
-	border: 1px solid var(--color-border);
-	border-radius: 12px;
-	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
-	padding: 6px;
-}
-.row-context-menu__item {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	width: 100%;
-	text-align: left;
-	background: none;
-	border: none;
-	border-radius: 8px;
-	padding: 9px 10px;
-	font-size: .92rem;
-	color: var(--color-main-text);
-	cursor: pointer;
-	transition: background-color .12s ease;
-}
-.row-context-menu__item:hover { background: var(--color-background-hover); }
-.row-context-menu__icon {
-	display: inline-flex;
-	width: 18px;
-	height: 18px;
-	flex-shrink: 0;
-	color: var(--color-text-maxcontrast);
-}
-.row-context-menu__icon svg { width: 18px; height: 18px; }
-.row-context-menu__text { flex: 1; }
-.row-context-menu__count {
-	font-size: .78rem;
-	font-weight: 600;
-	color: var(--color-text-maxcontrast);
-	padding: 6px 10px 8px;
-	border-bottom: 1px solid var(--color-border);
-	margin-bottom: 4px;
-}
-.row-context-menu__divider {
-	height: 1px;
-	background: var(--color-border);
-	margin: 4px 8px;
-}
-.row-context-menu__item--danger { color: var(--color-error); }
-.row-context-menu__item--danger .row-context-menu__icon { color: var(--color-error); }
-.row-context-menu__item--danger:hover { background: var(--color-error-light, rgba(200, 60, 60, 0.08)); }
+/* Kontextmenü-Styles sind jetzt global in styles/contextMenu.css
+   (zentrales Modul utils/contextMenu.js, wird von allen Flächen genutzt). */
 .move-modal-backdrop {
 	position: fixed;
 	inset: 0;

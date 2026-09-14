@@ -22,7 +22,8 @@
 					:collapsed-ids="navCollapsedMailboxes"
 					@select="onMailboxSelect"
 					@drop-email="onDropEmail"
-					@toggle-collapse="onMailboxCollapseToggle" />
+					@toggle-collapse="onMailboxCollapseToggle"
+					@contextmenu="onMailboxContextMenu" />
 
 				<template v-if="sharedAbove && sharedFolders.length > 0">
 					<NcAppNavigationCaption :name="t('souvera_mail', 'Shared with me')" />
@@ -44,6 +45,7 @@
 								:collapsed-ids="navCollapsedMailboxes"
 								@select="onSharedSelect(mp._accountId, $event)"
 								@drop-email="onDropEmail"
+								@contextmenu="onSharedMailboxContextMenu(mp, $event)"
 								@toggle-collapse="onMailboxCollapseToggle" />
 						</template>
 					</template>
@@ -56,6 +58,7 @@
 						:collapsed-ids="navCollapsedMailboxes"
 						@select="onMailboxSelect"
 						@drop-email="onDropEmail"
+						@contextmenu="onMailboxContextMenu"
 						@toggle-collapse="onMailboxCollapseToggle" />
 				</template>
 
@@ -114,6 +117,7 @@
 								:collapsed-ids="navCollapsedMailboxes"
 								@select="onSharedSelect(mp._accountId, $event)"
 								@drop-email="onDropEmail"
+								@contextmenu="onSharedMailboxContextMenu(mp, $event)"
 								@toggle-collapse="onMailboxCollapseToggle" />
 						</template>
 					</template>
@@ -162,6 +166,9 @@ import { useJmapClient } from './composables/useJmapClient.js'
 import { extFolderDisplayName } from './utils/mailboxNames.js'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
+import { showSuccess, showError } from '@nextcloud/dialogs'
+import { openContextMenu } from './utils/contextMenu.js'
+import { CTX_ICONS } from './utils/contextMenuIcons.js'
 import { useHotkeys } from './composables/useHotkeys.js'
 import { emit } from '@nextcloud/event-bus'
 
@@ -355,6 +362,86 @@ export default {
 			const to = recipients.map(r => r.email).join(',')
 			const names = recipients.map(r => r.name ? `${r.name} <${r.email}>` : r.email).join(',')
 			this.$router.push({ name: 'compose', query: { to: names } })
+		},
+		/**
+		 * Rechtsklick auf einen Sidebar-Ordner (eigenes Konto).
+		 * System-Ordner (role gesetzt) bekommen nur ungefährliche Aktionen;
+		 * Umbenennen/Löschen nur für eigene Benutzer-Ordner.
+		 */
+		onMailboxContextMenu(mailbox, ev) {
+			if (!mailbox) return
+			this.openMailboxMenu(mailbox, ev, { shared: false })
+		},
+		/** Rechtsklick auf einen geteilten Ordner: nur ungefährliche Aktionen. */
+		onSharedMailboxContextMenu(mailbox, ev) {
+			if (!mailbox) return
+			this.openMailboxMenu(mailbox, ev, { shared: true })
+		},
+		openMailboxMenu(mailbox, ev, { shared = false }) {
+			const t = (k) => this.t('souvera_mail', k)
+			const isSystem = !!mailbox.role
+			const id = mailbox.id
+			const selectId = shared ? (mailbox._accountId || '') + '|' + id : id
+
+			const items = [
+				{ icon: CTX_ICONS.check, label: t('Mark all as read'),
+					onClick: () => this.mailboxMarkAllRead(id) },
+			]
+			if (!isSystem) {
+				items.push({ type: 'divider' })
+				items.push({ icon: CTX_ICONS.pencil, label: t('Rename folder'),
+					onClick: () => this.mailboxRename(mailbox) })
+				items.push({ icon: CTX_ICONS.trash, label: t('Delete folder'), danger: true,
+					onClick: () => this.mailboxDelete(mailbox) })
+			}
+
+			openContextMenu({
+				x: ev.clientX,
+				y: ev.clientY,
+				opener: ev.target,
+				items,
+			})
+			void selectId
+		},
+		async mailboxMarkAllRead(id) {
+			try {
+				await axios.post(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + encodeURIComponent(id) + '/mark-all-read'))
+				showSuccess(this.t('souvera_mail', 'All messages marked as read'))
+				await this.refreshMailboxes()
+			} catch (e) {
+				console.error('Mark all as read failed', e)
+				showError(this.t('souvera_mail', 'Failed to mark all as read'))
+			}
+		},
+		async mailboxRename(mailbox) {
+			const name = window.prompt(this.t('souvera_mail', 'New folder name'), mailbox.name || '')
+			if (name === null) return
+			const trimmed = name.trim()
+			if (trimmed === '' || trimmed === mailbox.name) return
+			try {
+				await axios.put(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + encodeURIComponent(mailbox.id)), { name: trimmed })
+				showSuccess(this.t('souvera_mail', 'Folder renamed'))
+				await this.refreshMailboxes()
+			} catch (e) {
+				console.error('Rename failed', e)
+				showError(this.t('souvera_mail', 'Failed to rename folder'))
+			}
+		},
+		async mailboxDelete(mailbox) {
+			if (!window.confirm(this.t('souvera_mail', 'Really delete folder "{name}" and all its messages?'.replace('{name}', mailbox.name || '')))) return
+			try {
+				await axios.delete(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + encodeURIComponent(mailbox.id)))
+				showSuccess(this.t('souvera_mail', 'Folder deleted'))
+				await this.refreshMailboxes()
+			} catch (e) {
+				console.error('Delete folder failed', e)
+				showError(this.t('souvera_mail', 'Failed to delete folder'))
+			}
+		},
+		async refreshMailboxes() {
+			// Wiederverwendet den bestehenden Reload (eigene + geteilte
+			// Mailboxes + Badges) statt ihn zu duplizieren.
+			await this.onRefreshMailboxes()
 		},
 		async loadQuota() {
 			try {

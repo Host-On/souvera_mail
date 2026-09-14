@@ -39,7 +39,8 @@
 			<div v-for="item in items" :key="item._source + '|' + item.id"
 				class="spam-item"
 				:class="{ 'spam-item--active': selectedItem && selectedItem.id === item.id && selectedItem._source === item._source }"
-				@click="openItem(item)">
+				@click="openItem(item)"
+				@contextmenu.prevent.stop="onItemContextMenu(item, $event)">
 				<NcCheckboxRadioSwitch :model-value="item._checked" @click.stop @update:model-value="item._checked = $event" />
 				<div class="spam-item__content">
 					<div class="spam-item__top">
@@ -87,6 +88,8 @@ import TrashCan from 'vue-material-design-icons/TrashCan.vue'
 import CheckAll from 'vue-material-design-icons/CheckAll.vue'
 import AlertCircle from 'vue-material-design-icons/AlertCircle.vue'
 import { useSpamClient } from '../composables/useSpamClient.js'
+import { openContextMenu } from '../utils/contextMenu.js'
+import { CTX_ICONS } from '../utils/contextMenuIcons.js'
 import SpamDetail from '../components/SpamDetail.vue'
 
 const { fetchSpamItems, viewSpamItem, releaseSpamItems, deleteSpamItems } = useSpamClient()
@@ -178,6 +181,23 @@ export default {
 				console.error('Release failed', e)
 				showError(this.t('souvera_mail', 'Failed to release'))
 			}
+		},
+		/** Rechtsklick auf eine Spam-Zeile: Freigeben / Endgültig löschen. */
+		onItemContextMenu(item, ev) {
+			const t = (k) => this.t('souvera_mail', k)
+			this.selectedItem = item
+			openContextMenu({
+				x: ev.clientX,
+				y: ev.clientY,
+				opener: ev.target,
+				items: [
+					{ icon: CTX_ICONS.openInFolder, label: t('Release'),
+						onClick: () => this.releaseOne(item) },
+					{ type: 'divider' },
+					{ icon: CTX_ICONS.trash, label: t('Delete'), danger: true,
+						onClick: () => this.deleteOne(item) },
+				],
+			})
 		},
 		async deleteSelected() {
 			const checked = this.checkedIds

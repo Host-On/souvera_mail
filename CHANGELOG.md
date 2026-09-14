@@ -1,5 +1,31 @@
 # Changelog
 
+## [1.2.67]
+
+### Fixed
+
+- **Rechtsklick-Fehler-Toast behoben** („Kontextmenü konnte nicht
+  geöffnet werden [b:empty-content]“): der Document-Fallback-Listener
+  fing jeden Rechtsklick auf der ganzen Seite und warf für Ziele
+  außerhalb von Mail-Zeilen Debug-Toasts. preventDefault passiert jetzt
+  nur noch, wenn tatsächlich ein Menü geöffnet wird — außerhalb bleibt
+  das native Browsermenü.
+
+### Added
+
+- **Zentrales Kontextmenü-Modul** (`utils/contextMenu.js` + eigens
+  Stylesheet): Viewport-Clamping, Escape/Scroll/Outside-Close,
+  Tastatursteuerung (Pfeiltasten, Fokus-Rückgabe), Touch-freundlich
+  (Long-Press), aufgeräumtes Nextcloud-Design mit Danger- und
+  Divider-Stil.
+- **Rechtsklick überall**: Mail-Zeilen (neu: Flag, Antworten/Allen
+  antworten/Weiterleiten), Spam-Ansicht (Freigeben/Löschen,
+  quellenspezifisch), Sidebar-Ordner (Alle als gelesen, Umbenennen,
+  Löschen — System-Ordner nur ungefährlich), Anhänge (Vorschau/
+  Download/In Dateien speichern).
+- Alte Debug-Toasts ([a:]/[b:]/[c:]/[e:]) entfernt; Fehler nur noch im
+  Console-Log.
+
 ## [1.2.66]
 
 ### Fixed

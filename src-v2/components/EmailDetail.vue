@@ -65,7 +65,8 @@
 				</div>
 				<div class="attachment-chips">
 					<div v-for="att in email.attachments" :key="att.blobId" class="attachment-chip"
-						:class="{ 'attachment-chip--many': email.attachments.length > 3 }">
+						:class="{ 'attachment-chip--many': email.attachments.length > 3 }"
+						@contextmenu.prevent.stop="onAttContextMenu(att, $event)">
 						<div class="attachment-chip__actions">
 							<NcButton variant="tertiary" size="small"
 								:title="t('souvera_mail', 'Download file')"
@@ -206,6 +207,8 @@
 
 <script>
 import { NcButton, NcActions, NcActionButton, NcDialog, NcTextField, NcEmptyContent, NcLoadingIcon } from '@nextcloud/vue'
+import { openContextMenu } from '../utils/contextMenu.js'
+import { CTX_ICONS } from '../utils/contextMenuIcons.js'
 import ArrowLeft from 'vue-material-design-icons/ArrowLeft.vue'
 import WeatherNight from 'vue-material-design-icons/WeatherNight.vue'
 import WeatherSunny from 'vue-material-design-icons/WeatherSunny.vue'
@@ -325,6 +328,25 @@ export default {
 	methods: {
 		detectDarkContent() {
 			return !!document.querySelector('body.theme--dark, html.theme--dark')
+		},
+		/** Rechtsklick auf einen Anhang: Vorschau / Download / In Dateien speichern. */
+		onAttContextMenu(att, ev) {
+			if (!att) return
+			const t = (k) => this.t('souvera_mail', k)
+			openContextMenu({
+				x: ev.clientX,
+				y: ev.clientY,
+				opener: ev.target,
+				header: att.name,
+				items: [
+					{ icon: CTX_ICONS.eye, label: t('Preview'),
+						onClick: () => this.previewAtt(att) },
+					{ icon: CTX_ICONS.download, label: t('Download file'),
+						onClick: () => this.downloadAtt(att) },
+					{ icon: CTX_ICONS.save, label: t('Save to Files'),
+						onClick: () => this.startSaveToFiles(att) },
+				],
+			})
 		},
 		async loadInvite(att) {
 			this.inviteLoading = true

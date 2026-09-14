@@ -3,7 +3,8 @@
 		:style="{ paddingLeft: (depth * 10) + 'px' }"
 		@dragover.prevent="onDragOver"
 		@dragleave="onDragLeave"
-		@drop.prevent="onDrop">
+		@drop.prevent="onDrop"
+		@contextmenu.prevent.stop="$emit('contextmenu', mailbox, $event)">
 	<NcAppNavigationItem
 		:name="displayName"
 		:active="active"
@@ -68,7 +69,7 @@ export default {
 		// Ids of mailboxes the user collapsed (persisted per user).
 		collapsedIds: { type: Array, default: () => [] },
 	},
-	emits: ['select', 'dropEmail', 'toggle-collapse'],
+	emits: ['select', 'dropEmail', 'toggle-collapse', 'contextmenu'],
 	data() { return { _open: null, dragOver: false } },
 	watch: {
 		collapsedIds() { this._open = null },
