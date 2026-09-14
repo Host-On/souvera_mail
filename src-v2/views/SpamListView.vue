@@ -88,7 +88,7 @@ import TrashCan from 'vue-material-design-icons/TrashCan.vue'
 import CheckAll from 'vue-material-design-icons/CheckAll.vue'
 import AlertCircle from 'vue-material-design-icons/AlertCircle.vue'
 import { useSpamClient } from '../composables/useSpamClient.js'
-import { openContextMenu } from '../utils/contextMenu.js'
+import { openContextMenu, closeContextMenu } from '../utils/contextMenu.js'
 import { CTX_ICONS } from '../utils/contextMenuIcons.js'
 import SpamDetail from '../components/SpamDetail.vue'
 
@@ -97,6 +97,8 @@ const { fetchSpamItems, viewSpamItem, releaseSpamItems, deleteSpamItems } = useS
 export default {
 	name: 'SpamListView',
 	components: { NcButton, NcEmptyContent, NcCheckboxRadioSwitch, EmailOutline, TrashCan, CheckAll, AlertCircle, SpamDetail },
+	// Offenes Kontextmenü beim Verlassen der View schließen.
+	beforeUnmount() { closeContextMenu() },
 	data() {
 		return {
 			items: [],

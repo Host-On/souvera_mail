@@ -45,7 +45,7 @@
 								:collapsed-ids="navCollapsedMailboxes"
 								@select="onSharedSelect(mp._accountId, $event)"
 								@drop-email="onDropEmail"
-								@contextmenu="onSharedMailboxContextMenu(mp, $event)"
+								@contextmenu="onSharedMailboxContextMenu"
 								@toggle-collapse="onMailboxCollapseToggle" />
 						</template>
 					</template>
@@ -117,7 +117,7 @@
 								:collapsed-ids="navCollapsedMailboxes"
 								@select="onSharedSelect(mp._accountId, $event)"
 								@drop-email="onDropEmail"
-								@contextmenu="onSharedMailboxContextMenu(mp, $event)"
+								@contextmenu="onSharedMailboxContextMenu"
 								@toggle-collapse="onMailboxCollapseToggle" />
 						</template>
 					</template>
@@ -387,7 +387,7 @@ export default {
 				{ icon: CTX_ICONS.check, label: t('Mark all as read'),
 					onClick: () => this.mailboxMarkAllRead(id) },
 			]
-			if (!isSystem) {
+			if (!isSystem && !shared) {
 				items.push({ type: 'divider' })
 				items.push({ icon: CTX_ICONS.pencil, label: t('Rename folder'),
 					onClick: () => this.mailboxRename(mailbox) })

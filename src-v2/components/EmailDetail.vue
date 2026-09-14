@@ -207,7 +207,7 @@
 
 <script>
 import { NcButton, NcActions, NcActionButton, NcDialog, NcTextField, NcEmptyContent, NcLoadingIcon } from '@nextcloud/vue'
-import { openContextMenu } from '../utils/contextMenu.js'
+import { openContextMenu, closeContextMenu } from '../utils/contextMenu.js'
 import { CTX_ICONS } from '../utils/contextMenuIcons.js'
 import ArrowLeft from 'vue-material-design-icons/ArrowLeft.vue'
 import WeatherNight from 'vue-material-design-icons/WeatherNight.vue'
@@ -255,6 +255,8 @@ export default {
 			inviteStatus: '',
 		}
 	},
+	// Offenes Kontextmenü (Anhang) beim Verlassen schließen.
+	beforeUnmount() { closeContextMenu() },
 	data() { return { savingAll: false, showFolderPicker: false, folderPath: '', folders: [], loadingFolders: false, showCreateFolder: false, newFolderName: '', pendingAtt: null, pendingAll: false, blockedCount: 0, remoteAllowed: this.remoteAlways, contentDark: false, frameReady: false } },
 	mounted() {
 		// Dark-Mode ohne Weißblitz: den iframe-Inhalt direkt im NC-Theme
