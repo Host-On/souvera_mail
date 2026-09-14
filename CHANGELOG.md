@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.68]
+
+### Fixed
+
+- **„Alle als gelesen“ (Sidebar-Kontextmenü) wirkungslos**: die Route
+  `/mark-all-read` paginiert nicht (max. 500) und ignoriert
+  notUpdated-Fehler — der Erfolgs-Toast loggte, ohne zu wirken. Das
+  Kontextmenü nutzt jetzt den bewährten Pfad aus MailHomeView
+  (fetchEmails-‚unread‘-Batches + markEmailRead, immer ab Position 0,
+  Cap 10.000) — inkl. Zähler im Erfolgs-Toast und Konto-Unterstützung
+  für geteilte Ordner.
+
 ## [1.2.67]
 
 ### Fixed

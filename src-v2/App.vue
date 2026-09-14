@@ -172,7 +172,7 @@ import { CTX_ICONS } from './utils/contextMenuIcons.js'
 import { useHotkeys } from './composables/useHotkeys.js'
 import { emit } from '@nextcloud/event-bus'
 
-const { fetchMailboxes } = useJmapClient()
+const { fetchMailboxes, fetchEmails, markEmailRead } = useJmapClient()
 const SYSTEM_ROLES = ['inbox', 'drafts', 'sent', 'junk', 'trash']
 const ROLE_ORDER = { inbox:0, drafts:1, sent:2, junk:3, trash:4 }
 
@@ -385,7 +385,7 @@ export default {
 
 			const items = [
 				{ icon: CTX_ICONS.check, label: t('Mark all as read'),
-					onClick: () => this.mailboxMarkAllRead(id) },
+					onClick: () => this.mailboxMarkAllRead(id, shared ? (mailbox._accountId || undefined) : undefined) },
 			]
 			if (!isSystem && !shared) {
 				items.push({ type: 'divider' })
@@ -403,10 +403,34 @@ export default {
 			})
 			void selectId
 		},
-		async mailboxMarkAllRead(id) {
+		/**
+		 * „Alle als gelesen“ — bewusst über den BEWÄHRTEN Pfad
+		 * (fetchEmails-‚unread‘-Batches + markEmailRead je Mail, immer
+		 * ab Position 0) wie MailHomeView::markAllRead(). Die Backend-Route
+		 * /mark-all-read paginiert nicht (max. 500) und ignoriert
+		 * notUpdated-Fehler — deshalb nicht verwenden.
+		 */
+		async mailboxMarkAllRead(mailboxId, accountId) {
+			const batchSize = 500
+			let total = 0
 			try {
-				await axios.post(generateUrl('/apps/souvera_mail/api/v2/mailboxes/' + encodeURIComponent(id) + '/mark-all-read'))
-				showSuccess(this.t('souvera_mail', 'All messages marked as read'))
+				// Safety-Cap: 10.000 Mails reichen — danach abbrechen statt
+				// endlos zu loopen (jede Batch rutscht nach vorne, da gelesene
+				// aus dem ‚unread‘-Set fallen).
+				while (total < 10000) {
+					const r = await fetchEmails(mailboxId, batchSize, 0, accountId, '', 'unread')
+					if (r.emails.length === 0) break
+					for (const e of r.emails) {
+						try { await markEmailRead(e.id, true, accountId) } catch (err) { console.error('Failed to mark read', err) }
+					}
+					total += r.emails.length
+					if (r.emails.length < batchSize) break
+				}
+				if (total > 0) {
+					showSuccess(this.t('souvera_mail', '{count} messages marked as read', { count: total }))
+				} else {
+					showSuccess(this.t('souvera_mail', 'No unread messages'))
+				}
 				await this.refreshMailboxes()
 			} catch (e) {
 				console.error('Mark all as read failed', e)
