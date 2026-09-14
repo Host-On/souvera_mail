@@ -199,6 +199,7 @@ export default {
 			showCloseDialog: false,
 			signatureHtml: '',
 			signatureEnabled: false,
+			centralSignatureHtml: '',
 			identitySignatures: {},
 			replyPosition: 'above',
 			signaturePosition: 'above',
@@ -215,10 +216,15 @@ export default {
 			return (this.to.length > 0 || this.cc.length > 0 || this.bcc.length > 0) && !this.sending
 		},
 		// The signature that applies for the currently selected sender.
-		// Precedence: per-identity entry (enabled) → per-identity entry
-		// (disabled = explicit opt-out) → legacy GLOBAL signature as
-		// fallback for identities the user never customized.
+		// PRECEDENCE: CENTRAL signature (admin-managed, replaces everything
+		// — Policy: Corporate-Signatur gewinnt) → per-identity entry
+		// (enabled) → per-identity entry (disabled = explicit opt-out) →
+		// legacy GLOBAL signature as fallback for identities the user never
+		// customized.
 		effectiveSignature() {
+			if (this.centralSignatureHtml) {
+				return { html: this.centralSignatureHtml, enabled: true }
+			}
 			const entry = this.identitySignatures[this.fromIdentityId]
 			if (entry) {
 				if (entry.enabled && entry.html) {
@@ -311,6 +317,19 @@ export default {
 				this.replyPosition = data.replyPosition === 'below' ? 'below' : 'above'
 				this.signaturePosition = data.signaturePosition === 'below' ? 'below' : 'above'
 				this.defaultIdentityId = data.defaultIdentityId || ''
+				// ZENTRALE Signatur (Central-Admin): höchste Präzedenz — sie
+				// ersetzt die persönliche/Identity-Signatur komplett (Policy:
+				// Corporate-Signatur gewinnt). Fail-open: bei Fehler gilt wie
+				// bisher die persönliche Konfiguration.
+				try {
+					const cs = await axios.get(generateUrl('/apps/souvera_central/api/mail-settings/signature'))
+					const cdata = cs.data.ocs?.data || cs.data.data || cs.data
+					if (cdata && cdata.found && cdata.html) {
+						this.centralSignatureHtml = cdata.html
+					}
+				} catch (e) {
+					console.debug('Central signature not available', e)
+				}
 			} catch (e) {
 				console.error('Failed to load preferences', e)
 			}

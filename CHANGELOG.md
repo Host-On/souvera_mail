@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.69]
+
+### Added
+
+- **Zentrale Signatur beim Compose**: die in souvera_central verwaltete
+  Signatur wird beim Verfassen automatisch eingefügt (WYSIWYG, Logo per
+  data-URI aus Central) — höchste Präzedenz vor Identity-/persönlichen
+  Signaturen (Corporate gewinnt). Für den Versand via SMTP-Submission
+  injiziert der Stalwart-MTA-Hook von Central dieselbe Signatur
+  serverseitig (Marker-Klasse verhindert Doppel-Signierung).
+
 ## [1.2.68]
 
 ### Fixed
