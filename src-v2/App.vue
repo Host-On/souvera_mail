@@ -381,7 +381,6 @@ export default {
 			const t = (k) => this.t('souvera_mail', k)
 			const isSystem = !!mailbox.role
 			const id = mailbox.id
-			const selectId = shared ? (mailbox._accountId || '') + '|' + id : id
 
 			const items = [
 				{ icon: CTX_ICONS.check, label: t('Mark all as read'),
@@ -401,7 +400,6 @@ export default {
 				opener: ev.target,
 				items,
 			})
-			void selectId
 		},
 		/**
 		 * „Alle als gelesen“ — bewusst über den BEWÄHRTEN Pfad
