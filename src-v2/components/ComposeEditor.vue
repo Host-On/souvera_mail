@@ -347,7 +347,11 @@ export default {
 			if (!eff.enabled) return ''
 			const sig = this.sanitizedSignature(eff.html)
 			if (!sig) return ''
-			return `<p>--</p><div data-signature="">${sig}</div>`
+			// Zentrale Signatur bekommt den souvera-sig-Marker — der
+			// Stalwart-Hook erkennt daran die bereits signierte Mail
+			// (kein Doppel-Einfügen bei SMTP-Submission).
+			const cls = this.centralSignatureHtml ? ' class="souvera-sig"' : ''
+			return `<p>--</p><div data-signature=""${cls}>${sig}</div>`
 		},
 		// Serialize the editor body for sending: getHTML emits an empty
 		// <div data-signature=""></div> marker for each signature node —
@@ -359,7 +363,8 @@ export default {
 			// Tolerant marker match: attribute may or may not carry =""
 			const markerRe = /<div data-signature(?:="")?><\/div>/
 			if (raw) {
-				html = html.replace(markerRe, `<div data-signature="">${raw}</div>`)
+				const cls = this.centralSignatureHtml ? ' class="souvera-sig"' : ''
+				html = html.replace(markerRe, `<div data-signature=""${cls}>${raw}</div>`)
 			} else {
 				html = html.replace(markerRe, '')
 				// Also drop a leftover standalone "--" separator line
