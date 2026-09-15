@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.70]
+
+### Fixed
+
+- **Anhänge/Inline-Bilder: „Zugriff verboten — CSRF check failed"**: der
+  Blob-Proxy (`/api/v2/blobs/...`) wird per <img src>/window.open geladen
+  (ohne requesttoken möglich) und verlor in v1.2.60 sein NoCSRFRequired —
+  wiederhergestellt (read-only, session-authentifiziert). Volle Prüfung
+  aller v1.2.60-Entfernungen: alle übrigen Aufrufer laufen über
+  @nextcloud/axios (requesttoken) bzw. Native-Token-Auth.
+
 ## [1.2.69]
 
 ### Added

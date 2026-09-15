@@ -7,6 +7,7 @@ namespace OCA\SouveraMail\Controller;
 use OCA\SouveraMail\Service\V2JmapProxy;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\IRequest;
 
@@ -545,6 +546,10 @@ class V2MailboxController extends Controller
         return \is_string($raw) && $raw !== '' ? $raw : null;
     }
 
+    // NoCSRFRequired: der Blob-Proxy wird per <img src>/window.open vom
+    // Browser geladen (Anhänge + Inline-Bilder im Mail-Body) — ohne
+    // requesttoken möglich. Read-only (eigene Mailbox-Blobs), v1.2.60-Regression.
+    #[NoCSRFRequired]
     #[NoAdminRequired]
     public function downloadBlob(string $id, string $name): \OCP\AppFramework\Http\Response
     {
