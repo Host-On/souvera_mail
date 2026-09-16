@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.71]
+
+### Added
+
+- `occ souvera_mail:diag:jmap [email]` — JMAP-Kettendiagnose
+  (API-URL/Credentials/JMAP-Session inkl. Stalwart-Server-Header/accountId/
+  Bearer/Mailbox-Roundtrip) Station für Station.
+
 ## [1.2.70]
 
 ### Fixed
