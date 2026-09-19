@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.3.0]
+
+### Changed
+
+- Push-Pipeline auf die Nextcloud-BenachrichtigungsPipeline umgestellt:
+  neue Mails erzeugen NC-Benachrichtigungen, die über die
+  Notifications-App E2E-verschlüsselt an den eigenen Push-Proxy
+  (push.souvera.eu) gehen und von dort per FCM (Android) bzw. APNs
+  (iOS) zugestellt werden. Google/Apple sehen nur Ciphertext.
+
+### Removed
+
+- Direkter FCM/APNs-Versand (`FcmClient`, `ApnsClient`), Device-Token-
+  Registry (`DeviceToken*`, `/devices`-Endpunkte, `occ
+  souvera_mail:push:test`) inklusive Migration, die die alte
+  Registrierungstabelle entfernt. Die Geräte registrieren sich künftig
+  beim Push-Proxy; `souvera_mail.push_mode` ist entfallen.
+
 ## [1.2.71]
 
 ### Added

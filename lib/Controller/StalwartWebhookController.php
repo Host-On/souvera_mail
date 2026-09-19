@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace OCA\SouveraMail\Controller;
 
-use OCA\SouveraMail\Db\DeviceTokenMapper;
-use OCA\SouveraMail\Service\ApnsClient;
-use OCA\SouveraMail\Service\FcmClient;
 use OCA\SouveraMail\Service\MailPushNotifier;
 use OCA\SouveraMail\Service\StalwartAdminService;
 use OCA\SouveraMail\Service\StalwartUserContext;
@@ -104,8 +101,8 @@ use Psr\Log\LoggerInterface;
  *      {@see IUserManager::getByEmail()}, same as the legacy path.
  *   No persistent NC-user↔accountId cache is kept: `Principal/get` is a
  *   single cheap admin call per ham event, and this app has no existing
- *   table that already stores this mapping (checked: DeviceToken,
- *   AppPasswordMapping, MigrationJob — none carry a Stalwart accountId).
+ *   table that already stores this mapping (checked: AppPasswordMapping,
+ *   MigrationJob — none carry a Stalwart accountId).
  *   Revisit if webhook volume ever makes that round-trip a bottleneck.
  *
  * Response: always 200 OK as fast as possible (Stalwart should not retry
@@ -143,9 +140,6 @@ class StalwartWebhookController extends Controller
      *  a LEGACY-shaped event. */
     private const RECIPIENT_KEYS = ['account', 'recipient', 'email', 'recipients', 'to', 'rcptTo', 'rcpt_to'];
 
-    private const PUSH_TITLE = 'Neue E-Mail';
-    private const PUSH_BODY = 'Du hast eine neue Nachricht erhalten.';
-
     /** @var array<int, string|null> per-request memo: numeric Stalwart
      *  accountId → resolved NC user id (or null = unresolved). */
     private array $accountIdUserCache = [];
@@ -163,9 +157,6 @@ class StalwartWebhookController extends Controller
         private IConfig $config,
         private IAppConfig $appConfig,
         private IUserManager $userManager,
-        private DeviceTokenMapper $tokens,
-        private FcmClient $fcm,
-        private \OCA\SouveraMail\Service\ApnsClient $apns,
         private \OCA\SouveraMail\Service\MailPushNotifier $notifier,
         private StalwartAdminService $stalwartAdmin,
         private StalwartUserContext $userContext,
@@ -359,67 +350,26 @@ class StalwartWebhookController extends Controller
     }
 
     /**
-     * Sends the push to every device registered for one NC user.
+     * Sends the new-mail notification for one NC user through the
+     * Nextcloud notification pipeline (notifications app → E2E-encrypted
+     * push proxy push.souvera.eu → FCM/APNs → device).
      *
-     * @return bool true if at least one device token existed and a push was sent
+     * @return bool true if a notification was created
      */
     private function pushToUser(string $userId, array $event = []): bool
     {
-        // NC-Modus zuerst: der Benachrichtigungspfad braucht weder registrierte
-        // Device-Tokens noch FCM/APNs — die Zustellung übernimmt die
-        // Notifications-App (Web-Bell, notify_push, Push-Proxy der NC-Apps).
-        if ((string) $this->config->getSystemValue(MailPushNotifier::PUSH_MODE_CONFIG, MailPushNotifier::PUSH_MODE_DIRECT)
-            === MailPushNotifier::PUSH_MODE_NC) {
-            $documentId = (int) ($event['data']['documentId'] ?? 0);
-            $emailId = $documentId > 0 ? StalwartAdminService::encodeJmapId($documentId) : '';
-            $enrichment = $emailId !== ''
-                ? $this->enricher->fetchDetails($userId, $emailId)
-                : ['subject' => '', 'from' => '', 'preview' => ''];
-            $this->notifier->notify(
-                $userId,
-                $emailId,
-                $enrichment['subject'],
-                $enrichment['from'],
-                $enrichment['preview'],
-            );
-            return true;
-        }
-
-        $androidTokens = [];
-        $iosTokens = [];
-        foreach ($this->tokens->findAllForUser($userId) as $device) {
-            if ($device->getPlatform() === \OCA\SouveraMail\Db\DeviceToken::PLATFORM_IOS) {
-                $iosTokens[] = $device->getFcmToken();
-            } else {
-                $androidTokens[] = $device->getFcmToken();
-            }
-        }
-        if ($androidTokens === [] && $iosTokens === []) {
-            $this->logger->info('Souvera Mail: webhook push skipped — no registered device tokens for user "' . $userId . '"', ['app' => 'souvera_mail']);
-            return false;
-        }
-
-        // Deep-Link-Daten: data.documentId ist die numerische Stalwart-Doc-ID,
-        // deren base32-Form die JMAP-Email-ID ist - damit kann die App beim
-        // Antippen der Notification die Mail direkt oeffnen.
-        $data = ['type' => 'new_mail'];
         $documentId = (int) ($event['data']['documentId'] ?? 0);
-        if ($documentId > 0) {
-            $emailId = StalwartAdminService::encodeJmapId($documentId);
-            $data['emailId'] = $emailId;
-            $data['mailboxPath'] = 'INBOX';
-            $enrichment = $this->enricher->fetchDetails($userId, $emailId);
-            $data['subject'] = $enrichment['subject'];
-            $data['sender'] = $enrichment['from'];
-            $data['preview'] = $enrichment['preview'];
-        }
-
-        if ($androidTokens !== []) {
-            $this->fcm->send($androidTokens, self::PUSH_TITLE, self::PUSH_BODY, $data);
-        }
-        if ($iosTokens !== [] && $this->apns->isConfigured()) {
-            $this->apns->send($iosTokens, self::PUSH_TITLE, self::PUSH_BODY, $data);
-        }
+        $emailId = $documentId > 0 ? StalwartAdminService::encodeJmapId($documentId) : '';
+        $enrichment = $emailId !== ''
+            ? $this->enricher->fetchDetails($userId, $emailId)
+            : ['subject' => '', 'from' => '', 'preview' => ''];
+        $this->notifier->notify(
+            $userId,
+            $emailId,
+            $enrichment['subject'],
+            $enrichment['from'],
+            $enrichment['preview'],
+        );
         return true;
     }
 

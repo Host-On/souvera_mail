@@ -8,23 +8,15 @@ use OCP\Notification\IManager;
 
 /**
  * Versendet Mail-Eingangsmeldungen über das Nextcloud-Benachrichtigungssystem
- * (Notifications-App + notify_push-Proxy) statt direkt über FCM/APNs.
- *
- * Vorteil gegenüber dem direkten Weg: Die Inhalte (Betreff, Absender,
- * Vorschau) werden vom Push-Proxy mit dem Geräte-Schlüssel
+ * (Notifications-App + push.souvera.eu Push-Proxy). Die Inhalte (Betreff,
+ * Absender, Vorschau) werden vom Proxy mit dem Geräte-Schlüssel
  * end-to-end-verschlüsselt — Google/Apple sehen den Inhalt nicht.
  *
- * Umschaltung über System-Config `souvera_mail.push_mode`:
- *   - "direct" (Default): bisheriges Verhalten (FcmClient/ApnsClient)
- *   - "nc":      Benachrichtigungspfad über die NC-Notifications-API
+ * object_type für Mail-Benachrichtigungen (Deep-Link über object_id =
+ * JMAP-Email-ID).
  */
 class MailPushNotifier
 {
-    public const PUSH_MODE_CONFIG = 'souvera_mail.push_mode';
-    public const PUSH_MODE_DIRECT = 'direct';
-    public const PUSH_MODE_NC = 'nc';
-
-    /** object_type für Mail-Benachrichtigungen (Deep-Link über object_id = JMAP-Email-ID). */
     public const OBJECT_TYPE = 'souvera_mail';
 
     public function __construct(
