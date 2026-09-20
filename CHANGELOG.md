@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.1]
+
+### Fixed
+
+- Composer zeigt die Bilder der zentralen Signatur wieder an: die
+  `cid:souvera-sig-*`-Referenzen werden nur für die Editor-Anzeige gegen
+  den Vorschau-Endpunkt (`signature-assets/{slug}`) getauscht — gesendet
+  wird weiterhin die cid-Variante (Empfänger bekommen die Bilder
+  eingebettet vom Stalwart-Hook).
+
 ## [1.3.0]
 
 ### Changed

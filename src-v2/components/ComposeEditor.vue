@@ -338,6 +338,20 @@ export default {
 			if (!html) return ''
 			return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } })
 		},
+		/**
+		 * Display-Variante der Signatur: cid:souvera-sig-<slug>-Bildreferenzen
+		 * werden gegen den ladbaren Vorschau-Endpunkt getauscht (cid: ist kein
+		 * Browser-Schema — ohne Rewrite zeigen Bilder nur ihren Alt-Text).
+		 * NUR für die Editor-Darstellung; serializeBody() sendet weiterhin die
+		 * cid-Variante (der Stalwart-Hook bettet die Bilder als MIME-Parts ein).
+		 */
+		displaySignature(html) {
+			if (!html) return ''
+			return html.replace(/src=["']cid:(souvera-sig-[^"']+)["']/gi, (m, cid) => {
+				const slug = cid.replace(/^souvera-sig-/, '')
+				return 'src="' + generateUrl('/apps/souvera_central/api/mail-settings/signature-assets/{slug}', { slug }) + '"'
+			})
+		},
 		// Thunderbird-style signature block: RFC 3676 separator "--" line
 		// followed by the signature. The signature HTML is wrapped in a
 		// <div data-signature> so the editor renders it RAW (tables, images,
@@ -345,7 +359,9 @@ export default {
 		signatureBlock() {
 			const eff = this.effectiveSignature
 			if (!eff.enabled) return ''
-			const sig = this.sanitizedSignature(eff.html)
+			// Display-Variante in den Node (der Editor zeigt sie); serializeBody()
+			// rendert beim Senden die cid:-Variante aus eff.html.
+			const sig = this.displaySignature(this.sanitizedSignature(eff.html))
 			if (!sig) return ''
 			// Zentrale Signatur bekommt den souvera-sig-Marker — der
 			// Stalwart-Hook erkennt daran die bereits signierte Mail
@@ -381,7 +397,9 @@ export default {
 		swapSignature() {
 			if (!this.$refs.editor) return
 			const eff = this.effectiveSignature
-			const raw = eff.enabled ? this.sanitizedSignature(eff.html) : ''
+			// Display-Variante für den Node (wie in signatureBlock); senden
+			// tut serializeBody() aus eff.html.
+			const raw = eff.enabled ? this.displaySignature(this.sanitizedSignature(eff.html)) : ''
 			let html = this.bodyHtml || ''
 			const markerRe = /<div data-signature(?:="")?><\/div>/
 			const hasMarker = markerRe.test(html)
