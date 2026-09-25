@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.3]
+
+### Fixed
+
+- **Push für echte Mails schlug mit „Value provided for message is not valid"
+  fehl**: echte Mail-Inhalte (Betreff/Absender/Vorschau) mit Sonderzeichen
+  oder ungültigem UTF-8 ließen den NotificationManager die Erstellung
+  abbrechen — der Push kam nicht an. Neu: Inhalte werden vor dem Übergaben
+  bereinigt (valides UTF-8 erzwungen, Steuerzeichen entfernt, auf die
+  NC-Limits Subject=64/Message=4000 gekürzt); schlägt die Erstellung trotzdem
+  fehl, wird einmal mit einem generischen Fallback („Neue E-Mail") erneut
+  versucht, damit ein Push nie an einem Betreff scheitert.
+
 ## [1.3.2]
 
 ### Fixed
