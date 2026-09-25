@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.6]
+
+### Fixed
+
+- Whitespace-only Absender aus dem JMAP-Enrichment überschreibt nicht mehr den
+  Absender aus dem Webhook-Payload (Stufe-1-Fallback greift bei leerem bzw.
+  nur aus Leerraum bestehendem Wert).
+
 ## [1.3.5]
 
 ### Added
