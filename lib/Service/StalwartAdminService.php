@@ -373,6 +373,48 @@ class StalwartAdminService
     }
 
     /**
+     * Stalwart JMAP accountId (base32-String) für eine E-Mail-Adresse —
+     * KOMPLETT über den Admin-Pfad (Principal/query nach E-Mail + Principal/get),
+     * kein User-Bearer. Für Kontexte ohne Usersession (Webhook, Cron-Poller).
+     */
+    public function lookupAccountIdByEmail(string $email): ?string
+    {
+        if (!$this->isConfigured() || $this->getAdminCredentials() === null || $email === '') {
+            return null;
+        }
+
+        try {
+            $response = $this->jmapCallAsAdmin(
+                [
+                    ['Principal/query', [
+                        'filter' => ['email' => $email],
+                        'limit' => 1,
+                    ], 'q0'],
+                    ['Principal/get', [
+                        'accountId' => null,
+                        '#ids' => ['resultOf' => 'q0', 'name' => 'Principal/query', 'path' => '/ids'],
+                        'properties' => ['id'],
+                    ], 'p0'],
+                ],
+                ['urn:ietf:params:jmap:principals'],
+            );
+            $result = $this->extractMethodResponse($response, 'Principal/get');
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail: Stalwart Principal lookup by email failed for "' . $email . '": ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
+            );
+            return null;
+        }
+
+        $principal = $result['list'][0] ?? null;
+        if (!\is_array($principal) || !isset($principal['id']) || !\is_string($principal['id']) || $principal['id'] === '') {
+            return null;
+        }
+        return $principal['id'];
+    }
+
+    /**
      * Extracts the response body of a specific method call from a full JMAP
      * response envelope. Throws on JMAP-level errors or missing method.
      *

@@ -331,7 +331,7 @@ class StalwartWebhookController extends Controller
                 $this->logger->info('Souvera Mail: Stalwart webhook ham event: accountId ' . $accountId . ' not resolvable to an NC user — push skipped', ['app' => 'souvera_mail']);
                 return 0;
             }
-            return $this->pushToUser($userId, $event) ? 1 : 0;
+            return $this->pushToUser($userId, $accountId, $event) ? 1 : 0;
         }
 
         if (\in_array($type, self::LEGACY_TRIGGER_EVENTS, true)) {
@@ -356,51 +356,37 @@ class StalwartWebhookController extends Controller
      *
      * @return bool true if a notification was created
      */
-    private function pushToUser(string $userId, array $event = []): bool
+    private function pushToUser(string $userId, ?int $numericAccountId = null, array $event = []): bool
     {
         $documentId = (int) ($event['data']['documentId'] ?? 0);
         $emailId = $documentId > 0 ? StalwartAdminService::encodeJmapId($documentId) : '';
-
-        // Stufe 1: Absender direkt aus dem Webhook-Payload (`data.from`) —
-        // der Stalwart-Payload trägt KEINEN Betreff, aber immer `from`.
-        // Das garantiert selbst bei komplett ausfallendem JMAP-Fetch einen
-        // aussagekräftigen "Von: …"-Push statt des generischen Fallbacks.
-        $payloadFrom = $this->extractPayloadFrom($event);
+        if ($documentId === 0) {
+            $this->logger->warning(
+                'Souvera Mail: webhook event carried no data.documentId — push goes out unenriched',
+                ['app' => 'souvera_mail', 'eventKeys' => \array_keys($event)]
+            );
+        }
+        $jmapAccountId = ($numericAccountId !== null && $numericAccountId > 0)
+            ? StalwartAdminService::encodeJmapId($numericAccountId)
+            : '';
 
         $enrichment = $emailId !== ''
-            ? $this->enricher->fetchDetails($userId, $emailId)
+            ? $this->enricher->fetchDetails($jmapAccountId, $emailId)
             : ['subject' => '', 'from' => '', 'preview' => ''];
-
-        // Stufe 2 (besser): JMAP liefert Betreff + Absendernamen. Schlägt der
-        // Fetch fehl oder liefert keinen (bzw. nur aus Leerraum bestehenden)
-        // Absender, fällt der Absender auf den Payload-`from`-Wert zurück
-        // (Stufe 1).
-        $enrichedFrom = \trim((string) $enrichment['from']);
-        $sender = $enrichedFrom !== '' ? $enrichedFrom : $payloadFrom;
-
+        $this->logger->info(
+            'Souvera Mail: new-mail notification assembled [len subject=' . \strlen($enrichment['subject'])
+            . ' from=' . \strlen($enrichment['from'])
+            . ' preview=' . \strlen($enrichment['preview']) . ']',
+            ['app' => 'souvera_mail', 'user' => $userId, 'emailId' => $emailId]
+        );
         $this->notifier->notify(
             $userId,
             $emailId,
             $enrichment['subject'],
-            $sender,
+            $enrichment['from'],
             $enrichment['preview'],
         );
         return true;
-    }
-
-    /**
-     * Liest den Absender (`data.from`) aus dem Webhook-Event. Der Stalwart-
-     * Payload enthält nur die nackte Absender-Adresse, aber keinen Betreff —
-     * die Adresse ist daher die einzige sofort verfügbare, verlässliche
-     * Anzeigeinformation.
-     *
-     * @param array<string, mixed> $event
-     */
-    private function extractPayloadFrom(array $event): string
-    {
-        $data = $event['data'] ?? null;
-        $from = \is_array($data) ? ($data['from'] ?? '') : '';
-        return \is_string($from) ? \trim($from) : '';
     }
 
     private function extractProvidedSecret(): string

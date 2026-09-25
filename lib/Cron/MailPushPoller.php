@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace OCA\SouveraMail\Cron;
 
 use OCA\SouveraMail\AppInfo\Application;
-use OCA\SouveraMail\Service\MailPushNotifier;
+use OCA\SouveraMail\Service\MailEnricherService;
 use OCA\SouveraMail\Service\StalwartAdminService;
-use OCA\SouveraMail\Service\StalwartUserContext;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\BackgroundJob\TimedJob;
 use OCP\ICacheFactory;
 use OCP\IGroupManager;
 use OCP\IConfig;
+use OCP\IUserManager;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -22,18 +22,19 @@ use Psr\Log\LoggerInterface;
  * NC instance briefly down), this poller notices new mail within 5
  * minutes and raises the missed notification.
  *
- * For every member of the `souvera-users` group we fetch the JMAP
- * `Email/query` `queryState` for their Inbox (a cheap, opaque marker
- * that changes whenever the mailbox's result set changes — no message
- * bodies/subjects are ever read) and compare it against the user's
- * last known state (oc_preferences). A state change means new mail
- * arrived without a webhook → raise the notification through the
- * Nextcloud notification pipeline (notifications app → E2E-encrypted
- * push proxy push.souvera.eu → FCM/APNs → device).
+ * For every member of the `souvera-users` group: resolve the Stalwart
+ * JMAP accountId (email → Principal/query, ADMIN path — no user bearer,
+ * no OIDC dependency), fetch the JMAP `Email/query` `queryState` for
+ * their Inbox as ADMIN (a cheap, opaque marker that changes whenever the
+ * mailbox's result set changes — no message bodies/subjects are ever
+ * read here) and compare against the user's last known state
+ * (oc_preferences). A state change means new mail arrived without a
+ * webhook → raise the notification through the Nextcloud notification
+ * pipeline (notifications app → E2E-encrypted push proxy
+ * push.souvera.eu → FCM/APNs → device).
  *
- * Pure safety net: the notifications themselves are content-complete
- * (subject/sender/preview) and end-to-end encrypted towards the device;
- * Google/Apple only ever see ciphertext.
+ * Pure safety net: the notification content (subject/sender/preview) is
+ * enriched by {@see MailEnricherService} on the ADMIN path as well.
  */
 class MailPushPoller extends TimedJob
 {
@@ -50,12 +51,12 @@ class MailPushPoller extends TimedJob
 
     public function __construct(
         ITimeFactory $time,
-        private StalwartUserContext $userContext,
         private StalwartAdminService $stalwartAdmin,
-        private \OCA\SouveraMail\Service\MailEnricherService $enricher,
+        private MailEnricherService $enricher,
         private \OCA\SouveraMail\Service\MailPushNotifier $notifier,
         private IConfig $config,
         private IGroupManager $groupManager,
+        private IUserManager $userManager,
         private ICacheFactory $cacheFactory,
         private LoggerInterface $logger,
     ) {
@@ -67,13 +68,13 @@ class MailPushPoller extends TimedJob
 
     protected function run($argument): void
     {
-        if (!$this->userContext->isAvailable()) {
-            return; // Ohne OIDC-Setup keine JMAP-Abfragen möglich.
+        if (!$this->stalwartAdmin->isConfigured()) {
+            return; // Ohne Admin-Zugang keine JMAP-Abfragen möglich.
         }
 
         $cache = $this->cacheFactory->createLocal(self::CACHE_NAME);
         if ($cache->get(self::LOCK_KEY)) {
-            // Vorheriger Lauf hängt noch (oder TTL läuft ohnehin über die ab).
+            // Vorheriger Lauf hängt noch (TTL läuft ohnehin ab).
             return;
         }
         $cache->set(self::LOCK_KEY, true, self::LOCK_TTL);
@@ -86,9 +87,12 @@ class MailPushPoller extends TimedJob
 
     private function runLocked(): void
     {
-        $users = $this->sweepUsers();
-        foreach ($users as $userId) {
-            $snapshot = $this->resolveInboxSnapshot($userId);
+        foreach ($this->sweepUsers() as $userId) {
+            $accountId = $this->resolveJmapAccountId($userId);
+            if ($accountId === null || $accountId === '') {
+                continue;
+            }
+            $snapshot = $this->resolveInboxSnapshot($accountId);
             if ($snapshot === null) {
                 continue;
             }
@@ -102,7 +106,7 @@ class MailPushPoller extends TimedJob
             if ($isBaseline) {
                 continue;
             }
-            $details = $this->enricher->fetchDetails($userId, $snapshot['emailId']);
+            $details = $this->enricher->fetchDetails($accountId, $snapshot['emailId']);
             $this->notifier->notify(
                 $userId,
                 $snapshot['emailId'],
@@ -139,18 +143,41 @@ class MailPushPoller extends TimedJob
     }
 
     /**
-     * Resolves the current Email/query `queryState` for a user's Inbox.
-     * Returns null on any resolution failure — the poller simply skips
-     * that user for this tick.
+     * Stalwart JMAP accountId eines NC-Users — KOMPLETT über den
+     * Admin-Pfad (kein User-Bearer, kein OIDC): Mail-Adresse des Users
+     * (über zentralen StalwartService) → `Principal/query`+`get` per
+     * Admin-Basic-Auth.
      */
-    private function resolveInboxSnapshot(string $userId): ?array
+    private function resolveJmapAccountId(string $userId): ?string
     {
         try {
-            $bearer = $this->userContext->resolveBearer($userId);
-            $accountId = $this->userContext->resolveAccountId($userId);
+            $user = $this->userManager->get($userId);
+            if ($user === null) {
+                return null;
+            }
+            $email = $user->getEMailAddress();
+            if ($email === null || $email === '') {
+                return null;
+            }
+            return $this->stalwartAdmin->lookupAccountIdByEmail($email);
+        } catch (\Throwable $e) {
+            $this->logger->warning(
+                'Souvera Mail: push poller could not resolve accountId for "' . $userId . '": ' . $e->getMessage(),
+                ['app' => 'souvera_mail']
+            );
+            return null;
+        }
+    }
 
-            $mailboxResponse = $this->stalwartAdmin->jmapCall(
-                $bearer,
+    /**
+     * Resolves the current Email/query `queryState` for a user's Inbox —
+     * als ADMIN (kein User-Bearer). Returns null on any resolution
+     * failure — the poller simply skips that user for this tick.
+     */
+    private function resolveInboxSnapshot(string $accountId): ?array
+    {
+        try {
+            $mailboxResponse = $this->stalwartAdmin->jmapCallAsAdmin(
                 [
                     ['Mailbox/query', ['accountId' => $accountId, 'filter' => ['role' => 'inbox'], 'limit' => 1], 'm0'],
                 ],
@@ -162,8 +189,7 @@ class MailPushPoller extends TimedJob
                 return null;
             }
 
-            $emailResponse = $this->stalwartAdmin->jmapCall(
-                $bearer,
+            $emailResponse = $this->stalwartAdmin->jmapCallAsAdmin(
                 [
                     ['Email/query', [
                         'accountId' => $accountId,
@@ -184,7 +210,7 @@ class MailPushPoller extends TimedJob
             return ['state' => $state, 'emailId' => $emailId];
         } catch (\Throwable $e) {
             $this->logger->debug(
-                'Souvera Mail: MailPushPoller could not resolve inbox state for user "' . $userId . '": '
+                'Souvera Mail: MailPushPoller could not resolve inbox state for account "' . $accountId . '": '
                 . $e->getMessage(),
                 ['app' => 'souvera_mail']
             );

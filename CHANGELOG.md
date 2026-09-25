@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.3.7]
+
+### Fixed
+
+- **Anreicherung lief leer → Push kam nur als „Neue E-Mail"**: `fetchDetails`
+  holte den Mail-Inhalt mit einem per-User-OIDC-Bearer — im kontextlosen
+  Webhook-/Cron-Pfad stille Sterbephase (Fehler loggte nur DEBUG). Neu: die
+  komplette JMAP-Kette (accountId-Auflösung, Mailbox/Email-Query,
+  Email/get-Anreicherung) läuft über den **Admin-Pfad** (`jmapCallAsAdmin`,
+  `Principal/query` per E-Mail) — ohne User-Bearer, ohne OIDC-Abhängigkeit.
+- Diagnose: Enrichment-Fehler jetzt auf WARNING, je Push eine Info-Zeile mit
+  den Inhalts-Längen, Warnung bei fehlendem `documentId` im Webhook.
+- Toten `data.from`-Stufe-1-Fallback entfernt (der verifizierte Stalwart-
+  Payload enthält kein `from` — der Pfad war nie wirksam).
+
 ## [1.3.6]
 
 ### Fixed

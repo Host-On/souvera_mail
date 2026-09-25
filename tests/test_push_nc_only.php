@@ -59,12 +59,27 @@ assertTrue(str_contains($wh, 'pushToUser'), 'Webhook: pushToUser vorhanden', $pa
 assertTrue(!str_contains($wh, 'PUSH_MODE'), 'Webhook: kein push_mode-Schalter mehr', $passes, $failures);
 assertTrue(str_contains($wh, 'notifier->notify('), 'Webhook: Versand über MailPushNotifier', $passes, $failures);
 
-// 4) Poller: Gruppen-Sweep + Preferences-State
+// 4) Poller: Admin-Pfad + Gruppen-Sweep + Preferences-State
 $poller = file_get_contents($lib . '/Cron/MailPushPoller.php') ?: '';
 assertTrue(str_contains($poller, 'RESTRICTED_GROUP_ID'), 'Poller: User-Quelle = souvera-users-Gruppe', $passes, $failures);
 assertTrue(str_contains($poller, 'getUserValue') && str_contains($poller, 'setUserValue'), 'Poller: State in oc_preferences', $passes, $failures);
 assertTrue(str_contains($poller, 'notifier->notify('), 'Poller: Versand über MailPushNotifier', $passes, $failures);
 assertTrue(!str_contains($poller, 'DeviceToken'), 'Poller: keine Token-Registry mehr', $passes, $failures);
+assertTrue(str_contains($poller, 'jmapCallAsAdmin') && str_contains($poller, 'lookupAccountIdByEmail'), 'Poller: Anreicherung/Snapshot über Admin-Pfad (kein User-Bearer)', $passes, $failures);
+assertTrue(!str_contains($poller, 'resolveBearer'), 'Poller: kein OIDC-Bearer mehr (fragiler Webhook/Cron-Kontext)', $passes, $failures);
+
+// 4b) Enricher: Admin-JMAP (der User-Bearer-Pfad war der stille Tod der
+//     Anreicherung — Pushes kamen nur als „Neue E-Mail" ohne Inhalt)
+$enricher = file_get_contents($lib . '/Service/MailEnricherService.php') ?: '';
+assertTrue(str_contains($enricher, 'jmapCallAsAdmin'), 'Enricher: Email/get über Admin-JMAP', $passes, $failures);
+assertTrue(!str_contains($enricher, 'resolveBearer'), 'Enricher: kein User-Bearer mehr', $passes, $failures);
+assertTrue(str_contains($enricher, "logger->warning"), 'Enricher: Fehlerversagen auf WARNING sichtbar (statt DEBUG)', $passes, $failures);
+
+// 4c) Webhook: kein toter payloadFrom-Stufe-1-Pfad, Anomalie-Warnung vorhanden
+$webhookSrc = file_get_contents($lib . '/Controller/StalwartWebhookController.php') ?: '';
+assertTrue(!str_contains($webhookSrc, 'payloadFrom'), 'Webhook: toter payloadFrom-Pfad entfernt', $passes, $failures);
+assertTrue(str_contains($webhookSrc, 'carried no data.documentId'), 'Webhook: Warnung bei fehlendem documentId', $passes, $failures);
+assertTrue(str_contains($webhookSrc, 'notification assembled [len'), 'Webhook: Inhalts-Längen-Log je Push', $passes, $failures);
 
 // 5) Notifier: Notification-Pipeline
 $notifier = file_get_contents($lib . '/Service/MailPushNotifier.php') ?: '';

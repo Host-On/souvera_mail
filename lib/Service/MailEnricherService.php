@@ -8,13 +8,18 @@ use Psr\Log\LoggerInterface;
 
 /**
  * Zentrale Anreicherung einer Mail für Push-Benachrichtigungen:
- * Betreff, Absender und Text-Vorschau per JMAP `Email/get` als User.
+ * Betreff, Absender und Text-Vorschau per JMAP `Email/get` als ADMIN.
  *
- * Dedupe: war zuvor 1:1 doppelt implementiert (MailPushPoller::
- * fetchEmailDetails und StalwartWebhookController::fetchEmailEnrichment).
+ * Bewusst KEIN User-Bearer: der primäre Aufrufer ist der Stalwart-Webhook
+ * (kontextlos, keine Usersession) — eine On-demand-OIDC-Token-Generierung
+ * pro User wäre der wunde Punkt, an dem die komplette Anreicherung still
+ * gestorben ist (Push kam dann nur als „Neue E-Mail" ohne Inhalt). Der
+ * Admin-JMAP-Pfad darf fremde Accounts lesen (gleiche Berechtigungsstufe
+ * wie das Principal/get der Webhook-Auflösung) und ist kontextlos robust.
  *
  * Fehler sind bewusst nicht fatal — der Push geht dann ohne Anreicherung
- * raus (z. B. wenn OIDC auf der Instanz gerade nicht verfügbar ist).
+ * raus; der Grund steht allerdings auf WARNING im Log (statt DEBUG), damit
+ * ein stiller Anreicherungs-Tod sofort sichtbar ist.
  *
  * @return array{subject: string, from: string, preview: string}
  */
@@ -25,22 +30,24 @@ class MailEnricherService
 
     public function __construct(
         private readonly StalwartAdminService $stalwart,
-        private readonly StalwartUserContext $userContext,
         private readonly LoggerInterface $logger,
     ) {
     }
 
-    public function fetchDetails(string $userId, string $emailId): array
+    /**
+     * @param string $accountId JMAP accountId (base32 des numerischen
+     *                          Stalwart-Account-Ids) des Empfängers
+     * @param string $emailId   JMAP Email-Id (base32 der Stalwart-Doc-ID)
+     * @return array{subject: string, from: string, preview: string}
+     */
+    public function fetchDetails(string $accountId, string $emailId): array
     {
         $empty = ['subject' => '', 'from' => '', 'preview' => ''];
-        if ($emailId === '') {
+        if ($emailId === '' || $accountId === '') {
             return $empty;
         }
         try {
-            $bearer = $this->userContext->resolveBearer($userId);
-            $accountId = $this->userContext->resolveAccountId($userId);
-            $response = $this->stalwart->jmapCall(
-                $bearer,
+            $response = $this->stalwart->jmapCallAsAdmin(
                 [
                     ['Email/get', [
                         'accountId' => $accountId,
@@ -66,9 +73,10 @@ class MailEnricherService
             $preview = $this->buildPreview($first);
             return ['subject' => $subject, 'from' => $from, 'preview' => $preview];
         } catch (\Throwable $e) {
-            $this->logger->debug(
-                'Souvera Mail: mail enrichment failed for "' . $userId . '": ' . $e->getMessage(),
-                ['app' => 'souvera_mail']
+            $this->logger->warning(
+                'Souvera Mail: mail enrichment failed (accountId=' . $accountId
+                . ' emailId=' . $emailId . '): ' . $e->getMessage(),
+                ['app' => 'souvera_mail', 'exception' => $e]
             );
             return $empty;
         }
@@ -122,9 +130,8 @@ class MailEnricherService
     }
 
     /**
-     * Reduziert einen HTML-Body auf reinen Text: Tags entfernen, dann
-     * Entities auflösen (analog zum Webmail-Compose-Pfad in
-     * {@see ExternalSmtpService}).
+     * Reduziert einen HTML-Body auf reinen Text (Original-Implementierung —
+     * getestet; bewusst tolerant gegen strip_tags-Fehlschläge).
      */
     private function htmlToText(string $html): string
     {
@@ -136,21 +143,12 @@ class MailEnricherService
         return \is_string($decoded) ? $decoded : $stripped;
     }
 
-    /**
-     * Fasst aufeinanderfolgende Whitespace-Zeichen (inkl. Non-breaking
-     * Spaces, die aus &nbsp; entstehen) zu einem einzelnen Leerzeichen
-     * zusammen und trimmt das Ergebnis.
-     */
     private function normalizeWhitespace(string $text): string
     {
         $collapsed = \preg_replace('/[\s\p{Z}]+/u', ' ', $text);
         return \is_string($collapsed) ? \trim($collapsed) : '';
     }
 
-    /**
-     * Kürzt auf `$maxLen` Zeichen und hängt bei Abschneidung "..." an.
-     * Eingabe muss valides UTF-8 sein.
-     */
     private function truncate(string $text, int $maxLen): string
     {
         if (\mb_strlen($text, 'UTF-8') <= $maxLen) {
@@ -160,12 +158,10 @@ class MailEnricherService
     }
 
     /**
-     * Extrahiert eine Text-Vorschau aus den bodyValues einer Email/get-Antwort.
-     * Stalwart liefert bodyValues nur, wenn "bodyValues" in properties steht.
-     * Roh-Zusammenführung der Teilwerte — Normalisierung und Kürzung übernimmt
-     * {@see buildPreview}.
+     * Fallback über die Roh-Teilwerte (bodyValues), wenn weder textBody
+     * noch htmlBody noch preview geliefert wurden.
      *
-     * @param array<string, mixed> $email Email-Objekt aus Email/get
+     * @param array<string, mixed> $email
      */
     public function extractPreview(array $email): string
     {
