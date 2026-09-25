@@ -71,6 +71,15 @@ $notifier = file_get_contents($lib . '/Service/MailPushNotifier.php') ?: '';
 assertTrue(str_contains($notifier, 'notificationManager->notify('), 'Notifier: NC-NotificationManager', $passes, $failures);
 assertTrue(!str_contains($notifier, 'PUSH_MODE'), 'Notifier: keine Push-Mode-Konstanten mehr', $passes, $failures);
 
+// 5b) INotifier registriert (ohne ihn skipped die Push-Pipeline: prepare()
+//     wirft IncompleteParsedNotificationException — Mail-Pushes kamen nie an)
+assertTrue(is_file($lib . '/Notification/MailNotifier.php'), 'MailNotifier-Klasse vorhanden', $passes, $failures);
+$app = file_get_contents($lib . '/AppInfo/Application.php') ?: '';
+assertTrue(str_contains($app, 'registerNotifierService'), 'Application: registerNotifierService', $passes, $failures);
+$mailNotifier = is_file($lib . '/Notification/MailNotifier.php') ? (file_get_contents($lib . '/Notification/MailNotifier.php') ?: '') : '';
+assertTrue(str_contains($mailNotifier, 'implements INotifier'), 'MailNotifier implementiert INotifier', $passes, $failures);
+assertTrue(str_contains($mailNotifier, 'setParsedSubject'), 'MailNotifier setzt ParsedSubject (Push-Pflicht)', $passes, $failures);
+
 // 6) Routen: keine deviceToken-Endpunkte
 $routes = file_get_contents(__DIR__ . '/../appinfo/routes.php') ?: '';
 assertTrue(!str_contains($routes, 'deviceToken#'), 'Routes: keine deviceToken-Endpunkte', $passes, $failures);

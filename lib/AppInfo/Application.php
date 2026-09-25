@@ -69,6 +69,12 @@ if (!\class_exists(Application::class, false)) {class Application extends App im
     {
         // NC 28+: Controllers use autowiring — no manual registerService needed.
 
+        // Notifier für die Mail-Benachrichtigungen — OHNE ihn wirft
+        // NotificationManager::prepare() beim Push eine
+        // IncompleteParsedNotificationException und die Notifications-App
+        // überspringt den Push (Mail-Pushes erreichten nie die Geräte).
+        $context->registerNotifierService(\OCA\SouveraMail\Notification\MailNotifier::class);
+
         // Stamp souvera_mail-uid into the session on Nextcloud login. The OIDC access
         // token itself is issued on-demand by OidcProviderService via the
         // H2CK/oidc TokenGenerationRequestEvent — no session-side bridging or

@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.2]
+
+### Fixed
+
+- **Mail-Push erreichte nie die Geräte**: der Push-Pfad der Notifications-App
+  rendert jede Benachrichtigung über den INotifier der Quell-App — souvera_mail
+  hatte keinen registriert, `prepare()` warf
+  `IncompleteParsedNotificationException` und der Push wurde übersprungen.
+  Neu: `MailNotifier` (INotifier) registriert, der Betreff/Absender/Vorschau
+  als geparste Werte liefert. Dadurch verschickt die Notifications-App die
+  Mail-Benachrichtigungen E2E-verschlüsselt über push.souvera.eu wie jede
+  andere Benachrichtigung auch.
+
 ## [1.3.1]
 
 ### Fixed
