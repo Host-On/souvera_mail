@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.5]
+
+### Added
+
+- **Body-Vorschau in der Push-Benachrichtigung**: neben Betreff und Absender
+  zeigt die Notification jetzt eine Vorschau des Mail-Inhalts (die ersten
+  ~80 Zeichen). Die Vorschau wird per JMAP `Email/get` geladen und bevorzugt
+  den Text-Teil, fällt auf den HTML-Teil (Tags entfernt, Entities aufgelöst),
+  die serverseitige Vorschau bzw. die Roh-Teilwerte zurück. Kein verwertbarer
+  Body (nur Anhang/Binär oder kaputtes Encoding) → Push ohne Vorschau-Zeile.
+
 ## [1.3.3]
 
 ### Fixed
