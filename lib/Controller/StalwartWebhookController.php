@@ -360,17 +360,45 @@ class StalwartWebhookController extends Controller
     {
         $documentId = (int) ($event['data']['documentId'] ?? 0);
         $emailId = $documentId > 0 ? StalwartAdminService::encodeJmapId($documentId) : '';
+
+        // Stufe 1: Absender direkt aus dem Webhook-Payload (`data.from`) —
+        // der Stalwart-Payload trägt KEINEN Betreff, aber immer `from`.
+        // Das garantiert selbst bei komplett ausfallendem JMAP-Fetch einen
+        // aussagekräftigen "Von: …"-Push statt des generischen Fallbacks.
+        $payloadFrom = $this->extractPayloadFrom($event);
+
         $enrichment = $emailId !== ''
             ? $this->enricher->fetchDetails($userId, $emailId)
             : ['subject' => '', 'from' => '', 'preview' => ''];
+
+        // Stufe 2 (besser): JMAP liefert Betreff + Absendernamen. Schlägt der
+        // Fetch fehl oder liefert keinen Absender, fällt der Absender auf den
+        // Payload-`from`-Wert zurück (Stufe 1).
+        $sender = $enrichment['from'] !== '' ? $enrichment['from'] : $payloadFrom;
+
         $this->notifier->notify(
             $userId,
             $emailId,
             $enrichment['subject'],
-            $enrichment['from'],
+            $sender,
             $enrichment['preview'],
         );
         return true;
+    }
+
+    /**
+     * Liest den Absender (`data.from`) aus dem Webhook-Event. Der Stalwart-
+     * Payload enthält nur die nackte Absender-Adresse, aber keinen Betreff —
+     * die Adresse ist daher die einzige sofort verfügbare, verlässliche
+     * Anzeigeinformation.
+     *
+     * @param array<string, mixed> $event
+     */
+    private function extractPayloadFrom(array $event): string
+    {
+        $data = $event['data'] ?? null;
+        $from = \is_array($data) ? ($data['from'] ?? '') : '';
+        return \is_string($from) ? \trim($from) : '';
     }
 
     private function extractProvidedSecret(): string

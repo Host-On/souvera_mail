@@ -96,7 +96,7 @@ class MailPushNotifier
 
         $lines = [];
         if ($sender !== '') {
-            $lines[] = $sender;
+            $lines[] = 'Von: ' . $sender;
         }
         if ($preview !== '') {
             $lines[] = $preview;
