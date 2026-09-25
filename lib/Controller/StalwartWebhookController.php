@@ -372,9 +372,11 @@ class StalwartWebhookController extends Controller
             : ['subject' => '', 'from' => '', 'preview' => ''];
 
         // Stufe 2 (besser): JMAP liefert Betreff + Absendernamen. Schlägt der
-        // Fetch fehl oder liefert keinen Absender, fällt der Absender auf den
-        // Payload-`from`-Wert zurück (Stufe 1).
-        $sender = $enrichment['from'] !== '' ? $enrichment['from'] : $payloadFrom;
+        // Fetch fehl oder liefert keinen (bzw. nur aus Leerraum bestehenden)
+        // Absender, fällt der Absender auf den Payload-`from`-Wert zurück
+        // (Stufe 1).
+        $enrichedFrom = \trim((string) $enrichment['from']);
+        $sender = $enrichedFrom !== '' ? $enrichedFrom : $payloadFrom;
 
         $this->notifier->notify(
             $userId,
