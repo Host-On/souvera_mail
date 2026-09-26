@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.2]
+
+### Fixed
+
+- **Draft-Flut SERVERSEITIG abgedichtet (composeKey-Upsert)**: der Composer
+  sendet einen stabilen Session-Schlüssel (sessionStorage, überlebt
+  Component-Remounts). Das Backend merkt sich pro Schlüssel den Draft und
+  **zerstört den alten beim nächsten Speichern** (JMAP-konform: destroy +
+  create, da der Mail-Body immutable ist) — es existiert maximal EIN Draft
+  pro Compose-Session, unabhängig davon, was das Frontend tut. Der
+  Resolve-Mechanismus (inReplyTo) bleibt als zusätzliche Ladestufe aktiv.
+
 ## [1.4.2]
 
 ### Fixed
