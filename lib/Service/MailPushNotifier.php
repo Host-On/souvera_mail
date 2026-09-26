@@ -29,8 +29,16 @@ class MailPushNotifier
     public const OBJECT_TYPE = 'souvera_mail';
 
     /** NC-Validierungslimits: Subject max 64, Message max 4000 Zeichen. */
-    private const SUBJECT_MAX_LEN = 64;
-    private const MESSAGE_MAX_LEN = 4000;
+    /**
+     * NC-Validierungslimits (v34 core, Notification::setSubject/setMessage):
+     * RAW-Subject/-Message dürfen max. 64 BYTE haben (isset($s[64])-Trick —
+     * BYTE, nicht Zeichen!). Die PARSED-Werte (setParsedSubject/
+     * setParsedMessage, gesetzt vom MailNotifier) sind unbegrenzt und tragen
+     * den vollen Inhalt zum Gerät.
+     */
+    private const SUBJECT_MAX_BYTES = 64;
+    private const SENDER_MAX_BYTES = 64;
+    private const PREVIEW_MAX_BYTES = 240;
 
     public function __construct(
         private IManager $notificationManager,
@@ -49,9 +57,9 @@ class MailPushNotifier
         string $sender,
         string $preview,
     ): void {
-        $safeSubject = $this->sanitize($subject, self::SUBJECT_MAX_LEN);
-        $safeSender = $this->sanitize($sender, self::SUBJECT_MAX_LEN);
-        $safePreview = $this->sanitize($preview, self::MESSAGE_MAX_LEN);
+        $safeSubject = $this->sanitize($subject, self::SUBJECT_MAX_BYTES);
+        $safeSender = $this->sanitize($sender, self::SENDER_MAX_BYTES);
+        $safePreview = $this->sanitize($preview, self::PREVIEW_MAX_BYTES);
 
         try {
             $this->doNotify($userId, $emailId, $safeSubject, $safeSender, $safePreview);
@@ -87,24 +95,22 @@ class MailPushNotifier
         string $preview,
     ): void {
         $notification = $this->notificationManager->createNotification();
+        // NC-Muster: RAW-Subject ist auf 64 BYTE validiert — die vollen
+        // Inhalte wandern in die Subject-Parameter (unbegrenzt) und der
+        // MailNotifier setzt daraus die geparsten Werte, die der Push trägt.
+        // setMessage bewusst NICHT gerufen (ebenfalls 64-BYTE-validiert —
+        // Absender+Vorschau passen dort nie hinein; die Zeilen liefert der
+        // Notifier als geparste Message).
         $notification
             ->setApp('souvera_mail')
             ->setUser($userId)
             ->setDateTime(new \DateTime())
             ->setObject(self::OBJECT_TYPE, $emailId)
-            ->setSubject($subject !== '' ? $subject : 'Neue E-Mail');
-
-        $lines = [];
-        if ($sender !== '') {
-            $lines[] = 'Von: ' . $sender;
-        }
-        if ($preview !== '') {
-            $lines[] = $preview;
-        }
-        if ($lines !== []) {
-            $message = \implode("\n", $lines);
-            $notification->setMessage(\mb_substr($message, 0, self::MESSAGE_MAX_LEN, 'UTF-8'));
-        }
+            ->setSubject(\mb_strcut($subject !== '' ? $subject : 'Neue E-Mail', 0, self::SUBJECT_MAX_BYTES), [
+                'fullSubject' => $subject !== '' ? $subject : 'Neue E-Mail',
+                'from' => $sender,
+                'preview' => $preview,
+            ]);
 
         $this->notificationManager->notify($notification);
     }
@@ -112,10 +118,12 @@ class MailPushNotifier
     /**
      * Bereinigt einen Mail-Inhalt für die NC-Benachrichtigungsvalidierung:
      * garantiert valides UTF-8, entfernt Steuerzeichen (C0 + DEL) und kürzt
-     * auf die übergebene Maximallänge. Leerer/nicht bereinigbarer Wert wird
-     * zu '' (der Aufrufer setzt dann ggf. einen Fallback-Betreff).
+     * auf die übergebene Maximallänge in BYTE (mb_strcut — NC validiert
+     * Bytes, nicht Zeichen; mb_strcut schneidet trotzdem UTF-8-sauber).
+     * Leerer/nicht bereinigbarer Wert wird zu '' (der Aufrufer setzt dann
+     * ggf. einen Fallback-Betreff).
      */
-    private function sanitize(string $value, int $maxLen): string
+    private function sanitize(string $value, int $maxBytes): string
     {
         $value = (string) $value;
         if ($value === '') {
@@ -138,7 +146,7 @@ class MailPushNotifier
             return '';
         }
 
-        return \trim(\mb_substr($value, 0, $maxLen, 'UTF-8'));
+        return \trim(\mb_strcut($value, 0, $maxBytes, 'UTF-8'));
     }
 
     private function logger(): LoggerInterface

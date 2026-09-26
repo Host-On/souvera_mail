@@ -46,13 +46,26 @@ class MailNotifier implements INotifier {
 
 		$l = $this->l10nFactory->get(Application::APP_ID, $languageCode);
 
-		// Betreff/Meldung wurden bei Erstellung gesetzt (subject = Mail-Betreff,
-		// message = Absender + Vorschau) — als geparste Werte übernehmen, das
-		// verlangt die Push-Pipeline. Keine Platzhalter im Spiel.
-		$subject = (string) $notification->getSubject();
-		$notification->setParsedSubject($subject !== '' ? $subject : $l->t('Neue E-Mail'));
+		// Die vollen Inhalte (Betreff, Absender, Vorschau) kommen aus den
+		// Subject-Parametern — setParsedSubject/setParsedMessage sind UNBEGRENZT
+		// und genau diese geparsten Werte trägt der Push zum Gerät (der RAW-
+		// Subject ist vom Ersteller auf 64 BYTE gekürzt, um die NC-Validierung
+		// zu bestehen). Ohne Parameter (z. B. DB-geladene alte Notifications)
+		// fällt der Notifier auf den RAW-Subject zurück.
+		$params = $notification->getSubjectParameters();
 
-		$message = (string) $notification->getMessage();
+		$parsedSubject = \trim((string) ($params['fullSubject'] ?? ''));
+		if ($parsedSubject === '') {
+			$parsedSubject = \trim((string) $notification->getSubject());
+		}
+		if ($parsedSubject === '') {
+			$parsedSubject = $l->t('Neue E-Mail');
+		}
+		$notification->setParsedSubject($parsedSubject);
+
+		$from = \trim((string) ($params['from'] ?? ''));
+		$preview = \trim((string) ($params['preview'] ?? ''));
+		$message = $from !== '' && $preview !== '' ? $from . "\n" . $preview : $from . $preview;
 		if ($message !== '') {
 			$notification->setParsedMessage($message);
 		}

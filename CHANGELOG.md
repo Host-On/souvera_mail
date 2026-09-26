@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.8]
+
+### Fixed
+
+- **Der eigentliche Grund für „Neue E-Mail" ohne Inhalt**: NC validiert das
+  RAW-Subject/-Message der Notification auf max. **64 BYTE** (isset($s[64])-
+  Trick — Bytes, nicht Zeichen!). Sender + Vorschau überschritten das
+  Message-Limit bei praktisch jeder echten Mail → InvalidValueException →
+  der Fallback verschickte die generische „Neue E-Mail". Neu nach dem
+  offiziellen NC-Muster: RAW-Subject byte-sicher gekürzt (mb_strcut),
+  die vollen Inhalte (Betreff/Absender/Vorschau) wandern in die
+  Subject-Parameter, und der MailNotifier setzt daraus die geparsten
+  Werte (unbegrenzt) — genau diese trägt der Push zum Gerät.
+
 ## [1.3.7]
 
 ### Fixed
