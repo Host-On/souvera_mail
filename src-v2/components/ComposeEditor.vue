@@ -356,14 +356,58 @@ export default {
 		async refreshCentralSignature() {
 			const fresh = await fetchAndCacheSignature()
 			if (!fresh) return
-			const changed = fresh.html !== this.centralSignatureHtml
+			const htmlChanged = fresh.html !== this.centralSignatureHtml
+			const assetsChanged = JSON.stringify(fresh.assets || []) !== JSON.stringify(this.centralAssets || [])
 			this.centralSignatureHtml = fresh.html
 			this.centralAssets = fresh.assets || []
-			if (changed && this._prefsLoaded) {
+			if ((htmlChanged || assetsChanged) && this._prefsLoaded) {
 				// Nur tauschen, wenn der Editor bereits initialisiert ist und
-				// die Signatur sich tatsächlich unterscheidet (Cache war alt).
-				// swapSignature prüft selbst, ob der Editor bereit ist.
+				// sich Signatur ODER Assets unterscheiden (Cache war alt bzw.
+				// leer). swapSignature prüft selbst, ob der Editor bereit ist.
 				this.swapSignature()
+			}
+			// Ältere Central-Versionen (< 0.58.5) liefern kein assets-Feld:
+			// die referenzierten Bilder einzeln über den Vorschau-Endpunkt
+			// als Blob holen und in Data-URLs wandeln — dann sind sie im
+			// Composer unabhängig vom Central-Stand embeddet.
+			if (!(fresh.assets || []).length) {
+				await this.ensureAssetsFor(fresh.html)
+			}
+		},
+		/**
+		 * Fallback für Central < 0.58.5: lädt jedes per cid: referenzierte
+		 * Asset über den Vorschau-Endpunkt (Blob) und wandelt es in eine
+		 * Data-URL — anschließend werden die Assets übernommen und die
+		 * Signatur im Editor neu gerendert.
+		 */
+		async ensureAssetsFor(html) {
+			if ((this.centralAssets || []).length > 0) return
+			const cidMatches = [...String(html || '').matchAll(/cid:(souvera-sig-[a-z0-9\-_]+)/gi)].map(m => m[1])
+			if (cidMatches.length === 0) return
+			const assets = []
+			for (const cid of [...new Set(cidMatches)]) {
+				const slug = cid.replace(/^souvera-sig-/, '')
+				try {
+					const r = await axios.get(
+						generateUrl('/apps/souvera_central/api/mail-settings/signature-assets/{slug}', { slug }),
+						{ responseType: 'blob' },
+					)
+					const dataUrl = await new Promise((resolve) => {
+						const fr = new FileReader()
+						fr.onload = () => resolve(String(fr.result || ''))
+						fr.onerror = () => resolve('')
+						fr.readAsDataURL(r.data)
+					})
+					if (dataUrl !== '') assets.push({ cid, dataUrl })
+				} catch (e) {
+					// Asset fehlt (Slug-Mismatch/Endpoint down) — cid bleibt,
+					// das Bild zeigt seinen Alt-Text.
+					console.debug('Signature asset fallback failed', slug, e)
+				}
+			}
+			if (assets.length > 0) {
+				this.centralAssets = assets
+				if (this._prefsLoaded) this.swapSignature()
 			}
 		},
 		sanitizedSignature(html) {

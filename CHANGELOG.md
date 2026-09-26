@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.7]
+
+### Fixed
+
+- **Composer-Bilder robust gegen jede Central-Version**: liefert der
+  Resolve-Endpunkt kein assets-Feld (Central < 0.58.5), holt der Composer
+  jedes per cid: referenzierte Bild selbst über den Vorschau-Endpunkt als
+  Blob und wandelt es in eine Data-URL — die Signatur wird danach neu
+  gerendert. Zusätzlich: Editor-Swap auch bei Asset-Änderungen (nicht nur
+  HTML-Änderungen), sobald der Refresh bessere Assets liefert.
+
+
 ## [1.5.6]
 
 ### Fixed
