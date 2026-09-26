@@ -150,24 +150,35 @@ trait SelfUpdateTrait
         }
 
         // Dev channel: only download if the branch HEAD changed.
-        $latestSha = $this->fetchBranchSha($repo, $branch);
-        if ($latestSha === null) {
-            return ['error' => 'Cannot fetch branch HEAD'];
+        // RESILIENZ: GitLab primär — bei Ausfall automatisch auf den
+        // GitHub-Mirror (Host-On/<app>) ausweichen (Port des central-Fixes).
+        $head = $this->fetchBranchShaResilient($repo, $branch);
+        if ($head === null) {
+            return ['error' => 'Cannot fetch branch HEAD (GitLab und GitHub-Mirror unerreichbar)'];
         }
+        [$latestSha, $source, $githubRepo] = $head;
+
         $lastSha = trim((string) \OCP\Server::get(\OCP\IConfig::class)
             ->getAppValue($appId, 'devops.last_sha', ''));
         if ($latestSha === $lastSha) {
             return ['up_to_date' => true, 'sha' => $latestSha];
         }
 
-        if ($this->isGitlabApp()) {
+        if ($source === 'gitlab') {
+            // AUFgelösten Commit-SHA statt Branch-Namen: GitLab cachet
+            // archive.zip pro SHA-String — "?sha=main" kann einen STALE
+            // Stand liefern (Fall 0.46/0.47: Zipball ohne js/css/img).
             $url = $this->gitlabBase() . '/api/v4/projects/'
                 . $this->gitlabProjectEncoded() . '/repository/archive.zip?sha='
-                . rawurlencode($branch);
+                . rawurlencode($latestSha) . '&_=' . time();
+            $github = false;
         } else {
-            $url = "https://api.github.com/repos/$repo/zipball/$branch";
+            // GitHub-Mirror-Fallback: öffentliches Repo — keine Auth mitsenden
+            // (GitHub liefert 401 auf ungültige Bearer-Tokens).
+            $url = "https://api.github.com/repos/$githubRepo/zipball/$latestSha";
+            $github = true;
         }
-        $result = $this->downloadAndApply($appId, $appPath, $url);
+        $result = $this->downloadAndApply($appId, $appPath, $url, $github);
         if (!isset($result['error'])) {
             $this->runAppMigrations($appId);
         }
@@ -176,6 +187,36 @@ trait SelfUpdateTrait
                 ->setAppValue($appId, 'devops.last_sha', $latestSha);
         }
         return $result;
+    }
+
+    /**
+     * Branch-HEAD holen — GitLab primär, GitHub-Mirror als Ausfall-Fallback.
+     * @return array{0: string, 1: string, 2: ?string}|null [sha, source, githubRepo]
+     */
+    private function fetchBranchShaResilient(string $repo, string $branch): ?array
+    {
+        $sha = $this->fetchBranchSha($repo, $branch);
+        if ($sha !== null) {
+            return [$sha, 'gitlab', null];
+        }
+        $mirror = $this->githubMirrorFor();
+        if ($mirror === null) {
+            return null;
+        }
+        $data = $this->apiGet("https://api.github.com/repos/$mirror/commits/$branch");
+        if ($data === null || !isset($data['sha'])) {
+            return null;
+        }
+        return [(string) $data['sha'], 'github', $mirror];
+    }
+
+    /** GitHub-Spiegel-Repo je App (null = kein Spiegel). */
+    private function githubMirrorFor(): ?string
+    {
+        return match ($this->getAppId()) {
+            'souvera_mail' => 'Host-On/souvera_mail',
+            default => null,
+        };
     }
 
     private function downloadTag(string $appId, string $appPath, string $tag): array
@@ -241,22 +282,59 @@ trait SelfUpdateTrait
      * does NOT execute migrations — without this, new tables from newer
      * versions are missing and the app crashes on first use.
      * (Same mechanism as `occ migrations:migrate <app>`.)
+     *
+     * Nach erfolgreicher Migration wird die App-Version aus der frisch
+     * getauschten info.xml in oc_appconfig gesynct (installed_version) —
+     * ohne das Sync gilt die App in NC als „upgrade pending" und alle
+     * Routen 404en bis jemand `occ upgrade` ausführt.
      */
     private function runAppMigrations(string $appId): void
     {
         try {
-            $connection = \OCP\Server::get(\OCP\IDBConnection::class);
-            $ms = new \OC\DB\MigrationService($appId, $connection);
-            $ms->migrate();
+            \OCA\SouveraMail\DevOps\MigrationRunner::migrate($appId);
             \OCP\Server::get(\Psr\Log\LoggerInterface::class)
                 ->info('Souvera SelfUpdate: migrations executed', ['app' => $appId]);
         } catch (\Throwable $e) {
             \OCP\Server::get(\Psr\Log\LoggerInterface::class)
                 ->error('Souvera SelfUpdate: migrations failed for ' . $appId . ': ' . $e->getMessage());
+            return;
+        }
+
+        $this->syncInstalledVersion($appId);
+
+        // Stale caches nach dem Datei-Tausch leeren
+        try {
+            if (function_exists('opcache_reset')) {
+                @\opcache_reset();
+            }
+            \OCP\Server::get(\OCP\ICacheFactory::class)->createDistributed('souvera_selfupdate')->clear();
+            \OCP\Server::get(\OCP\ICacheFactory::class)->createLocal('souvera_selfupdate')->clear();
+        } catch (\Throwable $e) {
+            // best effort
         }
     }
 
-    private function downloadAndApply(string $appId, string $appPath, string $url): array
+    /**
+     * installed_version aus der frisch getauschten info.xml in die DB
+     * schreiben — äquivalent zum Versions-Write in AppManager::enableApp.
+     * (Port des central-Fixes v0.54.2: verhindert den „upgrade pending"-
+     * Zustand mit durchgängigen 404s nach jedem Self-Update.)
+     */
+    private function syncInstalledVersion(string $appId): void
+    {
+        try {
+            $version = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId, false);
+            if ($version !== '' && $version !== '0') {
+                \OCP\Server::get(\OCP\IConfig::class)
+                    ->setAppValue($appId, 'installed_version', $version);
+            }
+        } catch (\Throwable $e) {
+            \OCP\Server::get(\Psr\Log\LoggerInterface::class)
+                ->warning('Souvera SelfUpdate: installed_version sync failed for ' . $appId . ': ' . $e->getMessage());
+        }
+    }
+
+    private function downloadAndApply(string $appId, string $appPath, string $url, bool $github = false): array
     {
         $token = $this->readToken();
         if ($token === '') {
@@ -264,17 +342,25 @@ trait SelfUpdateTrait
         }
 
         $client = \OCP\Server::get(\OCP\Http\Client\IClientService::class)->newClient();
-        if ($this->isGitlabApp()) {
+        $useGitlab = !$github && $this->isGitlabApp();
+        if ($useGitlab) {
             $token = $this->readGitlabToken();
         }
         try {
-            $headers = $this->isGitlabApp()
-                ? ['PRIVATE-TOKEN' => $token, 'User-Agent' => 'Souvera-DevOps']
-                : [
-                    'Authorization' => 'Bearer ' . $token,
+            $headers = $github
+                // GitHub-Mirror: öffentliches Repo — KEINE Auth mitsenden
+                // (GitHub liefert 401 auf ungültige Bearer-Tokens).
+                ? [
                     'User-Agent' => 'Souvera-DevOps',
                     'Accept' => 'application/vnd.github+json',
-                ];
+                ]
+                : ($useGitlab
+                    ? ['PRIVATE-TOKEN' => $token, 'User-Agent' => 'Souvera-DevOps']
+                    : [
+                        'Authorization' => 'Bearer ' . $token,
+                        'User-Agent' => 'Souvera-DevOps',
+                        'Accept' => 'application/vnd.github+json',
+                    ]);
             $response = $client->get($url, [
                 'headers' => $headers,
                 'timeout' => 60,

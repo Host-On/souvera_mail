@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.9]
+
+### Fixed
+
+- Self-Update-Härtung (Port der central-Fixes): Migrationen laufen jetzt über
+  den MigrationRunner mit der inneren DB-Connection (der Adapter-basierte
+  Aufruf warf einen TypeError — Mails Self-Update-Migrationen sind deshalb
+  nie gelaufen), und nach erfolgreicher Migration wird die `installed_version`
+  in die DB gesynct — verhindert den „upgrade pending"-Zustand mit
+  durchgängigen 404s nach jedem Self-Update.
+- GitLab-Ausfall-Fallback: HEAD-Fetch und Download weichen automatisch auf den
+  GitHub-Mirror (Host-On/souvera_mail) aus; SHA-aufgelöste Archive-URL gegen
+  GitLab-Cache-Staleness.
+
 ## [1.3.8]
 
 ### Fixed
