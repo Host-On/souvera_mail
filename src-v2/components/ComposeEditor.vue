@@ -146,6 +146,7 @@ import { showSuccess, showError } from '@nextcloud/dialogs'
 import DOMPurify from 'dompurify'
 import { sanitizeMailHtml } from '../utils/mailSanitizer.js'
 import { buildReplyQuote, buildForwardBody } from '../utils/quoteBuilder.js'
+import { readSignatureCache, fetchAndCacheSignature } from '../utils/signatureCache.js'
 
 let draftTimer = null
 
@@ -328,20 +329,41 @@ export default {
 				// ersetzt die persönliche/Identity-Signatur komplett (Policy:
 				// Corporate-Signatur gewinnt). Fail-open: bei Fehler gilt wie
 				// bisher die persönliche Konfiguration.
-				try {
-					const cs = await axios.get(generateUrl('/apps/souvera_central/api/mail-settings/signature'))
-					const cdata = cs.data.ocs?.data || cs.data.data || cs.data
-					if (cdata && cdata.found && cdata.html) {
-						this.centralSignatureHtml = cdata.html
-						// Assets als Data-URLs (netzwerk- und flapping-unabhängig):
-						// die Composer-Vorschau bettet die Bilder direkt ein.
-						this.centralAssets = cdata.assets || []
-					}
-				} catch (e) {
-					console.debug('Central signature not available', e)
+				//
+				// INSTANT: der Cache wird SYNCHRON gelesen (App-Start preloadet
+				// ihn) — die Signatur inkl. Bild-Data-URLs steht sofort bereit,
+				// egal wie schnell der Nutzer „Neue Nachricht" klickt. Ohne
+				// Cache wird der Fetch abgewartet (allererster Start); mit
+				// Cache läuft der Refresh im Hintergrund und tauscht die
+				// Signatur nur bei Änderung aus.
+				const cached = readSignatureCache()
+				if (cached && cached.html) {
+					this.centralSignatureHtml = cached.html
+					this.centralAssets = cached.assets || []
+					this.refreshCentralSignature()
+				} else {
+					await this.refreshCentralSignature()
 				}
 			} catch (e) {
 				console.error('Failed to load preferences', e)
+			}
+		},
+		/**
+		 * Frischt die zentrale Signatur vom Resolve-Endpunkt, schreibt den
+		 * Cache und tauscht die Editor-Signatur aus, wenn sie sich nach dem
+		 * initialen Rendern (aus dem Cache) geändert hat.
+		 */
+		async refreshCentralSignature() {
+			const fresh = await fetchAndCacheSignature()
+			if (!fresh) return
+			const changed = fresh.html !== this.centralSignatureHtml
+			this.centralSignatureHtml = fresh.html
+			this.centralAssets = fresh.assets || []
+			if (changed && this._prefsLoaded) {
+				// Nur tauschen, wenn der Editor bereits initialisiert ist und
+				// die Signatur sich tatsächlich unterscheidet (Cache war alt).
+				// swapSignature prüft selbst, ob der Editor bereit ist.
+				this.swapSignature()
 			}
 		},
 		sanitizedSignature(html) {
@@ -666,27 +688,32 @@ export default {
 			this._forceSave = false
 			try {
 				const payload = this.buildPayload()
-				if (this.savedDraftId) {
-					const { data } = await axios.put(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId), payload)
-					// Keep the id in sync (e.g. after a vanished-draft fallback create).
-					if (data?.draftId) this.savedDraftId = data.draftId
-				} else {
-					const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/drafts'), payload)
-					if (!data?.draftId) {
-						// Server hat den Draft nicht angelegt — Autosave stoppen,
-						// statt alle 3 s einen neuen Create-Versuch (Draft-Flut).
-						this._draftSaveFailed = true
-						showError(data?.error || this.t('souvera_mail', 'Entwurf konnte nicht gespeichert werden'))
-						return
-					}
-					this.savedDraftId = data.draftId
-					this.trackDraft(data.draftId)
+				// IMMER der Create-Upsert-Pfad (ein Code-Pfad): der Backend
+				// zerstört den bisherigen Draft der Compose-Session
+				// (existingDraftId + composeKey-Mapping) und legt den neuen an
+				// — garantiert genau EIN Draft pro Session.
+				// Der PUT-Pfad ist ENTFALLEN: Email/set update kann den
+				// immutable Mail-Body nicht ändern; sein Fallback-Create hat
+				// die Draft-Flut erzeugt (jeder Autosave = +1 Waise).
+				const previousId = this.savedDraftId || null
+				const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/drafts'), payload)
+				if (!data?.draftId) {
+					// Server hat den Draft nicht angelegt — Autosave stoppen,
+					// statt alle 3 s einen neuen Create-Versuch (Draft-Flut).
+					this._draftSaveFailed = true
+					showError(data?.error || this.t('souvera_mail', 'Entwurf konnte nicht gespeichert werden'))
+					return
 				}
+				if (previousId && previousId !== data.draftId) {
+					this.trackDraft(null, previousId)
+				}
+				this.savedDraftId = data.draftId
+				this.trackDraft(data.draftId)
 			} catch (e) {
 				console.error('Draft save failed', e)
-				// HTTP-Fehler (4xx/5xx) beim CREATE → ebenfalls stoppen (Backoff),
+				// HTTP-Fehler (4xx/5xx) beim Create → ebenfalls stoppen (Backoff),
 				// der User sieht den Fehler beim manuellen Speichern/Senden erneut.
-				if (!this.savedDraftId && e.response?.status >= 400) {
+				if (e.response?.status >= 400) {
 					this._draftSaveFailed = true
 				}
 			} finally {
@@ -713,7 +740,9 @@ export default {
 				references: this.replyTo?.references || null,
 				draftId: this.savedDraftId,
 				composeKey: this._composeKey || null,
-				existingDraftId: this._existingDraftId || null,
+				// Der zu ersetzende Draft: die aktuelle ID (Always-POST-Upsert)
+				// bzw. die per Resolve geladene.
+				existingDraftId: this.savedDraftId || this._existingDraftId || null,
 			}
 		},
 

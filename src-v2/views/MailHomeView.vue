@@ -170,6 +170,7 @@ import Folder from 'vue-material-design-icons/Folder.vue'
 import ChevronLeft from 'vue-material-design-icons/ChevronLeft.vue'
 import ChevronRight from 'vue-material-design-icons/ChevronRight.vue'
 import { useJmapClient } from '../composables/useJmapClient.js'
+import { fetchAndCacheSignature } from '../utils/signatureCache.js'
 import EmailListToolbar from '../components/EmailListToolbar.vue'
 import EmailListItem from '../components/EmailListItem.vue'
 import EmailListSkeleton from '../components/EmailListSkeleton.vue'
@@ -275,6 +276,11 @@ export default {
 	},
 	async mounted() {
 		this._originalTitle = document.title.replace(/^\(\d+\)\s*/, '')
+		// Zentrale Signatur PRELOADEN (Signatur-HTML + Asset-Data-URLs in den
+		// localStorage-Cache): der Composer liest den Cache synchron — die
+		// Signatur steht sofort bereit, egal wie schnell der Nutzer auf
+		// „Neue Nachricht" klickt. Fire-and-forget, kein await nötig.
+		fetchAndCacheSignature()
 		try {
 			const { data } = await axios.get(generateUrl('/apps/souvera_mail/api/v2/settings/preferences'))
 			this._remoteAlways = data.remoteImages === 'always'

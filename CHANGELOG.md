@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.5.6]
+
+### Fixed
+
+- **Draft-Flut — die echte Wurzel behoben (ein Code-Pfad)**: der Autosave
+  lief per PUT (`Email/set update`), aber JMAP macht den Mail-Body
+  **immutable** — Stalwart wies jedes Body-Update ab, und der interne
+  Fallback-Create des PUT-Endpunkts legte einen NEUEN Draft an, ohne den
+  alten zu zerstören: jeder Autosave = +1 Waise. Neu: der Autosave nutzt
+  NUR NOCH den Create-Upsert (zerstört den bisherigen Draft der Session
+  per existingDraftId + composeKey und legt den neuen an) — garantiert
+  genau EIN Draft pro Compose-Session. Der PUT-Endpunkt bleibt als
+  Kompatibilität und zerstört jetzt auch im Fallback den alten Draft.
+- **Signatur sofort beim Composer-Öffnen (kein Nachladen)**: die zentrale
+  Signatur inkl. Bild-Data-URLs wird beim App-Start in einen
+  localStorage-Cache vorab geladen; der Composer liest den Cache SYNCHRON —
+  auch bei sofortigem Klick auf „Neue Nachricht" ist die Signatur mit
+  Bildern komplett da. Ein Hintergrund-Refresh aktualisiert Cache und
+  Editor bei Änderungen (TTL 5 Minuten).
+
+
 ## [1.5.5]
 
 ### Fixed

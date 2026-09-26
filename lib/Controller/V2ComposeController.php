@@ -813,7 +813,15 @@ class V2ComposeController extends Controller
         $updated = $result['data']['updated'][$id] ?? null;
         $notUpdated = $result['data']['notUpdated'][$id] ?? null;
         if ($notUpdated !== null) {
-            // Draft vanished (e.g. destroyed elsewhere) — fall back to create.
+            // Draft vanished (e.g. destroyed elsewhere) or the update was
+            // rejected (JMAP: der Mail-Body ist immutable — Email/set update
+            // kann bodyValues nicht ändern). DENN: erst den alten Draft
+            // ZERSTÖREN, dann neu anlegen — sonst bleibt bei jedem Autosave
+            // eine Waise übrig (Draft-Flut).
+            $this->jmap->singleCall('Email/set', [
+                'accountId' => $accountId,
+                'destroy' => [$id],
+            ]);
             $create = $this->jmap->singleCall('Email/set', [
                 'accountId' => $accountId,
                 'create' => ['draft1' => $emailObj],
