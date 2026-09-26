@@ -473,10 +473,38 @@ class V2ComposeController extends Controller
         if ($submitted === null) {
             $reason = $submitFailed['description'] ?? $submitFailed['type'] ?? null;
             $this->logger->warning(
-                'Souvera Mail: EmailSubmission/set rejected the mail'
+                'Souvera Mail: EmailSubmission/set reported no created.send1'
                 . ($reason !== null ? ': ' . \json_encode($reason, JSON_UNESCAPED_SLASHES) : ''),
                 ['app' => 'souvera_mail']
             );
+
+            // AMBIGUITÄTS-AUFLÖSUNG: die Response kann created.send1 vermissen
+            // lassen, obwohl Stalwart die Submission ausgeführt hat — das
+            // onSuccessUpdateEmail verschiebt den Entwurf NUR bei Erfolg nach
+            // Sent. Der Ort der Mail entscheidet daher: in Sent = Erfolg.
+            $createdMailId = \is_array($created) ? (string) ($created['id'] ?? '') : '';
+            if ($createdMailId !== '' && $sentId !== null) {
+                $locResult = $this->jmap->singleCall('Email/get', [
+                    'accountId' => $accountId,
+                    'ids' => [$createdMailId],
+                    'properties' => ['mailboxIds'],
+                ]);
+                $locMail = $locResult['data']['list'][0] ?? null;
+                $inSent = \is_array($locMail) && \is_array($locMail['mailboxIds'] ?? null)
+                    && isset($locMail['mailboxIds'][$sentId]);
+                if ($inSent) {
+                    $this->logger->warning(
+                        'Souvera Mail: EmailSubmission/set response missing created.send1, but the mail IS in Sent — treating as delivered.',
+                        ['app' => 'souvera_mail', 'mailId' => $createdMailId]
+                    );
+                    return new JSONResponse([
+                        'success' => true,
+                        'draftId' => $createdMailId,
+                        'submitted' => true,
+                    ]);
+                }
+            }
+
             return new JSONResponse([
                 'error' => $this->humanSendError(
                     \is_array($reason) ? $reason : ($submitFailed ?? []),
