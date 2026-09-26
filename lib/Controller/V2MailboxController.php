@@ -397,8 +397,16 @@ class V2MailboxController extends Controller
             if (isset($result['error'])) {
                 // Ganzer Envelope fehlgeschlagen (z. B. Limit) — Fallback:
                 // die Chunk-Ids EINZELN zerstören, so dass eine Hartnäckige
-                // den Rest nicht blockiert.
+                // den Rest nicht blockiert. Gecappt, damit ein hängender
+                // Stalwart den PHP-Request nicht in den Timeout treibt.
+                $attempts = 0;
                 foreach ($chunk as $singleId) {
+                    if ($attempts >= 30) {
+                        $failedIds[] = $singleId;
+                        $failReasons[] = 'übersprungen (Fallback-Limit erreicht)';
+                        continue;
+                    }
+                    $attempts++;
                     $single = $this->jmap->singleCall('Email/set', [
                         'accountId' => $accountId,
                         'destroy' => [$singleId],
