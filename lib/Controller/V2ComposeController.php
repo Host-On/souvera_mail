@@ -462,18 +462,67 @@ class V2ComposeController extends Controller
         }
         if ($created === null && $submitted === null) {
             return new JSONResponse([
-                'error' => 'Email creation failed',
+                'error' => $this->humanSendError($submitFailed, 'Email creation failed'),
                 'detail' => $submitFailed !== null ? $submitFailed : ($emailResp['args'] ?? []),
             ], 500);
         }
-        // If the submission succeeded the mail IS sent — report success even
-        // when the intermediate draft create did not report a created id
-        // (the implicit onSuccessUpdateEmail Email/set response has none).
+        // Created, aber NICHT submitted (z. B. tooLarge/noQuota beim
+        // EmailSubmission/set): der Versand ist FEHLGESCHLAGEN — Erfolg zu
+        // melden wäre ein stiller Versandverlust. Der erzeugte Entwurf bleibt
+        // bewusst liegen (der User kann ihn korrigieren und erneut senden).
+        if ($submitted === null) {
+            $reason = $submitFailed['description'] ?? $submitFailed['type'] ?? null;
+            $this->logger->warning(
+                'Souvera Mail: EmailSubmission/set rejected the mail'
+                . ($reason !== null ? ': ' . \json_encode($reason, JSON_UNESCAPED_SLASHES) : ''),
+                ['app' => 'souvera_mail']
+            );
+            return new JSONResponse([
+                'error' => $this->humanSendError(
+                    \is_array($reason) ? $reason : ($submitFailed ?? []),
+                    'Die Nachricht konnte nicht übermittelt werden'
+                ),
+                'detail' => $submitFailed ?? [],
+            ], 502);
+        }
         return new JSONResponse([
             'success' => true,
             'draftId' => $created['id'] ?? '',
-            'submitted' => $submitted !== null,
+            'submitted' => true,
         ]);
+    }
+
+    /**
+     * Übersetzt JMAP-Submission-Reject-Gründe (Stalwart) in verständliche
+     * deutsche Meldungen — der Kunde soll den GRUND sehen (Anhang zu groß,
+     * Quote, ungültige Adresse …), nicht nur „fehlgeschlagen".
+     *
+     * @param mixed $reason notCreated-Eintrag (array mit type/description) oder String
+     */
+    private function humanSendError(mixed $reason, string $fallback): string {
+        $type = '';
+        $description = '';
+        if (\is_array($reason)) {
+            $type = \strtolower((string) ($reason['type'] ?? ''));
+            $description = \trim((string) ($reason['description'] ?? ''));
+        } elseif (\is_string($reason) && $reason !== '') {
+            $description = \trim($reason);
+            if (\preg_match('/toos?large|size|quota/i', $description)) { $type = 'tooLarge'; }
+            if (\preg_match('/invalid.*mail|bad.*address|noSuch/i', $description)) { $type = 'invalidEmail'; }
+        }
+
+        $msg = match ($type) {
+            'toolarge', 'sizelimit' => 'Die Nachricht ist zu groß (Limit des Mailservers überschritten — meist durch Anhänge). Verkleinere die Anhänge oder entferne sie.',
+            'noquota', 'overquota' => 'Das Postfach- oder Versandlimit ist erschöpft — bitte den Administrator informieren.',
+            'invalidemail', 'bademail', 'nosuchrecipient' => 'Eine Empfängeradresse ist ungültig oder wird vom Mailserver abgelehnt.',
+            'forbidden' => 'Der Mailserver hat den Versand abgelehnt (Berechtigung/Spamschutz).',
+            default => '',
+        };
+
+        if ($msg === '' && $description !== '') {
+            return $fallback . ' — ' . \mb_substr($description, 0, 200);
+        }
+        return $msg !== '' ? $msg : $fallback;
     }
 
     /**
@@ -517,6 +566,16 @@ class V2ComposeController extends Controller
         ]);
 
         $created = $result['data']['created']['draft1'] ?? null;
+        // notCreated (z. B. zu großes Draft): den Grund zurückgeben statt einer
+        // leeren ID — sonst startet der Frontend-Autosave alle 3 s einen neuen
+        // Create-Versuch und erzeugt eine Draft-Flut.
+        if ($created === null) {
+            $notCreated = $result['data']['notCreated']['draft1'] ?? [];
+            $reason = \is_array($notCreated)
+                ? (string) ($notCreated['description'] ?? $notCreated['type'] ?? 'Draft create rejected')
+                : 'Draft create rejected';
+            return new JSONResponse(['error' => 'Entwurf konnte nicht gespeichert werden: ' . $reason], 500);
+        }
         return new JSONResponse([
             'success' => true,
             'draftId' => $created['id'] ?? '',

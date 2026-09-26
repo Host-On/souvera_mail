@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.4.0]
+
+### Fixed
+
+- **Draft-Flut beim Verfassen**: schlug das Draft-Create fehl (notCreated),
+  startete der Autosave alle 3 s einen neuen Versuch. Der Backend gibt jetzt
+  den Fehlergrund zurück, der Frontend stoppt den Autosave-Zyklus bei
+  Fehlern (keine Wiederholungs-Flut mehr).
+- **Send-Fehler nennen jetzt den Grund**: JMAP-Submission-Rejects (Anhang zu
+  groß, Quote erschöpft, ungültige Empfängeradresse, Spamschutz) werden
+  verständlich auf Deutsch gemappt und angezeigt — statt nur „Fehlgeschlagen".
+- **Fehler beim Senden wurden als Erfolg gemeldet** (Draft erzeugt, Submission
+  aber abgelehnt): jetzt korrekt als Fehler mit Grund.
+- **Verschieben in der Mehrfachauswahl**: Erfolgs-/Fehler-Feedback mit Anzahl
+  und Grund je fehlgeschlagener Mail (statt stummem console.error).
+- **Entwurfs-Popup-Darstellung**: sauberer Rand, Border und Abstände
+  (statt aneinander klebender Elemente).
+
 ## [1.3.10]
 
 ### Fixed

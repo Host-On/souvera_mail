@@ -590,6 +590,7 @@ export default {
 			// Guard against overlapping autosaves (slow create + fast typing)
 			// which could otherwise create a second draft.
 			if (this._savingDraft) return
+			if (this._draftSaveFailed) return // Create fehlgeschlagen → keine Wiederholungs-Flut
 			this._savingDraft = true
 			try {
 				const payload = this.buildPayload()
@@ -599,11 +600,23 @@ export default {
 					if (data?.draftId) this.savedDraftId = data.draftId
 				} else {
 					const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/drafts'), payload)
+					if (!data?.draftId) {
+						// Server hat den Draft nicht angelegt — Autosave stoppen,
+						// statt alle 3 s einen neuen Create-Versuch (Draft-Flut).
+						this._draftSaveFailed = true
+						showError(data?.error || this.t('souvera_mail', 'Entwurf konnte nicht gespeichert werden'))
+						return
+					}
 					this.savedDraftId = data.draftId
 					this.trackDraft(data.draftId)
 				}
 			} catch (e) {
 				console.error('Draft save failed', e)
+				// HTTP-Fehler (4xx/5xx) beim CREATE → ebenfalls stoppen (Backoff),
+				// der User sieht den Fehler beim manuellen Speichern/Senden erneut.
+				if (!this.savedDraftId && e.response?.status >= 400) {
+					this._draftSaveFailed = true
+				}
 			} finally {
 				this._savingDraft = false
 			}
@@ -637,7 +650,12 @@ export default {
 				if (this.forwardAttachments.length > 0) {
 					payload.attachments.push(...this.forwardAttachments)
 				}
-				await axios.post(generateUrl('/apps/souvera_mail/api/v2/send'), payload)
+				const { data: sendData } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/send'), payload)
+				// Defensive: submitFailed (Draft erstellt, Submission abgelehnt)
+				// kommt als Fehler (502) — dieser Check fängt veraltete Backends ab.
+				if (sendData?.submitted === false) {
+					throw new Error(sendData.error || this.t('souvera_mail', 'Failed to send message'))
+				}
 				if (this.savedDraftId) {
 					try { await axios.delete(generateUrl('/apps/souvera_mail/api/v2/drafts/' + this.savedDraftId)) } catch {}
 					this.trackDraft(null, this.savedDraftId)
@@ -732,7 +750,7 @@ export default {
 
 <style scoped>
 .compose-layout { display: flex; flex-direction: column; height: 85vh; max-height: 85vh; overflow: hidden; }
-.compose-close-dialog { display: flex; flex-direction: column; gap: 18px; padding: 6px 2px 0; min-width: 380px; }
+.compose-close-dialog { display: flex; flex-direction: column; gap: 18px; padding: 24px; min-width: 380px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-main-background); }
 .compose-close-dialog__body { display: flex; align-items: flex-start; gap: 14px; }
 .compose-close-dialog__icon { color: var(--color-text-maxcontrast); flex-shrink: 0; margin-top: 2px; }
 .compose-close-dialog__text { margin: 0; font-size: 14px; line-height: 1.55; padding-top: 8px; }

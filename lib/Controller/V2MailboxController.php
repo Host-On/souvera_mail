@@ -510,6 +510,39 @@ class V2MailboxController extends Controller
             }
         }
 
+        // Liegt die Mail bereits im Papierkorb → ENDGÜLTIG löschen (destroy).
+        // Sonst: der übliche Move-to-Trash. (Ohne diesen Check war der
+        // Löschen-Button im Papierkorb ein No-Op mit UI-Flimmern.)
+        if ($trashId !== null) {
+            $emailResult = $this->jmap->singleCall('Email/get', [
+                'accountId' => $accountId,
+                'ids' => [$id],
+                'properties' => ['mailboxIds'],
+            ]);
+            foreach ($emailResult['data']['list'] ?? [] as $email) {
+                if (\is_array($email['mailboxIds'] ?? null) && isset($email['mailboxIds'][$trashId])) {
+                    $destroyResult = $this->jmap->call([
+                        ['Email/set', [
+                            'accountId' => $accountId,
+                            'destroy' => [$id],
+                        ]],
+                    ]);
+                    if (isset($destroyResult['error'])) {
+                        return new JSONResponse($destroyResult, 500);
+                    }
+                    $destroyed = $destroyResult['data'][0]['args']['destroyed'] ?? [];
+                    if (!\in_array($id, (array) $destroyed, true)) {
+                        $notDestroyed = $destroyResult['data'][0]['args']['notDestroyed'][$id] ?? null;
+                        return new JSONResponse([
+                            'error' => 'Endgültiges Löschen abgelehnt: '
+                                . (\is_array($notDestroyed) ? ($notDestroyed['description'] ?? ($notDestroyed['type'] ?? 'unbekannt')) : 'unbekannt'),
+                        ], 500);
+                    }
+                    return new JSONResponse(['success' => true, 'destroyed' => true]);
+                }
+            }
+        }
+
         $update = $trashId !== null
             ? ['mailboxIds' => [$trashId => true]]
             : ['keywords/$add' => ['$deleted' => true]];

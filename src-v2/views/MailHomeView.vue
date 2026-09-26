@@ -589,13 +589,27 @@ export default {
 		},
 		async bulkMoveTo(mailboxId) {
 			this.bulkProcessing = true
+			let moved = 0
+			const failed = []
 			for (const id of this.checkedIds) {
-				try { await moveEmail(id, mailboxId, this.currentAccountId) } catch (e) { console.error('Failed to move', e) }
+				try {
+					await moveEmail(id, mailboxId, this.currentAccountId)
+					moved++
+				} catch (e) {
+					console.error('Failed to move', e)
+					const reason = e.response?.data?.error || ''
+					failed.push(reason ? `${id}: ${reason}` : id)
+				}
 			}
 			this.checkedIds = []
 			await this.loadEmails()
 			this.notifyMailboxChange()
-			showSuccess(this.t('souvera_mail', 'Messages moved'))
+			if (failed.length > 0) {
+				showError(this.t('souvera_mail', '{moved} verschoben, {failed} fehlgeschlagen', { moved, failed: failed.length })
+					+ (failed.length <= 3 ? ' — ' + failed.join('; ') : ''))
+			} else {
+				showSuccess(this.t('souvera_mail', 'Messages moved'))
+			}
 			this.bulkProcessing = false
 		},
 		/**
