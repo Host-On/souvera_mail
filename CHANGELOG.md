@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.3.10]
+
+### Fixed
+
+- **Zweite Push-Zeile zeigte den Betreff doppelt**: das Android holt die
+  vollständige Notification per OCS-Fetch vom Server — und deren Message-Feld
+  war leer (die Inhalte leben in den nicht persistierten Subject-Parametern),
+  wodurch der Client auf den Betreff zurückfiel. Neu: die RAW-Message trägt
+  „Von: Absender · Vorschau" (byte-sicher auf die NC-Grenze von 64 Bytes
+  gekürzt) in die DB, und der MailNotifier nutzt sie im Fetch-Pfad als
+  geparste Message.
+
 ## [1.3.9]
 
 ### Fixed

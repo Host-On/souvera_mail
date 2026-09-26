@@ -39,6 +39,7 @@ class MailPushNotifier
     private const SUBJECT_MAX_BYTES = 64;
     private const SENDER_MAX_BYTES = 64;
     private const PREVIEW_MAX_BYTES = 240;
+    private const MESSAGE_LINE_MAX_BYTES = 64;
 
     public function __construct(
         private IManager $notificationManager,
@@ -95,12 +96,18 @@ class MailPushNotifier
         string $preview,
     ): void {
         $notification = $this->notificationManager->createNotification();
-        // NC-Muster: RAW-Subject ist auf 64 BYTE validiert — die vollen
-        // Inhalte wandern in die Subject-Parameter (unbegrenzt) und der
-        // MailNotifier setzt daraus die geparsten Werte, die der Push trägt.
-        // setMessage bewusst NICHT gerufen (ebenfalls 64-BYTE-validiert —
-        // Absender+Vorschau passen dort nie hinein; die Zeilen liefert der
-        // Notifier als geparste Message).
+        // NC-Muster: RAW-Subject/RAW-Message sind auf 64 BYTE validiert — die
+        // vollen Inhalte wandern in die Subject-Parameter (unbegrenzt) und der
+        // MailNotifier setzt daraus die geparsten Werte für den Push.
+        // Das RAW-Message-Feld trägt zusätzlich die „Von: …"-Zeile in die DB:
+        // das Android holt die komplette Notification per OCS-Fetch vom Server
+        // und zeigt deren Message als zweite Zeile (die Push-Payload selbst
+        // enthält KEIN Message-Feld).
+        $messageLine = \trim(
+            ($sender !== '' ? 'Von: ' . $sender : '')
+            . ($sender !== '' && $preview !== '' ? ' · ' : '')
+            . $preview
+        );
         $notification
             ->setApp('souvera_mail')
             ->setUser($userId)
@@ -111,6 +118,9 @@ class MailPushNotifier
                 'from' => $sender,
                 'preview' => $preview,
             ]);
+        if ($messageLine !== '') {
+            $notification->setMessage(\mb_strcut($messageLine, 0, self::MESSAGE_LINE_MAX_BYTES));
+        }
 
         $this->notificationManager->notify($notification);
     }

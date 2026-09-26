@@ -63,9 +63,16 @@ class MailNotifier implements INotifier {
 		}
 		$notification->setParsedSubject($parsedSubject);
 
+		// Geparste Message: im Push-Pfad aus den Parametern (voll), im
+		// DB-Fetch-Pfad (Android holt die Notification per OCS) aus der
+		// RAW-Message („Von: … · Vorschau", 64-Byte-zeilig). Ohne beides
+		// setzen — sonst zeigt der Client den Betreff doppelt.
 		$from = \trim((string) ($params['from'] ?? ''));
 		$preview = \trim((string) ($params['preview'] ?? ''));
 		$message = $from !== '' && $preview !== '' ? $from . "\n" . $preview : $from . $preview;
+		if ($message === '') {
+			$message = \trim((string) $notification->getMessage());
+		}
 		if ($message !== '') {
 			$notification->setParsedMessage($message);
 		}
