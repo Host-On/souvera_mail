@@ -278,6 +278,12 @@ export default {
 		},
 	},
 	async mounted() {
+		// COMPOSE-KEY: stabil über Component-Remounts hinweg (sessionStorage
+		// überlebt im selben Tab). Das Backend nutzt ihn als Upsert-Schlüssel —
+		// der Draft-Flut-Schutz auf Serverseite.
+		this._composeKey = sessionStorage.getItem('souvera_compose_key')
+			|| (crypto.randomUUID ? crypto.randomUUID() : 'ck-' + Date.now() + '-' + Math.random().toString(16).slice(2))
+		sessionStorage.setItem('souvera_compose_key', this._composeKey)
 		// Preferences FIRST: loadIdentities() picks the default identity
 		// (star) from defaultIdentityId, so it must already be loaded.
 		await this.loadPreferences()
@@ -532,6 +538,7 @@ export default {
 		/** Lädt einen existierenden Draft in den Editor (Resume). */
 		loadDraftContent(d) {
 			this.savedDraftId = d.draftId
+			this._existingDraftId = d.draftId
 			this._suppressDirty = true
 			if (d.subject) this.subject = d.subject
 			this.to = (d.to || []).map(e => ({ email: e }))
@@ -689,7 +696,16 @@ export default {
 				inReplyTo: this.replyTo?.messageId || null,
 				references: this.replyTo?.references || null,
 				draftId: this.savedDraftId,
+				composeKey: this._composeKey || null,
+				existingDraftId: this._existingDraftId || null,
 			}
+		},
+
+		/** Compose-Session beenden: Upsert-Mapping-Identität rotieren. */
+		endComposeSession() {
+			sessionStorage.removeItem('souvera_compose_key')
+			this._composeKey = null
+			this._existingDraftId = null
 		},
 		async doSend() {
 			if (!this.canSend) return
@@ -710,6 +726,7 @@ export default {
 					this.trackDraft(null, this.savedDraftId)
 					this.savedDraftId = null
 				}
+				this.endComposeSession()
 				showSuccess(this.t('souvera_mail', 'Message sent'))
 				this.$emit('sent')
 			} catch (e) {
@@ -765,11 +782,13 @@ export default {
 			this._forceSave = false
 			this.trackDraft(null, this.savedDraftId)
 			this.savedDraftId = null
+			this.endComposeSession()
 			this.showCloseDialog = false
 			this.$emit('cancel')
 		},
 		discardDraftAndClose() {
 			this.deleteSavedDraft()
+			this.endComposeSession()
 			this.showCloseDialog = false
 			this.$emit('cancel')
 		},

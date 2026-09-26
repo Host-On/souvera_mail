@@ -670,12 +670,38 @@ class V2ComposeController extends Controller
         $inReplyTo = \is_string($body['inReplyTo'] ?? null) ? \trim($body['inReplyTo']) : null;
         $references = \is_string($body['references'] ?? null) ? \trim($body['references']) : null;
 
+        // COMPOSE-KEY-UPSERT — die harte Draft-Flut-Bremse: das Frontend
+        // sendet einen stabilen Schlüssel pro Compose-Session (überlebt
+        // Component-Remounts via sessionStorage). Existiert für den Schlüssel
+        // bereits ein Draft, wird er DESTROYED und der neue tritt an seine
+        // Stelle — es gibt maximal EINEN Draft pro Compose-Session, egal was
+        // das Frontend tut (Remounts, verlorene IDs, doppelte Requests).
+        $composeKey = (string) ($body['composeKey'] ?? '');
+        $mappedDraftId = null;
+        if (\preg_match('/^[a-f0-9\-]{10,64}$/', $composeKey)) {
+            $mappedDraftId = $this->config->getUserValue($user->getUID(), 'souvera_mail', 'draftmap.' . $composeKey, '');
+            if ($mappedDraftId === '') { $mappedDraftId = null; }
+        }
+
         $emailObj = $this->buildEmailObject(
             $userEmail, $toAddr, $ccAddr, $bccAddr,
             $subject, $bodyHtml, $bodyPlain,
             [], $inReplyTo !== '' ? $inReplyTo : null, $references !== '' ? $references : null, $draftsId
         );
         $emailObj['keywords'] = ['$draft' => true];
+
+        // Alte Drafts dieser Compose-Session entfernen (JMAP: der Mail-Body
+        // ist immutable — ändern geht nur über destroy+create).
+        $staleIds = [];
+        if ($mappedDraftId !== null) { $staleIds[] = $mappedDraftId; }
+        $existingDraftId = \is_string($body['existingDraftId'] ?? null) ? \trim($body['existingDraftId']) : '';
+        if ($existingDraftId !== '' && $existingDraftId !== $mappedDraftId) { $staleIds[] = $existingDraftId; }
+        if ($staleIds !== []) {
+            $this->jmap->singleCall('Email/set', [
+                'accountId' => $accountId,
+                'destroy' => $staleIds,
+            ]);
+        }
 
         $result = $this->jmap->singleCall('Email/set', [
             'accountId' => $accountId,
@@ -692,6 +718,11 @@ class V2ComposeController extends Controller
                 ? (string) ($notCreated['description'] ?? $notCreated['type'] ?? 'Draft create rejected')
                 : 'Draft create rejected';
             return new JSONResponse(['error' => 'Entwurf konnte nicht gespeichert werden: ' . $reason], 500);
+        }
+
+        // Mapping der Compose-Session aktualisieren (auch im PUT-Pfad genutzt).
+        if ($composeKey !== '' && \preg_match('/^[a-f0-9\-]{10,64}$/', $composeKey)) {
+            $this->config->setUserValue($user->getUID(), 'souvera_mail', 'draftmap.' . $composeKey, (string) ($created['id'] ?? ''));
         }
         return new JSONResponse([
             'success' => true,
@@ -763,10 +794,24 @@ class V2ComposeController extends Controller
                 return new JSONResponse(['error' => 'Draft recreate failed', 'detail' => $create['error']], 500);
             }
             $created = $create['data']['created']['draft1'] ?? null;
+            // Mapping nachziehen (Upsert-Kreis: der nächste Create mit dem
+            // selben composeKey zerstört diesen Draft und legt neu an).
+            $uid = $this->userSession->getUser()?->getUID() ?? '';
+            $composeKey = (string) ($body['composeKey'] ?? '');
+            if ($uid !== '' && $composeKey !== '' && \preg_match('/^[a-f0-9\-]{10,64}$/', $composeKey) && $created !== null && isset($created['id'])) {
+                $this->config->setUserValue($uid, 'souvera_mail', 'draftmap.' . $composeKey, (string) $created['id']);
+            }
             return new JSONResponse([
                 'success' => true,
                 'draftId' => $created['id'] ?? '',
             ]);
+        }
+
+        // Mapping der Compose-Session aktualisieren (Upsert-Kreis).
+        $uid = $this->userSession->getUser()?->getUID() ?? '';
+        $composeKey = (string) ($body['composeKey'] ?? '');
+        if ($uid !== '' && $composeKey !== '' && \preg_match('/^[a-f0-9\-]{10,64}$/', $composeKey)) {
+            $this->config->setUserValue($uid, 'souvera_mail', 'draftmap.' . $composeKey, $id);
         }
 
         return new JSONResponse([
