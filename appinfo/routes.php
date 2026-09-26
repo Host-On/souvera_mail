@@ -309,6 +309,7 @@ return [
         [
             'name' => 'v2_mailbox#emptyMailbox',
             'url' => '/api/v2/mailboxes/{id}/empty',
+            'verb' => 'POST',
         ],
         [
             'name' => 'pmg#reportShieldHam',
