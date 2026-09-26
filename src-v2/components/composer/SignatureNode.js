@@ -51,12 +51,18 @@ export const Signature = Node.create({
 			dom.contentEditable = 'false'
 			dom.style.userSelect = 'none'
 			dom.classList.add('signature-node')
+			// ProseMirror/Editor-Kontexte können NodeViews einengen — die
+			// Signatur braucht die volle Breite (die Tabelle darin ist 460px).
+			dom.style.display = 'block'
+			dom.style.width = '100%'
+			dom.style.overflowX = 'auto'
 
 			const iframe = document.createElement('iframe')
 			iframe.className = 'signature-node__frame'
 			iframe.setAttribute('sandbox', 'allow-same-origin')
 			iframe.setAttribute('title', 'Signature')
 			iframe.style.width = '100%'
+			iframe.style.minWidth = '460px'
 			iframe.style.border = 'none'
 			iframe.style.display = 'block'
 			iframe.style.background = 'transparent'

@@ -362,14 +362,18 @@ export default {
 
 /* ── Signature node (sandboxed iframe, non-editable) ──────────────── */
 .richtext-editor__content :deep(.signature-node) {
+	display: block;
+	width: 100%;
 	margin-top: 14px;
 	padding-top: 8px;
 	border-top: 1px dashed var(--color-border);
 	cursor: default;
+	overflow-x: auto;
 }
 /* Der iframe rendert die Signatur 1:1 wie der Empfänger — KEIN Einfluss
    des Editor-CSS mehr auf Tabellen/Bilder (keine max-width-Ketten). */
 .richtext-editor__content :deep(.signature-node__frame) {
+	min-width: 460px;
 	min-height: 60px;
 }
 
