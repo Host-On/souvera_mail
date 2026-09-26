@@ -496,12 +496,48 @@ export default {
 				}, 100)
 			})
 		},
-		buildReplyOrForward() {
+		async buildReplyOrForward() {
 			if (this.mode === 'forward') {
 				this.buildForwardContent()
-			} else if (this.mode === 'reply' || this.mode === 'replyAll') {
+				return
+			}
+			if (this.mode === 'reply' || this.mode === 'replyAll') {
+				// DRAFT-RESUME: existiert bereits ein Entwurf für diesen
+				// Reply-Kontext (Öffnen/Schließen-Zyklus), laden statt einen
+				// neuen zu erzeugen — das verhindert die Draft-Flut.
+				const inReplyTo = this.replyTo?.messageId || this.originalEmail?.messageId || ''
+				if (inReplyTo !== '') {
+					try {
+						const { data } = await axios.get(
+							generateUrl('/apps/souvera_mail/api/v2/drafts/resolve'),
+							{ params: { inReplyTo } },
+						)
+						if (data?.found && data.draftId) {
+							this.loadDraftContent(data)
+							return
+						}
+					} catch (e) {
+						console.debug('Draft resolve failed — falling back to fresh reply', e)
+					}
+				}
 				this.buildReplyContent()
 			}
+		},
+		/** Lädt einen existierenden Draft in den Editor (Resume). */
+		loadDraftContent(d) {
+			this.savedDraftId = d.draftId
+			this._suppressDirty = true
+			if (d.subject) this.subject = d.subject
+			this.to = (d.to || []).map(e => ({ email: e }))
+			this.cc = (d.cc || []).map(e => ({ email: e }))
+			this.bcc = (d.bcc || []).map(e => ({ email: e }))
+			const html = d.bodyHtml || ''
+			this.$nextTick(() => {
+				this.$refs.editor?.setContent(html)
+				this.$refs.editor?.focus()
+				this.$nextTick(() => { this._suppressDirty = false })
+			})
+			this.trackDraft(d.draftId)
 		},
 		// Recipients come from the asynchronously loaded originalEmail (the
 		// router path never passes reply data in the query). Own addresses
@@ -697,6 +733,10 @@ export default {
 		},
 		onClose() {
 			// Ask BEFORE anything is dropped: keep / discard / stay.
+			// WICHTIG: das NcModal hat sich beim @close bereits geschlossen
+			// (v-model:show=false, Editor weg) — SOFORT wieder öffnen, damit
+			// „Abbrechen" ins Fenster zurückführt statt ins Leere.
+			this.visible = true
 			if (this.dirty || this.savedDraftId) {
 				this.showCloseDialog = true
 				return
@@ -750,11 +790,11 @@ export default {
 
 <style scoped>
 .compose-layout { display: flex; flex-direction: column; height: 85vh; max-height: 85vh; overflow: hidden; }
-.compose-close-dialog { display: flex; flex-direction: column; gap: 18px; padding: 24px; min-width: 380px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-main-background); }
-.compose-close-dialog__body { display: flex; align-items: flex-start; gap: 14px; }
-.compose-close-dialog__icon { color: var(--color-text-maxcontrast); flex-shrink: 0; margin-top: 2px; }
-.compose-close-dialog__text { margin: 0; font-size: 14px; line-height: 1.55; padding-top: 8px; }
-.compose-close-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--color-border); padding-top: 14px; }
+.compose-close-dialog { display: flex; flex-direction: column; gap: 20px; padding: 8px 4px 0; min-width: 380px; }
+.compose-close-dialog__body { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.compose-close-dialog__icon { color: var(--color-text-maxcontrast); }
+.compose-close-dialog__text { margin: 0; font-size: 14px; line-height: 1.55; }
+.compose-close-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; }
 
 .compose-layout__header { padding: 10px 16px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
 .compose-layout__header h3 { margin: 0; font-size: 15px; font-weight: 600; }

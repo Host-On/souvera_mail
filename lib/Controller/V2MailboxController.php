@@ -351,10 +351,14 @@ class V2MailboxController extends Controller
         }
 
         // Stalwart rejects Email/query.limit >= 500 (exclusive cap) and
-        // large destroys in one envelope are risky — paginate both.
+        // large destroys in one envelope are risky — paginate both. Destroy
+        // chunks stay SMALL (Stalwart cappt große Envelopes ähnlich wie
+        // Queries) und Einzelfehler blockieren den Rest nicht mehr.
         $pageSize = 250;
+        $destroyChunk = 50;
         $allIds = [];
         $position = 0;
+        $queryErrors = [];
         while (true) {
             $query = $this->jmap->singleCall('Email/query', [
                 'accountId' => $accountId,
@@ -383,21 +387,55 @@ class V2MailboxController extends Controller
         }
 
         $destroyed = 0;
-        foreach (\array_chunk($allIds, $pageSize) as $chunk) {
+        $failedIds = [];
+        $failReasons = [];
+        foreach (\array_chunk($allIds, $destroyChunk) as $chunk) {
             $result = $this->jmap->singleCall('Email/set', [
                 'accountId' => $accountId,
                 'destroy' => $chunk,
             ]);
             if (isset($result['error'])) {
-                return new JSONResponse(['error' => 'Destroy failed', 'detail' => $result], 500);
+                // Ganzer Envelope fehlgeschlagen (z. B. Limit) — Fallback:
+                // die Chunk-Ids EINZELN zerstören, so dass eine Hartnäckige
+                // den Rest nicht blockiert.
+                foreach ($chunk as $singleId) {
+                    $single = $this->jmap->singleCall('Email/set', [
+                        'accountId' => $accountId,
+                        'destroy' => [$singleId],
+                    ]);
+                    if (isset($single['error'])) {
+                        $failedIds[] = $singleId;
+                        $failReasons[] = $single['error'];
+                        continue;
+                    }
+                    if (\in_array($singleId, (array) ($single['data']['destroyed'] ?? []), true)) {
+                        $destroyed++;
+                    } else {
+                        $nd = $single['data']['notDestroyed'][$singleId] ?? [];
+                        $failedIds[] = $singleId;
+                        $failReasons[] = \is_array($nd) ? ($nd['description'] ?? ($nd['type'] ?? 'unbekannt')) : 'unbekannt';
+                    }
+                }
+                continue;
             }
             if (!empty($result['data']['notDestroyed'] ?? null)) {
-                return new JSONResponse([
-                    'error' => 'Some emails could not be destroyed',
-                    'detail' => $result['data']['notDestroyed'],
-                ], 500);
+                // Teil-Fehlschläge sammeln (der Rest des Chunks ist zerstört)
+                foreach (($result['data']['notDestroyed'] ?? []) as $nid => $nd) {
+                    $failedIds[] = (string) $nid;
+                    $failReasons[] = \is_array($nd) ? ($nd['description'] ?? ($nd['type'] ?? 'unbekannt')) : 'unbekannt';
+                }
             }
             $destroyed += \count($result['data']['destroyed'] ?? []);
+        }
+
+        if ($failedIds !== []) {
+            return new JSONResponse([
+                'error' => 'Nur ' . $destroyed . ' von ' . \count($allIds)
+                    . ' Mails endgültig gelöscht — ' . \count($failedIds)
+                    . ' fehlgeschlagen (' . \mb_substr(\implode('; ', \array_unique($failReasons)), 0, 200) . ')',
+                'failedIds' => $failedIds,
+                'destroyed' => $destroyed,
+            ], 500);
         }
 
         return new JSONResponse([

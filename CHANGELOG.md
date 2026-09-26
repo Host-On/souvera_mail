@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.1]
+
+### Fixed
+
+- **Draft-Flut endgültig behoben (Resume)**: beim erneuten Öffnen einer
+  Antwort wird der existierende Entwurf jetzt über
+  `GET /api/v2/drafts/resolve?inReplyTo=…` gefunden und **geladen** (Inhalt
+  + draftId) — statt bei jedem Öffnen/Schließen-Zyklus einen neuen zu
+  erzeugen. Der Autosave aktualisiert denselben Draft per PUT.
+- **Entwurfs-Popup**: „Abbrechen" führt jetzt zurück in das offene
+  Verfassen-Fenster (das Modal blieb vorher geschlossen); Darstellung auf
+  NC-Dialog-Muster umgestellt (zentriert, ohne doppelten Rahmen).
+- **Papierkorb leeren**: Destroy-Chunks verkleinert (Stalwart cappt große
+  Envelopes), Einzelfehler blockieren den Rest nicht mehr, und die
+  Fehlermeldung nennt Anzahl + Grund der fehlgeschlagenen Mails.
+
 ## [1.4.0]
 
 ### Fixed

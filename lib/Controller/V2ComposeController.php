@@ -526,6 +526,107 @@ class V2ComposeController extends Controller
     }
 
     /**
+     * GET /apps/souvera_mail/api/v2/drafts/resolve?inReplyTo=<messageId>
+     *
+     * Findet den bereits existierenden Entwurf für einen Antwort-Kontext
+     * (Drafts-Ordner, $draft-Keyword + In-Reply-To-Match) und liefert
+     * draftId + vollständigen Inhalt. Der Composer lädt damit den bestehenden
+     * Entwurf statt bei jedem Öffnen/Schließen-Zyklus einen neuen zu erzeugen
+     * (Draft-Flut).
+     */
+    #[NoAdminRequired]
+    public function resolveDraft(): JSONResponse
+    {
+        $accountId = $this->jmap->getCurrentAccountId();
+        if ($accountId === null) {
+            return new JSONResponse(['error' => 'Not authenticated'], 401);
+        }
+        $inReplyTo = \trim((string) ($this->request->getParam('inReplyTo') ?? ''));
+        if ($inReplyTo === '') {
+            return new JSONResponse(['error' => 'inReplyTo required'], 400);
+        }
+
+        $draftsId = $this->resolveMailboxId($accountId, 'drafts');
+        if ($draftsId === null) {
+            return new JSONResponse(['found' => false]);
+        }
+
+        // Kandidaten: Drafts im Drafts-Ordner ($draft-Keyword), begrenzt.
+        $query = $this->jmap->singleCall('Email/query', [
+            'accountId' => $accountId,
+            'filter' => ['inMailbox' => $draftsId, 'hasKeyword' => '$draft'],
+            'sort' => [['property' => 'receivedAt', 'isAscending' => false]],
+            'limit' => 25,
+        ]);
+        if (isset($query['error'])) {
+            return new JSONResponse(['error' => 'Draft query failed', 'detail' => $query['error']], 500);
+        }
+        $ids = $query['data']['ids'] ?? [];
+        if (!\is_array($ids) || $ids === []) {
+            return new JSONResponse(['found' => false]);
+        }
+
+        $get = $this->jmap->singleCall('Email/get', [
+            'accountId' => $accountId,
+            'ids' => $ids,
+            'properties' => ['id', 'subject', 'inReplyTo', 'to', 'cc', 'bcc'],
+            'bodyProperties' => ['textBody', 'htmlBody', 'preview'],
+            'fetchTextBodyValues' => true,
+            'fetchHTMLBodyValues' => true,
+            'maxBodyValueBytes' => 1048576,
+        ]);
+        if (isset($get['error'])) {
+            return new JSONResponse(['error' => 'Draft fetch failed', 'detail' => $get['error']], 500);
+        }
+        foreach (($get['data']['list'] ?? []) as $email) {
+            if (!\is_array($email)) { continue; }
+            $refs = $email['inReplyTo'] ?? null;
+            $refList = \is_array($refs) ? $refs : [];
+            if (\in_array($inReplyTo, $refList, true)) {
+                // Draft-Inhalt für den Editor extrahieren (gleiches Muster
+                // wie die Detail-Ansicht: textBody bevorzugt, HTML fallback).
+                $bodyHtml = '';
+                $bodyPlain = '';
+                $htmlArr = $email['htmlBody'] ?? [];
+                $textArr = $email['textBody'] ?? [];
+                if (\is_array($htmlArr) && isset($htmlArr[0]['partId'])) {
+                    $pid = (string) $htmlArr[0]['partId'];
+                    $bv = $email['bodyValues'][$pid]['value'] ?? null;
+                    if (\is_string($bv)) { $bodyHtml = $bv; }
+                }
+                if (\is_array($textArr) && isset($textArr[0]['partId'])) {
+                    $pid = (string) $textArr[0]['partId'];
+                    $bv = $email['bodyValues'][$pid]['value'] ?? null;
+                    if (\is_string($bv)) { $bodyPlain = $bv; }
+                }
+                $to = [];
+                foreach (($email['to'] ?? []) as $r) {
+                    if (\is_array($r) && isset($r['email'])) { $to[] = $r['email']; }
+                }
+                $cc = [];
+                foreach (($email['cc'] ?? []) as $r) {
+                    if (\is_array($r) && isset($r['email'])) { $cc[] = $r['email']; }
+                }
+                $bcc = [];
+                foreach (($email['bcc'] ?? []) as $r) {
+                    if (\is_array($r) && isset($r['email'])) { $bcc[] = $r['email']; }
+                }
+                return new JSONResponse([
+                    'found' => true,
+                    'draftId' => (string) ($email['id'] ?? ''),
+                    'subject' => (string) ($email['subject'] ?? ''),
+                    'to' => $to,
+                    'cc' => $cc,
+                    'bcc' => $bcc,
+                    'bodyHtml' => $bodyHtml,
+                    'bodyPlain' => $bodyPlain,
+                ]);
+            }
+        }
+        return new JSONResponse(['found' => false]);
+    }
+
+    /**
      * POST /apps/souvera_mail/api/v2/drafts
      */
     #[NoAdminRequired]

@@ -51,5 +51,14 @@ export function useJmapClient() {
 		await axios.delete(base + '/api/v2/emails/' + id, { params })
 	}
 
-	return { fetchMailboxes, fetchEmails, fetchEmailBody, markEmailRead, toggleEmailFlag, moveEmail, deleteEmailApi }
+	// Findet den existierenden Entwurf für einen Antwort-Kontext (Draft-Resume) —
+	// verhindert die Draft-Flut bei Öffnen/Schließen-Zyklen.
+	async function resolveDraft(inReplyTo) {
+		const { data } = await axios.get(base + '/api/v2/drafts/resolve', {
+			params: { inReplyTo },
+		})
+		return data ?? { found: false }
+	}
+
+	return { fetchMailboxes, fetchEmails, fetchEmailBody, markEmailRead, toggleEmailFlag, moveEmail, deleteEmailApi, resolveDraft }
 }

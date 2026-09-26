@@ -538,7 +538,9 @@ export default {
 				await this.loadEmails()
 			} catch (e) {
 				console.error('Empty trash failed', e)
-				showError(this.t('souvera_mail', 'Failed to empty trash'))
+				// Grund durchreichen (z. B. „Nur 12 von 40 … — <Reason>")
+				const detail = e.response?.data?.error || this.t('souvera_mail', 'Failed to empty trash')
+				showError(detail)
 			} finally { this.bulkProcessing = false }
 		},
 		async bulkMarkRead() {

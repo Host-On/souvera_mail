@@ -567,6 +567,11 @@ return [
             'verb' => 'PUT',
         ],
         [
+            'name' => 'v2_compose#resolveDraft',
+            'url' => '/api/v2/drafts/resolve',
+            'verb' => 'GET',
+        ],
+        [
             'name' => 'v2_compose#createDraft',
             'url' => '/api/v2/drafts',
             'verb' => 'POST',
