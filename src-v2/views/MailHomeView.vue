@@ -42,6 +42,7 @@
 							:email="email"
 							:active="selectedEmail?.id === email.id"
 							:checked="checkedIds.includes(email.id)"
+							:checked-ids="checkedIds"
 							@click="openEmailFromList(email)"
 							@dblclick="onOpenEmail(email)"
 							@check="toggleCheck(email.id)"
@@ -300,8 +301,13 @@ export default {
 		document.addEventListener('keydown', this._onUserGesture, { once: true })
 		this._onMoveEmail = (ev) => {
 			if (this._movingEmail) return
-			const { emailId, mailboxId, accountId: targetAccountId } = ev.detail || {}
-			if (!emailId || !mailboxId) return
+			// Mehrfachauswahl per Drag&Drop: emailIds (Array) hat Vorrang.
+			const emailIds = Array.isArray(ev.detail?.emailIds) && ev.detail.emailIds.length > 0
+				? ev.detail.emailIds
+				: (ev.detail?.emailId ? [ev.detail.emailId] : [])
+			const mailboxId = ev.detail?.mailboxId
+			const targetAccountId = ev.detail?.accountId
+			if (emailIds.length === 0 || !mailboxId) return
 			this._movingEmail = true
 			// Try source account first; Stalwart auto-rejects if the mailbox
 			// does not exist in that account. Falls through to target account
@@ -313,20 +319,26 @@ export default {
 			if (targetId && targetId !== sourceId) accountsToTry.push(targetId)
 			if (!sourceId && !targetId) accountsToTry.push(undefined)
 			;(async () => {
-				let moved = false
-				for (const acct of accountsToTry) {
-					try {
-						await moveEmail(emailId, mailboxId, acct)
-						moved = true
-						break
-					} catch (e) { /* try next account */ }
+				let moved = 0
+				const failed = []
+				for (const emailId of emailIds) {
+					let ok = false
+					for (const acct of accountsToTry) {
+						try {
+							await moveEmail(emailId, mailboxId, acct)
+							ok = true
+							break
+						} catch (e) { /* try next account */ }
+					}
+					if (ok) moved++
+					else failed.push(emailId)
 				}
-				if (moved) {
-					await this.loadEmails(false)
-					this.notifyMailboxChange()
-					showSuccess(this.t('souvera_mail', 'Message moved'))
+				await this.loadEmails(false)
+				this.notifyMailboxChange()
+				if (failed.length > 0) {
+					showError(this.t('souvera_mail', '{moved} verschoben, {failed} fehlgeschlagen', { moved, failed: failed.length }))
 				} else {
-					showError(this.t('souvera_mail', 'Failed to move message'))
+					showSuccess(this.t('souvera_mail', emailIds.length > 1 ? 'Messages moved' : 'Message moved'))
 				}
 				this._movingEmail = false
 			})()

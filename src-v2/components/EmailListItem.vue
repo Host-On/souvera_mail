@@ -52,13 +52,24 @@ export default {
 		email: { type: Object, required: true },
 		active: { type: Boolean, default: false },
 		checked: { type: Boolean, default: false },
+		// Die komplette Auswahl der Liste — für Drag&Drop-Mehrfachverschiebung
+		// (gezogene Mail ist angehakt → die GANZE Auswahl wandert mit).
+		checkedIds: { type: Array, default: () => [] },
 	},
 	emits: ['click', 'check', 'flag'],
 	methods: {
 		onDragStart(e) {
 			e.dataTransfer.effectAllowed = 'move'
 			e.dataTransfer.setData('text/plain', this.email.id)
-			window.__souveraDragEmail = this.email.id
+			// Mehrfachauswahl: hängt die gezogene Mail an der Auswahl → alle
+			// markierten Mails wandern mit. Sonst nur die gezogene.
+			if (this.checked && (this.checkedIds?.length ?? 0) > 0) {
+				window.__souveraDragEmails = [...this.checkedIds]
+				window.__souveraDragEmail = this.email.id
+			} else {
+				window.__souveraDragEmails = [this.email.id]
+				window.__souveraDragEmail = this.email.id
+			}
 		},
 	},
 }

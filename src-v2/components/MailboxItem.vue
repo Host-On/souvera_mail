@@ -109,10 +109,15 @@ export default {
 		onDrop(e) {
 			e.stopPropagation()
 			this.dragOver = false
-			const emailId = window.__souveraDragEmail
-			if (emailId) {
-				window.__souveraDragEmail = null
-				this.$emit('dropEmail', { emailId, mailboxId: this.mailbox.id, mailbox: this.mailbox })
+			// Mehrfachauswahl: __souveraDragEmails (Array) hat Vorrang vor der
+			// Einzelpost __souveraDragEmail.
+			const ids = Array.isArray(window.__souveraDragEmails) && window.__souveraDragEmails.length > 0
+				? [...window.__souveraDragEmails]
+				: (window.__souveraDragEmail ? [window.__souveraDragEmail] : [])
+			window.__souveraDragEmails = null
+			window.__souveraDragEmail = null
+			if (ids.length > 0) {
+				this.$emit('dropEmail', { emailIds: ids, emailId: ids[0], mailboxId: this.mailbox.id, mailbox: this.mailbox })
 			}
 		},
 	},

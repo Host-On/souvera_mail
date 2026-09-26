@@ -1,6 +1,11 @@
 OC.L10N.register(
     "souvera_mail",
     {
+    "Auswahl nach „{folder}“ verschieben" : "Auswahl nach „{folder}“ verschieben",
+    "Auswahl als gelesen markieren" : "Auswahl als gelesen markieren",
+    "Auswahl als ungelesen markieren" : "Auswahl als ungelesen markieren",
+    "Auswahl löschen (in den Papierkorb verschieben)" : "Auswahl löschen (in den Papierkorb verschieben)",
+    "{moved} verschoben, {failed} fehlgeschlagen" : "{moved} verschoben, {failed} fehlgeschlagen",
         "%n folder" : "['%n Ordner', '%n Ordner']",
         "%n folder selected" : "['%n Ordner ausgewählt', '%n Ordner ausgewählt']",
         "%n mail" : "['%n Mail', '%n Mails']",

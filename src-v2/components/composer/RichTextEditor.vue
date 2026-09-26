@@ -360,22 +360,17 @@ export default {
 
 .richtext-editor__loading { display: flex; justify-content: center; padding: 48px; }
 
-/* ── Signature node (raw HTML, non-editable) ───────────────────────── */
+/* ── Signature node (sandboxed iframe, non-editable) ──────────────── */
 .richtext-editor__content :deep(.signature-node) {
 	margin-top: 14px;
 	padding-top: 8px;
 	border-top: 1px dashed var(--color-border);
 	cursor: default;
 }
-.richtext-editor__content :deep(.signature-node *) {
-	max-width: 100%;
+/* Der iframe rendert die Signatur 1:1 wie der Empfänger — KEIN Einfluss
+   des Editor-CSS mehr auf Tabellen/Bilder (keine max-width-Ketten). */
+.richtext-editor__content :deep(.signature-node__frame) {
+	min-height: 60px;
 }
-.richtext-editor__content :deep(.signature-node table) {
-	border-collapse: collapse;
-	max-width: 100%;
-}
-.richtext-editor__content :deep(.signature-node img) {
-	max-width: 100%;
-	height: auto;
-}
+
 </style>

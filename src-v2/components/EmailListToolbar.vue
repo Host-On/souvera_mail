@@ -29,24 +29,26 @@
 
 			<template v-if="selectedCount > 0">
 				<span class="selected-count">{{ selectedCount }} {{ t('souvera_mail', 'selected') }}</span>
-				<NcButton variant="tertiary" @click="$emit('markRead')">
+				<NcButton variant="tertiary" :title="t('souvera_mail', 'Auswahl als gelesen markieren')" @click="$emit('markRead')">
 					<template #icon><EmailOpen :size="20" /></template>
 				</NcButton>
-				<NcButton variant="tertiary" @click="$emit('markUnread')">
+				<NcButton variant="tertiary" :title="t('souvera_mail', 'Auswahl als ungelesen markieren')" @click="$emit('markUnread')">
 					<template #icon><EmailOutline :size="20" /></template>
 				</NcButton>
 				<NcActions :aria-label="t('souvera_mail', 'Move to folder')">
 					<template #icon><FolderMove :size="20" /></template>
-					<NcActionButton v-for="mb in targetMailboxes" :key="mb.id">
+					<NcActionButton v-for="mb in targetMailboxes" :key="mb.id"
+						:title="t('souvera_mail', 'Auswahl nach „{folder}“ verschieben', { folder: mailboxDisplayName(mb) })"
+						@click="$emit('moveTo', mb.id)">
 						<template #icon><Folder :size="20" /></template>
-						<span @click.stop="$emit('moveTo', mb.id)">{{ mailboxDisplayName(mb) }}</span>
+						{{ mailboxDisplayName(mb) }}
 					</NcActionButton>
 				</NcActions>
 				<NcButton variant="tertiary" :title="t('souvera_mail', 'Move to spam and block sender')"
 					@click="$emit('bulkSpam')">
 					<template #icon><AlertOctagon :size="20" /></template>
 				</NcButton>
-				<NcButton variant="tertiary" @click="$emit('bulkDelete')">
+				<NcButton variant="tertiary" :title="t('souvera_mail', 'Auswahl löschen (in den Papierkorb verschieben)')" @click="$emit('bulkDelete')">
 					<template #icon><TrashCan :size="20" /></template>
 				</NcButton>
 			</template>
