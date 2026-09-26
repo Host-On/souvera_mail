@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.4.2]
+
+### Fixed
+
+- **Review-Findings zur Draft-Resume-Mechanik** (Gemini-Review):
+  - `createDraft`/`updateDraft` reichen `inReplyTo`/`references` jetzt
+    tatsächlich an das Email-Objekt durch (vorher hardcodiert null — der
+    Resolve konnte den Draft nie finden und die Flut blieb).
+  - Tolerantes `inReplyTo`-Matching im Resolve (case-insensitive, spitze
+    Klammern getrimmt).
+  - Resolve-Race-Schutz: während des Resolves blockiert (`_resolvingDraft`)
+    — kein paralleler Create-POST und kein Textverlust durch spätes
+    setContent.
+  - `_draftSaveFailed` blockiert nicht mehr das manuelle „Behalten"
+    (force-Save — sonst stiller Datenverlust).
+- **Papierkorb**: endgültiges Löschen nutzt singleCall (das manuelle
+  Multi-Call-Response-Parsing war kaputt → 500 bei jedem Trash-Delete);
+  Empty-Trash: Fallback-Cap request-weit statt je Chunk + Abbruch bei
+  Verbindungsfehlern; Fehlermeldung nennt Anzahl + Gründe.
+
 ## [1.4.1]
 
 ### Fixed

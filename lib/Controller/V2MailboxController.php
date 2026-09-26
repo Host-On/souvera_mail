@@ -389,6 +389,9 @@ class V2MailboxController extends Controller
         $destroyed = 0;
         $failedIds = [];
         $failReasons = [];
+        // Fallback-Limit REQUEST-WEIT (nicht je Chunk) — sonst kaskadiert
+        // der Einzel-Fallback über alle Chunks in den PHP-Timeout.
+        $fallbackAttempts = 0;
         foreach (\array_chunk($allIds, $destroyChunk) as $chunk) {
             $result = $this->jmap->singleCall('Email/set', [
                 'accountId' => $accountId,
@@ -399,14 +402,13 @@ class V2MailboxController extends Controller
                 // die Chunk-Ids EINZELN zerstören, so dass eine Hartnäckige
                 // den Rest nicht blockiert. Gecappt, damit ein hängender
                 // Stalwart den PHP-Request nicht in den Timeout treibt.
-                $attempts = 0;
                 foreach ($chunk as $singleId) {
-                    if ($attempts >= 30) {
+                    if ($fallbackAttempts >= 30) {
                         $failedIds[] = $singleId;
                         $failReasons[] = 'übersprungen (Fallback-Limit erreicht)';
                         continue;
                     }
-                    $attempts++;
+                    $fallbackAttempts++;
                     $single = $this->jmap->singleCall('Email/set', [
                         'accountId' => $accountId,
                         'destroy' => [$singleId],
@@ -414,7 +416,7 @@ class V2MailboxController extends Controller
                     if (isset($single['error'])) {
                         $failedIds[] = $singleId;
                         $failReasons[] = $single['error'];
-                        continue;
+                        break 2; // Mailserver generell nicht erreichbar — Rest aufgeben
                     }
                     if (\in_array($singleId, (array) ($single['data']['destroyed'] ?? []), true)) {
                         $destroyed++;
@@ -567,21 +569,19 @@ class V2MailboxController extends Controller
             ]);
             foreach ($emailResult['data']['list'] ?? [] as $email) {
                 if (\is_array($email['mailboxIds'] ?? null) && isset($email['mailboxIds'][$trashId])) {
-                    $destroyResult = $this->jmap->call([
-                        ['Email/set', [
-                            'accountId' => $accountId,
-                            'destroy' => [$id],
-                        ]],
+                    $destroyResult = $this->jmap->singleCall('Email/set', [
+                        'accountId' => $accountId,
+                        'destroy' => [$id],
                     ]);
                     if (isset($destroyResult['error'])) {
                         return new JSONResponse($destroyResult, 500);
                     }
-                    $destroyed = $destroyResult['data'][0]['args']['destroyed'] ?? [];
+                    $destroyed = $destroyResult['data']['destroyed'] ?? [];
                     if (!\in_array($id, (array) $destroyed, true)) {
-                        $notDestroyed = $destroyResult['data'][0]['args']['notDestroyed'][$id] ?? null;
+                        $nd = $destroyResult['data']['notDestroyed'][$id] ?? null;
                         return new JSONResponse([
                             'error' => 'Endgültiges Löschen abgelehnt: '
-                                . (\is_array($notDestroyed) ? ($notDestroyed['description'] ?? ($notDestroyed['type'] ?? 'unbekannt')) : 'unbekannt'),
+                                . (\is_array($nd) ? ($nd['description'] ?? ($nd['type'] ?? 'unbekannt')) : 'unbekannt'),
                         ], 500);
                     }
                     return new JSONResponse(['success' => true, 'destroyed' => true]);

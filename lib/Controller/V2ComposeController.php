@@ -580,9 +580,20 @@ class V2ComposeController extends Controller
         }
         foreach (($get['data']['list'] ?? []) as $email) {
             if (!\is_array($email)) { continue; }
+            // Toleranter Match: Message-Ids sind case-insensitive und können
+            // mit spitzen Klammern gespeichert sein (RFC 5322) — beides
+            // normalisieren, sonst findet der Resolve den Draft nie.
+            $needle = \strtolower(\trim($inReplyTo, '<> '));
             $refs = $email['inReplyTo'] ?? null;
             $refList = \is_array($refs) ? $refs : [];
-            if (\in_array($inReplyTo, $refList, true)) {
+            $matched = false;
+            foreach ($refList as $ref) {
+                if (\is_string($ref) && \strtolower(\trim($ref, '<> ')) === $needle) {
+                    $matched = true;
+                    break;
+                }
+            }
+            if ($matched) {
                 // Draft-Inhalt für den Editor extrahieren (gleiches Muster
                 // wie die Detail-Ansicht: textBody bevorzugt, HTML fallback).
                 $bodyHtml = '';
@@ -654,10 +665,15 @@ class V2ComposeController extends Controller
 
         $draftsId = $this->resolveMailboxId($accountId, 'drafts');
 
+        // Reply-Kontext DURGREICHEN — ohne inReplyTo kann der Draft-Resolve
+        // (GET /drafts/resolve) den Entwurf nie wiederfinden (Draft-Flut!).
+        $inReplyTo = \is_string($body['inReplyTo'] ?? null) ? \trim($body['inReplyTo']) : null;
+        $references = \is_string($body['references'] ?? null) ? \trim($body['references']) : null;
+
         $emailObj = $this->buildEmailObject(
             $userEmail, $toAddr, $ccAddr, $bccAddr,
             $subject, $bodyHtml, $bodyPlain,
-            [], null, null, $draftsId
+            [], $inReplyTo !== '' ? $inReplyTo : null, $references !== '' ? $references : null, $draftsId
         );
         $emailObj['keywords'] = ['$draft' => true];
 
@@ -711,10 +727,15 @@ class V2ComposeController extends Controller
 
         $draftsId = $this->resolveMailboxId($accountId, 'drafts');
 
+        // Reply-Kontext DURGREICHEN — ohne inReplyTo kann der Draft-Resolve
+        // (GET /drafts/resolve) den Entwurf nie wiederfinden (Draft-Flut!).
+        $inReplyTo = \is_string($body['inReplyTo'] ?? null) ? \trim($body['inReplyTo']) : null;
+        $references = \is_string($body['references'] ?? null) ? \trim($body['references']) : null;
+
         $emailObj = $this->buildEmailObject(
             $userEmail, $toAddr, $ccAddr, $bccAddr,
             $subject, $bodyHtml, $bodyPlain,
-            [], null, null, $draftsId
+            [], $inReplyTo !== '' ? $inReplyTo : null, $references !== '' ? $references : null, $draftsId
         );
         $emailObj['keywords'] = ['$draft' => true];
 

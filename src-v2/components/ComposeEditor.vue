@@ -505,8 +505,12 @@ export default {
 				// DRAFT-RESUME: existiert bereits ein Entwurf für diesen
 				// Reply-Kontext (Öffnen/Schließen-Zyklus), laden statt einen
 				// neuen zu erzeugen — das verhindert die Draft-Flut.
+				// _resolvingDraft blockiert den Autosave während des Resolves
+				// (Race: schneller Autopost + langsamer Resolve = Zweit-Draft
+				// + Textverlust durch setContent).
 				const inReplyTo = this.replyTo?.messageId || this.originalEmail?.messageId || ''
 				if (inReplyTo !== '') {
+					this._resolvingDraft = true
 					try {
 						const { data } = await axios.get(
 							generateUrl('/apps/souvera_mail/api/v2/drafts/resolve'),
@@ -518,6 +522,8 @@ export default {
 						}
 					} catch (e) {
 						console.debug('Draft resolve failed — falling back to fresh reply', e)
+					} finally {
+						this._resolvingDraft = false
 					}
 				}
 				this.buildReplyContent()
@@ -626,8 +632,15 @@ export default {
 			// Guard against overlapping autosaves (slow create + fast typing)
 			// which could otherwise create a second draft.
 			if (this._savingDraft) return
-			if (this._draftSaveFailed) return // Create fehlgeschlagen → keine Wiederholungs-Flut
+			// Draft-Resume-Race: während resolveDraft läuft, darf der Autosave
+			// keinen Create-POST feuern (sonst Zweit-Draft + Textverlust).
+			if (this._resolvingDraft) return
+			// Draft-Flut-Schutz: nach einem Create-Fehler stoppt der AUTOSAVE
+			// (keine Wiederholungs-Flut). Manuelles Speichern (force) umgeht
+			// die Sperre — sonst würde „Behalten" still Inhalte verlieren.
+			if (this._draftSaveFailed && this._forceSave !== true) return
 			this._savingDraft = true
+			this._forceSave = false
 			try {
 				const payload = this.buildPayload()
 				if (this.savedDraftId) {
@@ -745,8 +758,11 @@ export default {
 		},
 		async keepDraftAndClose() {
 			// Flush the latest content into the SAME draft (no new id),
-			// then hand it over to the Drafts folder.
+			// then hand it over to the Drafts folder. force=true umgeht die
+			// Autosave-Sperre — sonst wäre stiller Datenverlust möglich.
+			this._forceSave = true
 			try { await this.saveDraft() } catch {}
+			this._forceSave = false
 			this.trackDraft(null, this.savedDraftId)
 			this.savedDraftId = null
 			this.showCloseDialog = false
