@@ -1,5 +1,26 @@
 # Changelog
 
+
+## [1.5.3]
+
+### Fixed
+
+- Composer-Signatur-Bilder als Data-URLs aus der Central-Resolve-Antwort
+  (flapping- und netzwerk-unabhängig; Fallback auf die Vorschau-Endpunkt-URLs).
+
+## [1.5.4]
+
+### Fixed
+
+- **Falscher „Konnte nicht übermittelt werden"-Fehler bei erfolgreichem
+  Versand**: die EmailSubmission/set-Response kann `created.send1` vermissen
+  lassen, obwohl Stalwart die Submission ausgeführt hat (das
+  `onSuccessUpdateEmail` verschiebt den Entwurf nur bei Erfolg nach Sent).
+  Neu: im Zweifel entscheidet der **Ort der Mail** — liegt sie im Sent-Ordner,
+  gilt der Versand als erfolgreich (mit Warn-Log für die Anomalie).
+
+
+
 ## [1.5.2]
 
 ### Fixed
