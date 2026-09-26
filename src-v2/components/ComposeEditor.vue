@@ -200,6 +200,7 @@ export default {
 			signatureHtml: '',
 			signatureEnabled: false,
 			centralSignatureHtml: '',
+			centralAssets: [],
 			identitySignatures: {},
 			replyPosition: 'above',
 			signaturePosition: 'above',
@@ -332,6 +333,9 @@ export default {
 					const cdata = cs.data.ocs?.data || cs.data.data || cs.data
 					if (cdata && cdata.found && cdata.html) {
 						this.centralSignatureHtml = cdata.html
+						// Assets als Data-URLs (netzwerk- und flapping-unabhängig):
+						// die Composer-Vorschau bettet die Bilder direkt ein.
+						this.centralAssets = cdata.assets || []
 					}
 				} catch (e) {
 					console.debug('Central signature not available', e)
@@ -353,7 +357,19 @@ export default {
 		 */
 		displaySignature(html) {
 			if (!html) return ''
-			return html.replace(/src=["']cid:(souvera-sig-[^"']+)["']/gi, (m, cid) => {
+			// 1. Data-URLs aus der Central-Antwort (bevorzugt — netzwerk- und
+			//    flapping-unabhängig, CSP-safe).
+			let out = html
+			const assets = this.centralAssets || []
+			if (assets.length > 0) {
+				out = out.replace(/src=["']cid:(souvera-sig-[^"']+)["']/gi, (m, cid) => {
+					const hit = assets.find(a => String(a.cid).toLowerCase() === String(cid).toLowerCase())
+					return hit?.dataUrl ? 'src="' + hit.dataUrl + '"' : m
+				})
+				return out
+			}
+			// 2. Fallback (ältere Central-Versionen): Vorschau-Endpunkt-URLs.
+			return out.replace(/src=["']cid:(souvera-sig-[^"']+)["']/gi, (m, cid) => {
 				const slug = cid.replace(/^souvera-sig-/, '')
 				return 'src="' + generateUrl('/apps/souvera_central/api/mail-settings/signature-assets/{slug}', { slug }) + '"'
 			})
