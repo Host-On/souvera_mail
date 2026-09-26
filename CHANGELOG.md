@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.5]
+
+### Fixed
+
+- **„Papierkorb konnte nicht geleert werden" — Wurzel behoben**: die Route
+  `POST /api/v2/mailboxes/{id}/empty` hatte **kein `verb`** in der
+  Routen-Registrierung — NC matchte sie nur für GET, jeder POST des
+  Frontends lief in einen 405 ohne JSON-Body (daher die generische
+  Fehlermeldung, nie ein konkreter Grund). Route auf POST gesetzt; die
+  Backend-Härtung aus v1.4.1/1.4.2 (Chunks, Einzelfallback, Gründe) ist
+  damit erstmals überhaupt erreichbar.
+
+
 
 ## [1.5.3]
 
