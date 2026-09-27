@@ -264,10 +264,10 @@ export default {
 		},
 	},
 	watch: {
-		to: { deep: true, handler() { this.markDirty() } },
-		cc: { deep: true, handler() { this.markDirty() } },
-		bcc: { deep: true, handler() { this.markDirty() } },
-		subject() { this.markDirty() },
+		to: { deep: true, handler() { if (!this._suppressDirty) this.markDirty() } },
+		cc: { deep: true, handler() { if (!this._suppressDirty) this.markDirty() } },
+		bcc: { deep: true, handler() { if (!this._suppressDirty) this.markDirty() } },
+		subject() { if (!this._suppressDirty) this.markDirty() },
 		// Switching the sender swaps the signature in the editor to the one
 		// configured for the newly selected identity (per-identity entry,
 		// or the legacy global signature when the identity has no entry).
@@ -736,15 +736,16 @@ export default {
 		async saveDraft() {
 			// Guard against overlapping autosaves (slow create + fast typing)
 			// which could otherwise create a second draft.
-			if (this._savingDraft) return
+			if (this._savingDraft) return false
 			// Draft-Resume-Race: während resolveDraft läuft, darf der Autosave
 			// keinen Create-POST feuern (sonst Zweit-Draft + Textverlust).
-			if (this._resolvingDraft) return
+			if (this._resolvingDraft && this._forceSave !== true) return false
 			// Draft-Flut-Schutz: nach einem Create-Fehler stoppt der AUTOSAVE
 			// (keine Wiederholungs-Flut). Manuelles Speichern (force) umgeht
 			// die Sperre — sonst würde „Behalten" still Inhalte verlieren.
-			if (this._draftSaveFailed && this._forceSave !== true) return
+			if (this._draftSaveFailed && this._forceSave !== true) return false
 			this._savingDraft = true
+			const wasForced = this._forceSave === true
 			this._forceSave = false
 			try {
 				const payload = this.buildPayload()
@@ -762,20 +763,26 @@ export default {
 					// statt alle 3 s einen neuen Create-Versuch (Draft-Flut).
 					this._draftSaveFailed = true
 					showError(data?.error || this.t('souvera_mail', 'Entwurf konnte nicht gespeichert werden'))
-					return
+					return false
 				}
 				if (previousId && previousId !== data.draftId) {
 					this.trackDraft(null, previousId)
 				}
 				this.savedDraftId = data.draftId
+				// Erfolgreich gespeichert → nicht mehr „ungespeichert" (der
+				// Close-Flow fragt sonst trotz aktuellem Draft nach) und die
+				// Autosave-Sperre wieder lösen (nächster Fehler stoppt erneut).
+				this.dirty = false
+				this._draftSaveFailed = false
 				this.trackDraft(data.draftId)
+				return true
 			} catch (e) {
 				console.error('Draft save failed', e)
-				// HTTP-Fehler (4xx/5xx) beim Create → ebenfalls stoppen (Backoff),
-				// der User sieht den Fehler beim manuellen Speichern/Senden erneut.
-				if (e.response?.status >= 400) {
-					this._draftSaveFailed = true
-				}
+				// HTTP-/Netzwerkfehler beim Create → Autosave stoppen (Backoff);
+				// force („Behalten") umgeht die Sperre für den nächsten Versuch.
+				this._draftSaveFailed = true
+				showError(e.response?.data?.error || this.t('souvera_mail', 'Entwurf konnte nicht gespeichert werden'))
+				return false
 			} finally {
 				this._savingDraft = false
 			}
@@ -867,10 +874,10 @@ export default {
 			})
 		},
 		requestClose() {
-			// Bestätigungsansicht IM Modal (kein Close/Reopen-Flackern):
-			// unspeicherte Änderungen? → Composer-Inhalt durch die
-			// Bestätigungsansicht ersetzen; sonst direkt schließen.
-			if (this.dirty || this.savedDraftId) {
+			// Bestätigungsansicht IM Modal (kein Close/Reopen-Flackern) — nur
+			// bei UNGESPEICHERTEN Änderungen. Ein unveränderter geladener
+			// Entwurf schließt direkt (der Draft bleibt sicher auf dem Server).
+			if (this.dirty) {
 				this.showCloseDialog = true
 				return
 			}
@@ -887,8 +894,13 @@ export default {
 			// then hand it over to the Drafts folder. force=true umgeht die
 			// Autosave-Sperre — sonst wäre stiller Datenverlust möglich.
 			this._forceSave = true
-			try { await this.saveDraft() } catch {}
+			const ok = await this.saveDraft()
 			this._forceSave = false
+			if (!ok) {
+				// Speichern fehlgeschlagen → Fenster bleibt OFFEN (Inhalt
+				// erhalten), der User kann es erneut versuchen.
+				return
+			}
 			this.trackDraft(null, this.savedDraftId)
 			this.savedDraftId = null
 			this.endComposeSession()

@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.5.9]
+
+### Fixed
+
+- **Review-Findings (Gemini) umgesetzt**:
+  - „Entwurf behalten" bricht jetzt ab, wenn das Speichern fehlschlägt — das
+    Fenster bleibt offen, kein stiller Datenverlust mehr (saveDraft liefert
+    einen Erfolgswert).
+  - Programmatische Prefills (Empfänger/Betreff bei Antworten) markieren den
+    Composer nicht mehr fälschlich als ungespeichert-geändert.
+  - Nach erfolgreichem Autosave wird der Composer nicht mehr als
+    „ungespeichert" geführt — ein unveränderter Entwurf schließt direkt ohne
+    Nachfrage (der Draft bleibt sicher auf dem Server).
+
+
 ## [1.5.8]
 
 ### Changed
