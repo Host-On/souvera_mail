@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.8]
+
+### Changed
+
+- **Schließen-Flow des Compose-Fensters komplett überarbeitet**: das
+  Bestätigen („Entwurf behalten / verwerfen / weiter schreiben") findet jetzt
+  **im Modal selbst** statt (Inhalt-Swap statt zweitem schwebendem Popup) —
+  kein Verschwinden/Wiederauftauchen mehr, kein Flackern. „Weiter schreiben"
+  führt sofort zurück in den Editor. Das native `confirm()` des Footer-
+  Verwerfens ist ebenfalls ersetzt. EByte-Design: zentriertes Icon, Headline,
+  erklärender Text, Buttons zentriert mit NC-Tokens.
+
+
 ## [1.5.7]
 
 ### Fixed

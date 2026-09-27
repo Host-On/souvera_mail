@@ -1,6 +1,12 @@
 OC.L10N.register(
     "souvera_mail",
     {
+
+    "Entwurf behalten?" : "Entwurf behalten?",
+    "Deine Änderungen wurden als Entwurf gesichert. Möchtest du den Entwurf behalten, verwerfen oder weiter schreiben?" : "Deine Änderungen wurden als Entwurf gesichert. Möchtest du den Entwurf behalten, verwerfen oder weiter schreiben?",
+    "Weiter schreiben" : "Weiter schreiben",
+    "Verwerfen" : "Verwerfen",
+    "Entwurf behalten" : "Entwurf behalten",
     "Auswahl nach „{folder}“ verschieben" : "Auswahl nach „{folder}“ verschieben",
     "Auswahl als gelesen markieren" : "Auswahl als gelesen markieren",
     "Auswahl als ungelesen markieren" : "Auswahl als ungelesen markieren",

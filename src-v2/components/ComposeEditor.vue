@@ -1,17 +1,29 @@
 <template>
-	<NcModal v-model:show="visible" :size="fullscreen ? '' : 'large'" @close="onClose"
+	<NcModal :show="visible" :size="fullscreen ? '' : 'large'" :no-close="true" :close-on-click-outside="false"
 		:class="['compose-modal', { 'compose-modal--fullscreen': fullscreen }]">
-		<div class="compose-layout">
+		<div v-show="!showCloseDialog" class="compose-layout">
 			<div class="compose-layout__header">
 				<h3>{{ composeTitle }}</h3>
-				<NcButton variant="tertiary" size="small"
-					:aria-label="fullscreen ? t('souvera_mail', 'Exit fullscreen') : t('souvera_mail', 'Fullscreen')"
-					@click="fullscreen = !fullscreen">
-					<template #icon>
-						<ArrowExpand v-if="!fullscreen" :size="18" />
-						<ArrowCollapse v-else :size="18" />
-					</template>
-				</NcButton>
+				<div class="compose-layout__header-actions">
+					<NcButton variant="tertiary" size="small"
+						:aria-label="fullscreen ? t('souvera_mail', 'Exit fullscreen') : t('souvera_mail', 'Fullscreen')"
+						:title="fullscreen ? t('souvera_mail', 'Exit fullscreen') : t('souvera_mail', 'Fullscreen')"
+						@click="fullscreen = !fullscreen">
+						<template #icon>
+							<ArrowExpand v-if="!fullscreen" :size="18" />
+							<ArrowCollapse v-else :size="18" />
+						</template>
+					</NcButton>
+					<NcButton variant="tertiary" size="small"
+						:aria-label="t('souvera_mail', 'Close')"
+						:title="t('souvera_mail', 'Close')"
+						data-testid="compose-close"
+						@click="requestClose">
+						<template #icon>
+							<Close :size="20" />
+						</template>
+					</NcButton>
+				</div>
 			</div>
 
 			<div v-if="identities.length > 1" class="compose-row">
@@ -91,7 +103,7 @@
 						{{ t('souvera_mail', 'Draft saved') }}
 					</span>
 				</div>
-				<NcButton variant="tertiary" @click="onDiscard">
+				<NcButton variant="tertiary" :title="t('souvera_mail', 'Entwurf verwerfen?')" @click="requestClose">
 					<template #icon><TrashCan :size="20" /></template>
 					{{ t('souvera_mail', 'Discard') }}
 				</NcButton>
@@ -99,34 +111,38 @@
 		</div>
 		<input ref="fileInput" type="file" multiple class="hidden-file-input" @change="onFilesSelected" />
 		<CloudFilePicker v-if="showCloudPicker" @close="showCloudPicker = false" @attach="onCloudFileAttached" />
-	</NcModal>
 
-	<NcDialog v-if="showCloseDialog" :name="t('souvera_mail', 'Draft')"
-		:open.sync="true"
-		size="normal"
-		@update:open="showCloseDialog = $event">
-		<div class="compose-close-dialog">
-			<div class="compose-close-dialog__body">
-				<FileEditOutline :size="42" class="compose-close-dialog__icon" />
-				<p class="compose-close-dialog__text">{{ t('souvera_mail', 'Do you want to keep this draft?') }}</p>
+		<!-- Bestätigungsansicht IM Modal: ersetzt den Composer-Inhalt (kein
+		     zweites schwebendes Popup, kein Modal-Close/Reopen-Flackern). -->
+		<div v-if="showCloseDialog" class="compose-close-view">
+			<div class="compose-close-view__icon-wrap">
+				<FileEditOutline :size="34" class="compose-close-view__icon" />
 			</div>
-			<div class="compose-close-dialog__actions">
-				<NcButton variant="tertiary" @click="showCloseDialog = false">{{ t('souvera_mail', 'Cancel') }}</NcButton>
+			<h3 class="compose-close-view__headline">
+				{{ t('souvera_mail', 'Entwurf behalten?') }}
+			</h3>
+			<p class="compose-close-view__text">
+				{{ t('souvera_mail', 'Deine Änderungen wurden als Entwurf gesichert. Möchtest du den Entwurf behalten, verwerfen oder weiter schreiben?') }}
+			</p>
+			<div class="compose-close-view__actions">
+				<NcButton variant="tertiary" @click="cancelCloseDialog">
+					{{ t('souvera_mail', 'Weiter schreiben') }}
+				</NcButton>
 				<NcButton variant="error" @click="discardDraftAndClose">
 					<template #icon><TrashCan :size="18" /></template>
-					{{ t('souvera_mail', 'Discard') }}
+					{{ t('souvera_mail', 'Verwerfen') }}
 				</NcButton>
 				<NcButton variant="primary" @click="keepDraftAndClose">
 					<template #icon><ContentSave :size="18" /></template>
-					{{ t('souvera_mail', 'Keep draft') }}
+					{{ t('souvera_mail', 'Entwurf behalten') }}
 				</NcButton>
 			</div>
 		</div>
-	</NcDialog>
+	</NcModal>
 </template>
 
 <script>
-import { NcModal, NcDialog, NcButton, NcTextField } from '@nextcloud/vue'
+import { NcModal, NcButton, NcTextField } from '@nextcloud/vue'
 import Send from 'vue-material-design-icons/Send.vue'
 import Paperclip from 'vue-material-design-icons/Paperclip.vue'
 import TrashCan from 'vue-material-design-icons/TrashCan.vue'
@@ -152,7 +168,7 @@ let draftTimer = null
 
 export default {
 	name: 'ComposeEditor',
-	components: { NcModal, NcDialog, NcButton, NcTextField, Send, Paperclip, TrashCan, ChevronDown, Fullscreen, FullscreenExit, Cloud, RecipientField, RichTextEditor, AttachmentList, CloudFilePicker },
+	components: { NcModal, NcButton, NcTextField, Send, Paperclip, TrashCan, ChevronDown, Fullscreen, FullscreenExit, Cloud, RecipientField, RichTextEditor, AttachmentList, CloudFilePicker },
 	props: {
 		replyTo: { type: Object, default: null },
 		forwardOf: { type: Object, default: null },
@@ -850,17 +866,21 @@ export default {
 				fromCloud: true,
 			})
 		},
-		onClose() {
-			// Ask BEFORE anything is dropped: keep / discard / stay.
-			// WICHTIG: das NcModal hat sich beim @close bereits geschlossen
-			// (v-model:show=false, Editor weg) — SOFORT wieder öffnen, damit
-			// „Abbrechen" ins Fenster zurückführt statt ins Leere.
-			this.visible = true
+		requestClose() {
+			// Bestätigungsansicht IM Modal (kein Close/Reopen-Flackern):
+			// unspeicherte Änderungen? → Composer-Inhalt durch die
+			// Bestätigungsansicht ersetzen; sonst direkt schließen.
 			if (this.dirty || this.savedDraftId) {
 				this.showCloseDialog = true
 				return
 			}
+			this.endComposeSession()
+			this.visible = false
 			this.$emit('cancel')
+		},
+		/** „Weiter schreiben": Bestätigungsansicht schließen, Composer zurück. */
+		cancelCloseDialog() {
+			this.showCloseDialog = false
 		},
 		async keepDraftAndClose() {
 			// Flush the latest content into the SAME draft (no new id),
@@ -873,19 +893,15 @@ export default {
 			this.savedDraftId = null
 			this.endComposeSession()
 			this.showCloseDialog = false
+			this.visible = false
 			this.$emit('cancel')
 		},
 		discardDraftAndClose() {
 			this.deleteSavedDraft()
 			this.endComposeSession()
 			this.showCloseDialog = false
+			this.visible = false
 			this.$emit('cancel')
-		},
-		onDiscard() {
-			if (confirm(this.t('souvera_mail', 'Discard this message?'))) {
-				this.deleteSavedDraft()
-				this.$emit('cancel')
-			}
 		},
 		deleteSavedDraft() {
 			if (this.savedDraftId) {
@@ -914,11 +930,23 @@ export default {
 
 <style scoped>
 .compose-layout { display: flex; flex-direction: column; height: 85vh; max-height: 85vh; overflow: hidden; }
-.compose-close-dialog { display: flex; flex-direction: column; gap: 20px; padding: 8px 4px 0; min-width: 380px; }
-.compose-close-dialog__body { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
-.compose-close-dialog__icon { color: var(--color-text-maxcontrast); }
-.compose-close-dialog__text { margin: 0; font-size: 14px; line-height: 1.55; }
-.compose-close-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.compose-close-view {
+	display: flex; flex-direction: column; align-items: center; justify-content: center;
+	text-align: center; padding: 48px 36px; min-height: 420px;
+}
+.compose-close-view__icon-wrap {
+	display: flex; align-items: center; justify-content: center;
+	width: 72px; height: 72px; border-radius: 50%;
+	background: var(--color-background-hover);
+	margin-bottom: 18px;
+}
+.compose-close-view__icon { color: var(--color-text-maxcontrast); }
+.compose-close-view__headline { margin: 0 0 8px; font-size: 19px; font-weight: 600; }
+.compose-close-view__text {
+	margin: 0 0 26px; font-size: 14px; line-height: 1.55;
+	color: var(--color-text-maxcontrast); max-width: 420px;
+}
+.compose-close-view__actions { display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; }
 
 .compose-layout__header { padding: 10px 16px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
 .compose-layout__header h3 { margin: 0; font-size: 15px; font-weight: 600; }
