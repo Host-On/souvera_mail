@@ -9,7 +9,7 @@
 		}"
 		@click="$emit('click')">
 		<div class="email-list-item__avatar" @click.stop="$emit('check')">
-			<SenderAvatar :email="email.fromAddress || ''" :name="email.fromName || email.fromAddress" :size="40" />
+			<SenderAvatar :email="displayAddress" :name="displayName" :size="40" />
 			<div class="avatar-check-overlay" :class="{ 'avatar-check-overlay--visible': checked }">
 				<div class="checkbox-box" :class="{ 'checkbox-box--checked': checked }">
 					<Check v-if="checked" :size="14" />
@@ -20,7 +20,7 @@
 			<div class="email-list-item__line1">
 				<span class="email-list-item__sender">
 					<span v-if="!email.isRead" class="unread-dot" />
-					{{ email.fromName || email.fromAddress }}
+					{{ displayName }}
 				</span>
 				<span class="email-list-item__date">
 					<NcDateTime :timestamp="email.receivedAt ? new Date(email.receivedAt).getTime() : undefined" :relative="true" :weekday="false" />
@@ -52,11 +52,24 @@ export default {
 		email: { type: Object, required: true },
 		active: { type: Boolean, default: false },
 		checked: { type: Boolean, default: false },
+		showRecipient: { type: Boolean, default: false },
 		// Die komplette Auswahl der Liste — für Drag&Drop-Mehrfachverschiebung
 		// (gezogene Mail ist angehakt → die GANZE Auswahl wandert mit).
 		checkedIds: { type: Array, default: () => [] },
 	},
 	emits: ['click', 'check', 'flag'],
+	computed: {
+		displayName() {
+			return this.showRecipient
+				? (this.email.toName || this.email.toAddress || '')
+				: (this.email.fromName || this.email.fromAddress || '')
+		},
+		displayAddress() {
+			return this.showRecipient
+				? (this.email.toAddress || this.email.toName || '')
+				: (this.email.fromAddress || this.email.fromName || '')
+		},
+	},
 	methods: {
 		onDragStart(e) {
 			e.dataTransfer.effectAllowed = 'move'

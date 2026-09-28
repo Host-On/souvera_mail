@@ -2,6 +2,11 @@ OC.L10N.register(
     "souvera_mail",
     {
 
+    "Auf vorhandene Mails anwenden" : "Auf vorhandene Mails anwenden",
+    "Wird angewendet…" : "Wird angewendet…",
+    "{scanned} Mails geprüft, {moved} einsortiert" : "{scanned} Mails geprüft, {moved} einsortiert",
+    "Anwenden fehlgeschlagen" : "Anwenden fehlgeschlagen",
+    "Entwurf verwerfen?" : "Entwurf verwerfen?",
     "Entwurf behalten?" : "Entwurf behalten?",
     "Deine Änderungen wurden als Entwurf gesichert. Möchtest du den Entwurf behalten, verwerfen oder weiter schreiben?" : "Deine Änderungen wurden als Entwurf gesichert. Möchtest du den Entwurf behalten, verwerfen oder weiter schreiben?",
     "Weiter schreiben" : "Weiter schreiben",

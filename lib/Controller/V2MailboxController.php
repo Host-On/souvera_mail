@@ -186,12 +186,18 @@ class V2MailboxController extends Controller
             $fromList = $email['from'] ?? [];
             $fromAddr = $fromList[0]['email'] ?? '';
             $fromName = $this->decodeMimeHeader($fromList[0]['name'] ?? '');
+            // Empfänger für den Gesendet-Ordner (dort zeigt die Liste „An:" statt „Von:")
+            $toList = $email['to'] ?? [];
+            $toAddr = $toList[0]['email'] ?? '';
+            $toName = $this->decodeMimeHeader($toList[0]['name'] ?? '');
             $keywords = $email['keywords'] ?? [];
             $emails[] = [
                 'id' => $email['id'] ?? '',
                 'subject' => $email['subject'] ?? '',
                 'fromAddress' => $fromAddr,
                 'fromName' => $fromName,
+                'toAddress' => $toAddr,
+                'toName' => $toName,
                 'receivedAt' => $email['receivedAt'] ?? '',
                 'size' => $email['size'] ?? 0,
                 'hasAttachment' => $email['hasAttachment'] ?? false,

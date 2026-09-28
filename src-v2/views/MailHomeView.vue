@@ -43,6 +43,7 @@
 							:active="selectedEmail?.id === email.id"
 							:checked="checkedIds.includes(email.id)"
 							:checked-ids="checkedIds"
+							:show-recipient="isSentMailbox"
 							@click="openEmailFromList(email)"
 							@dblclick="onOpenEmail(email)"
 							@check="toggleCheck(email.id)"
@@ -262,6 +263,10 @@ export default {
 		isTrashMailbox() {
 			const mb = this.allMailboxes.find(m => m.id === this.selectedMailbox || (m._accountId + '|' + m.id) === this.selectedMailbox)
 			return mb?.role === 'trash'
+		},
+		isSentMailbox() {
+			const mb = this.allMailboxes.find(m => m.id === this.selectedMailbox || (m._accountId + '|' + m.id) === this.selectedMailbox)
+			return mb?.role === 'sent'
 		},
 	},
 	watch: {

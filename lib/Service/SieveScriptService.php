@@ -57,12 +57,12 @@ class SieveScriptService
     /**
      * Sieve capabilities that Stalwart v0.16 does NOT implement. When the
      * user's (engine-generated) filter scripts require one of these, we drop
-     * it from the combined `require` union and strip the corresponding
-     * flag-marking commands — otherwise Stalwart rejects the whole active
-     * script with "Undeclared capability …". Flag marking is not critical
-     * for filtering/vacation (fileinto/keep/redirect keep working).
+     * imap4flags IS supported by Stalwart (verified against the server's
+     * sieve compiler) — the historical "Undeclared capability" failure came
+     * from the merged script MISSING the require line, which the capability
+     * union collection in rebuildInternal() fixes.
      */
-    private const UNSUPPORTED_CAPABILITIES = ['imap4flags'];
+    private const UNSUPPORTED_CAPABILITIES = [];
 
     /** Reserved script name for the combined active script (one active
      *  script per account is a Stalwart hard limit — see rebuildActiveScript). */
@@ -325,13 +325,6 @@ class SieveScriptService
                 $body = \trim($body);
                 if ($body === '') continue;
             }
-            // Drop flag-marking commands that depend on unsupported
-            // capabilities (imap4flags) — they would invalidate the script.
-            // Position-independent: also catches `addflag …;` inside a
-            // single-line `if … { … }` block.
-            $body = \preg_replace('/\b(?:addflag|setflag|removeflag)\b[^;]*;/', '', $body);
-            $body = \trim($body);
-            if ($body === '') continue;
             $blocks[] = '# --- ' . $s['name'] . " ---\n" . $body;
             $count++;
         }
@@ -522,15 +515,63 @@ class SieveScriptService
 
         $existing = $this->listScriptsWithBodies($userId)['scripts'];
 
-        $updates = [];
-        foreach ($existing as $entry) {
-            $shouldActivate = ($name !== '' && $entry['name'] === $name);
-            if ($entry['isActive'] !== $shouldActivate) {
-                $updates[$entry['id']] = ['isActive' => $shouldActivate];
+        // Reservierte Stalwart-Scripts ausklammern: das „vacation"-Script
+        // darf per SieveScript/set NICHT modifiziert werden (forbidden) —
+        // ein Update darauf würde nichtUpdated füllen und die AKTIVIERUNG
+        // des Ziel-Scripts mit blockieren (Stalwart set.rs: die Aktivierung
+        // läuft nur, wenn der Response KOMPLETT fehlerfrei ist).
+        $candidates = \array_filter($existing, static fn ($e) => \strtolower($e['name']) !== 'vacation');
+
+        if ($name === '') {
+            // Deaktivieren: GENAU EIN Update (isActive:false) auf das
+            // aktuell aktive Script.
+            foreach ($candidates as $entry) {
+                if ($entry['isActive']) {
+                    $resp = $this->stalwart->jmapCall(
+                        $bearer,
+                        [
+                            [
+                                'SieveScript/set',
+                                [
+                                    'accountId' => $accountId,
+                                    'update' => [$entry['id'] => ['isActive' => false]],
+                                ],
+                                'c0',
+                            ],
+                        ],
+                        [self::CAPABILITY_SIEVE]
+                    );
+                    $setResp = $this->stalwart->extractMethodResponse($resp, 'SieveScript/set');
+                    if (!empty($setResp['notUpdated'])) {
+                        throw new \RuntimeException(
+                            'Stalwart refused SieveScript/set deactivate: '
+                            . \json_encode($setResp['notUpdated'], JSON_UNESCAPED_SLASHES)
+                        );
+                    }
+                }
+            }
+            return;
+        }
+
+        // Aktivieren: GENAU EIN Update (isActive:true) für das Ziel-Script.
+        // Stalwart speichert den aktiven Script im Principal-Feld
+        // ActiveScriptId — der Wechsel deaktiviert den bisherigen implizit.
+        // KRITISCH (Stalwart set.rs): die Aktivierung läuft nur, wenn der
+        // Response KEINEN Fehler enthält und GENAU EIN isActive-Update im
+        // Request war — mehrere isActive-Änderungen in einem Envelope werden
+        // komplett ignoriert (activations.len() !== 1).
+        $target = null;
+        foreach ($candidates as $entry) {
+            if ($entry['name'] === $name) {
+                $target = $entry;
+                break;
             }
         }
-        if (\count($updates) === 0) {
-            return; // Already in the desired state.
+        if ($target === null) {
+            throw new \RuntimeException('Sieve script "' . $name . '" not found');
+        }
+        if ($target['isActive']) {
+            return; // Already active.
         }
 
         $resp = $this->stalwart->jmapCall(
@@ -540,7 +581,7 @@ class SieveScriptService
                     'SieveScript/set',
                     [
                         'accountId' => $accountId,
-                        'update' => $updates,
+                        'update' => [$target['id'] => ['isActive' => true]],
                     ],
                     'c0',
                 ],

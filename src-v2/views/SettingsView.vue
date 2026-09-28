@@ -355,10 +355,18 @@
 						</div>
 					</div>
 
-					<NcButton variant="primary" class="sieve-list__add" @click="showSieveEditor = true">
-						<template #icon><Plus :size="20" /></template>
-						{{ t('souvera_mail', 'New filter') }}
-					</NcButton>
+					<div class="sieve-list__row-actions-wrap">
+						<NcButton variant="primary" class="sieve-list__add" @click="showSieveEditor = true">
+							<template #icon><Plus :size="20" /></template>
+							{{ t('souvera_mail', 'New filter') }}
+						</NcButton>
+						<NcButton variant="secondary" class="sieve-list__apply"
+							:title="t('souvera_mail', 'Wendet die aktiven Filter auf die bereits im Posteingang liegenden Mails an')"
+							:disabled="applyingSieve || sieveScripts.filter(x => !x.isMain).length === 0"
+							@click="applySieveToInbox">
+							{{ applyingSieve ? t('souvera_mail', 'Wird angewendet…') : t('souvera_mail', 'Auf vorhandene Mails anwenden') }}
+						</NcButton>
+					</div>
 				</div>
 			</div>
 
@@ -717,6 +725,7 @@ export default {
 			allMailboxesList: [],
 
 			sieveScripts: [],
+			applyingSieve: false,
 			loadingSieve: false,
 			showSieveEditor: false,
 			editingSieve: null,
@@ -1112,6 +1121,22 @@ export default {
 		closeSieveEditor() {
 			this.showSieveEditor = false
 			this.editingSieve = null
+		},
+		async applySieveToInbox() {
+			this.applyingSieve = true
+			try {
+				const { data } = await axios.post(generateUrl('/apps/souvera_mail/api/v2/sieve/apply'), { folderId: 'INBOX' })
+				if ((data.status || '') === 'ok') {
+					const moved = (data.moved ?? 0) + (data.redirected ?? 0) + (data.discarded ?? 0) + (data.flagged ?? 0)
+					showSuccess(this.t('souvera_mail', '{scanned} Mails geprüft, {moved} einsortiert', { scanned: data.scanned ?? 0, moved }))
+				} else {
+					showError(data.message || this.t('souvera_mail', 'Anwenden fehlgeschlagen'))
+				}
+			} catch (e) {
+				showError(e.response?.data?.message || e.message || this.t('souvera_mail', 'Anwenden fehlgeschlagen'))
+			} finally {
+				this.applyingSieve = false
+			}
 		},
 		async toggleSieve(filter) {
 			try {

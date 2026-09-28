@@ -497,6 +497,7 @@ class V2ComposeController extends Controller
                         'Souvera Mail: EmailSubmission/set response missing created.send1, but the mail IS in Sent — treating as delivered.',
                         ['app' => 'souvera_mail', 'mailId' => $createdMailId]
                     );
+                    $this->cleanupSessionDrafts($user->getUID(), $body);
                     return new JSONResponse([
                         'success' => true,
                         'draftId' => $createdMailId,
@@ -513,11 +514,38 @@ class V2ComposeController extends Controller
                 'detail' => $submitFailed ?? [],
             ], 502);
         }
+        $this->cleanupSessionDrafts($user->getUID(), $body);
         return new JSONResponse([
             'success' => true,
             'draftId' => $created['id'] ?? '',
             'submitted' => true,
         ]);
+    }
+
+    /**
+     * Räumt nach erfolgreichem Versand die Session-Drafts auf: der autosave-
+     * Draft (existingDraftId aus dem Payload) sowie das composeKey-Mapping.
+     * Best effort — ein Fehlschlag ändert nichts am Versand-Ergebnis.
+     */
+    private function cleanupSessionDrafts(string $userUID, array $body): void {
+        $staleIds = [];
+        $existingDraftId = \is_string($body['existingDraftId'] ?? null) ? \trim($body['existingDraftId']) : '';
+        if ($existingDraftId !== '') { $staleIds[] = $existingDraftId; }
+        $composeKey = (string) ($body['composeKey'] ?? '');
+        if (\preg_match('/^[a-f0-9\-]{10,64}$/', $composeKey)) {
+            $mapped = $this->config->getUserValue($userUID, 'souvera_mail', 'draftmap.' . $composeKey, '');
+            if ($mapped !== '' && !\in_array($mapped, $staleIds, true)) { $staleIds[] = $mapped; }
+            $this->config->deleteUserValue($userUID, 'souvera_mail', 'draftmap.' . $composeKey);
+        }
+        if ($staleIds === []) { return; }
+        try {
+            $this->jmap->singleCall('Email/set', [
+                'accountId' => $this->jmap->getCurrentAccountId() ?? '',
+                'destroy' => $staleIds,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->debug('Souvera Mail: session draft cleanup skipped: ' . $e->getMessage());
+        }
     }
 
     /**

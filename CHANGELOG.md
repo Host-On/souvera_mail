@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.6.0]
+
+### Added
+
+- **Gesendet-Ordner zeigt den Empfänger** statt des Absenders (Liste über
+  `showRecipient`-Prop + Backend `toAddress`/`toName` im Listen-Mapping).
+- **„Auf vorhandene Mails anwenden"-Button** in den Filter-Einstellungen:
+  wendet die aktiven Sieve-Filter nachträglich auf den Posteingang an
+  (die `/sieve/apply`-Endpunkte waren bisher nie im Frontend verdrahtet).
+- **`occ souvera_mail:diag:sieve <uid>`**: Sieve-Kettendiagnose (Bearer,
+  accountId, Script-Liste mit isActive, aktiver Script-Inhalt,
+  Capabilities-Validate-Roundtrip, Disabled-Pref).
+
+### Fixed
+
+- **Sieve-Aktivierung (Root Cause für „Filter funktionieren nicht")**: der
+ 激活-Update durfte nur EIN Script je Request tragen und der Response musste
+  fehlerfrei sein (Stalwart set.rs: activations.len() === 1 + keine Errors) —
+  bei mehreren isActive-Änderungen oder dem geschützten vacation-Script wurde
+  die Aktivierung still übersprungen. Neu: EINZEL-Update (isActive:true nur
+  fürs Ziel), vacation-Script aus allen Listen/Schleifen gefiltert.
+- **imap4flags freigeschaltet**: Stalwart unterstützt die Extension — die
+  Merge-Logik stripte addflag/setflag aber still (UNSUPPORTED-Liste) und
+  „Kennzeichnen"-Filter liefen leer. Die Capabilities-Sammlung im Rebuild
+  nimmt imap4flags jetzt korrekt auf.
+
+
 ## [1.5.9]
 
 ### Fixed
