@@ -16,7 +16,7 @@
 ### Fixed
 
 - **Sieve-Aktivierung (Root Cause für „Filter funktionieren nicht")**: der
- 激活-Update durfte nur EIN Script je Request tragen und der Response musste
+ Aktivierungs-Update durfte nur EIN Script je Request tragen und der Response musste
   fehlerfrei sein (Stalwart set.rs: activations.len() === 1 + keine Errors) —
   bei mehreren isActive-Änderungen oder dem geschützten vacation-Script wurde
   die Aktivierung still übersprungen. Neu: EINZEL-Update (isActive:true nur
