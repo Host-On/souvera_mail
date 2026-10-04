@@ -51,14 +51,22 @@ trait SelfUpdateTrait
             }
         }
 
-        $installed = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId);
-        if ($installed === '0') {
-            return ['error' => 'No version'];
+        $appManager = \OCP\Server::get(\OCP\App\IAppManager::class);
+        $appPath = $appManager->getAppPath($appId);
+        if ($appPath === null || !is_dir($appPath)) {
+            return ['error' => 'App not found'];
         }
 
-        $appPath = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppPath($appId);
-        if ($appPath === null) {
-            return ['error' => 'App not found'];
+        $installed = $appManager->getAppVersion($appId);
+        if ($installed === '0' || $installed === '') {
+            // IAppManager kann bei NFS-App-Verzeichnissen/Symlinks eine leere
+            // oder '0'-Version liefern („No version"-Fall), obwohl die App
+            // intakt ist. info.xml direkt am Pfad lesen.
+            $infoXml = @simplexml_load_file($appPath . '/appinfo/info.xml');
+            $installed = $infoXml !== false ? (string) ($infoXml->version ?? '') : '';
+            if ($installed === '') {
+                return ['error' => 'No version (info.xml unlesbar unter ' . $appPath . ')'];
+            }
         }
 
         // Abort early on read-only filesystems (Docker/K8s with immutable containers).
@@ -137,6 +145,15 @@ trait SelfUpdateTrait
                 return version_compare($b['name'], $a['name']);
             });
             return ltrim((string) $tags[0]['name'], 'v');
+        }
+
+        // 3) Resilienz: GitLab komplett ausgefallen → GitHub-Mirror-Release
+        $mirror = $this->githubMirrorFor();
+        if ($mirror !== null) {
+            $data = $this->apiGet("https://api.github.com/repos/$mirror/releases/latest");
+            if ($data !== null && isset($data['tag_name'])) {
+                return ltrim((string) $data['tag_name'], 'v');
+            }
         }
 
         return null;
@@ -225,31 +242,36 @@ trait SelfUpdateTrait
         if ($repo === '') {
             return ['error' => 'Unknown app'];
         }
-        if ($this->isGitlabApp()) {
-            $data = $this->gitlabApiGet($this->gitlabBase() . '/api/v4/projects/'
-                . $this->gitlabProjectEncoded() . '/releases');
-            $rawTag = (is_array($data) && isset($data[0]['tag_name']))
-                ? (string) $data[0]['tag_name'] : '';
-            if ($rawTag === '') {
-                return ['error' => 'No GitLab release found'];
-            }
-            $url = $this->gitlabBase() . '/api/v4/projects/'
-                . $this->gitlabProjectEncoded() . '/repository/archive.zip?sha='
-                . rawurlencode($rawTag);
-            $applied = $this->downloadAndApply($appId, $appPath, $url);
-        if (!isset($applied['error'])) {
-            $this->runAppMigrations($appId);
-        }
-        return $applied;
-        }
-        // GitHub zipball expects the tag exactly as stored (with or without "v").
-        $data = $this->apiGet("https://api.github.com/repos/$repo/releases/latest");
-        $rawTag = '';
-        if ($data !== null && isset($data['tag_name'])) {
-            $rawTag = (string) $data['tag_name'];
-        }
-        $url = "https://api.github.com/repos/$repo/zipball/" . ($rawTag !== '' ? $rawTag : "v$tag");
+
+        // 1) GitLab: archive.zip am VERIFIZIERTEN Tag (nicht /releases[0] —
+        //    Releases-Liste kann leer sein, Tags existieren immer).
+        $url = $this->gitlabBase() . '/api/v4/projects/'
+            . $this->gitlabProjectEncoded() . '/repository/archive.zip?sha='
+            . rawurlencode($tag) . '&_=' . time();
         $applied = $this->downloadAndApply($appId, $appPath, $url);
+
+        // 2) Resilienz: GitLab-Ausfall → GitHub-Mirror-Zipball am selben Tag.
+        if (isset($applied['error'])) {
+            $mirror = $this->githubMirrorFor();
+            if ($mirror !== null) {
+                $result = $this->downloadAndApply(
+                    $appId, $appPath,
+                    "https://api.github.com/repos/$mirror/zipball/$tag",
+                    true
+                );
+                if (isset($result['error'])) {
+                    $result = $this->downloadAndApply(
+                        $appId, $appPath,
+                        "https://api.github.com/repos/$mirror/zipball/v$tag",
+                        true
+                    );
+                }
+                if (!isset($result['error'])) {
+                    $applied = $result;
+                }
+            }
+        }
+
         if (!isset($applied['error'])) {
             $this->runAppMigrations($appId);
         }
@@ -336,15 +358,13 @@ trait SelfUpdateTrait
 
     private function downloadAndApply(string $appId, string $appPath, string $url, bool $github = false): array
     {
-        $token = $this->readToken();
-        if ($token === '') {
-            return ['error' => 'No devops token configured'];
-        }
-
         $client = \OCP\Server::get(\OCP\Http\Client\IClientService::class)->newClient();
         $useGitlab = !$github && $this->isGitlabApp();
-        if ($useGitlab) {
-            $token = $this->readGitlabToken();
+        // Token-Pflicht nur für GitLab. Der GitHub-Mirror ist öffentlich —
+        // ein fehlender Token darf den Resilienz-Pfad nicht blockieren.
+        $token = $useGitlab ? $this->readGitlabToken() : $this->readToken();
+        if ($useGitlab && $token === '') {
+            return ['error' => 'No GitLab devops token configured'];
         }
         try {
             $headers = $github
