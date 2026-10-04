@@ -553,7 +553,7 @@ return [
             'verb' => 'PUT',
         ],
         [
-            'name' => 'v2_share#users',
+            'name' => 'v2_share#searchUsers',
             'url' => '/api/v2/share/users',
             'verb' => 'GET',
         ],

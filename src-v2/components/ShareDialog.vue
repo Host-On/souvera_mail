@@ -11,10 +11,9 @@
 			<p v-if="error" class="share-error">{{ error }}</p>
 
 			<div class="share-new">
-				<NcTextField :value.sync="q"
+				<NcTextField v-model="q"
 					:label="t('souvera_mail', 'Freigeben an Benutzer')"
-					:placeholder="t('souvera_mail', 'Name oder Benutzername…')"
-					@input="onSearch" />
+					:placeholder="t('souvera_mail', 'Name oder Benutzername…')" />
 				<ul v-if="userResults.length > 0" class="share-user-list">
 					<li v-for="u in userResults" :key="u.uid" @click="pickUser(u)">
 						<span class="share-user-name">{{ u.displayName }}</span>
@@ -105,6 +104,9 @@ export default {
 	},
 	async mounted() {
 		await this.loadGrants()
+	},
+	watch: {
+		q() { this.onSearch() },
 	},
 	beforeDestroy() {
 		if (this.searchTimer) clearTimeout(this.searchTimer)

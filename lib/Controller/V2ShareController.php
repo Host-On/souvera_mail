@@ -65,7 +65,7 @@ class V2ShareController extends Controller {
 			return new JSONResponse(['users' => []]);
 		}
 		$out = [];
-		foreach ($this->userManager->searchDisplayName($q, 20) as $u) {
+		foreach ($this->userManager->search($q, 20) as $u) {
 			$out[] = [
 				'uid' => $u->getUID(),
 				'displayName' => $u->getDisplayName(),

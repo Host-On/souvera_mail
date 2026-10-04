@@ -388,10 +388,15 @@ export default {
 				{ icon: CTX_ICONS.check, label: t('Mark all as read'),
 					onClick: () => this.mailboxMarkAllRead(id, shared ? (mailbox._accountId || undefined) : undefined) },
 			]
-			if (!isSystem && !shared) {
+			if (!shared) {
 				items.push({ type: 'divider' })
+				// Freigabe für ALLE eigenen Ordner — auch Systemordner
+				// (Posteingang, Gesendet, …). Nur fremde (shared) Ordner sind
+				// ausgeschlossen; die Freigabe-Verwaltung liegt beim Eigentümer.
 				items.push({ icon: CTX_ICONS.share, label: t('Ordner freigeben…'),
 					onClick: () => { this.shareMailbox = mailbox } })
+			}
+			if (!isSystem && !shared) {
 				items.push({ icon: CTX_ICONS.pencil, label: t('Rename folder'),
 					onClick: () => this.mailboxRename(mailbox) })
 				items.push({ icon: CTX_ICONS.trash, label: t('Delete folder'), danger: true,

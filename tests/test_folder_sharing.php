@@ -22,12 +22,16 @@ $root = \dirname(__DIR__);
 
 // --- Backend ---
 $routes = (string) \file_get_contents($root . '/appinfo/routes.php');
-foreach (['v2_share#list' => 'GET', 'v2_share#share' => 'POST', 'v2_share#revoke' => 'DELETE', 'v2_share#users' => 'GET'] as $name => $verb) {
+foreach (['v2_share#list' => 'GET', 'v2_share#share' => 'POST', 'v2_share#revoke' => 'DELETE', 'v2_share#searchUsers' => 'GET'] as $name => $verb) {
 	$ok(\str_contains($routes, "'name' => '{$name}'") && \str_contains($routes, "'verb' => '{$verb}'"),
 		"Route {$name} ({$verb}) registriert");
 }
-
 $ctl = (string) \file_get_contents($root . '/lib/Controller/V2ShareController.php');
+// Route-Name ↔ Controller-Methode: JEDER 'v2_share#X'-Eintrag braucht public function X()
+foreach (['list', 'searchUsers', 'share', 'revoke'] as $method) {
+	$ok(\preg_match('/public function ' . $method . '\\(/', $ctl) === 1,
+		"Controller-Methode {$method}() existiert (Route-Match)");
+}
 $ok(\str_contains($ctl, "'mayReadItems' => true,\n\t\t'mayAddItems' => true,\n\t\t'mayRemoveItems' => true,\n\t\t'maySetSeen' => true,\n\t\t'maySetKeywords' => true,"),
 	'Schreib-Rechte: lesen+verschieben+markieren (ohne maySubmit/mayDelete)');
 $ok(!\str_contains($ctl, "'maySubmit'"), 'kein maySubmit in v1');
@@ -51,6 +55,15 @@ $ok(\str_contains($ctl, 'principalIdFromAccountKey'), 'AccountId-Key-Rückauflö
 		'Notification erst NACH erfolgreicher Freigabe');
 	$ok(\str_contains($ctl, '$payload = $response->getData();'),
 		'JSONResponse.getData() korrekt gelesen (Array, nicht JSON-String)');
+
+	// --- v1.7.1 Fixes (Live-Test) ---
+	$ok(\str_contains($ctl, '$this->userManager->search($q, 20)') && !\str_contains($ctl, 'searchDisplayName'),
+		'User-Suche matched uid+Name+E-Mail (search statt searchDisplayName)');
+	$app171 = (string) \file_get_contents($root . '/src-v2/App.vue');
+	$ok(\preg_match('/if \(!shared\) \{[\s\S]{0,400}Ordner freigeben/', $app171) === 1,
+		'Share-Eintrag für ALLE eigenen Ordner (inkl. Systemordner)');
+	$ok(\strpos($app171, "CTX_ICONS.share") < \strpos($app171, "if (!isSystem && !shared)"),
+		'Share-Eintrag VOR dem isSystem-Block (Posteingang freigebbar)');
 
 	// --- Frontend ---
 $dlg = (string) \file_get_contents($root . '/src-v2/components/ShareDialog.vue');
