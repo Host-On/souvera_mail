@@ -242,18 +242,17 @@ class V2ShareController extends Controller {
 		// (bestehende Grants anderer Empfänger bleiben erhalten, der Ziel-
 		// Empfänger wird gesetzt oder — bei revoke — weggelassen).
 		$update = [];
-		$newShareWith = null;
 		foreach ($targets as $mb) {
 			$mbId = (string) ($mb['id'] ?? '');
 			if ($mbId === '') { continue; }
-			if ($newShareWith === null) {
-				$currentShareWith = \is_array($mailbox['shareWith'] ?? null) ? $mailbox['shareWith'] : [];
-				$newShareWith = $currentShareWith;
-				if ($permission === 'revoke') {
-					unset($newShareWith[$granteeAccountId]);
-				} else {
-					$newShareWith[$granteeAccountId] = $permission === 'write' ? self::RIGHTS_WRITE : self::RIGHTS_READ;
-				}
+			// PRO Ordner das eigene shareWith verwenden: bestehende, abweichende
+			// Grants der Kinder (und des Vaters) bleiben unberührt — nur der
+			// Ziel-Empfänger wird gesetzt/entfernt.
+			$newShareWith = \is_array($mb['shareWith'] ?? null) ? $mb['shareWith'] : [];
+			if ($permission === 'revoke') {
+				unset($newShareWith[$granteeAccountId]);
+			} else {
+				$newShareWith[$granteeAccountId] = $permission === 'write' ? self::RIGHTS_WRITE : self::RIGHTS_READ;
 			}
 			$update[$mbId] = ['shareWith' => \count($newShareWith) > 0 ? $newShareWith : null];
 		}
