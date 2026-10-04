@@ -147,6 +147,7 @@
 	</NcAppContent>
 	</NcContent>
 	<ContactPicker v-if="showContactPicker" @close="showContactPicker = false" @select="onContactsSelected" @compose="onContactsCompose" />
+	<ShareDialog v-if="shareMailbox" :mailbox="shareMailbox" @close="shareMailbox = null" />
 </template>
 
 <script>
@@ -162,6 +163,7 @@ import LanConnect from 'vue-material-design-icons/LanConnect.vue'
 import MailboxItem from './components/MailboxItem.vue'
 import QuotaDonut from './components/QuotaDonut.vue'
 import ContactPicker from './components/ContactPicker.vue'
+import ShareDialog from './components/ShareDialog.vue'
 import { useJmapClient } from './composables/useJmapClient.js'
 import { extFolderDisplayName } from './utils/mailboxNames.js'
 import axios from '@nextcloud/axios'
@@ -178,14 +180,14 @@ const ROLE_ORDER = { inbox:0, drafts:1, sent:2, junk:3, trash:4 }
 
 export default {
 	name: 'MailV2App',
-	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, LanConnect, MailboxItem, QuotaDonut, ContactPicker },
+	components: { NcContent, NcAppNavigation, NcAppNavigationItem, NcAppNavigationCaption, NcAppContent, NcButton, NcCounterBubble, Pencil, Cog, Share, Archive, Contacts, ChevronDown, ChevronRight, LanConnect, MailboxItem, QuotaDonut, ContactPicker, ShareDialog },
 	data() {
 		// Layout-Präferenzen kommen SERVERSEITIG injiziert (window.
 		// _souvera_mail_prefs, aus templates/v2.php) — damit rendert der
 		// erste Paint bereits im korrekten Layout, statt nach dem
 		// preferences-Fetch sichtbar umzuspringen (FOUC).
 		const prefs = (typeof window !== 'undefined' && window._souvera_mail_prefs) || {}
-		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], extFolders: {}, extFoldersLoading: {}, extExpanded: {}, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: !!prefs.verticalLayout, listOnlyLayout: !!prefs.listOnlyLayout, focusLayout: !!prefs.focusLayout, _responsiveVertical: false, mailArchiveEnabled: !!prefs.mailArchiveEnabled, showContactPicker: false, navCollapsedGroups: prefs.navCollapsedGroups || [], navCollapsedMailboxes: prefs.navCollapsedMailboxes || [] }
+		return { mailboxes: [], selectedMailbox: '', sharedFolders: [], sharedMailboxes: [], sharedAbove: true, externalAccounts: [], extFolders: {}, extFoldersLoading: {}, extExpanded: {}, quotaUsed: 0, quotaTotal: 0, quotaUnlimited: false, isVertical: !!prefs.verticalLayout, listOnlyLayout: !!prefs.listOnlyLayout, focusLayout: !!prefs.focusLayout, _responsiveVertical: false, mailArchiveEnabled: !!prefs.mailArchiveEnabled, showContactPicker: false, shareMailbox: null, navCollapsedGroups: prefs.navCollapsedGroups || [], navCollapsedMailboxes: prefs.navCollapsedMailboxes || [] }
 	},
 	computed: {
 		currentRoute() { return this.$route.name || 'inbox' },		systemFolders() { return this.mailboxes.filter(m => SYSTEM_ROLES.includes(m.role)).sort((a,b) => (ROLE_ORDER[a.role]??99) - (ROLE_ORDER[b.role]??99)) },
@@ -388,6 +390,8 @@ export default {
 			]
 			if (!isSystem && !shared) {
 				items.push({ type: 'divider' })
+				items.push({ icon: CTX_ICONS.share, label: t('Ordner freigeben…'),
+					onClick: () => { this.shareMailbox = mailbox } })
 				items.push({ icon: CTX_ICONS.pencil, label: t('Rename folder'),
 					onClick: () => this.mailboxRename(mailbox) })
 				items.push({ icon: CTX_ICONS.trash, label: t('Delete folder'), danger: true,

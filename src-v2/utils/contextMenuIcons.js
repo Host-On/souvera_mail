@@ -21,6 +21,7 @@ export const CTX_ICONS = {
 	openInFolder: svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/><circle cx="12" cy="13" r="2.4"/><path d="m13.8 14.8 2.7 2.7"/>'),
 	check: svg('<path d="m4 12.5 5 5L20 6.5"/>'),
 	refresh: svg('<path d="M20 11a8 8 0 1 0-2.3 6.3"/><path d="M20 5v6h-6"/>'),
+	share: svg('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>'),
 	pencil: svg('<path d="m4 20 1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1Z"/>'),
 	broom: svg('<path d="M19 3 12.5 9.5"/><path d="M11 8 4 15c-1.5 1.5-1.5 4 0 5s3.5 1.5 5 0l7-7-5-5Z"/><path d="M8 12l4 4"/>'),
 	info: svg('<circle cx="12" cy="12" r="9"/><path d="M12 8h.01"/><path d="M12 11v5"/>'),

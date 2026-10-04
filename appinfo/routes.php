@@ -553,6 +553,26 @@ return [
             'verb' => 'PUT',
         ],
         [
+            'name' => 'v2_share#users',
+            'url' => '/api/v2/share/users',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'v2_share#list',
+            'url' => '/api/v2/share',
+            'verb' => 'GET',
+        ],
+        [
+            'name' => 'v2_share#share',
+            'url' => '/api/v2/share',
+            'verb' => 'POST',
+        ],
+        [
+            'name' => 'v2_share#revoke',
+            'url' => '/api/v2/share',
+            'verb' => 'DELETE',
+        ],
+        [
             'name' => 'v2_compose#identities',
             'url' => '/api/v2/identities',
             'verb' => 'GET',
