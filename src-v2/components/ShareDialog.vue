@@ -4,63 +4,98 @@
 		:can-close="!busy"
 		@closing="$emit('close')">
 		<div class="share-dialog">
-			<p class="share-mailbox-name">
-				<span class="share-mailbox-icon" v-html="ctxIcons.folder" />
-				{{ mailbox.name }}
-			</p>
+			<!-- Ordner-Kontext -->
+			<div class="share-folder-card">
+				<Folder :size="18" class="share-folder-icon" />
+				<span class="share-folder-name">{{ mailbox.name }}</span>
+			</div>
 
 			<p v-if="error" class="share-error">{{ error }}</p>
 
-			<div class="share-new">
+			<!-- Neue Freigabe -->
+			<section class="share-section">
+				<h4 class="share-label">{{ t('souvera_mail', 'Freigeben an') }}</h4>
 				<NcTextField v-model="q"
 					:label="t('souvera_mail', 'Freigeben an Benutzer')"
 					:placeholder="t('souvera_mail', 'Name oder Benutzername…')" />
 				<ul v-if="userResults.length > 0" class="share-user-list">
 					<li v-for="u in userResults" :key="u.uid" @click="pickUser(u)">
+						<span class="share-initials">{{ initials(u.displayName || u.uid) }}</span>
 						<span class="share-user-name">{{ u.displayName }}</span>
 						<span class="share-user-detail">{{ u.email || u.uid }}</span>
 					</li>
 				</ul>
 
 				<template v-if="pickedUser">
-					<p class="share-picked">
-						{{ t('souvera_mail', 'Freigeben an') }}: <strong>{{ pickedUser.displayName }}</strong>
+					<div class="share-picked-chip">
+						<NcAvatar v-if="pickedUser.uid" :user="pickedUser.uid"
+							:display-name="pickedUser.displayName" :size="34"
+							:disable-menu="true" :show-user-status="false" />
+						<span v-else class="share-initials">{{ initials(pickedUser.displayName) }}</span>
+						<span class="share-picked-meta">
+							<strong>{{ pickedUser.displayName }}</strong>
+							<small>{{ pickedUser.email || pickedUser.uid }}</small>
+						</span>
 						<NcButton variant="tertiary" :aria-label="t('souvera_mail', 'Auswahl entfernen')" @click="clearPicked">
-							<template #icon><span class="share-x">×</span></template>
+							<template #icon><Close :size="18" /></template>
 						</NcButton>
-					</p>
-					<div class="share-permissions">
-						<label class="share-radio">
+					</div>
+
+					<h4 class="share-label">{{ t('souvera_mail', 'Berechtigung') }}</h4>
+					<div class="share-perm-cards">
+						<label class="share-perm-card" :class="{ 'share-perm-card--active': permission === 'read' }">
 							<input v-model="permission" type="radio" value="read">
-							{{ t('souvera_mail', 'Lesen') }}
+							<Lock :size="16" class="share-perm-icon" />
+							<span class="share-perm-text">
+								<strong>{{ t('souvera_mail', 'Lesen') }}</strong>
+								<small>{{ t('souvera_mail', 'Ordner ansehen und Mails lesen') }}</small>
+							</span>
 						</label>
-						<label class="share-radio">
+						<label class="share-perm-card" :class="{ 'share-perm-card--active': permission === 'write' }">
 							<input v-model="permission" type="radio" value="write">
-							{{ t('souvera_mail', 'Bearbeiten (lesen, verschieben, markieren)') }}
+							<Pencil :size="16" class="share-perm-icon" />
+							<span class="share-perm-text">
+								<strong>{{ t('souvera_mail', 'Bearbeiten') }}</strong>
+								<small>{{ t('souvera_mail', 'Mails verschieben und als gelesen markieren') }}</small>
+							</span>
 						</label>
 					</div>
+
 					<label class="share-children">
 						<input v-model="includeChildren" type="checkbox">
 						{{ t('souvera_mail', 'Unterordner einbeziehen') }}
 					</label>
-					<NcButton variant="primary" :disabled="busy" @click="grant">
-						{{ t('souvera_mail', 'Freigeben') }}
-					</NcButton>
-				</template>
-			</div>
 
-			<div v-if="grants.length > 0" class="share-existing">
-				<h4>{{ t('souvera_mail', 'Geteilt mit') }}</h4>
-				<ul>
+					<div class="share-actions">
+						<NcButton variant="primary" :disabled="busy" @click="grant">
+							{{ t('souvera_mail', 'Freigeben') }}
+						</NcButton>
+					</div>
+				</template>
+			</section>
+
+			<!-- Bestehende Freigaben -->
+			<section v-if="grants.length > 0" class="share-section share-section--divided">
+				<h4 class="share-label">{{ t('souvera_mail', 'Geteilt mit') }}</h4>
+				<NcLoadingIcon v-if="loading" :size="20" />
+				<ul v-else class="share-grants">
 					<li v-for="g in grants" :key="g.accountId">
-						<span class="share-user-name">{{ g.email || g.accountId }}</span>
-						<span class="share-user-detail">{{ rightsLabel(g) }}</span>
+						<NcAvatar v-if="g.granteeUid" :user="g.granteeUid"
+							:display-name="g.email || g.granteeUid" :size="34"
+							:disable-menu="true" :show-user-status="false" />
+						<span v-else class="share-initials">{{ initials(g.email || g.accountId) }}</span>
+						<span class="share-grant-meta">
+							<strong>{{ g.email || g.accountId }}</strong>
+							<span class="share-rights-badge" :class="{ 'share-rights-badge--write': (g.rights || {}).mayAddItems }">
+								{{ rightsLabel(g) }}
+							</span>
+						</span>
 						<NcButton variant="tertiary" :disabled="busy" @click="revoke(g)">
 							{{ t('souvera_mail', 'Entziehen') }}
 						</NcButton>
 					</li>
 				</ul>
-			</div>
+			</section>
 			<p v-else-if="!loading" class="share-empty">
 				{{ t('souvera_mail', 'Dieser Ordner ist bisher nicht freigegeben.') }}
 			</p>
@@ -71,21 +106,21 @@
 <script>
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
-import { NcDialog, NcButton, NcTextField } from '@nextcloud/vue'
-import { CTX_ICONS } from '../utils/contextMenuIcons.js'
+import { NcDialog, NcButton, NcTextField, NcAvatar, NcLoadingIcon } from '@nextcloud/vue'
+import Folder from 'vue-material-design-icons/Folder.vue'
+import Lock from 'vue-material-design-icons/Lock.vue'
+import Pencil from 'vue-material-design-icons/Pencil.vue'
+import Close from 'vue-material-design-icons/Close.vue'
 
 export default {
 	name: 'ShareDialog',
-	components: { NcDialog, NcButton, NcTextField },
+	components: { NcDialog, NcButton, NcTextField, NcAvatar, NcLoadingIcon, Folder, Lock, Pencil, Close },
 	props: {
 		mailbox: { type: Object, required: true },
 	},
 	emits: ['close'],
 	data() {
 		return {
-			ctxIcons: CTX_ICONS,
-			currentUid: (typeof window !== 'undefined' && window.OC && window.OC.getCurrentUser)
-				? (window.OC.getCurrentUser().uid || '') : '',
 			grants: [],
 			loading: true,
 			busy: false,
@@ -96,6 +131,8 @@ export default {
 			permission: 'read',
 			includeChildren: true,
 			searchTimer: null,
+			currentUid: (typeof window !== 'undefined' && window.OC && window.OC.getCurrentUser)
+				? (window.OC.getCurrentUser().uid || '') : '',
 		}
 	},
 	computed: {
@@ -113,6 +150,10 @@ export default {
 		if (this.searchTimer) clearTimeout(this.searchTimer)
 	},
 	methods: {
+		initials(name) {
+			const n = (name || '?').trim()
+			return n.slice(0, 2).toUpperCase()
+		},
 		async loadGrants() {
 			this.loading = true
 			this.error = ''
@@ -200,34 +241,63 @@ export default {
 </script>
 
 <style scoped>
+/* ---------- Grundraster ---------- */
 .share-dialog {
-	/* Container: NcDialog size="normal" (600px) — Content füllt ihn */
 	width: 100%;
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
 }
-.share-mailbox-name {
+.share-section {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.share-section--divided {
+	border-top: 1px solid var(--color-border);
+	padding-top: 16px;
+}
+.share-label {
+	margin: 0;
+	font-size: 12px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	color: var(--color-text-maxcontrast);
+}
+
+/* ---------- Ordner-Kontext ---------- */
+.share-folder-card {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: 10px;
+	padding: 10px 14px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-container);
+	background: var(--color-background-dark);
+}
+.share-folder-icon {
+	color: var(--color-primary-element);
+	flex-shrink: 0;
+}
+.share-folder-name {
 	font-weight: 600;
-	margin: 0 0 12px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
-.share-mailbox-icon :deep(svg) {
-	width: 16px;
-	height: 16px;
-}
+
+/* ---------- Fehler ---------- */
 .share-error {
+	margin: 0;
+	padding: 8px 12px;
+	border-radius: var(--border-radius);
+	background: var(--color-error-bg);
 	color: var(--color-error-text);
-	margin: 8px 0;
 }
-.share-new {
-	position: relative;
-	margin-bottom: 12px;
-}
+
+/* ---------- User-Suche ---------- */
 .share-user-list {
-	/* Im Fluss statt absolut: der NcDialog-Content hat overflow:auto und
-	   CLIPPT absolut positionierte Vorschläge am unteren Rand. So wächst
-	   der Dialog stattdessen; die Liste scrollt bei >200px selbst. */
-	position: static;
 	background: var(--color-main-background);
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius);
@@ -235,74 +305,180 @@ export default {
 	max-height: 200px;
 	overflow-y: auto;
 	list-style: none;
-	margin: 6px 0 0;
-	padding: 4px 0;
-}
-.share-user-list li {
+	margin: 0;
+	padding: 4px;
 	display: flex;
 	flex-direction: column;
-	padding: 6px 12px;
+	gap: 2px;
+}
+.share-user-list li {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	grid-template-areas: "avatar name" "avatar detail";
+	column-gap: 10px;
+	align-items: center;
+	padding: 6px 8px;
+	border-radius: var(--border-radius);
 	cursor: pointer;
 }
 .share-user-list li:hover {
 	background: var(--color-background-hover);
 }
 .share-user-name {
+	grid-area: name;
 	font-weight: 500;
 }
 .share-user-detail {
+	grid-area: detail;
 	font-size: 12px;
 	color: var(--color-text-maxcontrast);
 }
-.share-picked {
-	display: flex;
+
+/* ---------- Initialen-Kreis (ohne NC-Avatar) ---------- */
+.share-initials {
+	display: inline-flex;
 	align-items: center;
-	gap: 6px;
-	margin: 10px 0 6px;
+	justify-content: center;
+	width: 34px;
+	height: 34px;
+	flex-shrink: 0;
+	border-radius: 50%;
+	background: var(--color-primary-element-light);
+	color: var(--color-primary-element-text);
+	font-size: 13px;
+	font-weight: 700;
 }
-.share-x {
-	font-size: 16px;
-	line-height: 1;
-}
-.share-permissions {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-	margin: 8px 0;
-}
-.share-radio,
-.share-children {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	cursor: pointer;
-}
-.share-children {
-	margin: 4px 0 10px;
-}
-.share-existing h4 {
-	margin: 14px 0 6px;
-	font-weight: 600;
-}
-.share-existing ul {
-	list-style: none;
-	margin: 0;
-	padding: 0;
-}
-.share-existing li {
+
+/* ---------- Ausgewählter User (Chip) ---------- */
+.share-picked-chip {
 	display: flex;
 	align-items: center;
 	gap: 10px;
-	padding: 6px 0;
-	border-bottom: 1px solid var(--color-border);
+	padding: 8px 10px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-container);
+	background: var(--color-background-dark);
 }
-.share-existing li:last-child {
-	border-bottom: none;
-}
-.share-existing .share-user-detail {
+.share-picked-meta {
+	display: flex;
+	flex-direction: column;
+	line-height: 1.3;
 	flex: 1;
+	min-width: 0;
 }
-.share-empty {
+.share-picked-meta small {
 	color: var(--color-text-maxcontrast);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* ---------- Berechtigungs-Karten ---------- */
+.share-perm-cards {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 8px;
+}
+.share-perm-card {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 10px 12px;
+	border: 2px solid var(--color-border);
+	border-radius: var(--border-radius-container);
+	cursor: pointer;
+	transition: border-color .1s ease-in-out, background-color .1s ease-in-out;
+}
+.share-perm-card input[type='radio'] {
+	margin-top: 2px;
+}
+.share-perm-card--active {
+	border-color: var(--color-primary-element);
+	background: var(--color-primary-element-light);
+}
+.share-perm-icon {
+	color: var(--color-text-maxcontrast);
+	margin-top: 2px;
+	flex-shrink: 0;
+}
+.share-perm-card--active .share-perm-icon {
+	color: var(--color-primary-element);
+}
+.share-perm-text {
+	display: flex;
+	flex-direction: column;
+	line-height: 1.35;
+}
+.share-perm-text small {
+	color: var(--color-text-maxcontrast);
+}
+
+/* ---------- Unterordner + Aktionen ---------- */
+.share-children {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	cursor: pointer;
+	padding: 2px 0;
+}
+.share-actions {
+	display: flex;
+	justify-content: flex-end;
+}
+
+/* ---------- Bestehende Freigaben ---------- */
+.share-grants {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.share-grants li {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 10px;
+	border-radius: var(--border-radius-container);
+	transition: background-color .1s ease-in-out;
+}
+.share-grants li:hover {
+	background: var(--color-background-hover);
+}
+.share-grant-meta {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	line-height: 1.3;
+	flex: 1;
+	min-width: 0;
+}
+.share-grant-meta strong {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.share-rights-badge {
+	align-self: flex-start;
+	font-size: 11px;
+	font-weight: 600;
+	padding: 1px 8px;
+	border-radius: var(--border-radius-pill);
+	background: var(--color-background-dark);
+	color: var(--color-text-maxcontrast);
+	width: fit-content;
+}
+.share-rights-badge--write {
+	background: var(--color-primary-element-light);
+	color: var(--color-primary-element-text);
+}
+
+/* ---------- Empty state ---------- */
+.share-empty {
+	margin: 0;
+	text-align: center;
+	color: var(--color-text-maxcontrast);
+	padding: 8px 0 2px;
 }
 </style>

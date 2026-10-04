@@ -2,6 +2,9 @@ OC.L10N.register(
     "souvera_mail",
     {
 
+    "Berechtigung" : "Berechtigung",
+    "Ordner ansehen und Mails lesen" : "Ordner ansehen und Mails lesen",
+    "Mails verschieben und als gelesen markieren" : "Mails verschieben und als gelesen markieren",
     "Ordner freigeben…" : "Ordner freigeben…",
     "Ordner freigeben" : "Ordner freigeben",
     "Freigeben an Benutzer" : "Freigeben an Benutzer",
