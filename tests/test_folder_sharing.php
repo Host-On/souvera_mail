@@ -65,6 +65,11 @@ $ok(\str_contains($ctl, 'principalIdFromAccountKey'), 'AccountId-Key-Rückauflö
 	$ok(\strpos($app171, "CTX_ICONS.share") < \strpos($app171, "if (!isSystem && !shared)"),
 		'Share-Eintrag VOR dem isSystem-Block (Posteingang freigebbar)');
 
+	// --- v1.7.5: Downgrade-Gate (Live-Test: GitLab main war veraltet) ---
+	$trait = (string) \file_get_contents($root . '/lib/DevOps/SelfUpdateTrait.php');
+	$ok(\str_contains($trait, 'Downgrade verweigert') && \str_contains($trait, 'souvera.update.allow_downgrade'),
+		'Downgrade-Gate verweigert ältere Quell-Versionen (allow_downgrade-Schleuse)');
+
 	// --- Frontend ---
 $dlg = (string) \file_get_contents($root . '/src-v2/components/ShareDialog.vue');
 foreach (['mailboxId', 'granteeUid', 'permission', 'includeChildren'] as $field) {

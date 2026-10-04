@@ -435,6 +435,35 @@ trait SelfUpdateTrait
         }
         $sourceDir = $dirs[0];
 
+        // DOWNGRADE-GATE: Die primäre Update-Quelle kann älter sein als die
+        // installierte App (z. B. GitLab main hinter dem GitHub-Mirror —
+        // gemeldeter Fall: Swap 1.7.3 → 1.6.0). Ein Swap auf älter zerstört
+        // die Instanz statt sie zu reparieren → verweigern. Reparatur-
+        // Schleuse: config.php 'souvera.update.allow_downgrade' => true.
+        $newVersion = '';
+        $newInfo = @simplexml_load_file($sourceDir . '/appinfo/info.xml');
+        if ($newInfo !== false) {
+            $newVersion = (string) ($newInfo->version ?? '');
+        }
+        try {
+            $installedVersion = \OCP\Server::get(\OCP\App\IAppManager::class)->getAppVersion($appId, false);
+            $allowDowngrade = \OCP\Server::get(\OCP\IConfig::class)
+                ->getSystemValueBool('souvera.update.allow_downgrade', false);
+        } catch (\Throwable) {
+            $installedVersion = '';
+            $allowDowngrade = false;
+        }
+        if ($newVersion !== '' && $installedVersion !== '' && $installedVersion !== '0'
+            && version_compare($newVersion, $installedVersion, '<') && !$allowDowngrade) {
+            $this->rmdirRecursive($extractDir);
+            return [
+                'error' => 'Downgrade verweigert: Quelle ' . $newVersion . ' ist älter als installiert ' . $installedVersion
+                    . ' — Update-Quelle ist veraltet (Remote nicht synchron?)',
+                'source_version' => $newVersion,
+                'installed_version' => $installedVersion,
+            ];
+        }
+
         // Atomic swap: backup current → extract new → enable → keep or rollback.
         $backupDir = $appPath . '.bak';
         if (is_dir($backupDir)) {
