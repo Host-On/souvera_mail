@@ -1,5 +1,6 @@
 <template>
 	<NcDialog :name="dialogTitle"
+		size="normal"
 		:can-close="!busy"
 		@closing="$emit('close')">
 		<div class="share-dialog">
@@ -200,8 +201,8 @@ export default {
 
 <style scoped>
 .share-dialog {
-	min-width: 380px;
-	max-width: 460px;
+	/* Container: NcDialog size="normal" (600px) — Content füllt ihn */
+	width: 100%;
 }
 .share-mailbox-name {
 	display: flex;
@@ -223,10 +224,10 @@ export default {
 	margin-bottom: 12px;
 }
 .share-user-list {
-	position: absolute;
-	z-index: 10;
-	left: 0;
-	right: 0;
+	/* Im Fluss statt absolut: der NcDialog-Content hat overflow:auto und
+	   CLIPPT absolut positionierte Vorschläge am unteren Rand. So wächst
+	   der Dialog stattdessen; die Liste scrollt bei >200px selbst. */
+	position: static;
 	background: var(--color-main-background);
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius);
@@ -234,7 +235,7 @@ export default {
 	max-height: 200px;
 	overflow-y: auto;
 	list-style: none;
-	margin: 4px 0 0;
+	margin: 6px 0 0;
 	padding: 4px 0;
 }
 .share-user-list li {
