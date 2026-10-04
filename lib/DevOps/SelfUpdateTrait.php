@@ -142,7 +142,11 @@ trait SelfUpdateTrait
             . $project . '/repository/tags?per_page=100');
         if (is_array($tags) && $tags !== []) {
             usort($tags, static function ($a, $b) {
-                return version_compare($b['name'], $a['name']);
+                // 'v'-Präfixe strippen, sonst sortiert version_compare
+                // gemischte Tags falsch (v1.0 vs 0.9)
+                $na = ltrim((string) $a['name'], 'v');
+                $nb = ltrim((string) $b['name'], 'v');
+                return version_compare($nb, $na);
             });
             return ltrim((string) $tags[0]['name'], 'v');
         }
