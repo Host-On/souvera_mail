@@ -84,6 +84,8 @@ export default {
 	data() {
 		return {
 			ctxIcons: CTX_ICONS,
+			currentUid: (typeof window !== 'undefined' && window.OC && window.OC.getCurrentUser)
+				? (window.OC.getCurrentUser().uid || '') : '',
 			grants: [],
 			loading: true,
 			busy: false,
@@ -169,7 +171,7 @@ export default {
 			this.busy = true
 			this.error = ''
 			try {
-				const params = { mailboxId: this.mailbox.id }
+				const params = { mailboxId: this.mailbox.id, includeChildren: 'true' }
 				if (g.granteeUid) {
 					params.granteeUid = g.granteeUid
 				} else {

@@ -167,10 +167,13 @@ class V2ShareController extends Controller {
 			return new JSONResponse(['error' => 'Empfänger nicht gefunden'], 404);
 		}
 
-		// Recipient notification (der Empfänger sieht den Ordner in seiner Sidebar)
-		$this->notifyShare($grantee->getUID(), $user->getDisplayName());
-
-		return $this->applyShare($user, $mailboxId, $granteeUid, $permission, $includeChildren);
+		$response = $this->applyShare($user, $mailboxId, $granteeUid, $permission, $includeChildren);
+		// Notification erst NACH erfolgreicher Freigabe
+		$payload = $response->getData();
+		if (\is_array($payload) && ($payload['success'] ?? false) === true) {
+			$this->notifyShare($grantee->getUID(), $user->getDisplayName());
+		}
+		return $response;
 	}
 
 	/**
@@ -186,11 +189,12 @@ class V2ShareController extends Controller {
 		$mailboxId = \trim((string) ($this->request->getParam('mailboxId') ?? ''));
 		$granteeUid = \trim((string) ($this->request->getParam('granteeUid') ?? ''));
 		$granteeAccountId = \trim((string) ($this->request->getParam('granteeAccountId') ?? ''));
+		$includeChildren = \in_array($this->request->getParam('includeChildren'), ['1', 'true', true], true);
 		if ($mailboxId === '' || ($granteeUid === '' && $granteeAccountId === '')) {
 			return new JSONResponse(['error' => 'mailboxId und granteeUid/granteeAccountId erforderlich'], 400);
 		}
 
-		return $this->applyShare($user, $mailboxId, $granteeUid, 'revoke', false, $granteeAccountId);
+		return $this->applyShare($user, $mailboxId, $granteeUid, 'revoke', $includeChildren, $granteeAccountId);
 	}
 
 	/**
@@ -201,98 +205,79 @@ class V2ShareController extends Controller {
 		try {
 			$bearer = $this->userContext->resolveBearer($owner->getUID());
 			$accountId = $this->userContext->resolveAccountId($owner->getUID());
-			$granteeAccountId = $granteeAccountId !== ''
-				? $granteeAccountId
-				: $this->userContext->resolveAccountId($granteeUid);
+			if ($granteeAccountId === '' && $granteeUid !== '') {
+				$granteeAccountId = $this->userContext->resolveAccountId($granteeUid);
+			}
 		} catch (\Throwable $e) {
 			return new JSONResponse(['error' => 'Stalwart session failed: ' . $e->getMessage()], 502);
 		}
 
-		// Mailbox + Kinder laden (für den rekursiven Fall)
-		$mailboxResult = $this->stalwartAdmin->jmapCall($bearer, [
+		// EIN Mailbox/get ohne ids → ALLE Mailboxen des Owners, inkl. shareWith
+		// (bestehende Grants anderer Empfänger dürfen beim Update nicht verloren gehen)
+		$getResult = $this->stalwartAdmin->jmapCall($bearer, [
 			['Mailbox/get', [
 				'accountId' => $accountId,
-				'ids' => [$mailboxId],
-				'properties' => ['name', 'parentId', 'role'],
+				'ids' => null,
+				'properties' => ['id', 'parentId', 'name', 'role', 'shareWith'],
 			], 'm0'],
-			['Mailbox/query', [
-				'accountId' => $accountId,
-				'sort' => [['property' => 'sortOrder']],
-				'limit' => 200,
-			], 'm1'],
 		], ['urn:ietf:params:jmap:mail']);
-		if (isset($mailboxResult['error'])) {
-			return new JSONResponse(['error' => 'Mailbox lookup failed: ' . $mailboxResult['error']], 502);
+		if (isset($getResult['error'])) {
+			return new JSONResponse(['error' => 'Mailbox lookup failed: ' . $getResult['error']], 502);
 		}
-		$mailboxGet = $this->extractResponse($mailboxResult, 'Mailbox/get', 'm0');
-		$mailbox = $mailboxGet['list'][0] ?? null;
+		$all = $this->extractResponse($getResult, 'Mailbox/get', 'm0')['list'] ?? [];
+		$mailbox = null;
+		foreach ($all as $mb) {
+			if ((string) ($mb['id'] ?? '') === $mailboxId) { $mailbox = $mb; break; }
+		}
 		if (!\is_array($mailbox)) {
 			return new JSONResponse(['error' => 'Mailbox nicht gefunden'], 404);
 		}
-		$allMailboxes = $this->extractResponse($mailboxResult, 'Mailbox/query', 'm1')['list'] ?? [];
 
 		$targets = [$mailbox];
 		if ($includeChildren) {
-			$targets = \array_merge($targets, $this->collectChildren($mailbox, $allMailboxes));
+			$targets = \array_merge($targets, $this->collectChildren($mailbox, $all));
 		}
 
-		// Bestehendes shareWith lesen und den Grantee setzen/entfernen —
-		// pro Ordner EIN Mailbox/set-Update mit dem GESAMTEN neuen shareWith
-		// (ein anderer Grant bleibt unberührt).
-		$updated = 0;
-		$errors = [];
+		// EIN gebatchter Mailbox/set: pro Ordner das GESAMTE neue shareWith
+		// (bestehende Grants anderer Empfänger bleiben erhalten, der Ziel-
+		// Empfänger wird gesetzt oder — bei revoke — weggelassen).
+		$update = [];
+		$newShareWith = null;
 		foreach ($targets as $mb) {
 			$mbId = (string) ($mb['id'] ?? '');
 			if ($mbId === '') { continue; }
-			$currentShareWith = \is_array($mb['shareWith'] ?? null) ? $mb['shareWith'] : [];
-
-			if ($permission === 'revoke') {
-				// Grant entfernen: Schlüssel auf null setzen (JMAP-Share-Patch)
+			if ($newShareWith === null) {
+				$currentShareWith = \is_array($mailbox['shareWith'] ?? null) ? $mailbox['shareWith'] : [];
 				$newShareWith = $currentShareWith;
-				unset($newShareWith[$granteeAccountId]);
-			} else {
-				$rights = $permission === 'write' ? self::RIGHTS_WRITE : self::RIGHTS_READ;
-				$newShareWith = $currentShareWith;
-				$newShareWith[$granteeAccountId] = $rights;
+				if ($permission === 'revoke') {
+					unset($newShareWith[$granteeAccountId]);
+				} else {
+					$newShareWith[$granteeAccountId] = $permission === 'write' ? self::RIGHTS_WRITE : self::RIGHTS_READ;
+				}
 			}
-
-			$updateObject = \array_merge(
-				['name' => $mailbox['name'] ?? ''],
-				['shareWith' => \count($newShareWith) > 0 ? $newShareWith : null],
-			);
-			// name wird von Stalwart beim Update NICHT geändert — nur shareWith
-			// ist relevant; der Rest bleibt unberührt. (Das vollständige Objekt
-			// würde Namen/Reihenfolge überschreiben.)
-			$updateObject = ['shareWith' => \count($newShareWith) > 0 ? $newShareWith : null];
-
-			$result = $this->stalwartAdmin->jmapCall($bearer, [
-				['Mailbox/set', [
-					'accountId' => $accountId,
-					'update' => [$mbId => $updateObject],
-				], 'u0'],
-			], ['urn:ietf:params:jmap:mail']);
-			if (isset($result['error'])) {
-				$errors[] = $result['error'];
-				continue;
-			}
-			$notUpdated = $result['methodResponses'][0][1]['notUpdated'][$mbId] ?? null;
-			if ($notUpdated !== null) {
-				$errors[] = \json_encode($notUpdated, JSON_UNESCAPED_SLASHES);
-				continue;
-			}
-			$updated++;
+			$update[$mbId] = ['shareWith' => \count($newShareWith) > 0 ? $newShareWith : null];
 		}
 
-		if ($errors !== []) {
+		$result = $this->stalwartAdmin->jmapCall($bearer, [
+			['Mailbox/set', [
+				'accountId' => $accountId,
+				'update' => $update,
+			], 'u0'],
+		], ['urn:ietf:params:jmap:mail']);
+		if (isset($result['error'])) {
+			return new JSONResponse(['error' => 'Stalwart hat die Freigabe-Änderung abgelehnt: ' . \mb_substr((string) $result['error'], 0, 200)], 502);
+		}
+		$notUpdated = $result['methodResponses'][0][1]['notUpdated'] ?? [];
+		if (\is_array($notUpdated) && $notUpdated !== []) {
 			return new JSONResponse([
-				'error' => 'Stalwart hat die Freigabe-Änderung abgelehnt: ' . \mb_substr(\json_encode($errors, JSON_UNESCAPED_SLASHES), 0, 200),
+				'error' => 'Stalwart hat die Freigabe-Änderung abgelehnt: ' . \mb_substr(\json_encode($notUpdated, JSON_UNESCAPED_SLASHES), 0, 200),
 			], 502);
 		}
 
 		return new JSONResponse([
 			'success' => true,
 			'permission' => $permission,
-			'folders' => $updated,
+			'folders' => \count($update),
 		]);
 	}
 

@@ -38,7 +38,21 @@ $ok(\str_contains($ctl, 'collectChildren'), 'Rekursives Teilen (Kinder sammeln)'
 $ok(\str_contains($ctl, 'getByEmail'), 'Grants lösen Email → NC-Uid auf');
 $ok(\str_contains($ctl, 'principalIdFromAccountKey'), 'AccountId-Key-Rückauflösung (base32)');
 
-// --- Frontend ---
+// --- Gemini-Review-Fixes (Runde 1) ---
+	$ok(\str_contains($ctl, "'properties' => ['id', 'parentId', 'name', 'role', 'shareWith']"),
+		'Mailbox/get fragt shareWith MIT ab (kein Grant-Verlust)');
+	$ok(\str_contains($ctl, "'ids' => null") && !\str_contains($ctl, 'Mailbox/query'),
+		'Mailbox/get aller Mailboxen statt /query (nur IDs)');
+	$ok(\substr_count($ctl, "'Mailbox/set'") === 1 && \str_contains($ctl, "'update' => \$update"),
+		'Ein gebatchter Mailbox/set für Ordner + Kinder');
+	$ok(\str_contains($ctl, "getParam('includeChildren')"),
+		'Revoke akzeptiert includeChildren (kein geheimes Rest-Recht)');
+	$ok(\strpos($ctl, 'applyShare($user, $mailboxId, $granteeUid, $permission') < \strpos($ctl, 'notifyShare($grantee->getUID()'),
+		'Notification erst NACH erfolgreicher Freigabe');
+	$ok(\str_contains($ctl, '$payload = $response->getData();'),
+		'JSONResponse.getData() korrekt gelesen (Array, nicht JSON-String)');
+
+	// --- Frontend ---
 $dlg = (string) \file_get_contents($root . '/src-v2/components/ShareDialog.vue');
 foreach (['mailboxId', 'granteeUid', 'permission', 'includeChildren'] as $field) {
 	$ok(\str_contains($dlg, $field), "ShareDialog sendet {$field}");
