@@ -19,7 +19,10 @@
 					:label="t('souvera_mail', 'Freigeben an Benutzer')"
 					:placeholder="t('souvera_mail', 'Name oder Benutzername…')" />
 				<ul v-if="userResults.length > 0" class="share-user-list">
-					<li v-for="u in userResults" :key="u.uid" @click="pickUser(u)">
+					<li v-for="u in userResults" :key="u.uid" role="button" tabindex="0"
+						@click="pickUser(u)"
+						@keydown.enter.prevent="pickUser(u)"
+						@keydown.space.prevent="pickUser(u)">
 						<span class="share-initials">{{ initials(u.displayName || u.uid) }}</span>
 						<span class="share-user-name">{{ u.displayName }}</span>
 						<span class="share-user-detail">{{ u.email || u.uid }}</span>
@@ -151,8 +154,11 @@ export default {
 	},
 	methods: {
 		initials(name) {
-			const n = (name || '?').trim()
-			return n.slice(0, 2).toUpperCase()
+			// Echte Initialen: erste Buchstaben der ersten zwei Wörter
+			const parts = (name || '?').trim().split(/\s+/).filter(Boolean)
+			if (parts.length === 0) return '?'
+			if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+			return (parts[0][0] + parts[1][0]).toUpperCase()
 		},
 		async loadGrants() {
 			this.loading = true
@@ -310,6 +316,9 @@ export default {
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
+}
+.share-user-list li > .share-initials {
+	grid-area: avatar;
 }
 .share-user-list li {
 	display: grid;
